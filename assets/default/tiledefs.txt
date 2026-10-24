@@ -1,0 +1,45 @@
+# Seihai default tile types (original). index,x,y,type,name
+# x,y: pixel position of the tile's cell on pics1.png (2048x512, 16 px cells).
+# type: 11 water, 20 and above blocks, anything else is open floor.
+# Ids not listed are type 0 (open) and draw the purple/black 'unassigned' checker.
+0,0,0,0,grass
+1,16,0,0,grass2
+2,32,0,0,flowers
+3,48,0,0,path
+16,0,16,22,bush
+17,16,16,22,rock
+32,0,32,11,water
+33,16,32,11,water2
+34,32,32,0,sand
+35,48,32,0,sand2
+48,0,48,22,wall
+49,16,48,22,wallcap
+50,32,48,22,roof
+51,48,48,0,doorway
+52,64,48,0,woodfloor
+54,96,48,22,void
+64,0,64,22,chest0
+65,16,64,22,chest1
+66,32,64,22,chestopen0
+67,48,64,22,chestopen1
+68,64,64,22,chestw0
+69,80,64,22,chestw1
+70,96,64,22,chestwopen0
+71,112,64,22,chestwopen1
+80,0,80,22,chest2
+81,16,80,22,chest3
+82,32,80,22,chestopen2
+83,48,80,22,chestopen3
+84,64,80,22,chestw2
+85,80,80,22,chestw3
+86,96,80,22,chestwopen2
+87,112,80,22,chestwopen3
+96,0,96,22,sign0
+97,16,96,22,sign1
+98,32,96,22,signw0
+99,48,96,22,signw1
+112,0,112,22,tree0
+113,16,112,22,tree1
+128,0,128,22,tree2
+129,16,128,22,tree3
+4095,2032,496,0,unassigned
