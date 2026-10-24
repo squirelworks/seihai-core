@@ -1,5 +1,6 @@
 step	label	token	basis	kind	area	field	detail
 0	1.33	GNW20020	binary	origin	-	-	start of the chain, written out in full as ORIGIN
+0	1.33	GNW20020	binary	unknown	levels	-	Z3-V1 (.zelda): every binary from 1st Graal to 2.31 compares the level magic with Z3-V1.03 and Z3-V1.04, so the column is yes for every build; whether a build also tries .zelda for a bare level name is in no binary (Seihai tries .graal, then .zelda)
 0	1.33	GNW20020	binary	source	-	-	origin row (binary of 1.33)
 1	1.34	GNW22030	binary	changed	props	other-player props	+34 ACCOUNTNAME (21 -> 22 ids)
 1	1.34	GNW22030	binary	changed	ui	gs1_commands	88 -> 93
@@ -138,6 +139,7 @@ step	label	token	basis	kind	area	field	detail
 22	2.17	GNW22122	binary	unknown	props	-	other-player prop parser was not read; the 2.22 set is used
 22	2.17	GNW22122	binary	unknown	ui	-	GS1 command count was not read; 161 is carried
 22	2.17	GNW22122	binary	unknown	login	-	id 0 then id 1 listserver flow is untested against a server
+22	2.17	GNW22122	binary	unknown	showimg	-	the binary has the id 24 sender with 2.22's send test, and the solo 90 s capture saw none, as that test predicts; the period and a two-player run are not observed, so none is sent
 22	2.17	GNW22122	binary	source	-	-	binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, and the post-login frame seen in the lab (image checks, process list, props up to the language)
 23	2.22	GNW03014	binary	changed	protocol	client_type	0 -> 5
 23	2.22	GNW03014	binary	changed	protocol	encryption	Gen3 -> Gen5
