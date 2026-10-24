@@ -1,5 +1,6 @@
 step	label	token	basis	kind	area	field	detail
 0	1.33	GNW20020	binary	origin	-	-	start of the chain, written out in full as ORIGIN
+0	1.33	GNW20020	binary	unknown	levels	-	Z3-V1 (.zelda): every binary from 1st Graal to 2.31 compares the level magic with Z3-V1.03 and Z3-V1.04, so the column is yes for every build; whether a build also tries .zelda for a bare level name is in no binary (Seihai tries .graal, then .zelda)
 0	1.33	GNW20020	binary	source	-	-	origin row (binary of 1.33)
 1	1.34	GNW22030	binary	changed	props	other-player props	+34 ACCOUNTNAME (21 -> 22 ids)
 1	1.34	GNW22030	binary	changed	ui	gs1_commands	88 -> 93
