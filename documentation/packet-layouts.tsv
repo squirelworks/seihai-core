@@ -1,6 +1,7 @@
 # Packet field layouts, one row per field. Read by `seihai capture`; overridable with --tables DIR.
 # encoding: gchar gshort gint3 gint4 gint5 halftile (GCHAR/2 tiles) gstring (GCHAR length + bytes)
 #   gstring_list (repeated gstring) text (rest of payload as text) comma (comma text) props (prop stream)
+#   showimg (the image-record text of ids 24 and 32, decoded by the trace decoder)
 #   raw (rest, bytes) none (no payload)
 # from/to: inclusive version labels, - = not limited by the table. status: known partial unknown
 # Sources: Graal_analysis decomp-findings plo_layouts (2.17, 2.22, 2.31), 2.05 notes, lab captures.
@@ -11,7 +12,7 @@ C>S	0	LEVELWARP	3	level	text	-	-	known
 C>S	2	PLAYERPROPS	1	props	props	-	-	known	
 C>S	6	TOALL	1	text	text	-	-	known	
 C>S	23	WANTFILE	1	file	text	-	-	known	
-C>S	24	SHOWIMGPLAYER	1	value	gchar	-	-	unknown	2.22 and 2.31 send 9; what it means is unknown
+C>S	24	SHOWIMGPLAYER	1	images	showimg	-	-	known	the sender's weapon-script image list as changes; a leading 0x29 marks a full list; the 2.22 and 2.31 byte 9 is that marker alone (documentation/remaining-fields.md)
 C>S	30	LEVELWARPMOD	1	modtime	gint5	-	-	known	
 C>S	30	LEVELWARPMOD	2	x	halftile	-	-	known	
 C>S	30	LEVELWARPMOD	3	y	halftile	-	-	known	
@@ -25,7 +26,7 @@ C>S	39	TAMPERCHECK	1	check	raw	-	-	partial	see the tamper-check notes; viewer sh
 C>S	41	SERVERWARP	1	server	text	-	-	known	
 C>S	44	PROCESSLIST	1	processes	raw	-	-	unknown	the client's process list; content differs on every run and is not decoded
 C>S	45	PROCESSRUNNING	1	running	gchar	-	-	known	1 if a name from PLO 183 is in the process list, else 0
-C>S	46	ENTERLEVEL	1	value	gchar	-	-	partial	only the value 1 has been seen; any other meaning is unknown
+C>S	46	ENTERLEVEL	1	value	gchar	2.3	2.31	known	a literal 1 in the 2.31 client, sent when it switches its current level while connected; no field is read from anything; the server ignores it
 S>C	6	LEVELNAME	1	level	text	-	-	known	
 S>C	8	OTHERPLPROPS	1	player	gshort	-	-	known	player id; masked as <PIDn> by default
 S>C	8	OTHERPLPROPS	2	props	props	-	-	known	prop stream; the build's other-player prop set decides where it ends
@@ -36,6 +37,8 @@ S>C	14	PLAYERWARP	1	x	halftile	-	-	known
 S>C	14	PLAYERWARP	2	y	halftile	-	-	known	
 S>C	14	PLAYERWARP	3	level	text	-	-	known	
 S>C	25	SIGNATURE	1	v	gchar	2.17	2.31	known	1 quits; 0 quits unless the host is loopback; other values ignored
+S>C	32	SHOWIMGPLAYER	1	player	gshort	-	-	known	sender id; masked as <PIDn> by default
+S>C	32	SHOWIMGPLAYER	2	images	showimg	-	-	known	the sender's bytes as relayed by the server; the client applies them only for a player in its active level
 S>C	39	LEVELMODTIME	1	modtime	gint5	2.05	2.05	known	exactly 5 bytes
 S>C	39	LEVELMODTIME	1	rest	raw	2.17	2.31	partial	handed unparsed to the active level or gmap
 S>C	41	STARTMESSAGE	1	text	text	2.17	2.31	known	RTF or HTML
@@ -80,7 +83,7 @@ S>C	175	SHOOT	1	player	gshort	2.17	2.31	known
 S>C	175	SHOOT	2	shot	raw	2.17	2.31	partial	shot data; layout not decoded
 S>C	176	KINGDOMSMODE	1	(none)	none	2.17	2.31	known	
 S>C	177	NEWWORLDMODE	1	(none)	none	2.17	2.31	known	
-S>C	178	SERVERWARP	1	fields	comma	2.17	2.31	known	field 0 unused, 1 server name, 2 host, 3 port (at least 4 fields)
+S>C	178	SERVERWARP	1	fields	comma	2.17	2.31	known	client comma-text reader (quotes, white space splits unquoted items); field 0 unused, 1 server name (a 'P ' type prefix is dropped), 2 host, 3 port; at least 4 fields; a real service's wire text not seen
 S>C	179	RPGWINDOW	1	text	text	2.17	2.31	known	
 S>C	180	STATUSLIST	1	text	text	2.17	2.31	partial	text for the status-list form; its inner format is not decoded
 S>C	181	UNKNOWN181	1	player	gshort	2.17	2.31	known	

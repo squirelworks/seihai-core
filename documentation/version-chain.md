@@ -82,6 +82,7 @@ Generated; do not edit between the markers.
 #### 1.33 (`GNW20020`, binary, linked 2000-02-21)
 
 - start of the chain, written out in full as ORIGIN
+- unknown (levels): Z3-V1 (.zelda): every binary from 1st Graal to 2.31 compares the level magic with Z3-V1.03 and Z3-V1.04, so the column is yes for every build; whether a build also tries .zelda for a bare level name is in no binary (Seihai tries .graal, then .zelda)
 - source: origin row (binary of 1.33)
 
 #### 1.34 (`GNW22030`, binary, linked 2000-03-23)
@@ -287,6 +288,7 @@ Generated; do not edit between the markers.
 - unknown (props): other-player prop parser was not read; the 2.22 set is used
 - unknown (ui): GS1 command count was not read; 161 is carried
 - unknown (login): id 0 then id 1 listserver flow is untested against a server
+- unknown (showimg): the binary has the id 24 sender with 2.22's send test, and the solo 90 s capture saw none, as that test predicts; the period and a two-player run are not observed, so none is sent
 - source: binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, and the post-login frame seen in the lab (image checks, process list, props up to the language, the gr.x and gr.y flags once)
 
 #### 2.22 (`GNW03014`, binary)
