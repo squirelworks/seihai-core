@@ -282,13 +282,14 @@ Generated; do not edit between the markers.
 - protocol: **tampercheck**: no -> yes
 - protocol: **tamper**: none -> known words, re-send Never
 - protocol: **login frame**: none -> files, process list, props, idle.gani at once, status icons
+- protocol: **gr flags**: none -> gr.x and gr.y once, at login
 - props: **npc_max**: 43 -> 73
 - levels: **heights**: no -> yes
 - unknown (props): other-player prop parser was not read; the 2.22 set is used
 - unknown (ui): GS1 command count was not read; 161 is carried
 - unknown (login): id 0 then id 1 listserver flow is untested against a server
 - unknown (showimg): the binary has the id 24 sender with 2.22's send test, and the solo 90 s capture saw none, as that test predicts; the period and a two-player run are not observed, so none is sent
-- source: binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, and the post-login frame seen in the lab (image checks, process list, props up to the language)
+- source: binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, and the post-login frame seen in the lab (image checks, process list, props up to the language, the gr.x and gr.y flags once)
 
 #### 2.22 (`GNW03014`, binary)
 
@@ -300,11 +301,13 @@ Generated; do not edit between the markers.
 - protocol: **tamper**: known words, re-send Never -> known words, re-send OnLevelChange
 - protocol: **showimg (id 24)**: none -> every 5100 ms, only with others in the level
 - protocol: **login frame**: files, process list, props, idle.gani at once, status icons -> files, process list, props with OS and code page, idle.gani at once, status icons
+- protocol: **gr flags**: gr.x and gr.y once, at login -> gr.x and gr.y at login and on every position change
 - protocol: **udp_off_by_default**: no -> yes
+- levels: **link_boxes**: no -> yes
 - ui: **server_list**: 2 tabs -> 3 tabs
 - unknown (pli): send sites of ids 36, 42 and 45 were not matched in the binary, so 36 and 45 are not sent
 - unknown (framing): a client-originated bz2 frame (0x1000 and over) was never seen
-- source: binary and lab and public servers: client type 5 and gen 5 framing, listserver id 7 with GNW30123, PLO 186, PLI 36, 45 and 81 not sent, id 24 about every 5.1 s, post-login frame with OS and code page props
+- source: binary and lab and public servers: client type 5 and gen 5 framing, listserver id 7 with GNW30123, PLO 186, PLI 36, 45 and 81 not sent, id 24 about every 5.1 s, post-login frame with OS and code page props, gr.x and gr.y flags kept up to date on every tick, links tested with a per-direction probe box
 
 #### 2.3 (`GNW14015`, inferred)
 
@@ -313,6 +316,7 @@ Generated; do not edit between the markers.
 - protocol: **tamper**: known words, re-send OnLevelChange -> unknown words, re-send Timer
 - protocol: **showimg (id 24)**: every 5100 ms, only with others in the level -> none
 - protocol: **login frame**: files, process list, props with OS and code page, idle.gani at once, status icons -> none
+- protocol: **gr flags**: gr.x and gr.y at login and on every position change -> none
 - props: **own-player props**: +78 X2, +79 Y2, +80 Z2 (72 -> 75 ids)
 - props: **other-player props**: +78 X2, +79 Y2, +80 Z2 (64 -> 67 ids)
 - props: **npc_max**: 73 -> 77
@@ -323,6 +327,7 @@ Generated; do not edit between the markers.
 - unknown (tampercheck): constant of this build; the re-send rule is taken from 2.31
 - unknown (showimg): no id 24 observation, so none is sent
 - unknown (login): no post-login frame observation, so none is sent
+- unknown (gr flags): no observation of the 2.3 build; none are set (2.31 sets none either)
 - source: taken as 2.31 (no 2.3 binary): PLO 84 (LARGEFILESIZE) and 189 (MOVE2) in and 44 out, ENTERLEVEL (46) in and PUTNPC (21) out, X2/Y2/Z2 positions, editor moved out
 
 #### 2.31 (`GNW28015`, binary)
