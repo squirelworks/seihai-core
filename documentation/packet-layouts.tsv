@@ -1,0 +1,106 @@
+# Packet field layouts, one row per field. Read by `seihai capture`; overridable with --tables DIR.
+# encoding: gchar gshort gint3 gint4 gint5 halftile (GCHAR/2 tiles) gstring (GCHAR length + bytes)
+#   gstring_list (repeated gstring) text (rest of payload as text) comma (comma text) props (prop stream)
+#   raw (rest, bytes) none (no payload)
+# from/to: inclusive version labels, - = not limited by the table. status: known partial unknown
+# Sources: Graal_analysis decomp-findings plo_layouts (2.17, 2.22, 2.31), 2.05 notes, lab captures.
+dir	id	name	idx	field	encoding	from	to	status	note
+C>S	0	LEVELWARP	1	x	halftile	-	-	known	
+C>S	0	LEVELWARP	2	y	halftile	-	-	known	
+C>S	0	LEVELWARP	3	level	text	-	-	known	
+C>S	2	PLAYERPROPS	1	props	props	-	-	known	
+C>S	6	TOALL	1	text	text	-	-	known	
+C>S	23	WANTFILE	1	file	text	-	-	known	
+C>S	24	SHOWIMGPLAYER	1	value	gchar	-	-	unknown	2.22 and 2.31 send 9; what it means is unknown
+C>S	30	LEVELWARPMOD	1	modtime	gint5	-	-	known	
+C>S	30	LEVELWARPMOD	2	x	halftile	-	-	known	
+C>S	30	LEVELWARPMOD	3	y	halftile	-	-	known	
+C>S	30	LEVELWARPMOD	4	level	text	-	-	known	
+C>S	34	UPDATEFILE	1	modtime	gint5	-	-	known	
+C>S	34	UPDATEFILE	2	file	text	-	-	known	
+C>S	35	ADJACENTLEVEL	1	modtime	gint5	-	-	known	
+C>S	35	ADJACENTLEVEL	2	level	text	-	-	known	
+C>S	37	LANGUAGE	1	language	text	-	-	known	
+C>S	39	TAMPERCHECK	1	check	raw	-	-	partial	see the tamper-check notes; viewer shows length and crc
+C>S	41	SERVERWARP	1	server	text	-	-	known	
+C>S	44	PROCESSLIST	1	processes	raw	-	-	unknown	the client's process list; content differs on every run and is not decoded
+C>S	45	PROCESSRUNNING	1	running	gchar	-	-	known	1 if a name from PLO 183 is in the process list, else 0
+C>S	46	ENTERLEVEL	1	value	gchar	-	-	partial	only the value 1 has been seen; any other meaning is unknown
+S>C	6	LEVELNAME	1	level	text	-	-	known	
+S>C	8	OTHERPLPROPS	1	player	gshort	-	-	known	player id; masked as <PIDn> by default
+S>C	8	OTHERPLPROPS	2	props	props	-	-	known	prop stream; the build's other-player prop set decides where it ends
+S>C	9	PLAYERPROPS	1	props	props	-	-	known	prop stream of the own player
+S>C	13	TOALL	1	player	gshort	-	-	known	
+S>C	13	TOALL	2	text	text	-	-	known	
+S>C	14	PLAYERWARP	1	x	halftile	-	-	known	
+S>C	14	PLAYERWARP	2	y	halftile	-	-	known	
+S>C	14	PLAYERWARP	3	level	text	-	-	known	
+S>C	25	SIGNATURE	1	v	gchar	2.17	2.31	known	1 quits; 0 quits unless the host is loopback; other values ignored
+S>C	39	LEVELMODTIME	1	modtime	gint5	2.05	2.05	known	exactly 5 bytes
+S>C	39	LEVELMODTIME	1	rest	raw	2.17	2.31	partial	handed unparsed to the active level or gmap
+S>C	41	STARTMESSAGE	1	text	text	2.17	2.31	known	RTF or HTML
+S>C	42	NEWWORLDTIME	1	time	gint4	2.05	2.05	known	
+S>C	44	HASNPCSERVER	1	(none)	none	2.17	2.22	known	no payload; not handled in 2.31
+S>C	46	HITOBJECTS	1	player	gshort	2.17	2.31	known	used only when the level is the active level
+S>C	46	HITOBJECTS	2	rest	raw	2.17	2.31	unknown	handed to a per-player routine; what it carries is not settled
+S>C	47	STAFFGUILDS	1	guilds	comma	2.17	2.31	known	
+S>C	49	PLAYERWARP2	1	x	halftile	2.17	2.31	known	
+S>C	49	PLAYERWARP2	2	y	halftile	2.17	2.31	known	
+S>C	49	PLAYERWARP2	3	z	gchar	2.17	2.31	known	read, not used by the client
+S>C	49	PLAYERWARP2	4	gmap_x	gchar	2.17	2.31	known	used only when the name ends in .gmap
+S>C	49	PLAYERWARP2	5	gmap_y	gchar	2.17	2.31	known	
+S>C	49	PLAYERWARP2	6	level	text	2.17	2.31	known	
+S>C	68	LARGEFILESTART	1	name	text	2.17	2.31	known	
+S>C	69	LARGEFILEEND	1	name	text	2.17	2.31	known	
+S>C	75	PROFILE	1	fields	gstring_list	2.17	2.31	known	first field is the account; the rest are profile lines
+S>C	84	LARGEFILESIZE	1	size	gint5	2.31	2.31	known	
+S>C	100	RAWDATA	1	length	gint3	-	-	known	byte count of the next raw packet
+S>C	102	FILE	2	name	gstring	-	-	known	
+S>C	102	FILE	3	data	raw	-	-	known	file bytes; viewer shows size and crc only
+S>C	102	FILE	1	modtime	gint5	2.1	2.31	known	only where the build's PLO_FILE carries a modtime
+S>C	150	NPCDEL2	1	level	gstring	2.17	2.31	known	
+S>C	150	NPCDEL2	2	npc	gint3	2.17	2.31	known	
+S>C	151	HIDENPCS	1	(none)	none	2.17	2.31	known	
+S>C	153	SAY2	1	text	text	2.17	2.31	known	the section sign is a line break
+S>C	154	FREEZEPLAYER2	1	(none)	none	2.17	2.31	known	
+S>C	155	UNFREEZEPLAYER	1	(none)	none	2.17	2.31	known	
+S>C	156	SETACTIVELEVEL	1	level	text	2.17	2.31	known	level or .gmap name
+S>C	165	MOVE	1	npc	gint3	2.17	2.31	known	
+S>C	165	MOVE	2	move	raw	2.17	2.31	partial	passed to the NPC move routine; layout not decoded
+S>C	166	SHOWIMGNPC	1	npc	gint3	2.17	2.31	known	
+S>C	166	SHOWIMGNPC	2	props	raw	2.17	2.31	partial	NPC prop list; layout not decoded here
+S>C	168	UNKNOWN168	1	(none)	none	2.17	2.31	known	payload ignored by the client
+S>C	169	UPGRADEURL	1	url	text	2.17	2.31	known	
+S>C	170	GHOSTMODE	1	on	gchar	2.17	2.31	known	above 0 is on; only the first byte is read
+S>C	171	BIGMAP	1	fields	comma	2.17	2.31	known	txt, png, x, y; at least 4 fields to be used
+S>C	172	MINIMAP	1	fields	comma	2.17	2.31	known	same as 171
+S>C	173	GHOSTTEXT	1	text	text	2.17	2.31	known	
+S>C	174	GHOSTICON	1	on	gchar	2.17	2.31	known	
+S>C	175	SHOOT	1	player	gshort	2.17	2.31	known	
+S>C	175	SHOOT	2	shot	raw	2.17	2.31	partial	shot data; layout not decoded
+S>C	176	KINGDOMSMODE	1	(none)	none	2.17	2.31	known	
+S>C	177	NEWWORLDMODE	1	(none)	none	2.17	2.31	known	
+S>C	178	SERVERWARP	1	fields	comma	2.17	2.31	known	field 0 unused, 1 server name, 2 host, 3 port (at least 4 fields)
+S>C	179	RPGWINDOW	1	text	text	2.17	2.31	known	
+S>C	180	STATUSLIST	1	text	text	2.17	2.31	partial	text for the status-list form; its inner format is not decoded
+S>C	181	UNKNOWN181	1	player	gshort	2.17	2.31	known	
+S>C	181	UNKNOWN181	2	on	gchar	2.17	2.31	known	above 0 is on; at least 3 bytes needed
+S>C	182	LISTPROCESSES	1	(none)	none	2.17	2.31	known	the client answers with PLI 44
+S>C	183	HASPROCESSRUNNING	1	names	text	2.17	2.31	known	the client answers with PLI 45
+S>C	184	TAKESCREENSHOT	1	name	text	2.17	2.31	known	.png names only
+S>C	185	BOARDHEIGHTS	1	map_x	gchar	2.17	2.31	known	
+S>C	185	BOARDHEIGHTS	2	map_y	gchar	2.17	2.31	known	
+S>C	185	BOARDHEIGHTS	3	block_x	gchar	2.17	2.31	known	
+S>C	185	BOARDHEIGHTS	4	block_y	gchar	2.17	2.31	known	
+S>C	185	BOARDHEIGHTS	5	w_minus_1	gchar	2.17	2.31	known	
+S>C	185	BOARDHEIGHTS	6	h_minus_1	gchar	2.17	2.31	known	
+S>C	185	BOARDHEIGHTS	7	cells	raw	2.17	2.31	known	w*h cells of 2 raw bytes, row-major
+S>C	186	BOARDMODIFY2	1	map_x	gchar	2.22	2.31	known	
+S>C	186	BOARDMODIFY2	2	map_y	gchar	2.22	2.31	known	
+S>C	186	BOARDMODIFY2	3	x	gchar	2.22	2.31	known	
+S>C	186	BOARDMODIFY2	4	y	gchar	2.22	2.31	known	
+S>C	186	BOARDMODIFY2	5	w	gchar	2.22	2.31	known	
+S>C	186	BOARDMODIFY2	6	h	gchar	2.22	2.31	known	
+S>C	186	BOARDMODIFY2	7	tiles	raw	2.22	2.31	known	w*h GSHORT tiles, then padding the client ignores
+S>C	189	MOVE2	1	npc	gint3	2.31	2.31	known	
+S>C	189	MOVE2	2	move	raw	2.31	2.31	partial	same shape as 165, extra flag in the client
