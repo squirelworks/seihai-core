@@ -132,12 +132,13 @@ step	label	token	basis	kind	area	field	detail
 22	2.17	GNW22122	binary	changed	protocol	pli (client ids sent)	+39 TAMPERCHECK, +40 SHOOT, +43 MUTEPLAYER, +44 PROCESSLIST, +45 PROCESSRUNNING (40 -> 45 ids)
 22	2.17	GNW22122	binary	changed	protocol	tampercheck	no -> yes
 22	2.17	GNW22122	binary	changed	protocol	tamper	none -> known words, re-send Never
+22	2.17	GNW22122	binary	changed	protocol	login frame	none -> files, process list, props, idle.gani at once, status icons
 22	2.17	GNW22122	binary	changed	props	npc_max	43 -> 73
 22	2.17	GNW22122	binary	changed	levels	heights	no -> yes
 22	2.17	GNW22122	binary	unknown	props	-	other-player prop parser was not read; the 2.22 set is used
 22	2.17	GNW22122	binary	unknown	ui	-	GS1 command count was not read; 161 is carried
 22	2.17	GNW22122	binary	unknown	login	-	id 0 then id 1 listserver flow is untested against a server
-22	2.17	GNW22122	binary	source	-	-	binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73
+22	2.17	GNW22122	binary	source	-	-	binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, and the post-login frame seen in the lab (image checks, process list, props up to the language)
 23	2.22	GNW03014	binary	changed	protocol	client_type	0 -> 5
 23	2.22	GNW03014	binary	changed	protocol	encryption	Gen3 -> Gen5
 23	2.22	GNW03014	binary	changed	protocol	listserver	port 14922 -> port 14922, token GNW30123
@@ -145,15 +146,17 @@ step	label	token	basis	kind	area	field	detail
 23	2.22	GNW03014	binary	changed	protocol	pli (client ids sent)	-36 HITOBJECTS, -45 PROCESSRUNNING, -81 PROFILESET (45 -> 42 ids)
 23	2.22	GNW03014	binary	changed	protocol	tamper	known words, re-send Never -> known words, re-send OnLevelChange
 23	2.22	GNW03014	binary	changed	protocol	showimg (id 24)	none -> every 5100 ms, only with others in the level
+23	2.22	GNW03014	binary	changed	protocol	login frame	files, process list, props, idle.gani at once, status icons -> files, process list, props with OS and code page, idle.gani at once, status icons
 23	2.22	GNW03014	binary	changed	protocol	udp_off_by_default	no -> yes
 23	2.22	GNW03014	binary	changed	ui	server_list	2 tabs -> 3 tabs
 23	2.22	GNW03014	binary	unknown	pli	-	send sites of ids 36, 42 and 45 were not matched in the binary, so 36 and 45 are not sent
 23	2.22	GNW03014	binary	unknown	framing	-	a client-originated bz2 frame (0x1000 and over) was never seen
-23	2.22	GNW03014	binary	source	-	-	binary and lab and public servers: client type 5 and gen 5 framing, listserver id 7 with GNW30123, PLO 186, PLI 36, 45 and 81 not sent, id 24 about every 5.1 s
+23	2.22	GNW03014	binary	source	-	-	binary and lab and public servers: client type 5 and gen 5 framing, listserver id 7 with GNW30123, PLO 186, PLI 36, 45 and 81 not sent, id 24 about every 5.1 s, post-login frame with OS and code page props
 24	2.3	GNW14015	inferred	changed	protocol	plo (server ids handled)	+84 LARGEFILESIZE, +189 MOVE2; -44 HASNPCSERVER (80 -> 81 ids)
 24	2.3	GNW14015	inferred	changed	protocol	pli (client ids sent)	+46 ENTERLEVEL; -21 PUTNPC (42 -> 42 ids)
 24	2.3	GNW14015	inferred	changed	protocol	tamper	known words, re-send OnLevelChange -> unknown words, re-send Timer
 24	2.3	GNW14015	inferred	changed	protocol	showimg (id 24)	every 5100 ms, only with others in the level -> none
+24	2.3	GNW14015	inferred	changed	protocol	login frame	files, process list, props with OS and code page, idle.gani at once, status icons -> none
 24	2.3	GNW14015	inferred	changed	props	own-player props	+78 X2, +79 Y2, +80 Z2 (72 -> 75 ids)
 24	2.3	GNW14015	inferred	changed	props	other-player props	+78 X2, +79 Y2, +80 Z2 (64 -> 67 ids)
 24	2.3	GNW14015	inferred	changed	props	npc_max	73 -> 77
@@ -163,9 +166,11 @@ step	label	token	basis	kind	area	field	detail
 24	2.3	GNW14015	inferred	unknown	binary	-	no 2.3 binary; the whole step is the 2.31 values
 24	2.3	GNW14015	inferred	unknown	tampercheck	-	constant of this build; the re-send rule is taken from 2.31
 24	2.3	GNW14015	inferred	unknown	showimg	-	no id 24 observation, so none is sent
+24	2.3	GNW14015	inferred	unknown	login	-	no post-login frame observation, so none is sent
 24	2.3	GNW14015	inferred	source	-	-	taken as 2.31 (no 2.3 binary): PLO 84 (LARGEFILESIZE) and 189 (MOVE2) in and 44 out, ENTERLEVEL (46) in and PUTNPC (21) out, X2/Y2/Z2 positions, editor moved out
 25	2.31	GNW28015	binary	changed	protocol	tamper	unknown words, re-send Timer -> known words, re-send Timer
 25	2.31	GNW28015	binary	changed	protocol	showimg (id 24)	none -> every 5130 ms
+25	2.31	GNW28015	binary	changed	protocol	login frame	none -> files, process list, props with OS and code page, status icons
 25	2.31	GNW28015	binary	unknown	pli	-	the TOML's pli_changes (21 out, 46 in) disagrees with its pli_sent list, which lacks 44; a real client sent 44, so the row keeps it
 25	2.31	GNW28015	binary	unknown	live	-	never run against a public server
-25	2.31	GNW28015	binary	source	-	-	binary (same code as 2.22) and lab: its own tampercheck constant and timer re-send, id 24 every 5.13 s whether or not others are in the level
+25	2.31	GNW28015	binary	source	-	-	binary (same code as 2.22) and lab: its own tampercheck constant and timer re-send, id 24 every 5.13 s whether or not others are in the level, post-login frame without the idle.gani request
