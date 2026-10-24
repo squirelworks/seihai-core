@@ -299,10 +299,11 @@ Generated; do not edit between the markers.
 - protocol: **showimg (id 24)**: none -> every 5100 ms, only with others in the level
 - protocol: **login frame**: files, process list, props, idle.gani at once, status icons -> files, process list, props with OS and code page, idle.gani at once, status icons
 - protocol: **udp_off_by_default**: no -> yes
+- levels: **link_boxes**: no -> yes
 - ui: **server_list**: 2 tabs -> 3 tabs
 - unknown (pli): send sites of ids 36, 42 and 45 were not matched in the binary, so 36 and 45 are not sent
 - unknown (framing): a client-originated bz2 frame (0x1000 and over) was never seen
-- source: binary and lab and public servers: client type 5 and gen 5 framing, listserver id 7 with GNW30123, PLO 186, PLI 36, 45 and 81 not sent, id 24 about every 5.1 s, post-login frame with OS and code page props
+- source: binary and lab and public servers: client type 5 and gen 5 framing, listserver id 7 with GNW30123, PLO 186, PLI 36, 45 and 81 not sent, id 24 about every 5.1 s, post-login frame with OS and code page props, links tested with a per-direction probe box
 
 #### 2.3 (`GNW14015`, inferred)
 
