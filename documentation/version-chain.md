@@ -286,6 +286,7 @@ Generated; do not edit between the markers.
 - unknown (props): other-player prop parser was not read; the 2.22 set is used
 - unknown (ui): GS1 command count was not read; 161 is carried
 - unknown (login): id 0 then id 1 listserver flow is untested against a server
+- unknown (showimg): the binary has the id 24 sender with 2.22's send test, and the solo 90 s capture saw none, as that test predicts; the period and a two-player run are not observed, so none is sent
 - source: binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73
 
 #### 2.22 (`GNW03014`, binary)
@@ -327,5 +328,4 @@ Generated; do not edit between the markers.
 - unknown (pli): the TOML's pli_changes (21 out, 46 in) disagrees with its pli_sent list, which lacks 44; a real client sent 44, so the row keeps it
 - unknown (live): never run against a public server
 - source: binary (same code as 2.22) and lab: its own tampercheck constant and timer re-send, id 24 every 5.13 s whether or not others are in the level
-
 <!-- version-chain:end -->
