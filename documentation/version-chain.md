@@ -82,6 +82,7 @@ Generated; do not edit between the markers.
 #### 1.33 (`GNW20020`, binary, linked 2000-02-21)
 
 - start of the chain, written out in full as ORIGIN
+- unknown (levels): Z3-V1 (.zelda): every binary from 1st Graal to 2.31 compares the level magic with Z3-V1.03 and Z3-V1.04, so the column is yes for every build; whether a build also tries .zelda for a bare level name is in no binary (Seihai tries .graal, then .zelda)
 - source: origin row (binary of 1.33)
 
 #### 1.34 (`GNW22030`, binary, linked 2000-03-23)
