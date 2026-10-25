@@ -1,0 +1,62 @@
+// sword.gani: 5 steps (wind-up, arc, thrust, thrust, recover); sword.wav after step 0
+// Original Seihai default animation; layout and numbers follow documentation/asset-reference.md.
+// A step is four direction rows (up, left, down, right) of 'sprite x y' placements.
+// Plays once, then goes back to idle (SETBACKTO).
+SETBACKTO idle
+DEFAULTHEAD head0.png
+DEFAULTBODY body.png
+
+SPRITE 0 SPRITES 0 0 24 12 shadow
+SPRITE 100 HEAD 0 0 32 32 head up
+SPRITE 101 HEAD 0 32 32 32 head left
+SPRITE 102 HEAD 0 64 32 32 head down
+SPRITE 103 HEAD 0 96 32 32 head right
+SPRITE 236 BODY 0 288 32 32 body pose 9 up
+SPRITE 237 BODY 32 288 32 32 body pose 9 left
+SPRITE 238 BODY 64 288 32 32 body pose 9 down
+SPRITE 239 BODY 96 288 32 32 body pose 9 right
+SPRITE 240 BODY 0 320 32 32 body pose 10 up
+SPRITE 241 BODY 32 320 32 32 body pose 10 left
+SPRITE 242 BODY 64 320 32 32 body pose 10 down
+SPRITE 243 BODY 96 320 32 32 body pose 10 right
+SPRITE 300 SWORD 0 0 32 32 sword held up
+SPRITE 301 SWORD 32 0 32 32 sword held left
+SPRITE 302 SWORD 64 0 32 32 sword held down
+SPRITE 303 SWORD 96 0 32 32 sword held right
+SPRITE 304 SWORD 0 32 32 32 sword arc up
+SPRITE 305 SWORD 32 32 32 32 sword arc left
+SPRITE 306 SWORD 64 32 32 32 sword arc down
+SPRITE 307 SWORD 96 32 32 32 sword arc right
+SPRITE 308 SWORD 0 64 32 32 sword thrust up
+SPRITE 309 SWORD 32 64 32 32 sword thrust left
+SPRITE 310 SWORD 64 64 32 32 sword thrust down
+SPRITE 311 SWORD 96 64 32 32 sword thrust right
+
+ANI
+0 12 34, 300 15 -7, 236 8 16, 100 8 2
+0 12 36, 237 12 16, 101 12 2, 301 1 3
+0 12 34, 238 8 16, 102 8 2, 302 15 13
+0 12 36, 239 4 16, 103 4 2, 303 14 3
+PLAYSOUND sword.wav 1.5 2
+
+0 12 34, 304 15 -10, 240 8 16, 100 8 2
+0 12 36, 241 12 16, 101 12 2, 305 -9 12
+0 12 34, 242 8 16, 102 8 2, 306 15 30
+0 12 36, 243 4 16, 103 4 2, 307 24 12
+
+0 12 34, 308 15 -10, 240 8 16, 100 8 2
+0 12 36, 241 12 16, 101 12 2, 309 -9 12
+0 12 34, 242 8 16, 102 8 2, 310 15 30
+0 12 36, 243 4 16, 103 4 2, 311 24 12
+
+0 12 34, 308 15 -10, 240 8 16, 100 8 2
+0 12 36, 241 12 16, 101 12 2, 309 -9 12
+0 12 34, 242 8 16, 102 8 2, 310 15 30
+0 12 36, 243 4 16, 103 4 2, 311 24 12
+
+0 12 34, 304 15 -7, 236 8 16, 100 8 2
+0 12 36, 237 12 16, 101 12 2, 305 1 3
+0 12 34, 238 8 16, 102 8 2, 306 15 13
+0 12 36, 239 4 16, 103 4 2, 307 14 3
+
+ANIEND
