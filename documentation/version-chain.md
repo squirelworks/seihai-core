@@ -159,18 +159,21 @@ Generated; do not edit between the markers.
 
 #### 2.00 (`GNW24011`, binary, linked 2001-02-01)
 
+- protocol: **listserver**: port 14921 -> port 14923
 - protocol: **plo (server ids handled)**: +154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
 - ui: **gs1_commands**: 134 -> 142
 - unknown (login): props sent at login (verified for 2.05 only)
-- unknown (listserver): reply format; the first frame is known, no reply was observed
+- unknown (listserver): a real 2.00 client's reply was not captured; the public port 14923 answered Seihai's classic login with a plain zlib id-0 list (4 rows) on 2026-10-25
 - unknown (token): the token is not in gs2lib, so a stock GServer-v2 does not know it
-- source: binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142
+- source: binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142; list port 14923 from the public check of 2026-10-25 (built-in 14921)
 
 #### 2.01 (`GNW23021`, binary, linked 2001-03-08)
 
+- protocol: **listserver**: port 14923 -> port 14921
 - protocol: **plo (server ids handled)**: +46 HITOBJECTS, +156 SETACTIVELEVEL (53 -> 55 ids)
 - protocol: **pli (client ids sent)**: +35 ADJACENTLEVEL, +36 HITOBJECTS (35 -> 37 ids)
 - ui: **gs1_commands**: 142 -> 144
+- unknown (listserver): not run on 14923 (the public legacy port); 14921, the port the build carries, is refused by the public service
 - source: binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144
 
 #### 2.02 (`GNW15041`, binary, linked 2001-04-15)

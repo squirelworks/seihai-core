@@ -50,15 +50,18 @@ step	label	token	basis	kind	area	field	detail
 8	1.42	GNW08011	binary	unknown	listserver	-	host and port of this build; 14921 is the template value
 8	1.42	GNW08011	binary	unknown	listserver	-	whether 1.42 sends the account to the listserver
 8	1.42	GNW08011	binary	source	-	-	binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, GS1 126 to 134
+9	2.00	GNW24011	binary	changed	protocol	listserver	port 14921 -> port 14923
 9	2.00	GNW24011	binary	changed	protocol	plo (server ids handled)	+154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
 9	2.00	GNW24011	binary	changed	ui	gs1_commands	134 -> 142
 9	2.00	GNW24011	binary	unknown	login	-	props sent at login (verified for 2.05 only)
-9	2.00	GNW24011	binary	unknown	listserver	-	reply format; the first frame is known, no reply was observed
+9	2.00	GNW24011	binary	unknown	listserver	-	a real 2.00 client's reply was not captured; the public port 14923 answered Seihai's classic login with a plain zlib id-0 list (4 rows) on 2026-10-25
 9	2.00	GNW24011	binary	unknown	token	-	the token is not in gs2lib, so a stock GServer-v2 does not know it
-9	2.00	GNW24011	binary	source	-	-	binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142
+9	2.00	GNW24011	binary	source	-	-	binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142; list port 14923 from the public check of 2026-10-25 (built-in 14921)
+10	2.01	GNW23021	binary	changed	protocol	listserver	port 14923 -> port 14921
 10	2.01	GNW23021	binary	changed	protocol	plo (server ids handled)	+46 HITOBJECTS, +156 SETACTIVELEVEL (53 -> 55 ids)
 10	2.01	GNW23021	binary	changed	protocol	pli (client ids sent)	+35 ADJACENTLEVEL, +36 HITOBJECTS (35 -> 37 ids)
 10	2.01	GNW23021	binary	changed	ui	gs1_commands	142 -> 144
+10	2.01	GNW23021	binary	unknown	listserver	-	not run on 14923 (the public legacy port); 14921, the port the build carries, is refused by the public service
 10	2.01	GNW23021	binary	source	-	-	binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144
 11	2.02	GNW15041	binary	changed	protocol	plo (server ids handled)	+47 STAFFGUILDS (55 -> 56 ids)
 11	2.02	GNW15041	binary	changed	props	own-player props	+37-41 (37 -> 42 ids)
