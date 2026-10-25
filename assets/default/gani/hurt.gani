@@ -1,0 +1,23 @@
+// hurt.gani: the pose Seihai shows for the first moments of hurt mode (1 step)
+// Original Seihai default animation; layout and numbers follow documentation/asset-reference.md.
+// A step is four direction rows (up, left, down, right) of 'sprite x y' placements.
+// The name and the use are Seihai's convention, not a documented real-client one.
+DEFAULTHEAD head0.png
+DEFAULTBODY body.png
+
+SPRITE 0 SPRITES 0 0 24 12 shadow
+SPRITE 100 HEAD 0 0 32 32 head up
+SPRITE 101 HEAD 0 32 32 32 head left
+SPRITE 102 HEAD 0 64 32 32 head down
+SPRITE 103 HEAD 0 96 32 32 head right
+SPRITE 248 BODY 0 384 32 32 body pose 12 up
+SPRITE 249 BODY 32 384 32 32 body pose 12 left
+SPRITE 250 BODY 64 384 32 32 body pose 12 down
+SPRITE 251 BODY 96 384 32 32 body pose 12 right
+
+ANI
+0 12 34, 248 8 16, 100 9 4
+0 12 36, 249 12 16, 101 14 4
+0 12 34, 250 8 16, 102 7 4
+0 12 36, 251 4 16, 103 2 4
+ANIEND
