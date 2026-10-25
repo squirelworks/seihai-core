@@ -129,7 +129,7 @@ Generated; do not edit between the markers.
 #### 1.41 (`GNW13110`, binary)
 
 - protocol: **encryption**: Gen2 -> Gen3
-- protocol: **listserver**: none -> listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923
+- protocol: **listserver**: none -> listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape B (login frame inferred, not captured; no evidence for this shape)
 - protocol: **pli (client ids sent)**: -31 PACKETCOUNT (35 -> 34 ids)
 - props: **own-player props**: +35 BODYIMG, +36 RATING (35 -> 37 ids)
 - props: **other-player props**: +35 BODYIMG, +36 RATING (23 -> 25 ids)
@@ -139,14 +139,14 @@ Generated; do not edit between the markers.
 - ui: **server_list**: direct (www.graalonline.com:14900) -> one list
 - ui: **gs1_commands**: 111 -> 126
 - unknown (listserver): original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured
-- unknown (listserver): whether 1.41 sends the account to the listserver
+- unknown (listserver): login frame inferred, not captured, and no evidence for its shape: Seihai keeps shape B (id 0 `newmain`, then id 1 with the account), what it sent before the lab captures; whether a real 1.41 sends the account to the listserver is unknown
 - unknown (life): death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)
 - unknown (levels): the version-profile TOML lists GLEVNW01 (.nw) as readable by 1.41 and 1.42 and drops it at 2.00; the rows of 1.33 to 2.04 have .graal only
 - source: binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126
 
 #### 1.42 (`GNW08011`, binary, linked 2001-01-10)
 
-- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923 -> listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14921
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape B (login frame inferred, not captured; no evidence for this shape) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured)
 - protocol: **plo (server ids handled)**: +42 NEWWORLDTIME, +44 HASNPCSERVER, +45 FILEUPTODATE, +150 NPCDEL2, +151 HIDENPCS, +153 SAY2 (45 -> 51 ids)
 - protocol: **pli (client ids sent)**: +34 UPDATEFILE (34 -> 35 ids)
 - life: **death**: 2.05 rules (name-group test) -> none
@@ -154,24 +154,26 @@ Generated; do not edit between the markers.
 - ui: **ganis**: no -> yes
 - ui: **gs1_commands**: 126 -> 134
 - unknown (listserver): built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured
-- unknown (listserver): whether 1.42 sends the account to the listserver
+- unknown (listserver): login frame inferred, not captured: Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; a real 1.42 frame was never captured, and no run on the public service has used shape A, so the port is assumed
 - source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, GS1 126 to 134
 
 #### 2.00 (`GNW24011`, binary, linked 2001-02-01)
 
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
 - ui: **gs1_commands**: 134 -> 142
 - unknown (login): props sent at login (verified for 2.05 only)
-- unknown (listserver): a real 2.00 client's reply was not captured; the public port 14923 answered Seihai's classic login with a plain zlib id-0 list (4 rows) and 14922 stayed silent, on 2026-10-25
+- unknown (listserver): Seihai now sends the real 2.00 frame (shape A, captured in the lab: id 0 `newmain` only, no account). That frame has not been run on the public service. The 2026-10-25 matrix used Seihai's older classic login (shape B), which 14923 answered with a plain zlib id-0 list (4 rows) while 14922 stayed silent; the port is assumed for shape A until a run. A real 2.00's reply was not captured
 - unknown (token): the token is not in gs2lib, so a stock GServer-v2 does not know it
 - source: binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142; list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)
 
 #### 2.01 (`GNW23021`, binary, linked 2001-03-08)
 
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured)
 - protocol: **plo (server ids handled)**: +46 HITOBJECTS, +156 SETACTIVELEVEL (53 -> 55 ids)
 - protocol: **pli (client ids sent)**: +35 ADJACENTLEVEL, +36 HITOBJECTS (35 -> 37 ids)
 - ui: **gs1_commands**: 142 -> 144
-- unknown (listserver): 2.01 to 2.04 (and 2.02 rev 2): Seihai's classic login got a legacy list on 14923 and nothing on 14922 on 2026-10-25; a real client of these builds was not captured; 14921, the port the build carries, is dead
+- unknown (listserver): 2.01 to 2.04 (and 2.02 rev 2): login frame inferred, not captured. Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; no real client of these builds was captured and no run on the public service has used shape A, so the port is assumed. The 2026-10-25 matrix used Seihai's older shape B: a legacy list on 14923, nothing on 14922. 14921, the port the build carries, is dead
 - source: binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144
 
 #### 2.02 (`GNW15041`, binary, linked 2001-04-15)
@@ -206,7 +208,7 @@ Generated; do not edit between the markers.
 
 #### 2.05 (`GNW03081`, binary, linked 2001-08-16)
 
-- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14921 -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +168 UNKNOWN168 (58 -> 59 ids)
 - levels: **nw**: no -> yes
 - levels: **gmap**: no -> yes
@@ -215,12 +217,12 @@ Generated; do not edit between the markers.
 - life: **combat**: none -> 2.05 rules
 - ui: **server_in_title**: no -> yes
 - ui: **gs1_commands**: 157 -> 161
-- unknown (listserver): this profile sends the classic login, which no public run has used for 2.05: the 2026-10-25 matrix binary sent the gen-5 login for 2.05 and both 14922 and 14923 answered it. 14923 answered the classic login of every other classic profile, so 14923 is assumed here
+- unknown (listserver): this profile now sends the real 2.05 frame (shape A, captured in the lab: id 0 `newmain` only). No public run has used it: the 2026-10-25 matrix binary sent the gen-5 login for 2.05 (the saved-version override, since fixed) and both 14922 and 14923 answered that. 14923 answered the older classic login (shape B) of every other classic profile, so 14923 is assumed here
 - source: binary (rev 1 and rev 2) and lab: .nw and .gmap levels, PLO 168, server name in the title, GS1 157 to 161; death and combat rules traced here
 
 #### 2.1 (`GNW31101`, inferred)
 
-- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921 -> listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14922
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14922, login shape B (login frame inferred, not captured; no evidence for this shape)
 - protocol: **plo (server ids handled)**: +49 PLAYERWARP2, +169 UPGRADEURL, +170 GHOSTMODE, +171 BIGMAP, +172 MINIMAP, +173 GHOSTTEXT, +174 GHOSTICON (59 -> 66 ids)
 - props: **own-player props**: +43 GMAPLEVELX, +44 GMAPLEVELY, +45 Z (43 -> 46 ids)
 - props: **other-player props**: +43 GMAPLEVELX, +44 GMAPLEVELY, +45 Z (31 -> 34 ids)
@@ -236,7 +238,7 @@ Generated; do not edit between the markers.
 - unknown (binary): no 2.1 release binary; every value of this step is inferred
 - unknown (token): the 2.1 test builds still send the 2.05 token, so GNW31101 is from gs2lib only
 - unknown (protocol): PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169
-- unknown (listserver): 2.1 to 2.16 have no client binary: the port was checked with Seihai's classic login only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
+- unknown (listserver): 2.1 to 2.16 have no client binary: login frame inferred, not captured. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
 - unknown (pli): client send set is carried from 2.05
 - unknown (props): player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
 - unknown (life): death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
@@ -280,7 +282,7 @@ Generated; do not edit between the markers.
 
 #### 2.17 (`GNW22122`, binary)
 
-- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14922 -> listserver.graal.in:14923 (legacy, confirmed)
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14922, login shape B (login frame inferred, not captured; no evidence for this shape) -> listserver.graal.in:14923 (legacy, confirmed), login shape B (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +175 SHOOT, +176 KINGDOMSMODE, +177 NEWWORLDMODE, +179 RPGWINDOW, +181 UNKNOWN181, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +184 TAKESCREENSHOT, +185 BOARDHEIGHTS (70 -> 79 ids)
 - protocol: **pli (client ids sent)**: +39 TAMPERCHECK, +40 SHOOT, +43 MUTEPLAYER, +44 PROCESSLIST, +45 PROCESSRUNNING (40 -> 45 ids)
 - protocol: **tampercheck**: no -> yes
@@ -291,7 +293,7 @@ Generated; do not edit between the markers.
 - levels: **heights**: no -> yes
 - unknown (props): other-player prop parser was not read; the 2.22 set is used
 - unknown (ui): GS1 command count was not read; 161 is carried
-- unknown (login): how a real 2.17 client logs in to the listserver was not captured; Seihai's classic login (id 0 then id 1 in one plain frame) got a legacy list on 14923 and no reply on 14922 on 2026-10-25
+- unknown (login): the real 2.17.1 login to a lab listserver was captured: shape B (one plain zlib frame, id 0 `newmain` then id 1 with the account, no token), which Seihai sends. What the public service does for a real 2.17.1 was not observed; Seihai's frame got a legacy list on 14923 and no reply on 14922 on 2026-10-25 (with the default zlib header 78 9C; Seihai now sends 78 DA like the real client, not yet run)
 - unknown (showimg): the binary has the id 24 sender with 2.22's send test, and the solo 90 s capture saw none, as that test predicts; the period and a two-player run are not observed, so none is sent
 - source: binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, and the post-login frame seen in the lab (image checks, process list, props up to the language, the gr.x and gr.y flags once)
 
@@ -299,7 +301,7 @@ Generated; do not edit between the markers.
 
 - protocol: **client_type**: 0 -> 5
 - protocol: **encryption**: Gen3 -> Gen5
-- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed) -> listserver.graal.in:14922 (supported, confirmed), token GNW30123
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), login shape B (login frame captured from a real client) -> listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +186 BOARDMODIFY2 (79 -> 80 ids)
 - protocol: **pli (client ids sent)**: -36 HITOBJECTS, -45 PROCESSRUNNING, -81 PROFILESET (45 -> 42 ids)
 - protocol: **tamper**: known words, re-send Never -> known words, re-send OnLevelChange
@@ -315,6 +317,7 @@ Generated; do not edit between the markers.
 
 #### 2.3 (`GNW14015`, inferred)
 
+- protocol: **listserver**: listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame inferred, not captured)
 - protocol: **plo (server ids handled)**: +84 LARGEFILESIZE, +189 MOVE2; -44 HASNPCSERVER (80 -> 81 ids)
 - protocol: **pli (client ids sent)**: +46 ENTERLEVEL; -21 PUTNPC (42 -> 42 ids)
 - protocol: **tamper**: known words, re-send OnLevelChange -> unknown words, re-send Timer
@@ -337,6 +340,7 @@ Generated; do not edit between the markers.
 
 #### 2.31 (`GNW28015`, binary)
 
+- protocol: **listserver**: listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame inferred, not captured) -> listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client)
 - protocol: **tamper**: unknown words, re-send Timer -> known words, re-send Timer
 - protocol: **showimg (id 24)**: none -> every 5130 ms
 - protocol: **login frame**: none -> files, process list, props with OS and code page, status icons
