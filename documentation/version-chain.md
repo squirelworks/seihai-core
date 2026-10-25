@@ -129,7 +129,7 @@ Generated; do not edit between the markers.
 #### 1.41 (`GNW13110`, binary)
 
 - protocol: **encryption**: Gen2 -> Gen3
-- protocol: **listserver**: none -> port 14923
+- protocol: **listserver**: none -> listserver.graal.in:14923 (legacy, assumed), built in listserver.graal.in:14923
 - protocol: **pli (client ids sent)**: -31 PACKETCOUNT (35 -> 34 ids)
 - props: **own-player props**: +35 BODYIMG, +36 RATING (35 -> 37 ids)
 - props: **other-player props**: +35 BODYIMG, +36 RATING (23 -> 25 ids)
@@ -138,7 +138,7 @@ Generated; do not edit between the markers.
 - life: **combat**: none -> 2.05 rules
 - ui: **server_list**: direct (www.graalonline.com:14900) -> one list
 - ui: **gs1_commands**: 111 -> 126
-- unknown (listserver): original host and port; the only surviving 1.41 copy is patched, 14923 is its port
+- unknown (listserver): original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923; not run on the public service
 - unknown (listserver): whether 1.41 sends the account to the listserver
 - unknown (life): death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)
 - unknown (levels): the version-profile TOML lists GLEVNW01 (.nw) as readable by 1.41 and 1.42 and drops it at 2.00; the rows of 1.33 to 2.04 have .graal only
@@ -146,34 +146,34 @@ Generated; do not edit between the markers.
 
 #### 1.42 (`GNW08011`, binary, linked 2001-01-10)
 
-- protocol: **listserver**: port 14923 -> port 14921
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in listserver.graal.in:14923 -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921
 - protocol: **plo (server ids handled)**: +42 NEWWORLDTIME, +44 HASNPCSERVER, +45 FILEUPTODATE, +150 NPCDEL2, +151 HIDENPCS, +153 SAY2 (45 -> 51 ids)
 - protocol: **pli (client ids sent)**: +34 UPDATEFILE (34 -> 35 ids)
 - life: **death**: 2.05 rules (name-group test) -> none
 - life: **combat**: 2.05 rules -> none
 - ui: **ganis**: no -> yes
 - ui: **gs1_commands**: 126 -> 134
-- unknown (listserver): host and port of this build; 14921 is the template value
+- unknown (listserver): built-in port 14921 is dead and 14923 is the rule's legacy port; 1.42 was not run on the public service
 - unknown (listserver): whether 1.42 sends the account to the listserver
 - source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, GS1 126 to 134
 
 #### 2.00 (`GNW24011`, binary, linked 2001-02-01)
 
-- protocol: **listserver**: port 14921 -> port 14923
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921 -> listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14921
 - protocol: **plo (server ids handled)**: +154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
 - ui: **gs1_commands**: 134 -> 142
 - unknown (login): props sent at login (verified for 2.05 only)
 - unknown (listserver): a real 2.00 client's reply was not captured; the public port 14923 answered Seihai's classic login with a plain zlib id-0 list (4 rows) on 2026-10-25
 - unknown (token): the token is not in gs2lib, so a stock GServer-v2 does not know it
-- source: binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142; list port 14923 from the public check of 2026-10-25 (built-in 14921)
+- source: binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142; list port 14923 from the public check of 2026-10-25 (built-in www.graalonline.com:14921)
 
 #### 2.01 (`GNW23021`, binary, linked 2001-03-08)
 
-- protocol: **listserver**: port 14923 -> port 14921
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14921 -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921
 - protocol: **plo (server ids handled)**: +46 HITOBJECTS, +156 SETACTIVELEVEL (53 -> 55 ids)
 - protocol: **pli (client ids sent)**: +35 ADJACENTLEVEL, +36 HITOBJECTS (35 -> 37 ids)
 - ui: **gs1_commands**: 142 -> 144
-- unknown (listserver): not run on 14923 (the public legacy port); 14921, the port the build carries, is refused by the public service
+- unknown (listserver): 2.01 to 2.04 are legacy (14923) by the port rule and were never run on the public service; 14921, the port the build carries, is dead
 - source: binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144
 
 #### 2.02 (`GNW15041`, binary, linked 2001-04-15)
@@ -208,6 +208,7 @@ Generated; do not edit between the markers.
 
 #### 2.05 (`GNW03081`, binary, linked 2001-08-16)
 
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921 -> listserver.graal.in:14922 (supported, assumed), built in www.graalonline.com:14921
 - protocol: **plo (server ids handled)**: +168 UNKNOWN168 (58 -> 59 ids)
 - levels: **nw**: no -> yes
 - levels: **gmap**: no -> yes
@@ -216,12 +217,12 @@ Generated; do not edit between the markers.
 - life: **combat**: none -> 2.05 rules
 - ui: **server_in_title**: no -> yes
 - ui: **gs1_commands**: 157 -> 161
-- unknown (login): listserver host and port differ per server (built-in 14921, Reborn 14922 or 14923)
+- unknown (listserver): 14922 answered the user's 2.05 binary (gen-5 login); Seihai's classic 2.05 login was not run on the public service
 - source: binary (rev 1 and rev 2) and lab: .nw and .gmap levels, PLO 168, server name in the title, GS1 157 to 161; death and combat rules traced here
 
 #### 2.1 (`GNW31101`, inferred)
 
-- protocol: **listserver**: port 14921 -> port 14922
+- protocol: **listserver**: listserver.graal.in:14922 (supported, assumed), built in www.graalonline.com:14921 -> listserver.graal.in:14922 (supported, assumed), built in www.graalonline.com:14922
 - protocol: **plo (server ids handled)**: +49 PLAYERWARP2, +169 UPGRADEURL, +170 GHOSTMODE, +171 BIGMAP, +172 MINIMAP, +173 GHOSTTEXT, +174 GHOSTICON (59 -> 66 ids)
 - props: **own-player props**: +43 GMAPLEVELX, +44 GMAPLEVELY, +45 Z (43 -> 46 ids)
 - props: **other-player props**: +43 GMAPLEVELX, +44 GMAPLEVELY, +45 Z (31 -> 34 ids)
@@ -280,6 +281,7 @@ Generated; do not edit between the markers.
 
 #### 2.17 (`GNW22122`, binary)
 
+- protocol: **listserver**: listserver.graal.in:14922 (supported, assumed), built in www.graalonline.com:14922 -> listserver.graal.in:14922 (supported, assumed)
 - protocol: **plo (server ids handled)**: +175 SHOOT, +176 KINGDOMSMODE, +177 NEWWORLDMODE, +179 RPGWINDOW, +181 UNKNOWN181, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +184 TAKESCREENSHOT, +185 BOARDHEIGHTS (70 -> 79 ids)
 - protocol: **pli (client ids sent)**: +39 TAMPERCHECK, +40 SHOOT, +43 MUTEPLAYER, +44 PROCESSLIST, +45 PROCESSRUNNING (40 -> 45 ids)
 - protocol: **tampercheck**: no -> yes
@@ -290,7 +292,7 @@ Generated; do not edit between the markers.
 - levels: **heights**: no -> yes
 - unknown (props): other-player prop parser was not read; the 2.22 set is used
 - unknown (ui): GS1 command count was not read; 161 is carried
-- unknown (login): id 0 then id 1 listserver flow is untested against a server
+- unknown (login): id 0 then id 1 listserver flow is untested against a server; a classic login on 14922 got no reply from the public service (2026-10-25), so 14922 is the rule's port, not one a 2.17 login is known to use
 - unknown (showimg): the binary has the id 24 sender with 2.22's send test, and the solo 90 s capture saw none, as that test predicts; the period and a two-player run are not observed, so none is sent
 - source: binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, and the post-login frame seen in the lab (image checks, process list, props up to the language, the gr.x and gr.y flags once)
 
@@ -298,7 +300,7 @@ Generated; do not edit between the markers.
 
 - protocol: **client_type**: 0 -> 5
 - protocol: **encryption**: Gen3 -> Gen5
-- protocol: **listserver**: port 14922 -> port 14922, token GNW30123
+- protocol: **listserver**: listserver.graal.in:14922 (supported, assumed) -> listserver.graal.in:14922 (supported, confirmed), token GNW30123
 - protocol: **plo (server ids handled)**: +186 BOARDMODIFY2 (79 -> 80 ids)
 - protocol: **pli (client ids sent)**: -36 HITOBJECTS, -45 PROCESSRUNNING, -81 PROFILESET (45 -> 42 ids)
 - protocol: **tamper**: known words, re-send Never -> known words, re-send OnLevelChange
@@ -314,6 +316,7 @@ Generated; do not edit between the markers.
 
 #### 2.3 (`GNW14015`, inferred)
 
+- protocol: **listserver**: listserver.graal.in:14922 (supported, confirmed), token GNW30123 -> listserver.graal.in:14922 (supported, assumed), token GNW30123
 - protocol: **plo (server ids handled)**: +84 LARGEFILESIZE, +189 MOVE2; -44 HASNPCSERVER (80 -> 81 ids)
 - protocol: **pli (client ids sent)**: +46 ENTERLEVEL; -21 PUTNPC (42 -> 42 ids)
 - protocol: **tamper**: known words, re-send OnLevelChange -> unknown words, re-send Timer
@@ -335,6 +338,7 @@ Generated; do not edit between the markers.
 
 #### 2.31 (`GNW28015`, binary)
 
+- protocol: **listserver**: listserver.graal.in:14922 (supported, assumed), token GNW30123 -> listserver.graal.in:14922 (supported, confirmed), token GNW30123
 - protocol: **tamper**: unknown words, re-send Timer -> known words, re-send Timer
 - protocol: **showimg (id 24)**: none -> every 5130 ms
 - protocol: **login frame**: none -> files, process list, props with OS and code page, status icons
