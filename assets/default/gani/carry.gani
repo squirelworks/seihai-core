@@ -1,0 +1,90 @@
+// carry.gani: walking with an object held over the head; 8 steps, footsteps after steps 0 and 4
+// Original Seihai default animation; layout and numbers follow documentation/asset-reference.md.
+// A step is four direction rows (up, left, down, right) of 'sprite x y' placements.
+LOOP
+CONTINUOUS
+DEFAULTHEAD head0.png
+DEFAULTBODY body.png
+
+SPRITE 0 SPRITES 0 0 24 12 shadow
+SPRITE 100 HEAD 0 0 32 32 head up
+SPRITE 101 HEAD 0 32 32 32 head left
+SPRITE 102 HEAD 0 64 32 32 head down
+SPRITE 103 HEAD 0 96 32 32 head right
+SPRITE 256 BODY 0 448 32 32 body pose 14 up
+SPRITE 257 BODY 32 448 32 32 body pose 14 left
+SPRITE 258 BODY 64 448 32 32 body pose 14 down
+SPRITE 259 BODY 96 448 32 32 body pose 14 right
+SPRITE 260 BODY 0 480 32 32 body pose 15 up
+SPRITE 261 BODY 32 480 32 32 body pose 15 left
+SPRITE 262 BODY 64 480 32 32 body pose 15 down
+SPRITE 263 BODY 96 480 32 32 body pose 15 right
+SPRITE 264 BODY 0 512 32 32 body pose 16 up
+SPRITE 265 BODY 32 512 32 32 body pose 16 left
+SPRITE 266 BODY 64 512 32 32 body pose 16 down
+SPRITE 267 BODY 96 512 32 32 body pose 16 right
+SPRITE 268 BODY 0 544 32 32 body pose 17 up
+SPRITE 269 BODY 32 544 32 32 body pose 17 left
+SPRITE 270 BODY 64 544 32 32 body pose 17 down
+SPRITE 271 BODY 96 544 32 32 body pose 17 right
+SPRITE 272 BODY 0 576 32 32 body pose 18 up
+SPRITE 273 BODY 32 576 32 32 body pose 18 left
+SPRITE 274 BODY 64 576 32 32 body pose 18 down
+SPRITE 275 BODY 96 576 32 32 body pose 18 right
+SPRITE 276 BODY 0 608 32 32 body pose 19 up
+SPRITE 277 BODY 32 608 32 32 body pose 19 left
+SPRITE 278 BODY 64 608 32 32 body pose 19 down
+SPRITE 279 BODY 96 608 32 32 body pose 19 right
+SPRITE 280 BODY 0 640 32 32 body pose 20 up
+SPRITE 281 BODY 32 640 32 32 body pose 20 left
+SPRITE 282 BODY 64 640 32 32 body pose 20 down
+SPRITE 283 BODY 96 640 32 32 body pose 20 right
+SPRITE 284 BODY 0 672 32 32 body pose 21 up
+SPRITE 285 BODY 32 672 32 32 body pose 21 left
+SPRITE 286 BODY 64 672 32 32 body pose 21 down
+SPRITE 287 BODY 96 672 32 32 body pose 21 right
+
+ANI
+0 12 34, 256 8 17, 100 8 3
+0 12 36, 257 12 17, 101 12 3
+0 12 34, 258 8 17, 102 8 3
+0 12 36, 259 4 17, 103 4 3
+PLAYSOUND steps2.wav 1.5 2
+
+0 12 34, 260 8 16, 100 8 2
+0 12 36, 261 12 16, 101 12 2
+0 12 34, 262 8 16, 102 8 2
+0 12 36, 263 4 16, 103 4 2
+
+0 12 34, 264 8 15, 100 8 1
+0 12 36, 265 12 15, 101 12 1
+0 12 34, 266 8 15, 102 8 1
+0 12 36, 267 4 15, 103 4 1
+
+0 12 34, 268 8 16, 100 8 2
+0 12 36, 269 12 16, 101 12 2
+0 12 34, 270 8 16, 102 8 2
+0 12 36, 271 4 16, 103 4 2
+
+0 12 34, 272 8 17, 100 8 3
+0 12 36, 273 12 17, 101 12 3
+0 12 34, 274 8 17, 102 8 3
+0 12 36, 275 4 17, 103 4 3
+PLAYSOUND steps2.wav 1.5 2
+
+0 12 34, 276 8 16, 100 8 2
+0 12 36, 277 12 16, 101 12 2
+0 12 34, 278 8 16, 102 8 2
+0 12 36, 279 4 16, 103 4 2
+
+0 12 34, 280 8 15, 100 8 1
+0 12 36, 281 12 15, 101 12 1
+0 12 34, 282 8 15, 102 8 1
+0 12 36, 283 4 15, 103 4 1
+
+0 12 34, 284 8 16, 100 8 2
+0 12 36, 285 12 16, 101 12 2
+0 12 34, 286 8 16, 102 8 2
+0 12 36, 287 4 16, 103 4 2
+
+ANIEND
