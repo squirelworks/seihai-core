@@ -422,7 +422,7 @@ pub struct SessionState {
     pub own_cur_power: Option<u8>,
     /// GLOVEPOWER (prop 6) the server last gave for the player.
     pub own_glove_power: Option<u8>,
-    /// RUPEESCOUNT (3), BOMBSCOUNT (4) and ARROWSCOUNT (5) the server last
+    /// RUPEESCOUNT (3), ARROWSCOUNT (4) and BOMBSCOUNT (5) the server last
     /// gave, taken by the game loop: the login values, and what a pickup
     /// sent as `PLI_ITEMTAKE` gives.
     pub own_rupees: Option<u32>,
@@ -1558,8 +1558,8 @@ impl SessionState {
                 (2, Some(v)) => self.own_cur_power = Some(v),
                 (6, Some(v)) => self.own_glove_power = Some(v),
                 (3, _) => self.own_rupees = read_gint3(&prop.raw).map(|v| v as u32),
-                (4, Some(v)) => self.own_bombs = Some(v),
-                (5, Some(v)) => self.own_darts = Some(v),
+                (4, Some(v)) => self.own_darts = Some(v),
+                (5, Some(v)) => self.own_bombs = Some(v),
                 (18, Some(v)) => self.own_status = Some(v),
                 (32, Some(v)) => self.own_alignment = Some(v),
                 (0, _) => self.nickname = Some(latin1(prop.raw.get(1..).unwrap_or(&[]))),
@@ -2338,9 +2338,10 @@ mod tests {
         st.apply_body(&[9 + 0x20, 6 + 0x20, 3 + 0x20, b'\n']);
         assert_eq!(st.own_glove_power, Some(3));
         // RUPEESCOUNT 1 after a 1.39 pickup (lab capture S>C 9 `#  !`),
-        // then BOMBSCOUNT 15 and ARROWSCOUNT 7.
+        // then ARROWSCOUNT 7 and BOMBSCOUNT 15. Real 2.05 sends 5 with
+        // its BOMBADD and 4 with its ARROWADD (lab, 2026-10-30).
         st.apply_body(b")#  !\n");
-        st.apply_body(&[9 + 0x20, 4 + 0x20, 15 + 0x20, 5 + 0x20, 7 + 0x20, b'\n']);
+        st.apply_body(&[9 + 0x20, 4 + 0x20, 7 + 0x20, 5 + 0x20, 15 + 0x20, b'\n']);
         assert_eq!((st.own_rupees, st.own_bombs, st.own_darts), (Some(1), Some(15), Some(7)));
     }
 
