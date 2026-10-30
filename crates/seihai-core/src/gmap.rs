@@ -467,6 +467,24 @@ pub fn crossing_frame(
     if !rules.enabled {
         return Vec::new();
     }
+    let mut msgs = crossing_lead(version, tamper);
+    msgs.push(crossing_props_message(&rules, c));
+    msgs
+}
+
+/// The messages that open a crossing frame, ahead of the flags and the
+/// props: `PLI_ENTERLEVEL` (46) when the build sends it, then the tamper
+/// check (39) when `tamper` is given and the build re-sends it on level
+/// changes. A build has one or the other, never both (2.31 sends 46 and
+/// keeps 39 on its timer; 2.22 has no 46 and re-sends 39).
+///
+/// A build with a walk cadence (2.17, 2.22, 3.04) sends these in the frame
+/// of the step that crosses and leaves the cell prop to its next props
+/// message ([`crate::protocol::walkcadence::WalkCadence::cross`]).
+pub fn crossing_lead(version: ClientVersion, tamper: Option<&mut TamperSender>) -> Vec<Vec<u8>> {
+    if !GmapRules::for_version(version).enabled {
+        return Vec::new();
+    }
     let mut msgs = Vec::new();
     if version.sends_enter_level() {
         msgs.push(crate::net::enter_level_message());
@@ -476,7 +494,6 @@ pub fn crossing_frame(
             msgs.extend(t.message());
         }
     }
-    msgs.push(crossing_props_message(&rules, c));
     msgs
 }
 
