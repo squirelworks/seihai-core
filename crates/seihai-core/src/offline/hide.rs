@@ -6,6 +6,10 @@
 //!
 //! * **D while carrying** a bush, a light stone or a black stone hides the
 //!   player under it. A pot or a sign: D does nothing.
+//! * D hides only once the object counts as carried: four ticks into the
+//!   lift (the lift counter, seen live). While lifting the player can still
+//!   be hit, as a carrier can (lab, 2026-10-30: real 2.05 took a hit while
+//!   carrying).
 //! * **D again**, or **A**, comes out, back to carrying. Out from under a
 //!   bush the leaves fly at `(x + 0.5, y + 1)`.
 //! * **S** throws, from hiding too.
@@ -24,6 +28,10 @@ use super::OfflineSession;
 pub const HIDE_KINDS: [usize; 3] = [0, 3, 4];
 /// The STATUS (18) bit of a hidden player.
 pub const HIDDEN_STATUS: u8 = 0x02;
+/// The tick after a lift from which the object counts as carried (2.05,
+/// live: the lift counter runs 4 down to 0 and the carried flag is set as
+/// it reaches 0). Before it D does not hide.
+pub const LIFT_CARRIED_TICK: u32 = 4;
 /// The walk speed factor while hidden.
 pub const HIDE_SPEED: f32 = 0.2;
 /// Sprite numbers S of the `hidden` walk, one per step.
@@ -41,7 +49,8 @@ impl OfflineSession {
             self.leave_hiding();
             return true;
         }
-        let can = self.carried.as_ref().is_some_and(|c| HIDE_KINDS.contains(&c.kind));
+        let lifting = self.lift_ticks.is_some_and(|t| t < LIFT_CARRIED_TICK);
+        let can = !lifting && self.carried.as_ref().is_some_and(|c| HIDE_KINDS.contains(&c.kind));
         if !can || self.life.is_dead() || self.in_water {
             return false;
         }
@@ -106,6 +115,24 @@ mod tests {
         }
         let mut empty = OfflineSession::new();
         assert!(!empty.toggle_hide());
+    }
+
+    #[test]
+    fn d_during_the_lift_does_not_hide_and_the_lifter_can_be_hit() {
+        let mut s = carrying(0);
+        s.lift_ticks = Some(0);
+        assert!(!s.toggle_hide(), "D on the first tick of the lift");
+        assert_eq!(s.victim().state, crate::combat::Vulnerability::Hurtable);
+        for _ in 0..3 {
+            s.tick_poses(50);
+            assert!(!s.toggle_hide(), "still lifting at tick {:?}", s.lift_ticks);
+        }
+        // The fourth tick: the object counts as carried, with or without a
+        // `lift.gani`.
+        s.tick_poses(50);
+        assert!(s.lift_ticks.is_none());
+        assert!(s.toggle_hide());
+        assert_eq!(s.victim().state, crate::combat::Vulnerability::Hidden);
     }
 
     #[test]

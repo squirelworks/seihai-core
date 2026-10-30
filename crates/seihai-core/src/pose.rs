@@ -293,7 +293,10 @@ impl OfflineSession {
             changed = true;
             if let Some(t) = self.lift_ticks.as_mut() {
                 *t += 1;
-                let done = self.poses.lift.as_ref().map_or(true, |g| *t as usize >= g.total_ticks());
+                // Kept until the object counts as carried, with or without
+                // a `lift.gani`.
+                let done = self.poses.lift.as_ref().map_or(true, |g| *t as usize >= g.total_ticks())
+                    && *t >= crate::offline::LIFT_CARRIED_TICK;
                 if done || self.carried.is_none() {
                     self.lift_ticks = None;
                 }
