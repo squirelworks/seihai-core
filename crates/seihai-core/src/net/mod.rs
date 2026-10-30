@@ -711,6 +711,10 @@ pub struct Connection {
     /// Client→server ids the logged-in version can send, set by
     /// [`Self::login_versioned`]. Others are refused.
     pli: Option<IdSet>,
+    /// Plain zlib frames go out at the best level (`78 DA`): set by a gen-2
+    /// login. The real 1.28 beta 2 to 1.39 clients compressed every frame
+    /// that way (lab, 2026-10-30).
+    zlib_best: bool,
     /// Flag messages a script queued ([`Self::queue_flag`]): they ride
     /// ahead of the next walk update, or go out on their own.
     flags_out: Vec<Vec<u8>>,
@@ -752,7 +756,7 @@ impl Connection {
         let addrs: Vec<SocketAddr> = addr.to_socket_addrs()?.collect();
         let stream = connect_any(&addrs, CONNECT_TIMEOUT)?;
         stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-        Ok(Self { stream, gen3: None, gen5: None, gen5_in: None, pli: None, flags_out: Vec::new(), flags_since: None, files_out: Vec::new(), files_since: None, last_walk: None, io_thread: None })
+        Ok(Self { stream, gen3: None, gen5: None, gen5_in: None, pli: None, zlib_best: false, flags_out: Vec::new(), flags_since: None, files_out: Vec::new(), files_since: None, last_walk: None, io_thread: None })
     }
 
     /// Close the connection in both directions. A reader thread from
@@ -818,7 +822,9 @@ impl Connection {
                 None => line.extend_from_slice(m),
             }
         }
-        self.send_raw(&write_zlib_frame(&line)?)?;
+        self.zlib_best = version.encryption() == EncryptionGen::Gen2;
+        let frame = if self.zlib_best { write_zlib_frame_best(&line)? } else { write_zlib_frame(&line)? };
+        self.send_raw(&frame)?;
         self.pli = Some(version.profile().protocol.pli);
         self.take_flags();
         match version.encryption() {
@@ -987,7 +993,7 @@ impl Connection {
             let frame = write_frame(comp, &encoded);
             self.send_raw(&frame)?;
         } else {
-            let frame = write_zlib_frame(&body)?;
+            let frame = if self.zlib_best { write_zlib_frame_best(&body)? } else { write_zlib_frame(&body)? };
             self.send_raw(&frame)?;
         }
         self.stream.flush()
@@ -1818,6 +1824,25 @@ mod tests {
         let (mut conn, mut srv) = pair();
         conn.login_versioned(ClientVersion::V139, 0x42, "ab", "cd").unwrap();
         assert_eq!(read_frame(&mut srv), b" GNW07080\"ab\"cd\n");
+    }
+
+    /// Gen-2 frames, the login and every later one, are compressed at
+    /// zlib's best level (`78 DA`), as the real 1.28 beta 2 to 1.39 sent
+    /// them in the lab (1.33 and 1.39 tested here); gen 3 keeps the default level.
+    #[test]
+    fn gen2_frames_use_the_best_zlib_level() {
+        for v in [ClientVersion::V133, ClientVersion::V139] {
+            let (mut conn, mut srv) = pair();
+            conn.login_versioned(v, 0, "ab", "cd").unwrap();
+            conn.send_messages(&[b"\x22 \n".to_vec()]).unwrap();
+            for _ in 0..2 {
+                let raw = wire(&mut srv);
+                assert_eq!(&raw[2..4], &[0x78, 0xDA], "{}", v.label());
+            }
+        }
+        let (mut conn, mut srv) = pair();
+        conn.login_versioned(ClientVersion::V205, 0x21, "ab", "cd").unwrap();
+        assert_eq!(&wire(&mut srv)[2..4], &[0x78, 0x9C]);
     }
 
     /// With the reader running, the game loop's sends still go out, in
