@@ -314,13 +314,17 @@ pub const CLASSIC_STATUS_KEPT: u8 = 16 | 64;
 
 /// The head value of [`classic_login_props_message`] for the server's
 /// `HEADGIF` bytes: `c(n)` for a numbered head, else `c(len + 100)` + name.
+/// Builds before 1.34 send `c(0)` for a named head (lab, 2026-10-30: the
+/// real 1.33 sent `c(0)` and the real 1.34 to 1.39 sent `head3.png`).
 fn classic_head(version: super::ClientVersion, raw: &[u8]) -> Vec<u8> {
     let Some(&first) = raw.first() else { return vec![0x20] };
     let n = first.saturating_sub(0x20);
     if n < 100 {
         return vec![first];
     }
-    if version != super::ClientVersion::V139 {
+    let all = super::ClientVersion::all_versions();
+    let at = |v| all.iter().position(|&x| x == v);
+    if at(version) < at(super::ClientVersion::V134) {
         return vec![0x20];
     }
     let name = raw.get(1..).unwrap_or_default();
@@ -603,10 +607,11 @@ mod tests {
     }
 
     /// Lab, 2026-10-30: the real clients' first id 2 against the stub,
-    /// without the `UDPPORT` (31) prop, which Seihai leaves out.
+    /// without the `UDPPORT` (31) prop, which Seihai leaves out. 1.34 to
+    /// 1.38 were run with `head3.png` only.
     #[test]
-    fn classic_login_props_match_the_real_1_33_and_1_39() {
-        use crate::protocol::ClientVersion::{V133, V139};
+    fn classic_login_props_match_the_real_1_33_to_1_39() {
+        use crate::protocol::ClientVersion::{V133, V134, V135, V136, V137, V138, V139};
         let real = |hex: &str| {
             let mut v = vec![PLI_PLAYERPROPS + 0x20];
             v.extend((0..hex.len()).step_by(2).map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap()));
@@ -623,6 +628,11 @@ mod tests {
             (V139, image_head(b"head3.png"), 0, "2028737475626e69636b2b8d68656164332e706e672d22202a24323220"),
             (V133, vec![5 + 0x20], 16, "2028737475626e69636b2b252d22202a24323230"),
             (V139, vec![5 + 0x20], 16, "2028737475626e69636b2b252d22202a24323230"),
+            (V134, image_head(b"head3.png"), 20, "2028737475626e69636b2b8d68656164332e706e672d22202a24323230"),
+            (V135, image_head(b"head3.png"), 20, "2028737475626e69636b2b8d68656164332e706e672d22202a24323230"),
+            (V136, image_head(b"head3.png"), 20, "2028737475626e69636b2b8d68656164332e706e672d22202a24323230"),
+            (V137, image_head(b"head3.png"), 20, "2028737475626e69636b2b8d68656164332e706e672d22202a24323230"),
+            (V138, image_head(b"head3.png"), 20, "2028737475626e69636b2b8d68656164332e706e672d22202a24323230"),
         ];
         for (v, head, status, hex) in cases {
             let ids = v.profile().props.own.clone();
