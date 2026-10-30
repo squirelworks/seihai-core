@@ -1027,7 +1027,7 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "live", what: "never run" },
             Unknown { area: "listserver", what: "shape D (id 7 and id 1 in one plain zlib frame at 78 9C) is 3.04's capture; the binary has the same G3D30123 token and gen-5 cipher" },
             Unknown { area: "login", what: "OSTYPE mac is from the binary; the code page (1250), the files in the first frame (bigmap.txt, minimap.txt) and the head and default-weapon checks are 3.04's" },
-            Unknown { area: "3d", what: "the 3D mode (Torque GameConnection on port 28000) is not modelled" },
+            Unknown { area: "3d", what: "the 3D mode (Torque GameConnection, Graal3D protocol 19, on UDP listed port + 1) is not modelled here; seihai-ato::torque has its profile" },
         ],
     },
 ];
