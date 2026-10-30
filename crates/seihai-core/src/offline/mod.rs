@@ -1056,6 +1056,10 @@ impl OfflineSession {
         let c = self.carried.take()?;
         // S throws from hiding too.
         self.hidden = false;
+        // The 2.05 client puts a walking player back in the idle mode on a
+        // throw (A or S): the carry walk stops, and a held arrow starts the
+        // walk again on the next step.
+        self.walking = false;
         self.thrown.push(crate::throwing::Thrown::launch(c.kind, self.player_x, self.player_y, self.player_dir));
         Some(c.kind)
     }
@@ -2483,6 +2487,23 @@ mod tests {
         assert_eq!(c.len(), 1, "the cut goes to the server as one board modify");
         assert_eq!((c[0].x, c[0].y, c[0].width, c[0].height), (20, 20, 2, 2));
         assert_eq!(c[0].tiles, [BUSH_CUT[0][0], BUSH_CUT[1][0], BUSH_CUT[0][1], BUSH_CUT[1][1]].map(|t| t as u16), "row by row");
+    }
+
+    #[test]
+    fn a_throw_while_walking_puts_the_player_back_to_idle() {
+        let mut s = object_session(0);
+        face_up_at(&mut s, 20, 20);
+        assert_eq!(s.interact(), Interaction::Lifted { kind: 0 });
+        s.walking = true;
+        assert_eq!(s.interact(), Interaction::Thrown { kind: 0 });
+        assert!(!s.walking, "the throw ends the carry walk");
+        // A hidden player is thrown out of hiding the same way.
+        face_up_at(&mut s, 30, 20);
+        s.carried = Some(Carried { kind: 0, tiles: [[2, 18], [3, 19]] });
+        assert!(s.toggle_hide());
+        s.walking = true;
+        assert!(s.throw_carried().is_some());
+        assert!(!s.walking && !s.hidden);
     }
 
     #[test]
