@@ -20,6 +20,14 @@ pub fn is_gif(data: &[u8]) -> bool {
 /// Decode the first image of a GIF into `(width, height, rgba)` on the
 /// logical screen.
 pub fn read_gif_rgba(data: &[u8]) -> io::Result<(u32, u32, Vec<u8>)> {
+    read_gif_rgba_recolored(data, &[])
+}
+
+/// Like [`read_gif_rgba`], with some entries of the image's colour table
+/// replaced first: `(index, rgb)`, as for a palette PNG (see
+/// `read_png_rgba_recolored`). The transparent index stays clear. An index
+/// past the table is left alone.
+pub fn read_gif_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<(u32, u32, Vec<u8>)> {
     if !is_gif(data) || data.len() < 13 {
         return Err(bad("not a GIF"));
     }
@@ -66,6 +74,12 @@ pub fn read_gif_rgba(data: &[u8]) -> io::Result<(u32, u32, Vec<u8>)> {
                     let n = 3 << ((iflags & 7) + 1);
                     table = data.get(pos..pos + n).ok_or_else(|| bad("truncated colour table"))?;
                     pos += n;
+                }
+                let mut table = table.to_vec();
+                for &(idx, rgb) in recolor {
+                    if let Some(entry) = table.get_mut(idx * 3..idx * 3 + 3) {
+                        entry.copy_from_slice(&rgb);
+                    }
                 }
                 let min_code = *data.get(pos).ok_or_else(|| bad("truncated image"))?;
                 pos += 1;
@@ -236,6 +250,15 @@ mod tests {
         assert_eq!(p(3)[3], 0);
         assert_eq!(p(4), [255, 0, 0, 255]);
         assert_eq!(p(5), [0, 255, 0, 255]);
+    }
+
+    #[test]
+    fn recolour_replaces_colour_table_entries() {
+        // Red (1) becomes yellow; the transparent blue (3) stays clear.
+        let (_, _, px) = read_gif_rgba_recolored(&sample(), &[(1, [255, 255, 0]), (3, [9, 9, 9]), (200, [1, 1, 1])]).unwrap();
+        assert_eq!(&px[0..4], [255, 255, 0, 255]);
+        assert_eq!(&px[4..8], [0, 255, 0, 255]);
+        assert_eq!(px[11], 0);
     }
 
     #[test]

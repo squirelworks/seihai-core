@@ -119,17 +119,18 @@ fn zlib_rows(data: &[u8], stride: usize) -> io::Result<Vec<u8>> {
 pub fn read_png_rgba(data: &[u8]) -> io::Result<(u32, u32, Vec<u8>)> {
     // A server sends an image as it has it: a `.gif` (or a GIF under a
     // `.png` name) is read here too, so every image path takes both.
-    if super::gif::is_gif(data) {
-        return super::gif::read_gif_rgba(data);
-    }
     read_png_rgba_recolored(data, &[])
 }
 
 /// Like [`read_png_rgba`], with some palette entries of a palette PNG
 /// replaced first: `(index, rgb)`. Alpha still comes from the image. Other
 /// colour types ignore `recolor`. This is how a body picture is drawn in
-/// the player's colours (see `looks.rs`).
+/// the player's colours (see `looks.rs`). A GIF's colour table is
+/// recoloured the same way, so a `.gif` body takes the colours too.
 pub fn read_png_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<(u32, u32, Vec<u8>)> {
+    if super::gif::is_gif(data) {
+        return super::gif::read_gif_rgba_recolored(data, recolor);
+    }
     let bad = |m: &str| io::Error::new(io::ErrorKind::InvalidData, m.to_string());
     if data.len() < 8 || &data[..8] != &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A] {
         return Err(bad("not a PNG"));
