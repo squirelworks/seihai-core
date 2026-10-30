@@ -18,7 +18,7 @@ mod pause;
 mod pushpull;
 mod servernpcs;
 pub use hide::{HIDDEN_STATUS, HIDE_KINDS};
-pub use pause::{name_label, server_status_base, PAUSED_STATUS};
+pub use pause::{focus_pauses, name_label, pause_message_bits, server_status_base, PAUSED_STATUS};
 pub use pushpull::{NpcMoved, Grab, Jump, PushPull, Trigger};
 pub use servernpcs::{block_flags, Linked, ServerNpcSync, NPC_SEND_INTERVAL};
 use pushpull::StepResult;
