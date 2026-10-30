@@ -1,9 +1,10 @@
 //! The GS2 fixtures (`tests/fixtures/gs2/*.gs2bc`, output of the open-source
 //! gs2-parser compiler) against the opcode table and the operand rules in
 //! `documentation/gs2-opcodes.md`. The table is read from the document, so
-//! the two cannot drift apart. No GS2 reader or executor exists yet; this
-//! walk is only enough to check the bytes.
+//! the two cannot drift apart. The walk here is independent of the reader in
+//! `seihai_core::scripting::gs2`, and the reader is checked against it.
 
+use seihai_core::scripting::gs2;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -15,7 +16,7 @@ enum Operand {
     Jump,
 }
 
-struct Op {
+struct Row {
     name: String,
     operand: Operand,
     emitted: bool,
@@ -27,7 +28,7 @@ fn root() -> PathBuf {
 
 /// The rows of the opcode table: `| dec | 0xHH | name | operand | … | emitted |`.
 /// Range rows (`45–47`) are placeholders and are skipped.
-fn table() -> HashMap<u8, Op> {
+fn table() -> HashMap<u8, Row> {
     let doc = std::fs::read_to_string(root().join("documentation/gs2-opcodes.md")).unwrap();
     let mut ops = HashMap::new();
     for line in doc.lines() {
@@ -50,7 +51,7 @@ fn table() -> HashMap<u8, Op> {
             "no" => false,
             other => panic!("unknown emitted value {other:?} for {}", cells[3]),
         };
-        assert!(ops.insert(dec, Op { name: cells[3].to_string(), operand, emitted }).is_none(), "{dec} listed twice");
+        assert!(ops.insert(dec, Row { name: cells[3].to_string(), operand, emitted }).is_none(), "{dec} listed twice");
     }
     ops
 }
@@ -98,7 +99,7 @@ fn load(name: &str) -> Script {
 /// Walks the bytecode with the table's operand rules. Returns each opcode
 /// with its integer operand, if any; panics on anything the table does not
 /// allow.
-fn walk(name: &str, s: &Script, ops: &HashMap<u8, Op>) -> Vec<(u8, Option<i64>)> {
+fn walk(name: &str, s: &Script, ops: &HashMap<u8, Row>) -> Vec<(u8, Option<i64>)> {
     let c = &s.code;
     let mut out = Vec::new();
     let mut jumps = Vec::new();
@@ -230,4 +231,63 @@ fn jumps_and_numbers_decode_as_documented() {
 
     let s = load("objects.gs2bc");
     assert_eq!(s.functions.iter().map(|f| f.1.as_str()).collect::<Vec<_>>(), ["public.report", "onCreated"]);
+}
+
+// Stage B: the reader in `seihai_core::scripting::gs2` against the same
+// table and fixtures.
+
+
+fn read(name: &str) -> gs2::Script {
+    gs2::Script::parse(&std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/gs2").join(name)).unwrap()).unwrap()
+}
+
+#[test]
+fn reader_opcode_names_match_the_documented_table() {
+    let ops = table();
+    for v in 0..0xF0u8 {
+        // Placeholders (`OP_UNKNOWN_54`) are `Op::Unknown` in the reader.
+        let doc = ops.get(&v).map(|o| o.name.as_str()).filter(|n| !n.starts_with("OP_UNKNOWN"));
+        assert_eq!(gs2::Op::from_u8(v).doc_name(), doc, "opcode {v}");
+    }
+}
+
+#[test]
+fn reader_agrees_with_the_table_walk_on_every_fixture() {
+    let ops = table();
+    for f in FIXTURES {
+        let walked = walk(f, &load(f), &ops);
+        let s = read(f);
+        assert_eq!(s.code.len(), walked.len(), "{f}: instruction count");
+        for (i, (ins, (op, value))) in s.code.iter().zip(&walked).enumerate() {
+            assert_eq!(ins.op.value(), *op, "{f}: op {i}");
+            let got = match ins.operand {
+                gs2::Operand::Str(n) => Some(n as i64),
+                gs2::Operand::Int(n) => Some(n as i64),
+                gs2::Operand::None | gs2::Operand::Decimal(_) => None,
+            };
+            assert_eq!(got, *value, "{f}: operand of op {i}");
+            if let Some(t) = ins.jump_target() {
+                assert!(t <= s.code.len(), "{f}: op {i} jumps to {t}");
+            }
+        }
+        for func in &s.functions {
+            assert_eq!(s.code[func.start].op, gs2::Op::TypeArray, "{f}: {}", func.name);
+        }
+        assert!(s.code.iter().all(|i| !matches!(i.op, gs2::Op::Unknown(_))), "{f}: unknown opcode");
+    }
+}
+
+#[test]
+fn reader_disassembles_the_shared_fixture() {
+    let s = read("shared.gs2bc");
+    assert_eq!(s.gs1_flags, 0);
+    let text = s.disassemble();
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(lines[0], "    0  OP_SET_INDEX -> 44");
+    assert_eq!(lines[1], "onCreated:");
+    assert!(text.contains("   20  OP_IF -> 34\n"));
+    assert!(text.contains("   22  OP_TYPE_STRING #1 \"gs2seen\"\n   23  OP_TYPE_VAR #2 \"set\"\n   24  OP_CALL\n"));
+    assert!(text.contains("   39  OP_TYPE_NUMBER 0.5\n   40  OP_SLEEP\n"));
+    let called: Vec<&str> = s.code.windows(2).filter(|w| w[1].op == gs2::Op::Call).filter_map(|w| s.string(&w[0])).collect();
+    assert_eq!(called, ["set", "showimg", "hideimg"]);
 }
