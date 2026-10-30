@@ -114,7 +114,8 @@ Generated; do not edit between the markers.
 - ui: **emoticons**: no -> yes
 - ui: **key_config**: no -> yes
 - ui: **gs1_commands**: 106 -> 109
-- source: binary: PLO 43, PLI ITEMTAKE/WEAPONADD (32, 33) in and 25 out, configurable keys and emotions, GS1 106 to 109
+- drops: **drops**: client rolls bush and pot drops, applies pickups itself -> client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE
+- source: binary: PLO 43, PLI ITEMTAKE/WEAPONADD (32, 33) in and 25 out, configurable keys and emotions, GS1 106 to 109; bush rolls sent with PLI_ITEMADD and pickups with ITEMTAKE (1.39 lab capture)
 
 #### 1.39 (`GNW07080`, binary, linked 2000-08-07)
 
@@ -139,6 +140,7 @@ Generated; do not edit between the markers.
 - life: **combat**: none -> 2.05 rules
 - ui: **server_list**: direct (www.graalonline.com:14900) -> one list
 - ui: **gs1_commands**: 111 -> 126
+- unknown (drops): the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced
 - unknown (listserver): original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured
 - unknown (listserver): login frame inferred, not captured, and no evidence for its shape: Seihai keeps shape B (id 0 `newmain`, then id 1 with the account), what it sent before the lab captures; whether a real 1.41 sends the account to the listserver is unknown
 - unknown (life): death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)
@@ -156,9 +158,10 @@ Generated; do not edit between the markers.
 - ui: **chat_text**: ChatText { face: Helvetica, height: 24 } -> ChatText { face: TempusSans, height: 24 }
 - ui: **gs1_commands**: 126 -> 134
 - mannerisms: **mannerisms**: 1.39 (blink after the hurt pose, hide keeps the carry poses, 4-tile knockback) -> NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses)
+- drops: **drops**: client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE -> server drops (PLO_ITEMADD), pickups go through PLI_ITEMTAKE
 - unknown (listserver): built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured
 - unknown (listserver): login frame inferred, not captured: Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; a real 1.42 frame was never captured, and no run on the public service has used shape A, so the port is assumed
-- source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134
+- source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)
 
 #### 2.00 (`GNW24011`, binary, linked 2001-02-01)
 
