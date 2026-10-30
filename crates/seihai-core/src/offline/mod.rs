@@ -1715,6 +1715,23 @@ impl OfflineSession {
         }
     }
 
+    /// Whether `(fx, fy)` is off the board with no level there: the wall
+    /// test when there are no tile types (`--no-builtin` with nothing
+    /// cached). The 2.22 client's wall test checks the bounds before the
+    /// tile, so the edge is a wall whatever the tiles are; on a gmap a loaded
+    /// neighbour is open ground.
+    fn off_board(&self, fx: f32, fy: f32) -> bool {
+        let side = crate::gmap::CELL_TILES as f32;
+        let (kx, ky) = ((fx / side).floor() as i32, (fy / side).floor() as i32);
+        if (kx, ky) == (0, 0) {
+            return false;
+        }
+        match &self.gmap {
+            Some(w) => !w.levels.contains_key(&(w.cell.0 + kx, w.cell.1 + ky)),
+            None => true,
+        }
+    }
+
     /// Whether a sprite position (current-cell tiles) is a legal place to be
     /// as far as the gmap goes: inside the cell, or across an edge into a
     /// loaded level. A step that would cross both edges at once is refused
@@ -1785,10 +1802,11 @@ impl OfflineSession {
         if self.npc_blocks_at(px as f32, py as f32, except) {
             return true;
         }
-        if let (Some(level), Some(types)) = (&self.current_level, &self.tiletypes) {
-            if self.kind_at_point(level, types, (px + WALK_FLOOR_EPS) as f32, (py + WALK_FLOOR_EPS) as f32) == TileKind::Blocking {
-                return true;
-            }
+        let (fx, fy) = ((px + WALK_FLOOR_EPS) as f32, (py + WALK_FLOOR_EPS) as f32);
+        match (&self.current_level, &self.tiletypes) {
+            (Some(level), Some(types)) if self.kind_at_point(level, types, fx, fy) == TileKind::Blocking => return true,
+            (Some(_), None) if self.off_board(fx, fy) => return true,
+            _ => {}
         }
         match &self.current_level {
             Some(level) => level.chests.iter().any(|c| {
@@ -1990,10 +2008,10 @@ impl OfflineSession {
         if self.dev.wallhack() {
             return false;
         }
-        if let (Some(level), Some(types)) = (&self.current_level, &self.tiletypes) {
-            if self.kind_at_point(level, types, fx, fy) == TileKind::Blocking {
-                return true;
-            }
+        match (&self.current_level, &self.tiletypes) {
+            (Some(level), Some(types)) if self.kind_at_point(level, types, fx, fy) == TileKind::Blocking => return true,
+            (Some(_), None) if self.off_board(fx, fy) => return true,
+            _ => {}
         }
         match &self.current_level {
             Some(level) => level.chests.iter().any(|c| fx >= c.x as f32 && fx < c.x as f32 + 2.0 && fy >= c.y as f32 && fy < c.y as f32 + 2.0),
@@ -3341,6 +3359,44 @@ mod tests {
         s.big_map = Some(big3());
         assert!(s.check_links());
         assert_eq!(s.pending_link, Some(("e.nw".into(), -0.5, 17.25)));
+    }
+
+    /// The server's board with no tile types (`--no-builtin`, nothing
+    /// cached): off the board is still a wall, as in the 2.22 client's wall
+    /// test (bounds first). The Windows lab run walked to y 75 in `new1.nw`.
+    #[test]
+    fn off_the_board_is_a_wall_without_tile_types() {
+        let mut s = body_at(level(|_, _| OPEN), 30.0, 32.0);
+        s.tiletypes = None;
+        walk(&mut s, 0.0, 0.5, 200);
+        assert!(s.player_y <= 61.0, "south: stopped at the edge, got {}", s.player_y);
+        walk(&mut s, 0.5, 0.0, 200);
+        assert!(s.player_x <= 61.5, "east: got {}", s.player_x);
+        walk(&mut s, 0.0, -0.5, 200);
+        assert!(s.player_y >= -1.0, "north: got {}", s.player_y);
+        walk(&mut s, -0.5, 0.0, 200);
+        assert!(s.player_x >= -0.5, "west: got {}", s.player_x);
+    }
+
+    /// The lab's `new1.nw`: the server's board, its one west-edge link from
+    /// `PLO_LEVELLINK`, no tile types, 2.22 link boxes. Walking west from the
+    /// start fires the link, with the link's own arrival x.
+    #[test]
+    fn a_server_edge_link_fires_without_tile_types() {
+        let mut lvl = level(|_, _| OPEN);
+        lvl.add_server_links(&["testworld.nw 0 0 1 64 61 playery".to_string()]);
+        let mut s = body_at(lvl, 30.0, 32.0);
+        s.tiletypes = None;
+        s.link_boxes = true;
+        let mut fired = None;
+        for _ in 0..200 {
+            if s.try_move(-0.5, 0.0).is_some() && s.check_links() {
+                fired = s.pending_link.take();
+                break;
+            }
+        }
+        let (dest, x, y) = fired.expect("the west edge link fires");
+        assert_eq!((dest.as_str(), x, y), ("testworld.nw", 61.0, 32.0));
     }
 
     /// A Z3-V1 level read from disk drives the same link rules: a negative
