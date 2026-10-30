@@ -743,11 +743,19 @@ impl SessionState {
                     self.npcs.push(s);
                 }
                 if let Some((id, p)) = parse_npc_props(&msg.payload, self.bow_prop10) {
-                    let level = self.current_level_name();
+                    // The level the server is sending: on a gmap a neighbour's
+                    // NPCs come between that neighbour's name and the gmap's,
+                    // and belong to it, not to the player's level.
+                    let level = self.level_name.clone().or_else(|| self.current_level_name());
                     let e = self.server_npcs.entry(id).or_insert_with(|| (level.clone(), NpcProps::default()));
-                    e.0 = level;
+                    e.0 = level.clone();
                     e.1.merge(&p);
-                    self.npc_changes.push((id, p));
+                    // Only the player's level takes updates as they come; a
+                    // neighbour's records wait in `server_npcs` until it is entered.
+                    let here = self.current_level_name();
+                    if level.as_deref().zip(here.as_deref()).is_none_or(|(a, b)| a.eq_ignore_ascii_case(b)) {
+                        self.npc_changes.push((id, p));
+                    }
                 }
             }
             14 => {
@@ -3020,6 +3028,27 @@ mod tests {
 
     fn grid() -> Gmap {
         Gmap::parse(GRID).unwrap()
+    }
+
+    /// Lab 2026-10-30: a neighbour's NPCs (sent with its level data, after
+    /// its name and before the gmap's) belong to the neighbour. They were
+    /// taken as the player's level's and added to it, so their `created`
+    /// ran and sent GANI and BODY on every crossing.
+    #[test]
+    fn a_neighbours_npcs_are_kept_for_the_neighbour() {
+        use crate::protocol::npcprops::{npc_props_message, PropValue, NPCPROP_X};
+        let mut st = SessionState::for_version(ClientVersion::V222);
+        gmap_login(&mut st);
+        st.set_gmap_grid(grid());
+        st.npc_changes.clear();
+        let npc = |id| npc_props_message(id, &[(NPCPROP_X, PropValue::Byte(60))]);
+        st.apply_body(&[msg(6, b"gm_se.nw"), npc(302), msg(6, b"gm2x2.gmap")].concat());
+        assert!(st.npc_changes.is_empty(), "not the player's level");
+        assert_eq!(st.server_npcs.get(&302).and_then(|e| e.0.as_deref()), Some("gm_se.nw"));
+        // The player's own level still takes its updates.
+        st.apply_body(&npc(300));
+        assert_eq!(st.npc_changes.iter().map(|c| c.0).collect::<Vec<_>>(), [300]);
+        assert_eq!(st.server_npcs.get(&300).and_then(|e| e.0.as_deref()), Some("gm_nw.nw"));
     }
 
     #[test]
