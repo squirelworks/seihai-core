@@ -17,7 +17,8 @@ step	label	token	basis	kind	area	field	detail
 5	1.38	GNW22060	binary	changed	ui	emoticons	no -> yes
 5	1.38	GNW22060	binary	changed	ui	key_config	no -> yes
 5	1.38	GNW22060	binary	changed	ui	gs1_commands	106 -> 109
-5	1.38	GNW22060	binary	source	-	-	binary: PLO 43, PLI ITEMTAKE/WEAPONADD (32, 33) in and 25 out, configurable keys and emotions, GS1 106 to 109
+5	1.38	GNW22060	binary	changed	drops	drops	client rolls bush and pot drops, applies pickups itself -> client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE
+5	1.38	GNW22060	binary	source	-	-	binary: PLO 43, PLI ITEMTAKE/WEAPONADD (32, 33) in and 25 out, configurable keys and emotions, GS1 106 to 109; bush rolls sent with PLI_ITEMADD and pickups with ITEMTAKE (1.39 lab capture)
 6	1.39	GNW07080	binary	changed	protocol	plo (server ids handled)	+75 PROFILE (44 -> 45 ids)
 6	1.39	GNW07080	binary	changed	protocol	pli (client ids sent)	+80 PROFILEGET, +81 PROFILESET (33 -> 35 ids)
 6	1.39	GNW07080	binary	changed	props	own-player props	+34 ACCOUNTNAME (34 -> 35 ids)
@@ -36,6 +37,7 @@ step	label	token	basis	kind	area	field	detail
 7	1.41	GNW13110	binary	changed	life	combat	none -> 2.05 rules
 7	1.41	GNW13110	binary	changed	ui	server_list	direct (www.graalonline.com:14900) -> one list
 7	1.41	GNW13110	binary	changed	ui	gs1_commands	111 -> 126
+7	1.41	GNW13110	binary	unknown	drops	-	the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced
 7	1.41	GNW13110	binary	unknown	listserver	-	original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured
 7	1.41	GNW13110	binary	unknown	listserver	-	login frame inferred, not captured, and no evidence for its shape: Seihai keeps shape B (id 0 `newmain`, then id 1 with the account), what it sent before the lab captures; whether a real 1.41 sends the account to the listserver is unknown
 7	1.41	GNW13110	binary	unknown	life	-	death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)
@@ -50,9 +52,10 @@ step	label	token	basis	kind	area	field	detail
 8	1.42	GNW08011	binary	changed	ui	chat_text	ChatText { face: Helvetica, height: 24 } -> ChatText { face: TempusSans, height: 24 }
 8	1.42	GNW08011	binary	changed	ui	gs1_commands	126 -> 134
 8	1.42	GNW08011	binary	changed	mannerisms	mannerisms	1.39 (blink after the hurt pose, hide keeps the carry poses, 4-tile knockback) -> NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses)
+8	1.42	GNW08011	binary	changed	drops	drops	client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE -> server drops (PLO_ITEMADD), pickups go through PLI_ITEMTAKE
 8	1.42	GNW08011	binary	unknown	listserver	-	built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured
 8	1.42	GNW08011	binary	unknown	listserver	-	login frame inferred, not captured: Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; a real 1.42 frame was never captured, and no run on the public service has used shape A, so the port is assumed
-8	1.42	GNW08011	binary	source	-	-	binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134
+8	1.42	GNW08011	binary	source	-	-	binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)
 9	2.00	GNW24011	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
 9	2.00	GNW24011	binary	changed	protocol	plo (server ids handled)	+154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
 9	2.00	GNW24011	binary	changed	ui	gs1_commands	134 -> 142
