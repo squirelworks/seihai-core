@@ -8,6 +8,12 @@ enum), `src/codegen/GS2Bytecode.cpp` (the file and operand writer),
 from them. The fixtures are in `crates/seihai-core/tests/fixtures/gs2/` and
 `crates/seihai-core/tests/gs2_opcodes.rs` checks them against this file.
 
+Seihai reads these files with `seihai_core::scripting::gs2::Script::parse`
+(`crates/seihai-core/src/scripting/gs2.rs`). It returns the function table,
+the string table and one instruction per op index, and `disassemble()` prints
+them. It runs nothing. A value this table does not name, or a placeholder,
+comes back as `Op::Unknown`.
+
 This is what the open-source compiler **writes**. What the 3.x/4.x clients or
 the official server do with each opcode at run time is not in this source.
 Where the enum has a comment on meaning, it is the compiler author's own
