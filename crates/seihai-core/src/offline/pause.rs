@@ -125,13 +125,13 @@ mod tests {
         assert!(s.paused);
     }
 
-    /// The lab runs: no focus pause in 1.33 and 1.34; 1.35 to 1.39 send
+    /// The lab runs: no focus pause up to 1.34; 1.35 to 1.39 send
     /// STATUS 17 for the server's 20 and no position; later builds keep the
     /// server's bits and send the position.
     #[test]
     fn gen2_focus_pause_follows_the_lab() {
         use crate::protocol::ClientVersion::*;
-        assert!(!focus_pauses(V133) && !focus_pauses(V134));
+        assert!([V121, V128B2, V13T, V131, V132, V133, V134].iter().all(|&v| !focus_pauses(v)));
         assert!(focus_pauses(V135) && focus_pauses(V139) && focus_pauses(V222));
         assert_eq!(pause_message_bits(V139, 20, PAUSED_STATUS), (17, false));
         assert_eq!(pause_message_bits(V135, 20, PAUSED_STATUS), (17, false));
