@@ -79,11 +79,51 @@ If the new build lands between two existing ones, the step after it must be re-c
 Generated; do not edit between the markers.
 
 <!-- version-chain:begin -->
-#### 1.33 (`GNW20020`, binary, linked 2000-02-21)
+#### 1.21 (`GSERV007`, binary, linked 1999-05-10)
 
 - start of the chain, written out in full as ORIGIN
 - unknown (levels): Z3-V1 (.zelda): every binary from 1st Graal to 2.31 compares the level magic with Z3-V1.03 and Z3-V1.04, so the column is yes for every build; whether a build also tries .zelda for a bare level name is in no binary (Seihai tries .graal, then .zelda)
-- source: origin row (binary of 1.33)
+- unknown (pli): the binaries 1.21 to 1.32 show only the send ids passed as constants; the ids below the highest one are taken as sent
+- unknown (other props): 1.21 to 1.32 have no separate parser for other players' props; 1.33's set is kept
+- unknown (live): not run: the 1.21 install is an InstallShield setup
+- source: origin row (binary of 1.21, Graal_analysis client-internals/version-profiles/v121-v132.toml): login id 0 with token, account and password; zlib on every flush; no UDP; default server www.graalonline.com:14804
+
+#### 1.28 beta 2 (`GSERV013`, binary, linked 1999-11-23)
+
+- protocol: **plo (server ids handled)**: +30 FILESENDFAILED, +35 RC_ADMINMESSAGE, +36 EXPLOSION, +37 PRIVATEMESSAGE, +38 PUSHAWAY (35 -> 40 ids)
+- protocol: **pli (client ids sent)**: +27 EXPLOSION, +28 PRIVATEMESSAGE, +29 NPCWEAPONDEL (27 -> 30 ids)
+- protocol: **udp**: no -> yes
+- props: **own-player props**: +25 APCOUNTER, +26 MAGICPOINTS, +27 KILLSCOUNT, +28 DEATHSCOUNT, +29 ONLINESECS, +30 IPADDR, +31 UDPPORT (25 -> 32 ids)
+- props: **npc_max**: 17 -> 32
+- ui: **gs1_commands**: 71 -> 84
+- source: binary: PLO 30 and 35-38, send ids to 29, player props to 31, NPC props to 32, direct data packages (UDP ids 0, 10-22), language files, GS1 table 71 to 84
+
+#### 1.3 test (`GSERV014`, binary, linked 1999-11-29)
+
+- protocol: **plo (server ids handled)**: +39 LEVELMODTIME (40 -> 41 ids)
+- protocol: **pli (client ids sent)**: +30 LEVELWARPMOD (30 -> 31 ids)
+- props: **own-player props**: +32 ALIGNMENT (32 -> 33 ids)
+- props: **npc_max**: 32 -> 34
+- ui: **gs1_commands**: 84 -> 85
+- source: binary: PLO 39, send id 30, player prop 32 (alignment), NPC props to 34, GS1 table 85 (setgifpart)
+
+#### 1.31 (`GSERV016`, binary, linked 1999-12-07)
+
+- protocol: **plo (server ids handled)**: +40 HURTPLAYER (41 -> 42 ids)
+- ui: **server_list**: direct (www.graalonline.com:14804) -> direct (www.graalonline.com:14900)
+- source: binary: PLO 40, default port 14900 (14804 before), noudp= and fixedudpport= options
+
+#### 1.32 (`GSERV018`, binary, linked 2000-01-12)
+
+- protocol: **plo (server ids handled)**: +41 STARTMESSAGE (42 -> 43 ids)
+- props: **own-player props**: +33 ADDITFLAGS (33 -> 34 ids)
+- source: binary and lab: PLO 41, player prop 33 (ADDITFLAGS); the real 1.32 logged in to the gen-2 stub with the login props of 1.33 (2026-10-30)
+
+#### 1.33 (`GNW20020`, binary, linked 2000-02-21)
+
+- protocol: **pli (client ids sent)**: +31 PACKETCOUNT (31 -> 32 ids)
+- ui: **gs1_commands**: 85 -> 88
+- source: binary of 1.33: send id 31, GS1 table 88, GNW tokens from here on
 
 #### 1.34 (`GNW22030`, binary, linked 2000-03-23)
 

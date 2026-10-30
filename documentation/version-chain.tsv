@@ -1,230 +1,255 @@
 step	label	token	basis	kind	area	field	detail
-0	1.33	GNW20020	binary	origin	-	-	start of the chain, written out in full as ORIGIN
-0	1.33	GNW20020	binary	unknown	levels	-	Z3-V1 (.zelda): every binary from 1st Graal to 2.31 compares the level magic with Z3-V1.03 and Z3-V1.04, so the column is yes for every build; whether a build also tries .zelda for a bare level name is in no binary (Seihai tries .graal, then .zelda)
-0	1.33	GNW20020	binary	source	-	-	origin row (binary of 1.33)
-1	1.34	GNW22030	binary	changed	props	other-player props	+34 ACCOUNTNAME (21 -> 22 ids)
-1	1.34	GNW22030	binary	changed	ui	gs1_commands	88 -> 93
-1	1.34	GNW22030	binary	source	-	-	binary: other-player prop 34 (ACCOUNTNAME), GS1 table 88 to 93 (cross-version-timeline)
-2	1.35	GNW13040	binary	changed	ui	hud	Letters -> LettersChat
-2	1.35	GNW13040	binary	source	-	-	shipped state.png: CHAT label on the HUD sheet; GS1 table unchanged
-3	1.36	GNW10050	binary	changed	ui	gs1_commands	93 -> 104
-3	1.36	GNW10050	binary	source	-	-	binary: GS1 table 93 to 104
-4	1.37	GNW21050	binary	changed	ui	gs1_commands	104 -> 106
-4	1.37	GNW21050	binary	source	-	-	binary: GS1 table 104 to 106
-5	1.38	GNW22060	binary	changed	protocol	plo (server ids handled)	+43 DEFAULTWEAPON (43 -> 44 ids)
-5	1.38	GNW22060	binary	changed	protocol	pli (client ids sent)	+32 ITEMTAKE, +33 WEAPONADD; -25 UNKNOWN25 (32 -> 33 ids)
-5	1.38	GNW22060	binary	changed	ui	hud	LettersChat -> BlankButtons
-5	1.38	GNW22060	binary	changed	ui	emoticons	no -> yes
-5	1.38	GNW22060	binary	changed	ui	key_config	no -> yes
-5	1.38	GNW22060	binary	changed	ui	gs1_commands	106 -> 109
-5	1.38	GNW22060	binary	changed	drops	drops	client rolls bush and pot drops, applies pickups itself -> client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE
-5	1.38	GNW22060	binary	source	-	-	binary: PLO 43, PLI ITEMTAKE/WEAPONADD (32, 33) in and 25 out, configurable keys and emotions, GS1 106 to 109; bush rolls sent with PLI_ITEMADD and pickups with ITEMTAKE (1.39 lab capture)
-6	1.39	GNW07080	binary	changed	protocol	plo (server ids handled)	+75 PROFILE (44 -> 45 ids)
-6	1.39	GNW07080	binary	changed	protocol	pli (client ids sent)	+80 PROFILEGET, +81 PROFILESET (33 -> 35 ids)
-6	1.39	GNW07080	binary	changed	props	own-player props	+34 ACCOUNTNAME (34 -> 35 ids)
-6	1.39	GNW07080	binary	changed	props	other-player props	+33 ADDITFLAGS (22 -> 23 ids)
-6	1.39	GNW07080	binary	changed	ui	chat_recall	no -> yes
-6	1.39	GNW07080	binary	changed	ui	chat_text	ChatText { face: Dialog, height: 28 } -> ChatText { face: Helvetica, height: 24 }
-6	1.39	GNW07080	binary	changed	ui	gs1_commands	109 -> 111
-6	1.39	GNW07080	binary	source	-	-	binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111
-7	1.41	GNW13110	binary	changed	protocol	encryption	Gen2 -> Gen3
-7	1.41	GNW13110	binary	changed	protocol	listserver	none -> listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape B (login frame inferred, not captured; no evidence for this shape)
-7	1.41	GNW13110	binary	changed	protocol	pli (client ids sent)	-31 PACKETCOUNT (35 -> 34 ids)
-7	1.41	GNW13110	binary	changed	props	own-player props	+35 BODYIMG, +36 RATING (35 -> 37 ids)
-7	1.41	GNW13110	binary	changed	props	other-player props	+35 BODYIMG, +36 RATING (23 -> 25 ids)
-7	1.41	GNW13110	binary	changed	props	npc_max	34 -> 35
-7	1.41	GNW13110	binary	changed	life	death	none -> 2.05 rules (name-group test)
-7	1.41	GNW13110	binary	changed	life	combat	none -> 2.05 rules
-7	1.41	GNW13110	binary	changed	ui	server_list	direct (www.graalonline.com:14900) -> one list
-7	1.41	GNW13110	binary	changed	ui	gs1_commands	111 -> 126
-7	1.41	GNW13110	binary	unknown	drops	-	the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced
-7	1.41	GNW13110	binary	unknown	listserver	-	original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured
-7	1.41	GNW13110	binary	unknown	listserver	-	login frame inferred, not captured, and no evidence for its shape: Seihai keeps shape B (id 0 `newmain`, then id 1 with the account), what it sent before the lab captures; whether a real 1.41 sends the account to the listserver is unknown
-7	1.41	GNW13110	binary	unknown	life	-	death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)
-7	1.41	GNW13110	binary	unknown	levels	-	the version-profile TOML lists GLEVNW01 (.nw) as readable by 1.41 and 1.42 and drops it at 2.00; the rows of 1.33 to 2.04 have .graal only
-7	1.41	GNW13110	binary	source	-	-	binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126
-8	1.42	GNW08011	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape B (login frame inferred, not captured; no evidence for this shape) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured)
-8	1.42	GNW08011	binary	changed	protocol	plo (server ids handled)	+42 NEWWORLDTIME, +44 HASNPCSERVER, +45 FILEUPTODATE, +150 NPCDEL2, +151 HIDENPCS, +153 SAY2 (45 -> 51 ids)
-8	1.42	GNW08011	binary	changed	protocol	pli (client ids sent)	+34 UPDATEFILE (34 -> 35 ids)
-8	1.42	GNW08011	binary	changed	life	death	2.05 rules (name-group test) -> none
-8	1.42	GNW08011	binary	changed	life	combat	2.05 rules -> none
-8	1.42	GNW08011	binary	changed	ui	ganis	no -> yes
-8	1.42	GNW08011	binary	changed	ui	chat_text	ChatText { face: Helvetica, height: 24 } -> ChatText { face: TempusSans, height: 24 }
-8	1.42	GNW08011	binary	changed	ui	gs1_commands	126 -> 134
-8	1.42	GNW08011	binary	changed	mannerisms	mannerisms	1.39 (blink after the hurt pose, hide keeps the carry poses, 4-tile knockback) -> NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses)
-8	1.42	GNW08011	binary	changed	drops	drops	client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE -> server drops (PLO_ITEMADD), pickups go through PLI_ITEMTAKE
-8	1.42	GNW08011	binary	unknown	listserver	-	built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured
-8	1.42	GNW08011	binary	unknown	listserver	-	login frame inferred, not captured: Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; a real 1.42 frame was never captured, and no run on the public service has used shape A, so the port is assumed
-8	1.42	GNW08011	binary	source	-	-	binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)
-9	2.00	GNW24011	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
-9	2.00	GNW24011	binary	changed	protocol	plo (server ids handled)	+154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
-9	2.00	GNW24011	binary	changed	ui	gs1_commands	134 -> 142
-9	2.00	GNW24011	binary	unknown	login	-	props sent at login (verified for 2.05 only)
-9	2.00	GNW24011	binary	unknown	listserver	-	Seihai now sends the real 2.00 frame (shape A, captured in the lab: id 0 `newmain` only, no account). That frame has not been run on the public service. The 2026-10-25 matrix used Seihai's older classic login (shape B), which 14923 answered with a plain zlib id-0 list (4 rows) while 14922 stayed silent; the port is assumed for shape A until a run. A real 2.00's reply was not captured
-9	2.00	GNW24011	binary	unknown	token	-	the token is not in gs2lib, so a stock GServer-v2 does not know it
-9	2.00	GNW24011	binary	source	-	-	binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142; list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)
-10	2.01	GNW23021	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured)
-10	2.01	GNW23021	binary	changed	protocol	plo (server ids handled)	+46 HITOBJECTS, +156 SETACTIVELEVEL (53 -> 55 ids)
-10	2.01	GNW23021	binary	changed	protocol	pli (client ids sent)	+35 ADJACENTLEVEL, +36 HITOBJECTS (35 -> 37 ids)
-10	2.01	GNW23021	binary	changed	ui	gs1_commands	142 -> 144
-10	2.01	GNW23021	binary	unknown	listserver	-	2.01 to 2.04 (and 2.02 rev 2): login frame inferred, not captured. Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; no real client of these builds was captured and no run on the public service has used shape A, so the port is assumed. The 2026-10-25 matrix used Seihai's older shape B: a legacy list on 14923, nothing on 14922. 14921, the port the build carries, is dead
-10	2.01	GNW23021	binary	source	-	-	binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144
-11	2.02	GNW15041	binary	changed	protocol	plo (server ids handled)	+47 STAFFGUILDS (55 -> 56 ids)
-11	2.02	GNW15041	binary	changed	props	own-player props	+37-41 (37 -> 42 ids)
-11	2.02	GNW15041	binary	changed	props	other-player props	+37-41 (25 -> 30 ids)
-11	2.02	GNW15041	binary	changed	props	npc_max	35 -> 40
-11	2.02	GNW15041	binary	changed	ui	gs1_commands	144 -> 146
-11	2.02	GNW15041	binary	source	-	-	binary (base build and rev 1): PLO 47, player props 37 to 41, NPC props to 40, GS1 144 to 146
-12	2.02 rev2	GNW20041	binary	changed	protocol	pli (client ids sent)	+37 LANGUAGE (37 -> 38 ids)
-12	2.02 rev2	GNW20041	binary	changed	protocol	sends_language	no -> yes
-12	2.02 rev2	GNW20041	binary	source	-	-	binary: LANGUAGE (37) sent after login (no send site in rev 1)
-13	2.03	GNW06051	binary	changed	protocol	plo (server ids handled)	+48 TRIGGERACTION, +165 MOVE (56 -> 58 ids)
-13	2.03	GNW06051	binary	changed	protocol	pli (client ids sent)	+38 TRIGGERACTION (38 -> 39 ids)
-13	2.03	GNW06051	binary	changed	ui	gs1_commands	146 -> 148
-13	2.03	GNW06051	binary	source	-	-	binary: TRIGGERACTION (38) sent, PLO 48 and 165, GS1 146 to 148
-14	2.04	GNW24061	binary	changed	protocol	plo (server ids handled)	+166 SHOWIMGNPC; -26 NPCACTION (58 -> 58 ids)
-14	2.04	GNW24061	binary	changed	props	own-player props	+42 ATTACHNPC (42 -> 43 ids)
-14	2.04	GNW24061	binary	changed	props	other-player props	+42 ATTACHNPC (30 -> 31 ids)
-14	2.04	GNW24061	binary	changed	ui	gs1_commands	148 -> 157
-14	2.04	GNW24061	binary	source	-	-	binary: PLO 166 in and 26 out, prop 42 (ATTACHNPC), GS1 148 to 157
-15	2.05	GNW03081	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
-15	2.05	GNW03081	binary	changed	protocol	plo (server ids handled)	+168 UNKNOWN168 (58 -> 59 ids)
-15	2.05	GNW03081	binary	changed	levels	nw	no -> yes
-15	2.05	GNW03081	binary	changed	levels	gmap	no -> yes
-15	2.05	GNW03081	binary	changed	levels	cached_links	no -> yes
-15	2.05	GNW03081	binary	changed	life	death	none -> 2.05 rules (name-group test)
-15	2.05	GNW03081	binary	changed	life	combat	none -> 2.05 rules
-15	2.05	GNW03081	binary	changed	ui	server_in_title	no -> yes
-15	2.05	GNW03081	binary	changed	ui	gs1_commands	157 -> 161
-15	2.05	GNW03081	binary	changed	mannerisms	mannerisms	NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses) -> 2.05 (hidden ganis, pull stays, swim runs on)
-15	2.05	GNW03081	binary	unknown	listserver	-	this profile now sends the real 2.05 frame (shape A, captured in the lab: id 0 `newmain` only). No public run has used it: the 2026-10-25 matrix binary sent the gen-5 login for 2.05 (the saved-version override, since fixed) and both 14922 and 14923 answered that. 14923 answered the older classic login (shape B) of every other classic profile, so 14923 is assumed here
-15	2.05	GNW03081	binary	source	-	-	binary (rev 1 and rev 2) and lab: .nw and .gmap levels, PLO 168, server name in the title, GS1 157 to 161; death and combat rules traced here
-16	2.1	GNW31101	inferred	changed	protocol	listserver	listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14922, login shape B (login frame inferred, not captured; no evidence for this shape)
-16	2.1	GNW31101	inferred	changed	protocol	plo (server ids handled)	+49 PLAYERWARP2, +169 UPGRADEURL, +170 GHOSTMODE, +171 BIGMAP, +172 MINIMAP, +173 GHOSTTEXT, +174 GHOSTICON (59 -> 66 ids)
-16	2.1	GNW31101	inferred	changed	props	own-player props	+43 GMAPLEVELX, +44 GMAPLEVELY, +45 Z (43 -> 46 ids)
-16	2.1	GNW31101	inferred	changed	props	other-player props	+43 GMAPLEVELX, +44 GMAPLEVELY, +45 Z (31 -> 34 ids)
-16	2.1	GNW31101	inferred	changed	props	npc_max	40 -> 43
-16	2.1	GNW31101	inferred	changed	props	bow_prop10	yes -> no
-16	2.1	GNW31101	inferred	changed	files	modtime	no -> yes
-16	2.1	GNW31101	inferred	changed	files	image_ext	".gif" -> ".png"
-16	2.1	GNW31101	inferred	changed	files	download_maps	no -> yes
-16	2.1	GNW31101	inferred	changed	life	death	2.05 rules (name-group test) -> 2.1 rules (no name-group test)
-16	2.1	GNW31101	inferred	changed	ui	minimap	no -> yes
-16	2.1	GNW31101	inferred	changed	ui	log_window	no -> yes
-16	2.1	GNW31101	inferred	changed	ui	ghost_mode	no -> yes
-16	2.1	GNW31101	inferred	unknown	binary	-	no 2.1 release binary; every value of this step is inferred
-16	2.1	GNW31101	inferred	unknown	token	-	the 2.1 test builds still send the 2.05 token, so GNW31101 is from gs2lib only
-16	2.1	GNW31101	inferred	unknown	protocol	-	PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169
-16	2.1	GNW31101	inferred	unknown	listserver	-	2.1 to 2.16 have no client binary: login frame inferred, not captured. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
-16	2.1	GNW31101	inferred	unknown	pli	-	client send set is carried from 2.05
-16	2.1	GNW31101	inferred	unknown	props	-	player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
-16	2.1	GNW31101	inferred	unknown	life	-	death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
-16	2.1	GNW31101	inferred	unknown	files	-	the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-16	2.1	GNW31101	inferred	source	-	-	server source and release notes: gani prop 10, .png defaults, PLO_FILE modtime, gserver minimap, ghost mode; PLO 49 and 169 are in the two 2.1 test builds
-17	2.12	GNW01012	inferred	same	-	-	no change against the step before
-17	2.12	GNW01012	inferred	unknown	all	-	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
-17	2.12	GNW01012	inferred	source	-	-	release notes: multi-level editing in the editor
-18	2.13	GNW23012	inferred	same	-	-	no change against the step before
-18	2.13	GNW23012	inferred	unknown	all	-	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
-18	2.13	GNW23012	inferred	source	-	-	release notes: gani attributes to #P9
-19	2.14	GNW30042	inferred	changed	protocol	plo (server ids handled)	+68 LARGEFILESTART, +69 LARGEFILEEND, +178 SERVERWARP, +180 STATUSLIST (66 -> 70 ids)
-19	2.14	GNW30042	inferred	changed	protocol	pli (client ids sent)	+41 SERVERWARP (39 -> 40 ids)
-19	2.14	GNW30042	inferred	changed	files	large_files	no -> yes
-19	2.14	GNW30042	inferred	changed	ui	server_list	one list -> 2 tabs
-19	2.14	GNW30042	inferred	unknown	protocol	-	PLO 178 and 180 and PLI 41 are inferred (the TOML entry is itself inferred); 175 to 185 are first seen in 2.17
-19	2.14	GNW30042	inferred	source	-	-	server source and release notes: large files (LARGEFILESTART/END), SERVERWARP, server list in two tabs; PLO 178 and 180 from the version-profile TOML
-20	2.15	GNW19052	inferred	same	-	-	no change against the step before
-20	2.15	GNW19052	inferred	unknown	all	-	no change is known; the row is the step before (no 2.15 binary)
-20	2.15	GNW19052	inferred	source	-	-	no 2.15 source of its own
-21	2.16	GNW12102	inferred	changed	props	own-player props	+46-49, +52 PLANGUAGE, +54-74 (46 -> 72 ids)
-21	2.16	GNW12102	inferred	changed	props	other-player props	+23 EFFECTCOLORS, +46-49, +52 PLANGUAGE, +53 PSTATUSMSG, +54-74, +75 OSTYPE, +76 TEXTCODEPAGE (34 -> 64 ids)
-21	2.16	GNW12102	inferred	unknown	props	-	the version-profile TOML keeps the 2.15 prop limit (45) although its note says 54 to 74 arrive in 2.16; the row follows the note
-21	2.16	GNW12102	inferred	unknown	props	-	NPC prop limit is carried from 2.1 (the 2.17 value is 73)
-21	2.16	GNW12102	inferred	source	-	-	release notes: gani attributes to #P30 (props 54 to 74); player prop sets follow the 2.22 binary
-22	2.17	GNW22122	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14922, login shape B (login frame inferred, not captured; no evidence for this shape) -> listserver.graal.in:14923 (legacy, confirmed), login shape B (login frame captured from a real client)
-22	2.17	GNW22122	binary	changed	protocol	plo (server ids handled)	+175 SHOOT, +176 KINGDOMSMODE, +177 NEWWORLDMODE, +179 RPGWINDOW, +181 UNKNOWN181, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +184 TAKESCREENSHOT, +185 BOARDHEIGHTS (70 -> 79 ids)
-22	2.17	GNW22122	binary	changed	protocol	pli (client ids sent)	+39 TAMPERCHECK, +40 SHOOT, +43 MUTEPLAYER, +44 PROCESSLIST, +45 PROCESSRUNNING (40 -> 45 ids)
-22	2.17	GNW22122	binary	changed	protocol	tampercheck	no -> yes
-22	2.17	GNW22122	binary	changed	protocol	tamper	none -> known words, re-send Never
-22	2.17	GNW22122	binary	changed	protocol	showimg (id 24)	none -> every 5100 ms
-22	2.17	GNW22122	binary	changed	protocol	login frame	none -> files, process list, props, idle.gani at once, status icons, language and tamper check in the login frame, 96 ms after the level without 182
-22	2.17	GNW22122	binary	changed	props	npc_max	43 -> 73
-22	2.17	GNW22122	binary	changed	levels	heights	no -> yes
-22	2.17	GNW22122	binary	unknown	props	-	other-player prop parser was not read; the 2.22 set is used
-22	2.17	GNW22122	binary	unknown	ui	-	GS1 command count was not read; 161 is carried
-22	2.17	GNW22122	binary	unknown	login	-	the real 2.17.1 login to a lab listserver was captured: shape B (one plain zlib frame, id 0 `newmain` then id 1 with the account, no token), which Seihai sends. What the public service does for a real 2.17.1 was not observed; Seihai's frame got a legacy list on 14923 and no reply on 14922 on 2026-10-25 (with the default zlib header 78 9C; Seihai now sends 78 DA like the real client, not yet run)
-22	2.17	GNW22122	binary	unknown	showimg	-	the binary reading gave 2.17.1 2.22's send test (others in the level), and a solo 90 s capture on 2026-10-25 saw no id 24; the five solo 2026-10-30 runs on two lab servers saw it every 5.1 s, so Seihai follows those. Why the two disagree is not known, and the gap while walking (6.5 to 9.3 s) is not modelled
-22	2.17	GNW22122	binary	source	-	-	binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, the post-login frame seen in the lab (image checks, process list, props up to the language), and id 24 about every 5.1 s when alone (lab, 2026-10-30)
-23	2.22	GNW03014	binary	changed	protocol	client_type	0 -> 5
-23	2.22	GNW03014	binary	changed	protocol	encryption	Gen3 -> Gen5
-23	2.22	GNW03014	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, confirmed), login shape B (login frame captured from a real client) -> listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client)
-23	2.22	GNW03014	binary	changed	protocol	plo (server ids handled)	+186 BOARDMODIFY2 (79 -> 80 ids)
-23	2.22	GNW03014	binary	changed	protocol	pli (client ids sent)	-36 HITOBJECTS, -45 PROCESSRUNNING, -81 PROFILESET (45 -> 42 ids)
-23	2.22	GNW03014	binary	changed	protocol	tamper	known words, re-send Never -> known words, re-send OnLevelChange
-23	2.22	GNW03014	binary	changed	protocol	showimg (id 24)	every 5100 ms -> every 5100 ms, only with others in the level
-23	2.22	GNW03014	binary	changed	protocol	login frame	files, process list, props, idle.gani at once, status icons, language and tamper check in the login frame, 96 ms after the level without 182 -> files, process list, props with OS wind and code page 1252, idle.gani at once, status icons
-23	2.22	GNW03014	binary	changed	protocol	udp_off_by_default	no -> yes
-23	2.22	GNW03014	binary	changed	levels	link_boxes	no -> yes
-23	2.22	GNW03014	binary	changed	ui	server_list	2 tabs -> 3 tabs
-23	2.22	GNW03014	binary	changed	mannerisms	mannerisms	2.05 (hidden ganis, pull stays, swim runs on) -> 2.22 (as 2.05, swim restarts at the stop)
-23	2.22	GNW03014	binary	unknown	pli	-	send sites of ids 36, 42 and 45 were not matched in the binary, so 36 and 45 are not sent
-23	2.22	GNW03014	binary	unknown	framing	-	a client-originated bz2 frame (0x1000 and over) was never seen
-23	2.22	GNW03014	binary	source	-	-	binary and lab and public servers: client type 5 and gen 5 framing, listserver id 7 with GNW30123, PLO 186, PLI 36, 45 and 81 not sent, id 24 about every 5.1 s, post-login frame with OS and code page props, links tested with a per-direction probe box
-24	2.3	GNW14015	inferred	changed	protocol	listserver	listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame inferred, not captured)
-24	2.3	GNW14015	inferred	changed	protocol	plo (server ids handled)	+84 LARGEFILESIZE, +189 MOVE2; -44 HASNPCSERVER (80 -> 81 ids)
-24	2.3	GNW14015	inferred	changed	protocol	pli (client ids sent)	+46 ENTERLEVEL; -21 PUTNPC (42 -> 42 ids)
-24	2.3	GNW14015	inferred	changed	protocol	tamper	known words, re-send OnLevelChange -> unknown words, re-send Timer
-24	2.3	GNW14015	inferred	changed	protocol	showimg (id 24)	every 5100 ms, only with others in the level -> none
-24	2.3	GNW14015	inferred	changed	protocol	login frame	files, process list, props with OS wind and code page 1252, idle.gani at once, status icons -> none
-24	2.3	GNW14015	inferred	changed	props	own-player props	+78 X2, +79 Y2, +80 Z2 (72 -> 75 ids)
-24	2.3	GNW14015	inferred	changed	props	other-player props	+78 X2, +79 Y2, +80 Z2 (64 -> 67 ids)
-24	2.3	GNW14015	inferred	changed	props	npc_max	73 -> 77
-24	2.3	GNW14015	inferred	changed	props	precise_pos	no -> yes
-24	2.3	GNW14015	inferred	changed	files	large_file_size	no -> yes
-24	2.3	GNW14015	inferred	changed	ui	editor	yes -> no
-24	2.3	GNW14015	inferred	unknown	binary	-	no 2.3 binary; the whole step is the 2.31 values
-24	2.3	GNW14015	inferred	unknown	listserver	-	the port was checked with Seihai's gen-5 login only (2026-10-25); no real 2.3 client was captured
-24	2.3	GNW14015	inferred	unknown	tampercheck	-	constant of this build; the re-send rule is taken from 2.31
-24	2.3	GNW14015	inferred	unknown	showimg	-	no id 24 observation, so none is sent
-24	2.3	GNW14015	inferred	unknown	login	-	no post-login frame observation, so none is sent
-24	2.3	GNW14015	inferred	unknown	gr flags	-	no observation of the 2.3 build; none are set (2.31 sets none either)
-24	2.3	GNW14015	inferred	source	-	-	taken as 2.31 (no 2.3 binary): PLO 84 (LARGEFILESIZE) and 189 (MOVE2) in and 44 out, ENTERLEVEL (46) in and PUTNPC (21) out, X2/Y2/Z2 positions, editor moved out
-25	2.31	GNW28015	binary	changed	protocol	listserver	listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame inferred, not captured) -> listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client)
-25	2.31	GNW28015	binary	changed	protocol	tamper	unknown words, re-send Timer -> known words, re-send Timer
-25	2.31	GNW28015	binary	changed	protocol	showimg (id 24)	none -> every 5130 ms
-25	2.31	GNW28015	binary	changed	protocol	login frame	none -> files, process list, props with OS wind and code page 1252, status icons
-25	2.31	GNW28015	binary	unknown	pli	-	the TOML's pli_changes (21 out, 46 in) disagrees with its pli_sent list, which lacks 44; a real client sent 44, so the row keeps it
-25	2.31	GNW28015	binary	unknown	live	-	no game-server login on a public server; only the list reply was checked (2026-10-25)
-25	2.31	GNW28015	binary	source	-	-	binary (same code as 2.22) and lab: its own tampercheck constant and timer re-send, id 24 every 5.13 s whether or not others are in the level, post-login frame without the idle.gani request
-26	3.04	G3D03014	binary	changed	protocol	listserver	listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame captured from a real client)
-26	3.04	G3D03014	binary	changed	protocol	plo (server ids handled)	+44 HASNPCSERVER, +101 BOARDPACKET, +102 FILE; -170 GHOSTMODE, -177 NEWWORLDMODE, -182 LISTPROCESSES, -183 HASPROCESSRUNNING, -189 MOVE2 (81 -> 79 ids)
-26	3.04	G3D03014	binary	changed	protocol	pli (client ids sent)	+21 PUTNPC, +36 HITOBJECTS, +81 PROFILESET; -39 TAMPERCHECK, -44 PROCESSLIST, -46 ENTERLEVEL (42 -> 42 ids)
-26	3.04	G3D03014	binary	changed	protocol	tampercheck	yes -> no
-26	3.04	G3D03014	binary	changed	protocol	tamper	known words, re-send Timer -> none
-26	3.04	G3D03014	binary	changed	protocol	showimg (id 24)	every 5130 ms -> none
-26	3.04	G3D03014	binary	changed	protocol	login frame	files, process list, props with OS wind and code page 1252, status icons -> head and default-weapon files, props without head or colours with OS linux and code page 1250, status icons
-26	3.04	G3D03014	binary	changed	protocol	udp_off_by_default	yes -> no
-26	3.04	G3D03014	binary	changed	props	own-player props	-33 ADDITFLAGS, -78 X2, -79 Y2, -80 Z2 (75 -> 71 ids)
-26	3.04	G3D03014	binary	changed	props	other-player props	-78 X2, -79 Y2, -80 Z2 (67 -> 64 ids)
-26	3.04	G3D03014	binary	changed	props	npc_max	77 -> 73
-26	3.04	G3D03014	binary	changed	props	precise_pos	yes -> no
-26	3.04	G3D03014	binary	unknown	listserver	-	port 14922 and the G3D token were checked against the lab listserver only, never the public one
-26	3.04	G3D03014	binary	unknown	login	-	UDPPORT (31) is left out of the first props, as for every build (no UDP socket); the nickname is the account, where the real client sends the start window's nickname field
-26	3.04	G3D03014	binary	unknown	ui	-	the Torque front end (start window, options, themes, chat as white text with a blue shadow) is not modelled; the 2.31 UI row is kept
-26	3.04	G3D03014	binary	unknown	other props	-	the props it parses for other players are taken as 2.31's without 78-80
-26	3.04	G3D03014	binary	source	-	-	binary (Linux i386 ELF) and one lab run on GServer-v2 (Graal_analysis version-profiles/lab-304-linux-2026-10-30.md): PLO and PLI sets, props up to 76 (parsed to 74), NPC props to 73, no tampercheck, no showimg timer (UDP 15 instead), listserver id 7 with G3D30123
-27	3.153	G3D28015	binary	changed	protocol	listserver	listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame captured from a real client) -> listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame inferred, not captured)
-27	3.153	G3D28015	binary	changed	protocol	plo (server ids handled)	+67 RC_FILEBROWSER_MESSAGE, +74 RC_CHAT, +82 SERVERTEXT, +104 UNKNOWN104, +131 NPCBYTECODE, +132 UNKNOWN132, +133 UNKNOWN133, +134 GANISCRIPT, +187 UPDATEPACKAGEISUPDATED, +189 MOVE2; -44 HASNPCSERVER (79 -> 88 ids)
-27	3.153	G3D28015	binary	changed	protocol	pli (client ids sent)	+46 ENTERLEVEL, +50 RAWDATA, +93 RC_FILEBROWSER_UP, +96 RC_FILEBROWSER_MOVE, +97 RC_FILEBROWSER_DELETE, +98 RC_FILEBROWSER_RENAME, +152 REQUESTTEXT, +154 SENDTEXT, +155 RC_LARGEFILESTART, +156 RC_LARGEFILEEND, +157 UPDATEGANI, +158 UPDATESCRIPT (42 -> 54 ids)
-27	3.153	G3D28015	binary	changed	protocol	login frame	head and default-weapon files, props without head or colours with OS linux and code page 1250, status icons -> head and default-weapon files, props without head or colours with OS mac and code page 1250, status icons
-27	3.153	G3D28015	binary	changed	protocol	udp_off_by_default	no -> yes
-27	3.153	G3D28015	binary	changed	props	own-player props	+78 X2, +79 Y2, +80 Z2 (71 -> 74 ids)
-27	3.153	G3D28015	binary	changed	props	other-player props	+78 X2, +79 Y2, +80 Z2 (64 -> 67 ids)
-27	3.153	G3D28015	binary	changed	props	npc_max	73 -> 77
-27	3.153	G3D28015	binary	changed	props	precise_pos	no -> yes
-27	3.153	G3D28015	binary	unknown	pli	-	2, 3, 15, 24, 29 and 80 are taken from 3.04; the PPC scan did not resolve those call sites
-27	3.153	G3D28015	binary	unknown	live	-	never run
-27	3.153	G3D28015	binary	unknown	listserver	-	shape D (id 7 and id 1 in one plain zlib frame at 78 9C) is 3.04's capture; the binary has the same G3D30123 token and gen-5 cipher
-27	3.153	G3D28015	binary	unknown	login	-	OSTYPE mac is from the binary; the code page (1250), the files in the first frame (bigmap.txt, minimap.txt) and the head and default-weapon checks are 3.04's
-27	3.153	G3D28015	binary	unknown	3d	-	the 3D mode (Torque GameConnection on port 28000) is not modelled
-27	3.153	G3D28015	binary	source	-	-	binary (Mac OS X PPC Mach-O), not run: OSTYPE mac; PLO 67, 74, 82, 104, 131-134, 187 and MOVE2 (189) in, 44 out; RC file browser, script upload and text request ids; X2/Y2/Z2; UDP off in the shipped prefs
+0	1.21	GSERV007	binary	origin	-	-	start of the chain, written out in full as ORIGIN
+0	1.21	GSERV007	binary	unknown	levels	-	Z3-V1 (.zelda): every binary from 1st Graal to 2.31 compares the level magic with Z3-V1.03 and Z3-V1.04, so the column is yes for every build; whether a build also tries .zelda for a bare level name is in no binary (Seihai tries .graal, then .zelda)
+0	1.21	GSERV007	binary	unknown	pli	-	the binaries 1.21 to 1.32 show only the send ids passed as constants; the ids below the highest one are taken as sent
+0	1.21	GSERV007	binary	unknown	other props	-	1.21 to 1.32 have no separate parser for other players' props; 1.33's set is kept
+0	1.21	GSERV007	binary	unknown	live	-	not run: the 1.21 install is an InstallShield setup
+0	1.21	GSERV007	binary	source	-	-	origin row (binary of 1.21, Graal_analysis client-internals/version-profiles/v121-v132.toml): login id 0 with token, account and password; zlib on every flush; no UDP; default server www.graalonline.com:14804
+1	1.28 beta 2	GSERV013	binary	changed	protocol	plo (server ids handled)	+30 FILESENDFAILED, +35 RC_ADMINMESSAGE, +36 EXPLOSION, +37 PRIVATEMESSAGE, +38 PUSHAWAY (35 -> 40 ids)
+1	1.28 beta 2	GSERV013	binary	changed	protocol	pli (client ids sent)	+27 EXPLOSION, +28 PRIVATEMESSAGE, +29 NPCWEAPONDEL (27 -> 30 ids)
+1	1.28 beta 2	GSERV013	binary	changed	protocol	udp	no -> yes
+1	1.28 beta 2	GSERV013	binary	changed	props	own-player props	+25 APCOUNTER, +26 MAGICPOINTS, +27 KILLSCOUNT, +28 DEATHSCOUNT, +29 ONLINESECS, +30 IPADDR, +31 UDPPORT (25 -> 32 ids)
+1	1.28 beta 2	GSERV013	binary	changed	props	npc_max	17 -> 32
+1	1.28 beta 2	GSERV013	binary	changed	ui	gs1_commands	71 -> 84
+1	1.28 beta 2	GSERV013	binary	source	-	-	binary: PLO 30 and 35-38, send ids to 29, player props to 31, NPC props to 32, direct data packages (UDP ids 0, 10-22), language files, GS1 table 71 to 84
+2	1.3 test	GSERV014	binary	changed	protocol	plo (server ids handled)	+39 LEVELMODTIME (40 -> 41 ids)
+2	1.3 test	GSERV014	binary	changed	protocol	pli (client ids sent)	+30 LEVELWARPMOD (30 -> 31 ids)
+2	1.3 test	GSERV014	binary	changed	props	own-player props	+32 ALIGNMENT (32 -> 33 ids)
+2	1.3 test	GSERV014	binary	changed	props	npc_max	32 -> 34
+2	1.3 test	GSERV014	binary	changed	ui	gs1_commands	84 -> 85
+2	1.3 test	GSERV014	binary	source	-	-	binary: PLO 39, send id 30, player prop 32 (alignment), NPC props to 34, GS1 table 85 (setgifpart)
+3	1.31	GSERV016	binary	changed	protocol	plo (server ids handled)	+40 HURTPLAYER (41 -> 42 ids)
+3	1.31	GSERV016	binary	changed	ui	server_list	direct (www.graalonline.com:14804) -> direct (www.graalonline.com:14900)
+3	1.31	GSERV016	binary	source	-	-	binary: PLO 40, default port 14900 (14804 before), noudp= and fixedudpport= options
+4	1.32	GSERV018	binary	changed	protocol	plo (server ids handled)	+41 STARTMESSAGE (42 -> 43 ids)
+4	1.32	GSERV018	binary	changed	props	own-player props	+33 ADDITFLAGS (33 -> 34 ids)
+4	1.32	GSERV018	binary	source	-	-	binary and lab: PLO 41, player prop 33 (ADDITFLAGS); the real 1.32 logged in to the gen-2 stub with the login props of 1.33 (2026-10-30)
+5	1.33	GNW20020	binary	changed	protocol	pli (client ids sent)	+31 PACKETCOUNT (31 -> 32 ids)
+5	1.33	GNW20020	binary	changed	ui	gs1_commands	85 -> 88
+5	1.33	GNW20020	binary	source	-	-	binary of 1.33: send id 31, GS1 table 88, GNW tokens from here on
+6	1.34	GNW22030	binary	changed	props	other-player props	+34 ACCOUNTNAME (21 -> 22 ids)
+6	1.34	GNW22030	binary	changed	ui	gs1_commands	88 -> 93
+6	1.34	GNW22030	binary	source	-	-	binary: other-player prop 34 (ACCOUNTNAME), GS1 table 88 to 93 (cross-version-timeline)
+7	1.35	GNW13040	binary	changed	ui	hud	Letters -> LettersChat
+7	1.35	GNW13040	binary	source	-	-	shipped state.png: CHAT label on the HUD sheet; GS1 table unchanged
+8	1.36	GNW10050	binary	changed	ui	gs1_commands	93 -> 104
+8	1.36	GNW10050	binary	source	-	-	binary: GS1 table 93 to 104
+9	1.37	GNW21050	binary	changed	ui	gs1_commands	104 -> 106
+9	1.37	GNW21050	binary	source	-	-	binary: GS1 table 104 to 106
+10	1.38	GNW22060	binary	changed	protocol	plo (server ids handled)	+43 DEFAULTWEAPON (43 -> 44 ids)
+10	1.38	GNW22060	binary	changed	protocol	pli (client ids sent)	+32 ITEMTAKE, +33 WEAPONADD; -25 UNKNOWN25 (32 -> 33 ids)
+10	1.38	GNW22060	binary	changed	ui	hud	LettersChat -> BlankButtons
+10	1.38	GNW22060	binary	changed	ui	emoticons	no -> yes
+10	1.38	GNW22060	binary	changed	ui	key_config	no -> yes
+10	1.38	GNW22060	binary	changed	ui	gs1_commands	106 -> 109
+10	1.38	GNW22060	binary	changed	drops	drops	client rolls bush and pot drops, applies pickups itself -> client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE
+10	1.38	GNW22060	binary	source	-	-	binary: PLO 43, PLI ITEMTAKE/WEAPONADD (32, 33) in and 25 out, configurable keys and emotions, GS1 106 to 109; bush rolls sent with PLI_ITEMADD and pickups with ITEMTAKE (1.39 lab capture)
+11	1.39	GNW07080	binary	changed	protocol	plo (server ids handled)	+75 PROFILE (44 -> 45 ids)
+11	1.39	GNW07080	binary	changed	protocol	pli (client ids sent)	+80 PROFILEGET, +81 PROFILESET (33 -> 35 ids)
+11	1.39	GNW07080	binary	changed	props	own-player props	+34 ACCOUNTNAME (34 -> 35 ids)
+11	1.39	GNW07080	binary	changed	props	other-player props	+33 ADDITFLAGS (22 -> 23 ids)
+11	1.39	GNW07080	binary	changed	ui	chat_recall	no -> yes
+11	1.39	GNW07080	binary	changed	ui	chat_text	ChatText { face: Dialog, height: 28 } -> ChatText { face: Helvetica, height: 24 }
+11	1.39	GNW07080	binary	changed	ui	gs1_commands	109 -> 111
+11	1.39	GNW07080	binary	source	-	-	binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111
+12	1.41	GNW13110	binary	changed	protocol	encryption	Gen2 -> Gen3
+12	1.41	GNW13110	binary	changed	protocol	listserver	none -> listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape B (login frame inferred, not captured; no evidence for this shape)
+12	1.41	GNW13110	binary	changed	protocol	pli (client ids sent)	-31 PACKETCOUNT (35 -> 34 ids)
+12	1.41	GNW13110	binary	changed	props	own-player props	+35 BODYIMG, +36 RATING (35 -> 37 ids)
+12	1.41	GNW13110	binary	changed	props	other-player props	+35 BODYIMG, +36 RATING (23 -> 25 ids)
+12	1.41	GNW13110	binary	changed	props	npc_max	34 -> 35
+12	1.41	GNW13110	binary	changed	life	death	none -> 2.05 rules (name-group test)
+12	1.41	GNW13110	binary	changed	life	combat	none -> 2.05 rules
+12	1.41	GNW13110	binary	changed	ui	server_list	direct (www.graalonline.com:14900) -> one list
+12	1.41	GNW13110	binary	changed	ui	gs1_commands	111 -> 126
+12	1.41	GNW13110	binary	unknown	drops	-	the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced
+12	1.41	GNW13110	binary	unknown	listserver	-	original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured
+12	1.41	GNW13110	binary	unknown	listserver	-	login frame inferred, not captured, and no evidence for its shape: Seihai keeps shape B (id 0 `newmain`, then id 1 with the account), what it sent before the lab captures; whether a real 1.41 sends the account to the listserver is unknown
+12	1.41	GNW13110	binary	unknown	life	-	death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)
+12	1.41	GNW13110	binary	unknown	levels	-	the version-profile TOML lists GLEVNW01 (.nw) as readable by 1.41 and 1.42 and drops it at 2.00; the rows of 1.33 to 2.04 have .graal only
+12	1.41	GNW13110	binary	source	-	-	binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126
+13	1.42	GNW08011	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape B (login frame inferred, not captured; no evidence for this shape) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured)
+13	1.42	GNW08011	binary	changed	protocol	plo (server ids handled)	+42 NEWWORLDTIME, +44 HASNPCSERVER, +45 FILEUPTODATE, +150 NPCDEL2, +151 HIDENPCS, +153 SAY2 (45 -> 51 ids)
+13	1.42	GNW08011	binary	changed	protocol	pli (client ids sent)	+34 UPDATEFILE (34 -> 35 ids)
+13	1.42	GNW08011	binary	changed	life	death	2.05 rules (name-group test) -> none
+13	1.42	GNW08011	binary	changed	life	combat	2.05 rules -> none
+13	1.42	GNW08011	binary	changed	ui	ganis	no -> yes
+13	1.42	GNW08011	binary	changed	ui	chat_text	ChatText { face: Helvetica, height: 24 } -> ChatText { face: TempusSans, height: 24 }
+13	1.42	GNW08011	binary	changed	ui	gs1_commands	126 -> 134
+13	1.42	GNW08011	binary	changed	mannerisms	mannerisms	1.39 (blink after the hurt pose, hide keeps the carry poses, 4-tile knockback) -> NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses)
+13	1.42	GNW08011	binary	changed	drops	drops	client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE -> server drops (PLO_ITEMADD), pickups go through PLI_ITEMTAKE
+13	1.42	GNW08011	binary	unknown	listserver	-	built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured
+13	1.42	GNW08011	binary	unknown	listserver	-	login frame inferred, not captured: Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; a real 1.42 frame was never captured, and no run on the public service has used shape A, so the port is assumed
+13	1.42	GNW08011	binary	source	-	-	binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)
+14	2.00	GNW24011	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
+14	2.00	GNW24011	binary	changed	protocol	plo (server ids handled)	+154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
+14	2.00	GNW24011	binary	changed	ui	gs1_commands	134 -> 142
+14	2.00	GNW24011	binary	unknown	login	-	props sent at login (verified for 2.05 only)
+14	2.00	GNW24011	binary	unknown	listserver	-	Seihai now sends the real 2.00 frame (shape A, captured in the lab: id 0 `newmain` only, no account). That frame has not been run on the public service. The 2026-10-25 matrix used Seihai's older classic login (shape B), which 14923 answered with a plain zlib id-0 list (4 rows) while 14922 stayed silent; the port is assumed for shape A until a run. A real 2.00's reply was not captured
+14	2.00	GNW24011	binary	unknown	token	-	the token is not in gs2lib, so a stock GServer-v2 does not know it
+14	2.00	GNW24011	binary	source	-	-	binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142; list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)
+15	2.01	GNW23021	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured)
+15	2.01	GNW23021	binary	changed	protocol	plo (server ids handled)	+46 HITOBJECTS, +156 SETACTIVELEVEL (53 -> 55 ids)
+15	2.01	GNW23021	binary	changed	protocol	pli (client ids sent)	+35 ADJACENTLEVEL, +36 HITOBJECTS (35 -> 37 ids)
+15	2.01	GNW23021	binary	changed	ui	gs1_commands	142 -> 144
+15	2.01	GNW23021	binary	unknown	listserver	-	2.01 to 2.04 (and 2.02 rev 2): login frame inferred, not captured. Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; no real client of these builds was captured and no run on the public service has used shape A, so the port is assumed. The 2026-10-25 matrix used Seihai's older shape B: a legacy list on 14923, nothing on 14922. 14921, the port the build carries, is dead
+15	2.01	GNW23021	binary	source	-	-	binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144
+16	2.02	GNW15041	binary	changed	protocol	plo (server ids handled)	+47 STAFFGUILDS (55 -> 56 ids)
+16	2.02	GNW15041	binary	changed	props	own-player props	+37-41 (37 -> 42 ids)
+16	2.02	GNW15041	binary	changed	props	other-player props	+37-41 (25 -> 30 ids)
+16	2.02	GNW15041	binary	changed	props	npc_max	35 -> 40
+16	2.02	GNW15041	binary	changed	ui	gs1_commands	144 -> 146
+16	2.02	GNW15041	binary	source	-	-	binary (base build and rev 1): PLO 47, player props 37 to 41, NPC props to 40, GS1 144 to 146
+17	2.02 rev2	GNW20041	binary	changed	protocol	pli (client ids sent)	+37 LANGUAGE (37 -> 38 ids)
+17	2.02 rev2	GNW20041	binary	changed	protocol	sends_language	no -> yes
+17	2.02 rev2	GNW20041	binary	source	-	-	binary: LANGUAGE (37) sent after login (no send site in rev 1)
+18	2.03	GNW06051	binary	changed	protocol	plo (server ids handled)	+48 TRIGGERACTION, +165 MOVE (56 -> 58 ids)
+18	2.03	GNW06051	binary	changed	protocol	pli (client ids sent)	+38 TRIGGERACTION (38 -> 39 ids)
+18	2.03	GNW06051	binary	changed	ui	gs1_commands	146 -> 148
+18	2.03	GNW06051	binary	source	-	-	binary: TRIGGERACTION (38) sent, PLO 48 and 165, GS1 146 to 148
+19	2.04	GNW24061	binary	changed	protocol	plo (server ids handled)	+166 SHOWIMGNPC; -26 NPCACTION (58 -> 58 ids)
+19	2.04	GNW24061	binary	changed	props	own-player props	+42 ATTACHNPC (42 -> 43 ids)
+19	2.04	GNW24061	binary	changed	props	other-player props	+42 ATTACHNPC (30 -> 31 ids)
+19	2.04	GNW24061	binary	changed	ui	gs1_commands	148 -> 157
+19	2.04	GNW24061	binary	source	-	-	binary: PLO 166 in and 26 out, prop 42 (ATTACHNPC), GS1 148 to 157
+20	2.05	GNW03081	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
+20	2.05	GNW03081	binary	changed	protocol	plo (server ids handled)	+168 UNKNOWN168 (58 -> 59 ids)
+20	2.05	GNW03081	binary	changed	levels	nw	no -> yes
+20	2.05	GNW03081	binary	changed	levels	gmap	no -> yes
+20	2.05	GNW03081	binary	changed	levels	cached_links	no -> yes
+20	2.05	GNW03081	binary	changed	life	death	none -> 2.05 rules (name-group test)
+20	2.05	GNW03081	binary	changed	life	combat	none -> 2.05 rules
+20	2.05	GNW03081	binary	changed	ui	server_in_title	no -> yes
+20	2.05	GNW03081	binary	changed	ui	gs1_commands	157 -> 161
+20	2.05	GNW03081	binary	changed	mannerisms	mannerisms	NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses) -> 2.05 (hidden ganis, pull stays, swim runs on)
+20	2.05	GNW03081	binary	unknown	listserver	-	this profile now sends the real 2.05 frame (shape A, captured in the lab: id 0 `newmain` only). No public run has used it: the 2026-10-25 matrix binary sent the gen-5 login for 2.05 (the saved-version override, since fixed) and both 14922 and 14923 answered that. 14923 answered the older classic login (shape B) of every other classic profile, so 14923 is assumed here
+20	2.05	GNW03081	binary	source	-	-	binary (rev 1 and rev 2) and lab: .nw and .gmap levels, PLO 168, server name in the title, GS1 157 to 161; death and combat rules traced here
+21	2.1	GNW31101	inferred	changed	protocol	listserver	listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14922, login shape B (login frame inferred, not captured; no evidence for this shape)
+21	2.1	GNW31101	inferred	changed	protocol	plo (server ids handled)	+49 PLAYERWARP2, +169 UPGRADEURL, +170 GHOSTMODE, +171 BIGMAP, +172 MINIMAP, +173 GHOSTTEXT, +174 GHOSTICON (59 -> 66 ids)
+21	2.1	GNW31101	inferred	changed	props	own-player props	+43 GMAPLEVELX, +44 GMAPLEVELY, +45 Z (43 -> 46 ids)
+21	2.1	GNW31101	inferred	changed	props	other-player props	+43 GMAPLEVELX, +44 GMAPLEVELY, +45 Z (31 -> 34 ids)
+21	2.1	GNW31101	inferred	changed	props	npc_max	40 -> 43
+21	2.1	GNW31101	inferred	changed	props	bow_prop10	yes -> no
+21	2.1	GNW31101	inferred	changed	files	modtime	no -> yes
+21	2.1	GNW31101	inferred	changed	files	image_ext	".gif" -> ".png"
+21	2.1	GNW31101	inferred	changed	files	download_maps	no -> yes
+21	2.1	GNW31101	inferred	changed	life	death	2.05 rules (name-group test) -> 2.1 rules (no name-group test)
+21	2.1	GNW31101	inferred	changed	ui	minimap	no -> yes
+21	2.1	GNW31101	inferred	changed	ui	log_window	no -> yes
+21	2.1	GNW31101	inferred	changed	ui	ghost_mode	no -> yes
+21	2.1	GNW31101	inferred	unknown	binary	-	no 2.1 release binary; every value of this step is inferred
+21	2.1	GNW31101	inferred	unknown	token	-	the 2.1 test builds still send the 2.05 token, so GNW31101 is from gs2lib only
+21	2.1	GNW31101	inferred	unknown	protocol	-	PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169
+21	2.1	GNW31101	inferred	unknown	listserver	-	2.1 to 2.16 have no client binary: login frame inferred, not captured. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
+21	2.1	GNW31101	inferred	unknown	pli	-	client send set is carried from 2.05
+21	2.1	GNW31101	inferred	unknown	props	-	player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
+21	2.1	GNW31101	inferred	unknown	life	-	death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+21	2.1	GNW31101	inferred	unknown	files	-	the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+21	2.1	GNW31101	inferred	source	-	-	server source and release notes: gani prop 10, .png defaults, PLO_FILE modtime, gserver minimap, ghost mode; PLO 49 and 169 are in the two 2.1 test builds
+22	2.12	GNW01012	inferred	same	-	-	no change against the step before
+22	2.12	GNW01012	inferred	unknown	all	-	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
+22	2.12	GNW01012	inferred	source	-	-	release notes: multi-level editing in the editor
+23	2.13	GNW23012	inferred	same	-	-	no change against the step before
+23	2.13	GNW23012	inferred	unknown	all	-	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
+23	2.13	GNW23012	inferred	source	-	-	release notes: gani attributes to #P9
+24	2.14	GNW30042	inferred	changed	protocol	plo (server ids handled)	+68 LARGEFILESTART, +69 LARGEFILEEND, +178 SERVERWARP, +180 STATUSLIST (66 -> 70 ids)
+24	2.14	GNW30042	inferred	changed	protocol	pli (client ids sent)	+41 SERVERWARP (39 -> 40 ids)
+24	2.14	GNW30042	inferred	changed	files	large_files	no -> yes
+24	2.14	GNW30042	inferred	changed	ui	server_list	one list -> 2 tabs
+24	2.14	GNW30042	inferred	unknown	protocol	-	PLO 178 and 180 and PLI 41 are inferred (the TOML entry is itself inferred); 175 to 185 are first seen in 2.17
+24	2.14	GNW30042	inferred	source	-	-	server source and release notes: large files (LARGEFILESTART/END), SERVERWARP, server list in two tabs; PLO 178 and 180 from the version-profile TOML
+25	2.15	GNW19052	inferred	same	-	-	no change against the step before
+25	2.15	GNW19052	inferred	unknown	all	-	no change is known; the row is the step before (no 2.15 binary)
+25	2.15	GNW19052	inferred	source	-	-	no 2.15 source of its own
+26	2.16	GNW12102	inferred	changed	props	own-player props	+46-49, +52 PLANGUAGE, +54-74 (46 -> 72 ids)
+26	2.16	GNW12102	inferred	changed	props	other-player props	+23 EFFECTCOLORS, +46-49, +52 PLANGUAGE, +53 PSTATUSMSG, +54-74, +75 OSTYPE, +76 TEXTCODEPAGE (34 -> 64 ids)
+26	2.16	GNW12102	inferred	unknown	props	-	the version-profile TOML keeps the 2.15 prop limit (45) although its note says 54 to 74 arrive in 2.16; the row follows the note
+26	2.16	GNW12102	inferred	unknown	props	-	NPC prop limit is carried from 2.1 (the 2.17 value is 73)
+26	2.16	GNW12102	inferred	source	-	-	release notes: gani attributes to #P30 (props 54 to 74); player prop sets follow the 2.22 binary
+27	2.17	GNW22122	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14922, login shape B (login frame inferred, not captured; no evidence for this shape) -> listserver.graal.in:14923 (legacy, confirmed), login shape B (login frame captured from a real client)
+27	2.17	GNW22122	binary	changed	protocol	plo (server ids handled)	+175 SHOOT, +176 KINGDOMSMODE, +177 NEWWORLDMODE, +179 RPGWINDOW, +181 UNKNOWN181, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +184 TAKESCREENSHOT, +185 BOARDHEIGHTS (70 -> 79 ids)
+27	2.17	GNW22122	binary	changed	protocol	pli (client ids sent)	+39 TAMPERCHECK, +40 SHOOT, +43 MUTEPLAYER, +44 PROCESSLIST, +45 PROCESSRUNNING (40 -> 45 ids)
+27	2.17	GNW22122	binary	changed	protocol	tampercheck	no -> yes
+27	2.17	GNW22122	binary	changed	protocol	tamper	none -> known words, re-send Never
+27	2.17	GNW22122	binary	changed	protocol	showimg (id 24)	none -> every 5100 ms
+27	2.17	GNW22122	binary	changed	protocol	login frame	none -> files, process list, props, idle.gani at once, status icons, language and tamper check in the login frame, 96 ms after the level without 182
+27	2.17	GNW22122	binary	changed	props	npc_max	43 -> 73
+27	2.17	GNW22122	binary	changed	levels	heights	no -> yes
+27	2.17	GNW22122	binary	unknown	props	-	other-player prop parser was not read; the 2.22 set is used
+27	2.17	GNW22122	binary	unknown	ui	-	GS1 command count was not read; 161 is carried
+27	2.17	GNW22122	binary	unknown	login	-	the real 2.17.1 login to a lab listserver was captured: shape B (one plain zlib frame, id 0 `newmain` then id 1 with the account, no token), which Seihai sends. What the public service does for a real 2.17.1 was not observed; Seihai's frame got a legacy list on 14923 and no reply on 14922 on 2026-10-25 (with the default zlib header 78 9C; Seihai now sends 78 DA like the real client, not yet run)
+27	2.17	GNW22122	binary	unknown	showimg	-	the binary reading gave 2.17.1 2.22's send test (others in the level), and a solo 90 s capture on 2026-10-25 saw no id 24; the five solo 2026-10-30 runs on two lab servers saw it every 5.1 s, so Seihai follows those. Why the two disagree is not known, and the gap while walking (6.5 to 9.3 s) is not modelled
+27	2.17	GNW22122	binary	source	-	-	binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, the post-login frame seen in the lab (image checks, process list, props up to the language), and id 24 about every 5.1 s when alone (lab, 2026-10-30)
+28	2.22	GNW03014	binary	changed	protocol	client_type	0 -> 5
+28	2.22	GNW03014	binary	changed	protocol	encryption	Gen3 -> Gen5
+28	2.22	GNW03014	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, confirmed), login shape B (login frame captured from a real client) -> listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client)
+28	2.22	GNW03014	binary	changed	protocol	plo (server ids handled)	+186 BOARDMODIFY2 (79 -> 80 ids)
+28	2.22	GNW03014	binary	changed	protocol	pli (client ids sent)	-36 HITOBJECTS, -45 PROCESSRUNNING, -81 PROFILESET (45 -> 42 ids)
+28	2.22	GNW03014	binary	changed	protocol	tamper	known words, re-send Never -> known words, re-send OnLevelChange
+28	2.22	GNW03014	binary	changed	protocol	showimg (id 24)	every 5100 ms -> every 5100 ms, only with others in the level
+28	2.22	GNW03014	binary	changed	protocol	login frame	files, process list, props, idle.gani at once, status icons, language and tamper check in the login frame, 96 ms after the level without 182 -> files, process list, props with OS wind and code page 1252, idle.gani at once, status icons
+28	2.22	GNW03014	binary	changed	protocol	udp_off_by_default	no -> yes
+28	2.22	GNW03014	binary	changed	levels	link_boxes	no -> yes
+28	2.22	GNW03014	binary	changed	ui	server_list	2 tabs -> 3 tabs
+28	2.22	GNW03014	binary	changed	mannerisms	mannerisms	2.05 (hidden ganis, pull stays, swim runs on) -> 2.22 (as 2.05, swim restarts at the stop)
+28	2.22	GNW03014	binary	unknown	pli	-	send sites of ids 36, 42 and 45 were not matched in the binary, so 36 and 45 are not sent
+28	2.22	GNW03014	binary	unknown	framing	-	a client-originated bz2 frame (0x1000 and over) was never seen
+28	2.22	GNW03014	binary	source	-	-	binary and lab and public servers: client type 5 and gen 5 framing, listserver id 7 with GNW30123, PLO 186, PLI 36, 45 and 81 not sent, id 24 about every 5.1 s, post-login frame with OS and code page props, links tested with a per-direction probe box
+29	2.3	GNW14015	inferred	changed	protocol	listserver	listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame inferred, not captured)
+29	2.3	GNW14015	inferred	changed	protocol	plo (server ids handled)	+84 LARGEFILESIZE, +189 MOVE2; -44 HASNPCSERVER (80 -> 81 ids)
+29	2.3	GNW14015	inferred	changed	protocol	pli (client ids sent)	+46 ENTERLEVEL; -21 PUTNPC (42 -> 42 ids)
+29	2.3	GNW14015	inferred	changed	protocol	tamper	known words, re-send OnLevelChange -> unknown words, re-send Timer
+29	2.3	GNW14015	inferred	changed	protocol	showimg (id 24)	every 5100 ms, only with others in the level -> none
+29	2.3	GNW14015	inferred	changed	protocol	login frame	files, process list, props with OS wind and code page 1252, idle.gani at once, status icons -> none
+29	2.3	GNW14015	inferred	changed	props	own-player props	+78 X2, +79 Y2, +80 Z2 (72 -> 75 ids)
+29	2.3	GNW14015	inferred	changed	props	other-player props	+78 X2, +79 Y2, +80 Z2 (64 -> 67 ids)
+29	2.3	GNW14015	inferred	changed	props	npc_max	73 -> 77
+29	2.3	GNW14015	inferred	changed	props	precise_pos	no -> yes
+29	2.3	GNW14015	inferred	changed	files	large_file_size	no -> yes
+29	2.3	GNW14015	inferred	changed	ui	editor	yes -> no
+29	2.3	GNW14015	inferred	unknown	binary	-	no 2.3 binary; the whole step is the 2.31 values
+29	2.3	GNW14015	inferred	unknown	listserver	-	the port was checked with Seihai's gen-5 login only (2026-10-25); no real 2.3 client was captured
+29	2.3	GNW14015	inferred	unknown	tampercheck	-	constant of this build; the re-send rule is taken from 2.31
+29	2.3	GNW14015	inferred	unknown	showimg	-	no id 24 observation, so none is sent
+29	2.3	GNW14015	inferred	unknown	login	-	no post-login frame observation, so none is sent
+29	2.3	GNW14015	inferred	unknown	gr flags	-	no observation of the 2.3 build; none are set (2.31 sets none either)
+29	2.3	GNW14015	inferred	source	-	-	taken as 2.31 (no 2.3 binary): PLO 84 (LARGEFILESIZE) and 189 (MOVE2) in and 44 out, ENTERLEVEL (46) in and PUTNPC (21) out, X2/Y2/Z2 positions, editor moved out
+30	2.31	GNW28015	binary	changed	protocol	listserver	listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame inferred, not captured) -> listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client)
+30	2.31	GNW28015	binary	changed	protocol	tamper	unknown words, re-send Timer -> known words, re-send Timer
+30	2.31	GNW28015	binary	changed	protocol	showimg (id 24)	none -> every 5130 ms
+30	2.31	GNW28015	binary	changed	protocol	login frame	none -> files, process list, props with OS wind and code page 1252, status icons
+30	2.31	GNW28015	binary	unknown	pli	-	the TOML's pli_changes (21 out, 46 in) disagrees with its pli_sent list, which lacks 44; a real client sent 44, so the row keeps it
+30	2.31	GNW28015	binary	unknown	live	-	no game-server login on a public server; only the list reply was checked (2026-10-25)
+30	2.31	GNW28015	binary	source	-	-	binary (same code as 2.22) and lab: its own tampercheck constant and timer re-send, id 24 every 5.13 s whether or not others are in the level, post-login frame without the idle.gani request
+31	3.04	G3D03014	binary	changed	protocol	listserver	listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame captured from a real client)
+31	3.04	G3D03014	binary	changed	protocol	plo (server ids handled)	+44 HASNPCSERVER, +101 BOARDPACKET, +102 FILE; -170 GHOSTMODE, -177 NEWWORLDMODE, -182 LISTPROCESSES, -183 HASPROCESSRUNNING, -189 MOVE2 (81 -> 79 ids)
+31	3.04	G3D03014	binary	changed	protocol	pli (client ids sent)	+21 PUTNPC, +36 HITOBJECTS, +81 PROFILESET; -39 TAMPERCHECK, -44 PROCESSLIST, -46 ENTERLEVEL (42 -> 42 ids)
+31	3.04	G3D03014	binary	changed	protocol	tampercheck	yes -> no
+31	3.04	G3D03014	binary	changed	protocol	tamper	known words, re-send Timer -> none
+31	3.04	G3D03014	binary	changed	protocol	showimg (id 24)	every 5130 ms -> none
+31	3.04	G3D03014	binary	changed	protocol	login frame	files, process list, props with OS wind and code page 1252, status icons -> head and default-weapon files, props without head or colours with OS linux and code page 1250, status icons
+31	3.04	G3D03014	binary	changed	protocol	udp_off_by_default	yes -> no
+31	3.04	G3D03014	binary	changed	props	own-player props	-33 ADDITFLAGS, -78 X2, -79 Y2, -80 Z2 (75 -> 71 ids)
+31	3.04	G3D03014	binary	changed	props	other-player props	-78 X2, -79 Y2, -80 Z2 (67 -> 64 ids)
+31	3.04	G3D03014	binary	changed	props	npc_max	77 -> 73
+31	3.04	G3D03014	binary	changed	props	precise_pos	yes -> no
+31	3.04	G3D03014	binary	unknown	listserver	-	port 14922 and the G3D token were checked against the lab listserver only, never the public one
+31	3.04	G3D03014	binary	unknown	login	-	UDPPORT (31) is left out of the first props, as for every build (no UDP socket); the nickname is the account, where the real client sends the start window's nickname field
+31	3.04	G3D03014	binary	unknown	ui	-	the Torque front end (start window, options, themes, chat as white text with a blue shadow) is not modelled; the 2.31 UI row is kept
+31	3.04	G3D03014	binary	unknown	other props	-	the props it parses for other players are taken as 2.31's without 78-80
+31	3.04	G3D03014	binary	source	-	-	binary (Linux i386 ELF) and one lab run on GServer-v2 (Graal_analysis version-profiles/lab-304-linux-2026-10-30.md): PLO and PLI sets, props up to 76 (parsed to 74), NPC props to 73, no tampercheck, no showimg timer (UDP 15 instead), listserver id 7 with G3D30123
+32	3.153	G3D28015	binary	changed	protocol	listserver	listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame captured from a real client) -> listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame inferred, not captured)
+32	3.153	G3D28015	binary	changed	protocol	plo (server ids handled)	+67 RC_FILEBROWSER_MESSAGE, +74 RC_CHAT, +82 SERVERTEXT, +104 UNKNOWN104, +131 NPCBYTECODE, +132 UNKNOWN132, +133 UNKNOWN133, +134 GANISCRIPT, +187 UPDATEPACKAGEISUPDATED, +189 MOVE2; -44 HASNPCSERVER (79 -> 88 ids)
+32	3.153	G3D28015	binary	changed	protocol	pli (client ids sent)	+46 ENTERLEVEL, +50 RAWDATA, +93 RC_FILEBROWSER_UP, +96 RC_FILEBROWSER_MOVE, +97 RC_FILEBROWSER_DELETE, +98 RC_FILEBROWSER_RENAME, +152 REQUESTTEXT, +154 SENDTEXT, +155 RC_LARGEFILESTART, +156 RC_LARGEFILEEND, +157 UPDATEGANI, +158 UPDATESCRIPT (42 -> 54 ids)
+32	3.153	G3D28015	binary	changed	protocol	login frame	head and default-weapon files, props without head or colours with OS linux and code page 1250, status icons -> head and default-weapon files, props without head or colours with OS mac and code page 1250, status icons
+32	3.153	G3D28015	binary	changed	protocol	udp_off_by_default	no -> yes
+32	3.153	G3D28015	binary	changed	props	own-player props	+78 X2, +79 Y2, +80 Z2 (71 -> 74 ids)
+32	3.153	G3D28015	binary	changed	props	other-player props	+78 X2, +79 Y2, +80 Z2 (64 -> 67 ids)
+32	3.153	G3D28015	binary	changed	props	npc_max	73 -> 77
+32	3.153	G3D28015	binary	changed	props	precise_pos	no -> yes
+32	3.153	G3D28015	binary	unknown	pli	-	2, 3, 15, 24, 29 and 80 are taken from 3.04; the PPC scan did not resolve those call sites
+32	3.153	G3D28015	binary	unknown	live	-	never run
+32	3.153	G3D28015	binary	unknown	listserver	-	shape D (id 7 and id 1 in one plain zlib frame at 78 9C) is 3.04's capture; the binary has the same G3D30123 token and gen-5 cipher
+32	3.153	G3D28015	binary	unknown	login	-	OSTYPE mac is from the binary; the code page (1250), the files in the first frame (bigmap.txt, minimap.txt) and the head and default-weapon checks are 3.04's
+32	3.153	G3D28015	binary	unknown	3d	-	the 3D mode (Torque GameConnection on port 28000) is not modelled
+32	3.153	G3D28015	binary	source	-	-	binary (Mac OS X PPC Mach-O), not run: OSTYPE mac; PLO 67, 74, 82, 104, 131-134, 187 and MOVE2 (189) in, 44 out; RC file browser, script upload and text request ids; X2/Y2/Z2; UDP off in the shipped prefs

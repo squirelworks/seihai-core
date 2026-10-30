@@ -23,6 +23,16 @@ pub enum EncryptionGen {
 /// [`super::profile::PROFILES`]; the methods here read from it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ClientVersion {
+    /// Graal 1.21 (`GSERV007`). Gen 2, the oldest build with logins.
+    V121,
+    /// Graal 1.28 beta 2 (`GSERV013`). Gen 2.
+    V128B2,
+    /// Graal 1.3 test (`GSERV014`). Gen 2.
+    V13T,
+    /// Graal 1.31 (`GSERV016`). Gen 2.
+    V131,
+    /// Graal 1.32 (`GSERV018`). Gen 2.
+    V132,
     /// Graal 1.33 (`GNW20020`). Gen 2.
     V133,
     /// Graal 1.34 (`GNW22030`). Gen 2.
@@ -212,6 +222,7 @@ impl ClientVersion {
     /// All versions with a profile, oldest first.
     pub fn all_versions() -> &'static [ClientVersion] {
         &[
+            Self::V121, Self::V128B2, Self::V13T, Self::V131, Self::V132,
             Self::V133, Self::V134, Self::V135, Self::V136, Self::V137, Self::V138, Self::V139,
             Self::V141, Self::V142, Self::V200, Self::V201, Self::V202, Self::V202R2, Self::V203,
             Self::V204, Self::V205, Self::V210,
