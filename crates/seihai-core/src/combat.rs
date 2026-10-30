@@ -585,7 +585,7 @@ pub struct CombatState {
     knock: Option<(f32, f32)>,
     /// Knockback steps that came due in the ticks just run; the session
     /// takes them with [`CombatState::take_knock_steps`].
-    knock_steps: Vec<(f32, f32)>,
+    knock_steps: Vec<(u16, (f32, f32))>,
     /// The spin attack (mode 13) in progress: milliseconds in, and its
     /// length in ticks.
     spin: Option<(u64, u16)>,
@@ -711,9 +711,15 @@ impl CombatState {
         }
     }
 
-    /// The knockback steps (unit vectors) that came due since the last call.
-    pub fn take_knock_steps(&mut self) -> Vec<(f32, f32)> {
+    /// The knockback steps that came due since the last call: each step's
+    /// number (1 for the first) and unit vector.
+    pub fn take_knock_steps(&mut self) -> Vec<(u16, (f32, f32))> {
         std::mem::take(&mut self.knock_steps)
+    }
+
+    /// Knockback steps per hit for this build.
+    pub fn knockback_ticks(&self) -> u16 {
+        self.knockback_ticks.unwrap_or(KNOCKBACK_TICKS)
     }
 
     /// The SPRITE (17) value to send for a player facing `dir`: the swing
@@ -761,7 +767,7 @@ impl CombatState {
                 self.hurt_left -= 1;
                 if let Some(k) = self.knock {
                     if self.hurt_left + self.knockback_ticks.unwrap_or(KNOCKBACK_TICKS) >= r.hurt_ticks {
-                        self.knock_steps.push(k);
+                        self.knock_steps.push((r.hurt_ticks - self.hurt_left, k));
                     } else {
                         self.knock = None;
                     }
@@ -1002,9 +1008,15 @@ impl OfflineSession {
                 self.queue_sword_cues(step);
             }
         }
-        for (ux, uy) in self.combat.take_knock_steps() {
-            let moved = self.knock_step(ux, uy);
-            self.knock_moved |= moved;
+        let last = self.combat.knockback_ticks();
+        let every = self.knock_send_steps.max(1);
+        for (i, (ux, uy)) in self.combat.take_knock_steps() {
+            self.knock_unsent |= self.knock_step(ux, uy);
+            // The position goes out on every `every`-th step from the first,
+            // and after the last one.
+            if (i.saturating_sub(1)) % every == 0 || i >= last {
+                self.knock_moved |= std::mem::take(&mut self.knock_unsent);
+            }
         }
         changed || cancelled
     }
@@ -2157,6 +2169,43 @@ mod tests {
         assert!(!s.take_knock_moved());
         assert!(s.combat.is_hurt(), "hurt mode runs on for 40 ticks");
         assert_eq!(s.player_y, 30.0);
+    }
+
+    #[test]
+    fn a_200_sends_the_knockback_position_every_other_step() {
+        // The real 2.00 moves a tile every 50 ms but its props carry X on
+        // steps 1, 3 and 5 only (lab, 2026-10-30 lan-200j: 18.5, 16.5, 14.5).
+        let mut s = open_session(30.0, 30.0);
+        s.knock_send_steps = 2;
+        let h = HurtPlayer { dx: 2.0, dy: 0.0, ..hurt(1, 2) };
+        assert_eq!(s.receive_hurtplayer(&h, Some((28.0, 30.0))).outcome, Ok(2));
+        let mut sent = vec![];
+        for _ in 0..6 {
+            s.tick_combat(50);
+            sent.push(s.take_knock_moved().then_some(s.player_x));
+        }
+        assert_eq!(sent, vec![Some(31.0), None, Some(33.0), None, Some(35.0), None]);
+    }
+
+    #[test]
+    fn a_move_before_a_blocked_step_goes_out_in_the_next_slot() {
+        use crate::assets::{Level, TileTypes};
+        // A wall stops the push after two steps: the second step's place
+        // goes out with step 3, the next send.
+        let mut s = open_session(30.0, 30.0);
+        s.knock_send_steps = 2;
+        let tiles: Vec<u16> = (0..64 * 64).map(|i| if i % 64 == 35 { 1 } else { 0 }).collect();
+        s.current_level = Some(Level::from_board(&tiles));
+        let mut t = TileTypes::from_types([0; 4096]);
+        t.types[1] = 22;
+        s.tiletypes = Some(t);
+        s.receive_hurtplayer(&HurtPlayer { dx: 1.0, dy: 0.0, ..hurt(1, 2) }, Some((28.0, 30.0)));
+        let mut sent = vec![];
+        for _ in 0..5 {
+            s.tick_combat(50);
+            sent.push(s.take_knock_moved().then_some(s.player_x));
+        }
+        assert_eq!(sent, vec![Some(31.0), None, Some(32.0), None, None]);
     }
 
     #[test]

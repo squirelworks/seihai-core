@@ -359,6 +359,13 @@ pub struct OfflineSession {
     pub judged_at: std::collections::HashMap<u16, u32>,
     /// A hit's knockback moved the player since the last [`OfflineSession::take_knock_moved`].
     pub(crate) knock_moved: bool,
+    /// A knockback step moved the player and its position has not been
+    /// handed to the caller yet ([`Self::knock_send_steps`]).
+    pub(crate) knock_unsent: bool,
+    /// The knockback position goes out every this many steps (and after
+    /// the last): 1, or 2 for the real 2.00, whose props carry the
+    /// position every 100 ms while it moves a tile every 50 ms.
+    pub knock_send_steps: u16,
     /// File name of the level loaded last with [`Self::load_level`].
     loaded_file: Option<String>,
 }
@@ -587,6 +594,8 @@ impl OfflineSession {
             no_pk: false,
             judged_at: HashMap::new(),
             knock_moved: false,
+            knock_unsent: false,
+            knock_send_steps: 1,
             loaded_file: None,
         }
     }
