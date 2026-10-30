@@ -316,6 +316,21 @@ impl Gmap {
         v
     }
 
+    /// The level files to ask the server for now, ahead of a big-map edge:
+    /// [`Self::neighbours_near_edge`] for the player at `(x, y)` in `here`,
+    /// each name once per `asked` (the caller keeps it per connection), with
+    /// `.nw` added to a bare name. The caller sends them as file requests in
+    /// the same tick; a link on that edge fires only some steps later, at the
+    /// edge itself, so the level is asked for before the link is walked
+    /// (laundry item 9, `documentation/bigmap-neighbours.md`).
+    pub fn big_map_ahead(&self, here: &str, x: f32, y: f32, asked: &mut HashSet<String>) -> Vec<String> {
+        self.neighbours_near_edge(here, x, y)
+            .into_iter()
+            .filter(|n| asked.insert(format!("near:{}", n.to_ascii_lowercase())))
+            .map(|n| if n.contains('.') { n.to_string() } else { format!("{n}.nw") })
+            .collect()
+    }
+
     /// The cells around `(cx, cy)` (up to eight) that hold a level.
     pub fn neighbours(&self, (cx, cy): (i32, i32)) -> Vec<(i32, i32)> {
         let mut v = Vec::new();
