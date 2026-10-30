@@ -831,7 +831,7 @@ impl OfflineSession {
     /// Interact with what the player faces: throw, lift, grab, or open a
     /// closed chest (2×2 tiles) from below.
     pub fn interact(&mut self) -> Interaction {
-        if self.life.is_dead() || self.jumping() {
+        if self.life.is_dead() || self.jumping() || self.reading.is_some() {
             return Interaction::Nothing;
         }
         // The A key tries to lift first, then reads a sign or opens a chest.
@@ -1890,7 +1890,8 @@ impl OfflineSession {
     /// do nothing.
     /// Returns the emitted `PlayerUpdate` if the position changed.
     pub fn try_move(&mut self, dx: f32, dy: f32) -> Option<PlayerUpdate> {
-        if dx == 0.0 && dy == 0.0 || self.life.is_dead() || self.jumping() {
+        // An open sign takes the arrows (2.05): no step and no turn.
+        if dx == 0.0 && dy == 0.0 || self.life.is_dead() || self.jumping() || self.reading.is_some() {
             return None;
         }
         // Hurt: the arrows are ignored for the first ticks; after that a
@@ -2234,6 +2235,32 @@ mod tests {
         s.player_dir = DIR_NORTH;
         assert!(s.try_move(0.0, -0.5).is_none());
         assert_eq!(s.reading.as_deref(), Some("Hello"));
+    }
+
+    #[test]
+    fn an_open_sign_takes_the_walk_the_a_key_and_hiding() {
+        // 2.05: walking and the A / S / D handler are only reached outside
+        // reading (Graal_analysis `client-internals/sign-panel.md`).
+        let mut s = sign_on_wall();
+        s.player_x = 29.0;
+        s.player_y = 10.0;
+        s.player_dir = DIR_NORTH;
+        s.reading = Some("Hello".into());
+        assert!(s.try_move(0.5, 0.0).is_none(), "no step");
+        assert_eq!((s.player_x, s.player_y, s.player_dir), (29.0, 10.0, DIR_NORTH), "nor a turn");
+        assert!(!s.walking);
+        // The wall ahead would be grabbed outside reading.
+        assert_eq!(s.interact(), Interaction::Nothing);
+        assert!(s.pushpull.grab.is_none());
+        s.carried = Some(Carried { kind: 0, tiles: [[0, 0], [0, 0]] });
+        assert!(!s.toggle_hide(), "D does not hide");
+        assert!(!s.hidden);
+        assert_eq!(s.interact(), Interaction::Nothing, "A does not throw");
+        assert!(s.carried.is_some());
+        // Closed, the same keys act again.
+        s.reading = None;
+        assert!(s.toggle_hide());
+        assert!(matches!(s.interact(), Interaction::Thrown { kind: 0 }));
     }
 
     #[test]

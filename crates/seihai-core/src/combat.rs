@@ -950,7 +950,8 @@ impl OfflineSession {
     /// carrying either: the 2.05 client's sword key throws what is carried
     /// instead (the caller passes the key on to the interact).
     pub fn start_swing(&mut self) -> bool {
-        if self.life.is_dead() || self.in_water || self.sword_power == 0 || self.warp_pending.is_some() || self.carried.is_some() {
+        // An open sign takes S (2.05): it turns the page instead.
+        if self.life.is_dead() || self.in_water || self.sword_power == 0 || self.warp_pending.is_some() || self.carried.is_some() || self.reading.is_some() {
             return false;
         }
         // S again during a swing: the spin attack, if the status allows it.
@@ -1676,6 +1677,17 @@ mod tests {
         s.damage_half(1, None);
         s.tick_life(0);
         assert!(!s.start_swing(), "dead");
+    }
+
+    #[test]
+    fn no_swing_while_a_sign_is_open() {
+        // 2.05: S turns the sign's page and does not reach the sword.
+        let mut s = session();
+        s.reading = Some("Hello".into());
+        assert!(!s.start_swing());
+        assert!(!s.combat.is_swinging());
+        s.reading = None;
+        assert!(s.start_swing());
     }
 
     #[test]

@@ -33,6 +33,10 @@ impl OfflineSession {
     /// D: hide under what is carried, or come out. True if the state
     /// changed.
     pub fn toggle_hide(&mut self) -> bool {
+        // An open sign takes D (2.05): it turns the page instead.
+        if self.reading.is_some() {
+            return false;
+        }
         if self.hidden {
             self.leave_hiding();
             return true;
