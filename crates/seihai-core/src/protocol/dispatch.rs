@@ -377,7 +377,9 @@ pub struct SessionState {
     pub board_lines: Vec<String>,
     pub links: Vec<String>,
     pub chests: Vec<String>,
-    pub signs: Vec<String>,
+    /// `PLO_LEVELSIGN` records as sent: the sign text is coded in bytes
+    /// that run past 0x7F, so they are not UTF-8 text.
+    pub signs: Vec<Vec<u8>>,
     pub board_modifies: Vec<String>,
     pub baddies: Vec<String>,
     pub npcs: Vec<String>,
@@ -697,9 +699,7 @@ impl SessionState {
                 if std::mem::take(&mut self.restored.signs) {
                     self.signs.clear();
                 }
-                if let Ok(s) = String::from_utf8(msg.payload.clone()) {
-                    self.signs.push(s);
-                }
+                self.signs.push(msg.payload.clone());
             }
             6 => {
                 // PLO_LEVELNAME
@@ -2116,7 +2116,7 @@ mod tests {
         assert_eq!(st.level_name.as_deref(), Some("a.nw"));
         assert_eq!(st.cache_restores, 1);
         assert_eq!(st.links, vec!["b.nw 0 0 2 2 1 1".to_string()]);
-        assert_eq!(st.signs, vec!["sign a".to_string()]);
+        assert_eq!(st.signs, vec![b"sign a".to_vec()]);
         let board = st.board.as_ref().expect("board from the cache");
         assert_eq!((board[0], board[1]), (0, 1));
         assert_eq!(st.level_mod_time, Some(("a.nw".to_string(), 1_000)));
@@ -2150,7 +2150,7 @@ mod tests {
         st.expect_cached_level("a.nw");
         st.apply_body(&full_answer("a.nw", 1_500, 7, "new 0 0 2 2 1 1", "new sign"));
         assert_eq!(st.links, vec!["new 0 0 2 2 1 1".to_string()]);
-        assert_eq!(st.signs, vec!["new sign".to_string()]);
+        assert_eq!(st.signs, vec![b"new sign".to_vec()]);
         assert_eq!(st.level_mod_time, Some(("a.nw".to_string(), 1_500)));
         assert_eq!(st.board.as_ref().map(|b| b[0]), Some(7));
         // Leaving a again caches the new copy.
@@ -2600,6 +2600,17 @@ mod tests {
 
     fn msg(id: u8, payload: &[u8]) -> Vec<u8> {
         [&[id + 0x20][..], payload, b"\n"].concat()
+    }
+
+    /// The beta4 lab gserver's sign record for `SIGN 30 22` / "Hello" to a
+    /// 2.00 login (2026-10-30) ends in 0x80, which is not UTF-8. The record
+    /// must still be kept.
+    #[test]
+    fn a_sign_record_with_high_bytes_is_kept() {
+        let mut st = SessionState::for_version(ClientVersion::V200);
+        let record = [0x3eu8, 0x36, 0x27, 0x3e, 0x45, 0x45, 0x48, 0x80];
+        st.apply_body(&msg(5, &record));
+        assert_eq!(st.signs, vec![record.to_vec()]);
     }
 
     /// The messages every public 2.22 gserver sent around the level (ids
