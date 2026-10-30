@@ -316,6 +316,21 @@ impl Gmap {
         v
     }
 
+    /// The level files to ask the server for now, ahead of a big-map edge:
+    /// [`Self::neighbours_near_edge`] for the player at `(x, y)` in `here`,
+    /// each name once per `asked` (the caller keeps it per connection), with
+    /// `.nw` added to a bare name. The caller sends them as file requests in
+    /// the same tick; a link on that edge fires only some steps later, at the
+    /// edge itself, so the level is asked for before the link is walked
+    /// (laundry item 9, `documentation/bigmap-neighbours.md`).
+    pub fn big_map_ahead(&self, here: &str, x: f32, y: f32, asked: &mut HashSet<String>) -> Vec<String> {
+        self.neighbours_near_edge(here, x, y)
+            .into_iter()
+            .filter(|n| asked.insert(format!("near:{}", n.to_ascii_lowercase())))
+            .map(|n| if n.contains('.') { n.to_string() } else { format!("{n}.nw") })
+            .collect()
+    }
+
     /// The cells around `(cx, cy)` (up to eight) that hold a level.
     pub fn neighbours(&self, (cx, cy): (i32, i32)) -> Vec<(i32, i32)> {
         let mut v = Vec::new();
@@ -467,6 +482,24 @@ pub fn crossing_frame(
     if !rules.enabled {
         return Vec::new();
     }
+    let mut msgs = crossing_lead(version, tamper);
+    msgs.push(crossing_props_message(&rules, c));
+    msgs
+}
+
+/// The messages that open a crossing frame, ahead of the flags and the
+/// props: `PLI_ENTERLEVEL` (46) when the build sends it, then the tamper
+/// check (39) when `tamper` is given and the build re-sends it on level
+/// changes. A build has one or the other, never both (2.31 sends 46 and
+/// keeps 39 on its timer; 2.22 has no 46 and re-sends 39).
+///
+/// A build with a walk cadence (2.17, 2.22, 3.04) sends these in the frame
+/// of the step that crosses and leaves the cell prop to its next props
+/// message ([`crate::protocol::walkcadence::WalkCadence::cross`]).
+pub fn crossing_lead(version: ClientVersion, tamper: Option<&mut TamperSender>) -> Vec<Vec<u8>> {
+    if !GmapRules::for_version(version).enabled {
+        return Vec::new();
+    }
     let mut msgs = Vec::new();
     if version.sends_enter_level() {
         msgs.push(crate::net::enter_level_message());
@@ -476,7 +509,6 @@ pub fn crossing_frame(
             msgs.extend(t.message());
         }
     }
-    msgs.push(crossing_props_message(&rules, c));
     msgs
 }
 

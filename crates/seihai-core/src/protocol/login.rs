@@ -254,11 +254,11 @@ pub fn login_props_message(info: &LoginInfo, own_props: &[u8], account: &str, ac
     m
 }
 
-/// The first `PLI_PLAYERPROPS` of a gen-2 build (1.33 to 1.39), sent once
+/// The first `PLI_PLAYERPROPS` of a gen-2 build (1.21 to 1.39), sent once
 /// the first level has loaded: `NICKNAME` (0), `HEADGIF` (11), `COLORS`
-/// (13), `STATUS` (18), `ADDITFLAGS` (33). The values follow lab runs of the
-/// real 1.33 and 1.39 against a stub that varied the server's props
-/// (`documentation/login-burst.md`):
+/// (13), `STATUS` (18) from 1.31, `ADDITFLAGS` (33) from 1.32. The values
+/// follow lab runs of the real 1.28 beta 2 to 1.39 against a stub that
+/// varied the server's props (`documentation/login-burst.md`):
 ///
 /// * the nickname is the server's (prop 0), not the account;
 /// * colours go back as they came;
@@ -287,12 +287,25 @@ pub fn classic_login_props_message(version: super::ClientVersion, own_props: &[u
         m.push(13 + 0x20);
         m.extend(colors);
     }
-    if let Some(&b) = raw_of(18).and_then(|r| r.first()) {
-        m.extend([18 + 0x20, (b.saturating_sub(0x20) & CLASSIC_STATUS_KEPT) + 0x20]);
+    if classic_sends_status(version) {
+        if let Some(&b) = raw_of(18).and_then(|r| r.first()) {
+            m.extend([18 + 0x20, (b.saturating_sub(0x20) & CLASSIC_STATUS_KEPT) + 0x20]);
+        }
     }
-    m.extend([33 + 0x20, 0x20]);
+    // ADDITFLAGS came in with 1.32, the first build whose props reach 33.
+    if version.profile().props.own.contains(33) {
+        m.extend([33 + 0x20, 0x20]);
+    }
     m.push(b'\n');
     m
+}
+
+/// Whether the gen-2 login props carry `STATUS`: from 1.31. The real 1.28
+/// beta 2 and 1.3 test sent nick, head and colours only (and `UDPPORT`),
+/// lab 2026-10-30; 1.21, which was not run, is taken as 1.28 beta 2.
+fn classic_sends_status(version: super::ClientVersion) -> bool {
+    use super::ClientVersion::*;
+    !matches!(version, V121 | V128B2 | V13T)
 }
 
 /// The server's status bits a gen-2 client sends back at login (lab, 1.39:
@@ -618,6 +631,27 @@ mod tests {
         }
         assert!(sends_classic_login_props(V133) && sends_classic_login_props(V139));
         assert!(!sends_classic_login_props(crate::protocol::ClientVersion::V141));
+    }
+
+    /// The real 1.28 beta 2, 1.3 test, 1.31 and 1.32 against the gen-2
+    /// stub (lab, 2026-10-30; server head `head3.png`, status 20): the
+    /// bytes up to `UDPPORT`, then `ADDITFLAGS` 0 in 1.32 only. 1.28 beta 2
+    /// and 1.3 test send no `STATUS`.
+    #[test]
+    fn classic_login_props_match_the_real_1_28_to_1_32() {
+        use crate::protocol::ClientVersion::{V128B2, V131, V132, V13T};
+        let hex = |h: &str| -> Vec<u8> { (0..h.len()).step_by(2).map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap()).collect() };
+        let base = "2028737475626e69636b2b202d22202a2432";
+        let cases = [(V128B2, base.to_string()), (V13T, base.to_string()), (V131, format!("{base}3230")), (V132, format!("{base}32304120"))];
+        for (v, want) in cases {
+            let ids = v.profile().props.own.clone();
+            let m = classic_login_props_message(v, &classic_server_props(&image_head(b"head3.png"), 20), "acct", Some(&ids));
+            let mut w = vec![PLI_PLAYERPROPS + 0x20];
+            w.extend(hex(&want));
+            w.push(b'\n');
+            assert_eq!(m, w, "{}", v.label());
+            assert!(sends_classic_login_props(v), "{}", v.label());
+        }
     }
 
     #[test]

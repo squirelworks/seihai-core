@@ -711,6 +711,10 @@ pub struct Connection {
     /// Client→server ids the logged-in version can send, set by
     /// [`Self::login_versioned`]. Others are refused.
     pli: Option<IdSet>,
+    /// Plain zlib frames go out at the best level (`78 DA`): set by a gen-2
+    /// login. The real 1.28 beta 2 to 1.39 clients compressed every frame
+    /// that way (lab, 2026-10-30).
+    zlib_best: bool,
     /// Flag messages a script queued ([`Self::queue_flag`]): they ride
     /// ahead of the next walk update, or go out on their own.
     flags_out: Vec<Vec<u8>>,
@@ -752,7 +756,7 @@ impl Connection {
         let addrs: Vec<SocketAddr> = addr.to_socket_addrs()?.collect();
         let stream = connect_any(&addrs, CONNECT_TIMEOUT)?;
         stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-        Ok(Self { stream, gen3: None, gen5: None, gen5_in: None, pli: None, flags_out: Vec::new(), flags_since: None, files_out: Vec::new(), files_since: None, last_walk: None, io_thread: None })
+        Ok(Self { stream, gen3: None, gen5: None, gen5_in: None, pli: None, zlib_best: false, flags_out: Vec::new(), flags_since: None, files_out: Vec::new(), files_since: None, last_walk: None, io_thread: None })
     }
 
     /// Close the connection in both directions. A reader thread from
@@ -818,7 +822,9 @@ impl Connection {
                 None => line.extend_from_slice(m),
             }
         }
-        self.send_raw(&write_zlib_frame(&line)?)?;
+        self.zlib_best = version.encryption() == EncryptionGen::Gen2;
+        let frame = if self.zlib_best { write_zlib_frame_best(&line)? } else { write_zlib_frame(&line)? };
+        self.send_raw(&frame)?;
         self.pli = Some(version.profile().protocol.pli);
         self.take_flags();
         match version.encryption() {
@@ -987,7 +993,7 @@ impl Connection {
             let frame = write_frame(comp, &encoded);
             self.send_raw(&frame)?;
         } else {
-            let frame = write_zlib_frame(&body)?;
+            let frame = if self.zlib_best { write_zlib_frame_best(&body)? } else { write_zlib_frame(&body)? };
             self.send_raw(&frame)?;
         }
         self.stream.flush()
@@ -1279,16 +1285,18 @@ impl Connection {
         self.send_raw(&buf)
     }
 
-    /// One tick's frame for a build with a [`WalkCadence`]: the queued flags,
-    /// the tile changes, then the props message, if any. Nothing when all
-    /// three are empty.
+    /// One tick's frame for a build with a [`WalkCadence`]: `lead` (a gmap
+    /// crossing's tamper check, [`crate::gmap::crossing_lead`]), the queued
+    /// flags, the tile changes, then the props message, if any. Nothing when
+    /// all are empty.
     ///
     /// [`WalkCadence`]: crate::protocol::walkcadence::WalkCadence
-    pub fn send_tick_frame(&mut self, boards: Vec<Vec<u8>>, props: Option<Vec<u8>>) -> io::Result<()> {
+    pub fn send_tick_frame(&mut self, lead: Vec<Vec<u8>>, boards: Vec<Vec<u8>>, props: Option<Vec<u8>>) -> io::Result<()> {
         // Queued file requests go in the next tick's frame, with or without
         // props. (2.22's later-step requests do not wait for a tick: the
         // main loop sends them at once.)
-        let mut msgs = self.take_files();
+        let mut msgs = lead;
+        msgs.extend(self.take_files());
         msgs.extend(self.take_flags());
         msgs.extend(boards);
         msgs.extend(props);
@@ -1631,7 +1639,7 @@ mod tests {
         assert_eq!(f[3][0], 2 + 0x20);
 
         conn.queue_files(vec![want("steps2.wav")]);
-        conn.send_tick_frame(Vec::new(), None).unwrap();
+        conn.send_tick_frame(Vec::new(), Vec::new(), None).unwrap();
         assert_eq!(decode(&mut srv), vec![want("steps2.wav")], "a tick without props");
         assert!(conn.take_files().is_empty());
     }
@@ -1818,6 +1826,25 @@ mod tests {
         let (mut conn, mut srv) = pair();
         conn.login_versioned(ClientVersion::V139, 0x42, "ab", "cd").unwrap();
         assert_eq!(read_frame(&mut srv), b" GNW07080\"ab\"cd\n");
+    }
+
+    /// Gen-2 frames, the login and every later one, are compressed at
+    /// zlib's best level (`78 DA`), as the real 1.28 beta 2 to 1.39 sent
+    /// them in the lab (1.33 and 1.39 tested here); gen 3 keeps the default level.
+    #[test]
+    fn gen2_frames_use_the_best_zlib_level() {
+        for v in [ClientVersion::V133, ClientVersion::V139] {
+            let (mut conn, mut srv) = pair();
+            conn.login_versioned(v, 0, "ab", "cd").unwrap();
+            conn.send_messages(&[b"\x22 \n".to_vec()]).unwrap();
+            for _ in 0..2 {
+                let raw = wire(&mut srv);
+                assert_eq!(&raw[2..4], &[0x78, 0xDA], "{}", v.label());
+            }
+        }
+        let (mut conn, mut srv) = pair();
+        conn.login_versioned(ClientVersion::V205, 0x21, "ab", "cd").unwrap();
+        assert_eq!(&wire(&mut srv)[2..4], &[0x78, 0x9C]);
     }
 
     /// With the reader running, the game loop's sends still go out, in
@@ -2579,6 +2606,39 @@ mod tests {
         assert!(!conn.send_gmap_crossing(ClientVersion::V222, &east_crossing(), None).unwrap());
         let body = gen5_body(&mut srv, &mut g);
         assert_eq!(body, [&[2 + 0x20, 15 + 0x20, 0x20, 43 + 0x20, 1 + 0x20][..], b"\n"].concat());
+    }
+
+    /// 2.22 on its walk cadence, the lab's east crossing between two send
+    /// slots: the crossing step's tick frame carries the 39 and the `gr.x`
+    /// flag; the next slot's frame the props `X=0.5, GMAPLEVELX=1`.
+    #[test]
+    fn crossing_on_the_222_cadence_splits_the_39_from_the_cell_prop() {
+        use crate::protocol::walkcadence::{WalkCadence, WalkState};
+        let v = ClientVersion::V222;
+        let (mut conn, mut srv) = pair();
+        conn.login_versioned(v, 0x47, "ab", "cd").unwrap();
+        let _ = read_frame(&mut srv);
+        let mut g = Gen5::new(0x47);
+        let mut t = TamperSender::for_version(v);
+        let mut wc = WalkCadence::for_version(v).unwrap();
+        let st = |x: f32, gani| WalkState::new(x, 30.0, 3, Some(gani));
+        for _ in 0..3 {
+            assert!(wc.tick(st(63.0, "idle")).is_none());
+        }
+        // A slot on 63.5 ...
+        conn.send_tick_frame(Vec::new(), Vec::new(), wc.tick(st(63.5, "walk"))).unwrap();
+        let _ = gen5_body(&mut srv, &mut g);
+        // ... then the crossing step, between two slots.
+        let lead = crate::gmap::crossing_lead(v, t.as_mut());
+        wc.cross(&east_crossing());
+        conn.queue_flag("gr.x", Some("64"));
+        conn.send_tick_frame(lead, Vec::new(), wc.tick(st(0.0, "walk"))).unwrap();
+        let body = gen5_body(&mut srv, &mut g);
+        assert_eq!(body[0], 39 + 0x20, "the 39 opens the crossing step's frame");
+        assert_eq!(&body[12..], b"\x32gr.x=64\n", "then the flag; no props yet");
+        // The next slot: X = 0.5 (half tiles: 1), then the cell.
+        conn.send_tick_frame(Vec::new(), Vec::new(), wc.tick(st(0.5, "walk"))).unwrap();
+        assert_eq!(gen5_body(&mut srv, &mut g), [2 + 0x20, 15 + 0x20, 1 + 0x20, 43 + 0x20, 1 + 0x20, b'\n']);
     }
 
     /// A profile without gmaps writes nothing at a crossing.

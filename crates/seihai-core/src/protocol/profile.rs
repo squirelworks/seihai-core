@@ -884,8 +884,8 @@ mod tests {
     fn tokens_and_labels() {
         for p in PROFILES {
             assert_eq!(p.token.len(), 8, "{}", p.label);
-            // GNW for the 2D builds, G3D for the 3.x ones.
-            assert!(p.token.starts_with("GNW") || p.token.starts_with("G3D"), "{}", p.label);
+            // GSERV before 1.33, GNW for the later 2D builds, G3D for the 3.x ones.
+            assert!(p.token.starts_with("GNW") || p.token.starts_with("G3D") || p.token.starts_with("GSERV"), "{}", p.label);
         }
         let mut labels: Vec<_> = PROFILES.iter().map(|p| p.label).collect();
         labels.dedup();
@@ -983,6 +983,7 @@ mod tests {
         inferred: bool,
         plo: IdSet,
         pli: IdSet,
+        pli_lower_bound: bool,
         own_max: u8,
         npc_max: u8,
         other: Option<IdSet>,
@@ -1023,7 +1024,8 @@ mod tests {
                     token: c[1].to_string(),
                     inferred: c[2] == "inf",
                     plo: parse_ids(c[3]).unwrap(),
-                    pli: parse_ids(c[4]).unwrap(),
+                    pli: parse_ids(c[4].trim_start_matches('>')).unwrap(),
+                    pli_lower_bound: c[4].starts_with('>'),
                     own_max: c[5].parse().unwrap(),
                     npc_max: c[6].parse().unwrap(),
                     other: parse_ids(c[7]),
@@ -1061,7 +1063,12 @@ mod tests {
             check("token", p.token == t.token);
             check("basis", (p.basis == Basis::Inferred) == t.inferred);
             check("plo", p.protocol.plo == t.plo);
-            check("pli", p.protocol.pli == t.pli);
+            if t.pli_lower_bound {
+                // Only the constant send ids are listed: they must all be in the set.
+                check("pli covers the listed ids", (0..=255u8).all(|id| !t.pli.contains(id) || p.protocol.pli.contains(id)));
+            } else {
+                check("pli", p.protocol.pli == t.pli);
+            }
             check("npc_max", p.props.npc_max == t.npc_max);
             check("tampercheck", p.protocol.tampercheck == t.tampercheck);
             check("sends_language == pli has 37", p.protocol.sends_language == t.pli.contains(37));
@@ -1184,7 +1191,7 @@ mod tests {
         for p in PROFILES {
             match p.protocol.listserver {
                 None => {
-                    assert!(p.label.starts_with("1.3"), "{} has no listserver", p.label);
+                    assert!(p.label.starts_with("1.2") || p.label.starts_with("1.3"), "{} has no listserver", p.label);
                     assert_eq!(p.version.listserver_port(), 14923, "{}", p.label);
                 }
                 Some(l) => {
@@ -1211,7 +1218,7 @@ mod tests {
             }
         }
         assert_eq!(seen, classic.len() + gen5.len());
-        assert_eq!(seen + 7, PROFILES.len());
+        assert_eq!(seen + 12, PROFILES.len());
     }
 
     /// The login shape per profile and where it comes from: real 2.00, 2.05,

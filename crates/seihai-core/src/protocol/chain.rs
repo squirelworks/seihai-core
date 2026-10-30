@@ -314,27 +314,30 @@ pub const fn apply(prev: VersionProfile, s: &Step) -> VersionProfile {
 /// server ids 0–41 and 100, client ids 0–31. Every field is written out so a
 /// reader sees one complete row before the deltas begin.
 pub const ORIGIN: VersionProfile = VersionProfile {
-    version: ClientVersion::V133,
-    label: "1.33",
-    token: "GNW20020",
-    date: "2000-02-21",
+    version: ClientVersion::V121,
+    label: "1.21",
+    token: "GSERV007",
+    date: "1999-05-10",
     basis: Basis::Binary,
     protocol: Protocol {
         client_type: 0,
         encryption: EncryptionGen::Gen2,
         listserver: None,
-        plo: IdSet::range(0, 41).with(100),
-        pli: IdSet::range(0, 31),
+        plo: IdSet::range(0, 29).with_range(31, 34).with(100),
+        // The highest send id the binary passes as a constant; the ids below it
+        // that it passes in a register are taken as sent (1.33 sends 0 to 31).
+        pli: IdSet::range(0, 26),
         sends_language: false,
         tampercheck: false,
         tamper: None,
         showimg: None,
         login: None,
-        udp: true,
+        // No direct data packages before 1.28 beta 2.
+        udp: false,
         udp_off_by_default: false,
     },
     props: Props {
-        own: IdSet::range(0, 33),
+        own: IdSet::range(0, 24),
         // The 2.05 other-player set cut to the own-prop range of 1.33, plus
         // 50 and 51 (read from the 1.33 binary).
         other: IdSet::EMPTY
@@ -345,7 +348,7 @@ pub const ORIGIN: VersionProfile = VersionProfile {
             .with(24)
             .with_range(30, 32)
             .with_all(&[50, 51]),
-        npc_max: 34,
+        npc_max: 17,
         bow_prop10: true,
         precise_pos: false,
     },
@@ -359,7 +362,7 @@ pub const ORIGIN: VersionProfile = VersionProfile {
     levels: Levels { graal: true, zelda: true, nw: false, gmap: false, heights: false, cached_links: false, link_boxes: false },
     life: Health { death: None, combat: None },
     ui: Ui {
-        server_list: ServerList::Direct { default: "www.graalonline.com:14900" },
+        server_list: ServerList::Direct { default: "www.graalonline.com:14804" },
         chat_recall: false,
         hud: HudArt::Letters,
         minimap: false,
@@ -371,7 +374,7 @@ pub const ORIGIN: VersionProfile = VersionProfile {
         ghost_mode: false,
         server_in_title: false,
         chat_text: ChatText { face: ChatFace::Dialog, height: 28 },
-        gs1_commands: 88,
+        gs1_commands: 71,
     },
     // Read in 1.39; 1.33 to 1.38 were not run and take its row.
     mannerisms: MANNER_139,
@@ -385,16 +388,88 @@ pub const ORIGIN: VersionProfile = VersionProfile {
 /// [`super::profile::PROFILES`] and of the version pickers.
 pub const CHAIN: &[Step] = &[
     Step {
+        version: ClientVersion::V121,
+        label: "1.21",
+        token: "GSERV007",
+        date: "1999-05-10",
+        basis: Basis::Binary,
+        delta: Delta::NONE,
+        source: "origin row (binary of 1.21, Graal_analysis client-internals/version-profiles/v121-v132.toml): login id 0 with token, account and password; zlib on every flush; no UDP; default server www.graalonline.com:14804",
+        unknown: &[
+            Unknown { area: "levels", what: "Z3-V1 (.zelda): every binary from 1st Graal to 2.31 compares the level magic with Z3-V1.03 and Z3-V1.04, so the column is yes for every build; whether a build also tries .zelda for a bare level name is in no binary (Seihai tries .graal, then .zelda)" },
+            Unknown { area: "pli", what: "the binaries 1.21 to 1.32 show only the send ids passed as constants; the ids below the highest one are taken as sent" },
+            Unknown { area: "other props", what: "1.21 to 1.32 have no separate parser for other players' props; 1.33's set is kept" },
+            Unknown { area: "live", what: "not run: the 1.21 install is an InstallShield setup" },
+        ],
+    },
+    Step {
+        version: ClientVersion::V128B2,
+        label: "1.28 beta 2",
+        token: "GSERV013",
+        date: "1999-11-23",
+        basis: Basis::Binary,
+        delta: Delta {
+            plo: IdDelta::plus(&[30, 35, 36, 37, 38]),
+            pli: IdDelta { plus_ranges: &[(27, 29)], ..IdDelta::NONE },
+            udp: Some(true),
+            own_props: IdDelta { plus_ranges: &[(25, 31)], ..IdDelta::NONE },
+            npc_max: Some(32),
+            gs1_commands: Some(84),
+            ..Delta::NONE
+        },
+        source: "binary: PLO 30 and 35-38, send ids to 29, player props to 31, NPC props to 32, direct data packages (UDP ids 0, 10-22), language files, GS1 table 71 to 84",
+        unknown: &[],
+    },
+    Step {
+        version: ClientVersion::V13T,
+        label: "1.3 test",
+        token: "GSERV014",
+        date: "1999-11-29",
+        basis: Basis::Binary,
+        delta: Delta {
+            plo: IdDelta::plus(&[39]),
+            pli: IdDelta::plus(&[30]),
+            own_props: IdDelta::plus(&[32]),
+            npc_max: Some(34),
+            gs1_commands: Some(85),
+            ..Delta::NONE
+        },
+        source: "binary: PLO 39, send id 30, player prop 32 (alignment), NPC props to 34, GS1 table 85 (setgifpart)",
+        unknown: &[],
+    },
+    Step {
+        version: ClientVersion::V131,
+        label: "1.31",
+        token: "GSERV016",
+        date: "1999-12-07",
+        basis: Basis::Binary,
+        delta: Delta {
+            plo: IdDelta::plus(&[40]),
+            server_list: Some(ServerList::Direct { default: "www.graalonline.com:14900" }),
+            ..Delta::NONE
+        },
+        source: "binary: PLO 40, default port 14900 (14804 before), noudp= and fixedudpport= options",
+        unknown: &[],
+    },
+    Step {
+        version: ClientVersion::V132,
+        label: "1.32",
+        token: "GSERV018",
+        date: "2000-01-12",
+        basis: Basis::Binary,
+        delta: Delta { plo: IdDelta::plus(&[41]), own_props: IdDelta::plus(&[33]), ..Delta::NONE },
+        source: "binary and lab: PLO 41, player prop 33 (ADDITFLAGS); the real 1.32 logged in to the gen-2 stub with the login props of 1.33 (2026-10-30)",
+        unknown: &[],
+    },
+    Step {
         version: ClientVersion::V133,
         label: "1.33",
         token: "GNW20020",
         date: "2000-02-21",
         basis: Basis::Binary,
-        delta: Delta::NONE,
-        source: "origin row (binary of 1.33)",
-        unknown: &[
-            Unknown { area: "levels", what: "Z3-V1 (.zelda): every binary from 1st Graal to 2.31 compares the level magic with Z3-V1.03 and Z3-V1.04, so the column is yes for every build; whether a build also tries .zelda for a bare level name is in no binary (Seihai tries .graal, then .zelda)" },
-        ],
+        delta: Delta { pli: IdDelta::plus(&[31]), gs1_commands: Some(88), ..Delta::NONE },
+        source: "binary of 1.33: send id 31, GS1 table 88, GNW tokens from here on",
+        unknown: &[],
     },
     Step {
         version: ClientVersion::V134,
@@ -1454,7 +1529,8 @@ mod tests {
         for (s, v) in CHAIN.iter().zip(all.iter()) {
             assert_eq!(s.version, *v);
         }
-        assert_eq!(previous(ClientVersion::V133), None);
+        assert_eq!(previous(ClientVersion::V121), None);
+        assert_eq!(previous(ClientVersion::V133), Some(ClientVersion::V132));
         assert_eq!(previous(ClientVersion::V217), Some(ClientVersion::V216));
         assert_eq!(previous(ClientVersion::V231), Some(ClientVersion::V230));
         assert_eq!(ORIGIN, RESOLVED[0]);

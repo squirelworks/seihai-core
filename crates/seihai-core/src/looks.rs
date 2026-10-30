@@ -321,4 +321,16 @@ mod default_body {
         }
         assert_eq!(seen, [true; 5], "skin, coat, sleeves, shoes, belt");
     }
+
+    /// A 2.05 build reads `body.gif`, which must take the colours as the
+    /// PNG does (it used to come out of the recolour as an error, so a GIF
+    /// body was never drawn in the player's colours).
+    #[test]
+    fn gif_body_takes_the_same_colours() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/default/bodies/");
+        let png = std::fs::read(format!("{dir}body.png")).unwrap();
+        let gif = std::fs::read(format!("{dir}body.gif")).unwrap();
+        let recolor = body_recolor(&[13, 7, 14, 1, 10]);
+        assert_eq!(read_png_rgba_recolored(&gif, &recolor).unwrap(), read_png_rgba_recolored(&png, &recolor).unwrap());
+    }
 }

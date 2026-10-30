@@ -3258,6 +3258,50 @@ mod tests {
         assert_eq!(edge_link_arrival(&m, "mid.nw", &link("ne.nw", 63, 0, 1, 64, Some(0.0), None), 63.5, 5.0), None);
     }
 
+    /// Laundry item 9: walking east to the edge link of `mid.nw` on a big
+    /// map, `e.nw` is asked for while the player is still well inside the
+    /// level, and nothing more is asked when the link fires. Each tick does
+    /// what the main loop does: step, check the links, then the ahead
+    /// request (so a request in the link's own tick would count as late).
+    #[test]
+    fn a_big_map_neighbour_is_asked_for_before_its_edge_link_fires() {
+        let mut lvl = level(|_, _| OPEN);
+        lvl.links.push(link("e.nw", 63, 0, 1, 64, Some(0.0), None));
+        let mut s = session_at(lvl, 30.0, 20.0);
+        s.loaded_file = Some("mid.nw".into());
+        let map = big3();
+        let mut asked = std::collections::HashSet::new();
+        let (mut asked_at, mut link_at) = (None, None);
+        for step in 0..200 {
+            s.try_move(0.5, 0.0);
+            if s.check_links() {
+                link_at = Some(step);
+                assert_eq!(s.pending_link.as_ref().map(|l| l.0.as_str()), Some("e.nw"));
+                assert!(map.big_map_ahead("mid.nw", s.player_x, s.player_y, &mut asked).is_empty(), "nothing new at the link");
+                break;
+            }
+            let ahead = map.big_map_ahead("mid.nw", s.player_x, s.player_y, &mut asked);
+            if !ahead.is_empty() {
+                assert_eq!(ahead, ["e.nw"]);
+                assert!(asked_at.is_none(), "asked once");
+                asked_at = Some(step);
+            }
+        }
+        let (asked_at, link_at) = (asked_at.expect("asked ahead"), link_at.expect("the link fired"));
+        // Half-tile steps: at least five tiles (ten steps, 500 ms) ahead.
+        assert!(link_at - asked_at >= 10, "asked at step {asked_at}, link at {link_at}");
+    }
+
+    /// The ahead request covers the corner level too, and a bare big-map
+    /// name gets `.nw`.
+    #[test]
+    fn big_map_ahead_names_files_once() {
+        let map = crate::gmap::Gmap::parse_grid("\"mid\",\"e\"\r\n\"s\",\"se\"\r\n").unwrap();
+        let mut asked = std::collections::HashSet::new();
+        assert_eq!(map.big_map_ahead("mid", 60.0, 60.0, &mut asked), ["e.nw", "s.nw", "se.nw"]);
+        assert!(map.big_map_ahead("MID", 61.0, 61.0, &mut asked).is_empty());
+    }
+
     #[test]
     fn check_links_uses_the_big_map_rule_and_falls_back_without_one() {
         let mut lvl = level(|_, _| OPEN);
