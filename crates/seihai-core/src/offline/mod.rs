@@ -662,6 +662,13 @@ impl OfflineSession {
         self.power.report(half, dead, hurting, sprite)
     }
 
+    /// Hearts are at 0 but the death has not started yet (it starts at the
+    /// next [`Self::tick_life`]). The hearts report waits for it, so the
+    /// claim, CURPOWER 0 and GANI `dead` go out together.
+    pub fn death_pending(&self) -> bool {
+        self.life.rules().is_some() && !self.life.is_dead() && (self.player_health <= 0 || self.hearts_half() <= 0)
+    }
+
     /// Take damage in half hearts from `attacker` (a player id) or from
     /// nothing known. A player who is dead cannot be hurt. Returns false
     /// when the hit did nothing. The death itself starts at the next
@@ -3879,6 +3886,17 @@ mod tests {
         s.current_level = Some(level(|_, _| OPEN));
         s.tiletypes = Some(types());
         s
+    }
+
+    #[test]
+    fn a_killing_hit_holds_the_hearts_report_for_the_death() {
+        let mut s = mortal();
+        assert!(s.damage_half(s.max_hearts, Some(6)));
+        assert!(s.death_pending(), "hearts 0, death not started");
+        s.tick_life(0);
+        assert!(!s.death_pending());
+        let r = s.take_power_report().expect("the death's report");
+        assert!(r.message(true).is_some());
     }
 
     fn die(s: &mut OfflineSession, attacker: Option<u16>) -> Vec<LifeEvent> {
