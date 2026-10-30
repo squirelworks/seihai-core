@@ -432,6 +432,6 @@ Generated; do not edit between the markers.
 - unknown (live): never run
 - unknown (listserver): shape D (id 7 and id 1 in one plain zlib frame at 78 9C) is 3.04's capture; the binary has the same G3D30123 token and gen-5 cipher
 - unknown (login): OSTYPE mac is from the binary; the code page (1250), the files in the first frame (bigmap.txt, minimap.txt) and the head and default-weapon checks are 3.04's
-- unknown (3d): the 3D mode (Torque GameConnection on port 28000) is not modelled
+- unknown (3d): the 3D mode (Torque GameConnection, Graal3D protocol 19, on UDP listed port + 1) is not modelled here; seihai-ato::torque has its profile
 - source: binary (Mac OS X PPC Mach-O), not run: OSTYPE mac; PLO 67, 74, 82, 104, 131-134, 187 and MOVE2 (189) in, 44 out; RC file browser, script upload and text request ids; X2/Y2/Z2; UDP off in the shipped prefs
 <!-- version-chain:end -->
