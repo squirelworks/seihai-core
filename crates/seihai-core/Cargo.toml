@@ -1,0 +1,25 @@
+[package]
+name = "seihai-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# The shared library: protocol, assets, scripting, the offline simulation,
+# the version profiles and the connection code. Nothing here draws, opens a
+# window or opens a sound device; that is the client binaries' job.
+[lib]
+name = "seihai_core"
+path = "src/lib.rs"
+
+[dependencies]
+flate2 = "1"
+bzip2 = "0.5"
+
+[features]
+# Developer mode (F9 wallhack). The mae binary turns it on through its own
+# `dev` feature.
+default = ["dev"]
+dev = []
+
+[dev-dependencies]
+serde_json = "1"
