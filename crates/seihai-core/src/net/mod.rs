@@ -43,6 +43,17 @@ pub fn position_message(x: f32, y: f32, dir: u8) -> Vec<u8> {
     position_message_sprite(x, y, dir % 4)
 }
 
+/// `PLI_PLAYERPROPS` (2) with prop 10 in the pre-2.1 bow form, `c(10 + len)`
+/// + `name`: how the real 2.00 and 2.05 tell others their animation
+/// (`sword` as a swing starts, `idle` after it). See
+/// [`crate::combat::swing_in_bow_slot`].
+pub fn bow_slot_message(name: &str) -> Vec<u8> {
+    let mut m = vec![2 + 0x20, 10 + 0x20, (10 + name.len() as u8).wrapping_add(0x20)];
+    m.extend_from_slice(name.as_bytes());
+    m.push(b'\n');
+    m
+}
+
 /// The same with the whole SPRITE value (`dir + 4 * S`), for a sword swing
 /// or hurt mode. `position_message` is the S = 0 case.
 pub fn position_message_sprite(x: f32, y: f32, sprite: u8) -> Vec<u8> {
