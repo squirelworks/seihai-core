@@ -982,6 +982,41 @@ mod tests {
         assert_eq!(sent(&mut s), [set("gr.x", "30.5")]);
     }
 
+    #[test]
+    fn local_flags_stay_in_the_client() {
+        let mut s = session("GLEVNW01\nNPC - 1 1\nif (created) { set local.a; set b; unset b; setstring c,x; }\nNPCEND\n");
+        let mut sc = SessionScripts::new(ClientVersion::V205);
+        sc.load_level(&mut s, "a.nw");
+        let names: Vec<_> = s.flags_out.iter().map(|(n, v)| (n.as_str(), v.as_deref())).collect();
+        assert_eq!(names, [("b", Some("")), ("b", None), ("c", Some("x"))]);
+    }
+
+    #[test]
+    fn weapon_sync_adds_removes_and_runs_created_once() {
+        let mut s = session("GLEVNW01\n");
+        let mut sc = SessionScripts::new(ClientVersion::V205);
+        let bow = WeaponScript { name: "Bow", image: "", script: "if (created) { set bowready; }" };
+        sc.sync_weapons(&mut s, &[bow]);
+        assert_eq!(s.flags.get("bowready"), Some(&true));
+        s.flags.insert("bowready".into(), false);
+        sc.world.core.flags.clear();
+        sc.sync_weapons(&mut s, &[WeaponScript { name: "Bow", image: "", script: "if (created) { set bowready; }" }]);
+        assert_eq!(s.flags.get("bowready"), Some(&false)); // not run again
+        sc.sync_weapons(&mut s, &[]);
+        assert!(sc.world.ids().is_empty());
+    }
+
+    #[test]
+    fn effects_with_no_session_equivalent_are_handed_back() {
+        let mut s = session("GLEVNW01\nNPC - 1 1\nif (created) { triggeraction 1,1,x,; sendtoserver hi; }\nNPCEND\n");
+        let mut sc = SessionScripts::new(ClientVersion::V205);
+        sc.load_level(&mut s, "a.nw");
+        assert!(sc.unhandled.iter().any(|e| matches!(e, Effect::TriggerAction { .. })));
+        // 2.05 has no sendtoserver: it was gated out and only logged.
+        assert!(!sc.unhandled.iter().any(|e| matches!(e, Effect::SendToServer { .. })));
+        assert!(sc.world.take_log().iter().any(|l| l.contains("sendtoserver")));
+    }
+
     /// Lab 2026-10-30: walking back into a gmap level still loaded as a
     /// neighbour does not run `created` again (Seihai re-ran `setcharani`
     /// and resent GANI and BODY; the real 2.22 sent no NPC props). A level
@@ -1017,41 +1052,6 @@ mod tests {
         s.leave_gmap();
         sc.load_level(&mut s, "a.nw");
         assert_eq!(calls(&s), 2);
-    }
-
-    #[test]
-    fn local_flags_stay_in_the_client() {
-        let mut s = session("GLEVNW01\nNPC - 1 1\nif (created) { set local.a; set b; unset b; setstring c,x; }\nNPCEND\n");
-        let mut sc = SessionScripts::new(ClientVersion::V205);
-        sc.load_level(&mut s, "a.nw");
-        let names: Vec<_> = s.flags_out.iter().map(|(n, v)| (n.as_str(), v.as_deref())).collect();
-        assert_eq!(names, [("b", Some("")), ("b", None), ("c", Some("x"))]);
-    }
-
-    #[test]
-    fn weapon_sync_adds_removes_and_runs_created_once() {
-        let mut s = session("GLEVNW01\n");
-        let mut sc = SessionScripts::new(ClientVersion::V205);
-        let bow = WeaponScript { name: "Bow", image: "", script: "if (created) { set bowready; }" };
-        sc.sync_weapons(&mut s, &[bow]);
-        assert_eq!(s.flags.get("bowready"), Some(&true));
-        s.flags.insert("bowready".into(), false);
-        sc.world.core.flags.clear();
-        sc.sync_weapons(&mut s, &[WeaponScript { name: "Bow", image: "", script: "if (created) { set bowready; }" }]);
-        assert_eq!(s.flags.get("bowready"), Some(&false)); // not run again
-        sc.sync_weapons(&mut s, &[]);
-        assert!(sc.world.ids().is_empty());
-    }
-
-    #[test]
-    fn effects_with_no_session_equivalent_are_handed_back() {
-        let mut s = session("GLEVNW01\nNPC - 1 1\nif (created) { triggeraction 1,1,x,; sendtoserver hi; }\nNPCEND\n");
-        let mut sc = SessionScripts::new(ClientVersion::V205);
-        sc.load_level(&mut s, "a.nw");
-        assert!(sc.unhandled.iter().any(|e| matches!(e, Effect::TriggerAction { .. })));
-        // 2.05 has no sendtoserver: it was gated out and only logged.
-        assert!(!sc.unhandled.iter().any(|e| matches!(e, Effect::SendToServer { .. })));
-        assert!(sc.world.take_log().iter().any(|l| l.contains("sendtoserver")));
     }
 
     #[test]
