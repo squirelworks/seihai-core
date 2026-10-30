@@ -75,7 +75,7 @@ pub struct LevelSlot {
     pub board_lines: Vec<String>,
     pub links: Vec<String>,
     pub signs: Vec<String>,
-    pub chests: Vec<String>,
+    pub chests: Vec<Vec<u8>>,
 }
 
 /// The session's view of the gmap the player is on, built from the server's
