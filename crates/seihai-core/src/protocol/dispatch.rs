@@ -376,7 +376,9 @@ pub struct SessionState {
     pub level_name: Option<String>,
     pub board_lines: Vec<String>,
     pub links: Vec<String>,
-    pub chests: Vec<String>,
+    /// `PLO_LEVELCHEST` records as sent: the bytes can be 0x80 and up
+    /// (beta4 sends sign index -1 as 0xFF), so they are not text.
+    pub chests: Vec<Vec<u8>>,
     /// `PLO_LEVELSIGN` records as sent: the sign text is coded in bytes
     /// that run past 0x7F, so they are not UTF-8 text.
     pub signs: Vec<Vec<u8>>,
@@ -684,9 +686,7 @@ impl SessionState {
             }
             4 => {
                 // PLO_LEVELCHEST: c opened, c x, c y [, c item, c sign].
-                if let Ok(s) = String::from_utf8(msg.payload.clone()) {
-                    self.chests.push(s);
-                }
+                self.chests.push(msg.payload.clone());
                 if let [o, x, y, ..] = msg.payload[..] {
                     if o.wrapping_sub(0x20) == 1 {
                         let pos = (x.wrapping_sub(0x20) as i32, y.wrapping_sub(0x20) as i32);
@@ -2600,6 +2600,17 @@ mod tests {
 
     fn msg(id: u8, payload: &[u8]) -> Vec<u8> {
         [&[id + 0x20][..], payload, b"\n"].concat()
+    }
+
+    /// The beta4 lab gserver's chest record for `CHEST 30 36 greenrupee -1`
+    /// to a 2.00 login (2026-10-30): the sign index byte is 0xFF, which is
+    /// not UTF-8. The record must still be kept.
+    #[test]
+    fn a_chest_record_with_high_bytes_is_kept() {
+        let mut st = SessionState::for_version(ClientVersion::V200);
+        let record = [0x20u8, 0x3e, 0x44, 0x20, 0xff];
+        st.apply_body(&msg(4, &record));
+        assert_eq!(st.chests, vec![record.to_vec()]);
     }
 
     /// The beta4 lab gserver's sign record for `SIGN 30 22` / "Hello" to a

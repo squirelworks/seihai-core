@@ -1015,12 +1015,27 @@ impl OfflineSession {
     }
 
     /// The animation a bow-slot build ([`swing_in_bow_slot`]) names in prop
-    /// 10 now: `sword` during a swing, `spin` during the spin, else `idle`.
+    /// 10 now: `sword` during a swing, `spin` during the spin, the lift,
+    /// carry and hidden poses with an object, else `idle`.
+    ///
+    /// Read in the 2.05 rev 2 decompile: the sender writes its current
+    /// gani's name in prop 10. A watcher draws another player's carried
+    /// object only while that player's gani step is 23 to 32 (`lift`,
+    /// `carrystill` / `hiddenstill`, `carry` / `hidden`, or `def` driven by
+    /// SPRITE), and the STATUS hidden bit (0x02) leaves out the figure and
+    /// the name. Under a bush with `idle` in prop 10 (GServer's default), a
+    /// real 2.05 drew nothing at all.
     pub fn bow_slot_anim(&self) -> &'static str {
         if self.combat.spin_elapsed_ms().is_some() {
             "spin"
         } else if self.combat.is_swinging() {
             "sword"
+        } else if self.hidden {
+            if self.walking { "hidden" } else { "hiddenstill" }
+        } else if self.lift_ticks.is_some_and(|t| t < crate::offline::LIFT_CARRIED_TICK) {
+            "lift"
+        } else if self.carried.is_some() {
+            if self.walking { "carry" } else { "carrystill" }
         } else {
             "idle"
         }
@@ -1725,6 +1740,32 @@ mod tests {
         // Hurt mode still goes out in SPRITE: 128 + direction, as the real ones send it.
         s.combat.start_hurt();
         assert_eq!(s.bow_slot_sprite(true), 128 + 1);
+    }
+
+    #[test]
+    fn a_20x_build_names_the_lift_carry_and_hidden_poses_in_the_bow_slot() {
+        // A real 2.05 watcher draws the carried object only for these gani
+        // names (or `def`), and nothing at all of a hidden player on `idle`.
+        let mut s = session();
+        s.current_level = Some(crate::assets::Level::from_board(&[0u16; 64 * 64]));
+        s.tiletypes = Some(crate::assets::TileTypes::from_types([0; 4096]));
+        s.carried = Some(crate::offline::Carried { kind: 0, tiles: [[0, 0], [0, 0]] });
+        s.lift_ticks = Some(0);
+        assert_eq!(s.bow_slot_anim(), "lift");
+        s.lift_ticks = None;
+        assert_eq!(s.bow_slot_anim(), "carrystill");
+        s.walking = true;
+        assert_eq!(s.bow_slot_anim(), "carry");
+        s.walking = false;
+        assert!(s.toggle_hide());
+        assert_eq!(s.bow_slot_anim(), "hiddenstill");
+        s.walking = true;
+        assert_eq!(s.bow_slot_anim(), "hidden");
+        s.walking = false;
+        assert!(s.toggle_hide());
+        assert_eq!(s.bow_slot_anim(), "carrystill", "out of hiding, back to carrying");
+        assert!(s.throw_carried().is_some());
+        assert_eq!(s.bow_slot_anim(), "idle");
     }
 
     #[test]

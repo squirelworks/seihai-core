@@ -919,16 +919,15 @@ impl Level {
     ///
     /// The client draws the chest from the record (a 2 x 2 blit of the
     /// closed or open chest tiles), see `render::draw_chests`.
-    pub fn add_server_chests(&mut self, records: &[String]) {
-        for r in records {
-            let b = r.as_bytes();
+    pub fn add_server_chests(&mut self, records: &[Vec<u8>]) {
+        for b in records {
             if b.len() < 3 {
                 continue;
             }
             // The client reads any non-zero first byte as "opened".
             let opened = b[0].wrapping_sub(0x20) != 0;
             let (x, y) = (b[1].wrapping_sub(0x20) as i32, b[2].wrapping_sub(0x20) as i32);
-            let (item, sign_index) = match b {
+            let (item, sign_index) = match b[..] {
                 [_, _, _, i, s, ..] if !opened => (
                     CHEST_ITEMS.get(i.wrapping_sub(0x20) as usize).map(|s| s.to_string()).unwrap_or_default(),
                     s.wrapping_sub(0x20) as i32,
@@ -1908,10 +1907,15 @@ mod tests {
         let mut board = Level::from_board(&[0; 4096]);
         // Opened chest at (23, 19): three bytes. Closed chest at (5, 6):
         // item 0 (green rupee), sign 2.
-        let opened: String = [0x21u8, 0x20 + 23, 0x20 + 19].iter().map(|&b| b as char).collect();
-        let closed: String = [0x20u8, 0x20 + 5, 0x20 + 6, 0x20, 0x22].iter().map(|&b| b as char).collect();
-        board.add_server_chests(&[opened, closed, "!".into()]);
-        assert_eq!(board.chests.len(), 2);
+        // The last record is too short. The beta4 lab gserver's record for
+        // `CHEST 30 36 greenrupee -1` ends in 0xFF (2026-10-30); it is kept.
+        let opened = vec![0x21u8, 0x20 + 23, 0x20 + 19];
+        let closed = vec![0x20u8, 0x20 + 5, 0x20 + 6, 0x20, 0x22];
+        let beta4 = vec![0x20u8, 0x3e, 0x44, 0x20, 0xff];
+        board.add_server_chests(&[opened, closed, b"!".to_vec(), beta4]);
+        assert_eq!(board.chests.len(), 3);
+        assert_eq!((board.chests[2].x, board.chests[2].y, board.chests[2].item.as_str()), (30, 36, "greenrupee"));
+        assert!(!board.chests[2].opened);
         assert_eq!((board.chests[0].x, board.chests[0].y, board.chests[0].item.as_str()), (23, 19, ""));
         assert!(board.chests[0].opened && !board.chests[1].opened);
         assert_eq!((board.chests[1].x, board.chests[1].y, board.chests[1].item.as_str(), board.chests[1].sign_index), (5, 6, "greenrupee", 2));
