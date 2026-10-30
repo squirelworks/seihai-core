@@ -1,0 +1,9 @@
+function onCreated() {
+  this.count = 3 + 4 * 2;
+  if (this.count > 10) {
+    set("gs2seen");
+    showimg(1, "light2.png", x, y);
+  }
+  hideimg(1);
+  sleep(0.5);
+}

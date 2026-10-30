@@ -1,0 +1,22 @@
+// Loops, branches and the short-circuit operators.
+function onTimeout() {
+  temp.n = 0;
+  for (temp.i = 0; temp.i < 5; temp.i++) {
+    if (temp.i == 2) continue;
+    temp.n += temp.i;
+  }
+  while (temp.n > 0) {
+    temp.n--;
+    if (temp.n == 1) break;
+  }
+  switch (temp.n) {
+    case 1: say2("one"); break;
+    default: say2("other");
+  }
+  temp.ok = (temp.n > 0 && temp.n < 300) || temp.n == -1;
+  temp.big = 100000;
+  temp.mid = 1000;
+  temp.pick = temp.ok ? "yes" : "no";
+  temp.r = temp.n in |0, 10|;
+  setTimer(0.1);
+}

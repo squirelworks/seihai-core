@@ -1,0 +1,20 @@
+// Strings, arrays, objects and the GS2-only built-ins.
+public function report(msg) {
+  return format("%s: %d", msg, int(player.x));
+}
+function onCreated() {
+  temp.list = {1, 2, 3};
+  temp.list.add(4);
+  for (temp.v : temp.list) {
+    echo(temp.v);
+  }
+  temp.s = "a,b" @ "c" SPC player.account;
+  temp.p = temp.s.pos("b");
+  temp.t = temp.s.substring(1, 2);
+  temp.arr = new[3][2];
+  temp.o = new TStaticVar();
+  with (findplayer("lab")) {
+    chat = this.report("hi");
+  }
+  temp.w = sin(pi / 2) + abs(-3) + random(0, 1);
+}
