@@ -18,6 +18,15 @@
 //!   accounts' template has STATUS 21 (0x15), so copying the bit would show
 //!   the player as paused to everyone; only P and the focus set it.
 //!
+//! Gen-2 builds (lab, 2026-10-30, the real 1.32 to 1.39 under Wine with a
+//! window manager, focus moved to another window):
+//!
+//! * 1.32, 1.33 and 1.34 sent nothing when they lost the focus
+//!   ([`focus_pauses`] is false up to 1.34).
+//! * 1.35 to 1.39 sent one `PLAYERPROPS` with `STATUS` alone: the server's
+//!   bits they keep at login (16 and 64) and 0x01. The server gave 20 and
+//!   they sent 17. No position followed ([`pause_message_bits`]).
+//!
 //! Not read yet: whatever else pause stops in the real client (walking,
 //! timers). Seihai only marks the state and applies the hit gate.
 
@@ -54,6 +63,26 @@ impl OfflineSession {
 /// is ours to set (P or the focus), never taken from the account.
 pub fn server_status_base(status: u8) -> u8 {
     status & !PAUSED_STATUS
+}
+
+/// Whether losing the window focus pauses the player in this build: not in
+/// 1.33 and 1.34, nor in the builds before them (the real 1.32 to 1.34 sent
+/// nothing on losing it).
+pub fn focus_pauses(version: crate::protocol::ClientVersion) -> bool {
+    let all = crate::protocol::ClientVersion::all_versions();
+    let at = |v| all.iter().position(|&x| x == v);
+    at(version) > at(crate::protocol::ClientVersion::V134)
+}
+
+/// The `STATUS` a build sends when its own pause or hide bits change, and
+/// whether its position follows in the same frame. Gen 2 keeps only the
+/// server's bits 16 and 64 (as in its login props) and sends no position.
+pub fn pause_message_bits(version: crate::protocol::ClientVersion, base: u8, bits: u8) -> (u8, bool) {
+    if version.encryption() == crate::protocol::EncryptionGen::Gen2 {
+        ((base & crate::protocol::login::CLASSIC_STATUS_KEPT) | bits, false)
+    } else {
+        (base | bits, true)
+    }
 }
 
 /// The name label of another player: `unknown` for an empty name, with
@@ -94,6 +123,19 @@ mod tests {
         s.set_focused(false);
         s.set_focused(true);
         assert!(s.paused);
+    }
+
+    /// The lab runs: no focus pause in 1.33 and 1.34; 1.35 to 1.39 send
+    /// STATUS 17 for the server's 20 and no position; later builds keep the
+    /// server's bits and send the position.
+    #[test]
+    fn gen2_focus_pause_follows_the_lab() {
+        use crate::protocol::ClientVersion::*;
+        assert!(!focus_pauses(V133) && !focus_pauses(V134));
+        assert!(focus_pauses(V135) && focus_pauses(V139) && focus_pauses(V222));
+        assert_eq!(pause_message_bits(V139, 20, PAUSED_STATUS), (17, false));
+        assert_eq!(pause_message_bits(V135, 20, PAUSED_STATUS), (17, false));
+        assert_eq!(pause_message_bits(V304, 20, PAUSED_STATUS), (21, true));
     }
 
     #[test]

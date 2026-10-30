@@ -310,7 +310,7 @@ fn classic_sends_status(version: super::ClientVersion) -> bool {
 
 /// The server's status bits a gen-2 client sends back at login (lab, 1.39:
 /// 1, 2, 4, 8 and 32 came back clear, 16 and 64 as sent).
-const CLASSIC_STATUS_KEPT: u8 = 16 | 64;
+pub const CLASSIC_STATUS_KEPT: u8 = 16 | 64;
 
 /// The head value of [`classic_login_props_message`] for the server's
 /// `HEADGIF` bytes: `c(n)` for a numbered head, else `c(len + 100)` + name.
