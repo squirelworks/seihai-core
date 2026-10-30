@@ -207,20 +207,23 @@ Generated; do not edit between the markers.
 
 - protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
+- life: **combat**: none -> 2.00 rules (raw sword power, fewer packet gates)
 - ui: **gs1_commands**: 134 -> 142
+- unknown (life): combat read in 2.00 r0 only (Graal_analysis client-internals/combat-200-204.md); r1 to r3 assumed the same. Not run against a real client
 - unknown (login): props sent at login (verified for 2.05 only)
 - unknown (listserver): Seihai now sends the real 2.00 frame (shape A, captured in the lab: id 0 `newmain` only, no account). That frame has not been run on the public service. The 2026-10-25 matrix used Seihai's older classic login (shape B), which 14923 answered with a plain zlib id-0 list (4 rows) while 14922 stayed silent; the port is assumed for shape A until a run. A real 2.00's reply was not captured
 - unknown (token): the token is not in gs2lib, so a stock GServer-v2 does not know it
-- source: binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142; list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)
+- source: binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, combat rules read in r0; list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)
 
 #### 2.01 (`GNW23021`, binary, linked 2001-03-08)
 
 - protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured)
 - protocol: **plo (server ids handled)**: +46 HITOBJECTS, +156 SETACTIVELEVEL (53 -> 55 ids)
 - protocol: **pli (client ids sent)**: +35 ADJACENTLEVEL, +36 HITOBJECTS (35 -> 37 ids)
+- life: **combat**: 2.00 rules (raw sword power, fewer packet gates) -> 2.01 rules (raw sword power)
 - ui: **gs1_commands**: 142 -> 144
 - unknown (listserver): 2.01 to 2.04 (and 2.02 rev 2): login frame inferred, not captured. Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; no real client of these builds was captured and no run on the public service has used shape A, so the port is assumed. The 2026-10-25 matrix used Seihai's older shape B: a legacy list on 14923, nothing on 14922. 14921, the port the build carries, is dead
-- source: binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144
+- source: binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144; the hurt packet gains the AP 100, no-kill and once-a-second gates
 
 #### 2.02 (`GNW15041`, binary, linked 2001-04-15)
 
@@ -241,8 +244,9 @@ Generated; do not edit between the markers.
 
 - protocol: **plo (server ids handled)**: +48 TRIGGERACTION, +165 MOVE (56 -> 58 ids)
 - protocol: **pli (client ids sent)**: +38 TRIGGERACTION (38 -> 39 ids)
+- life: **combat**: 2.01 rules (raw sword power) -> 2.05 rules
 - ui: **gs1_commands**: 146 -> 148
-- source: binary: TRIGGERACTION (38) sent, PLO 48 and 165, GS1 146 to 148
+- source: binary: TRIGGERACTION (38) sent, PLO 48 and 165, GS1 146 to 148; sword power stored limited to -20..20, as 2.05
 
 #### 2.04 (`GNW24061`, binary, linked 2001-06-25)
 
@@ -260,12 +264,11 @@ Generated; do not edit between the markers.
 - levels: **gmap**: no -> yes
 - levels: **cached_links**: no -> yes
 - life: **death**: none -> 2.05 rules (name-group test)
-- life: **combat**: none -> 2.05 rules
 - ui: **server_in_title**: no -> yes
 - ui: **gs1_commands**: 157 -> 161
 - mannerisms: **mannerisms**: NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses) -> 2.05 (hidden ganis, pull stays, swim runs on)
 - unknown (listserver): this profile now sends the real 2.05 frame (shape A, captured in the lab: id 0 `newmain` only). No public run has used it: the 2026-10-25 matrix binary sent the gen-5 login for 2.05 (the saved-version override, since fixed) and both 14922 and 14923 answered that. 14923 answered the older classic login (shape B) of every other classic profile, so 14923 is assumed here
-- source: binary (rev 1 and rev 2) and lab: .nw and .gmap levels, PLO 168, server name in the title, GS1 157 to 161; death and combat rules traced here
+- source: binary (rev 1 and rev 2) and lab: .nw and .gmap levels, PLO 168, server name in the title, GS1 157 to 161; death rules traced here (combat as 2.03, traced in both)
 
 #### 2.1 (`GNW31101`, inferred)
 
@@ -431,5 +434,4 @@ Generated; do not edit between the markers.
 - unknown (login): OSTYPE mac is from the binary; the code page (1250), the files in the first frame (bigmap.txt, minimap.txt) and the head and default-weapon checks are 3.04's
 - unknown (3d): the 3D mode (Torque GameConnection on port 28000) is not modelled
 - source: binary (Mac OS X PPC Mach-O), not run: OSTYPE mac; PLO 67, 74, 82, 104, 131-134, 187 and MOVE2 (189) in, 44 out; RC file browser, script upload and text request ids; X2/Y2/Z2; UDP off in the shipped prefs
-
 <!-- version-chain:end -->

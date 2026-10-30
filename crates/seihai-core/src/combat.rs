@@ -19,7 +19,7 @@
 //! judged by [`judge_hurtplayer`].
 
 use crate::offline::OfflineSession;
-use crate::protocol::{ClientVersion, CombatRules, OtherPlayer};
+use crate::protocol::{ClientVersion, CombatRules, OtherPlayer, PowerStore};
 
 /// `PLI_HURTPLAYER` (26), client to server:
 /// `GSHORT victim, GCHAR (dx+4)*16, GCHAR (dy+4)*16, GCHAR power` (half
@@ -285,12 +285,19 @@ pub fn is_swinging(rules: &CombatRules, s: &Swinger) -> bool {
     s.swing_gani || is_swing_sprite(rules, s.sprite)
 }
 
-/// Half hearts a sword hit takes: the attacker's sword power, limited to the
-/// profile's plus or minus 20. Negative heals (see [`CombatRules::
-/// heal_min_ap`]); 0 only starts hurt mode.
+/// Half hearts a sword hit takes: the attacker's sword power as the victim
+/// stores it ([`PowerStore`]). From 2.03 that is the power limited to the
+/// profile's plus or minus 20, and a negative one heals (see
+/// [`CombatRules::heal_min_ap`]); before 2.03 it is the power in 6 bits, 0 to
+/// 63. 0 only starts hurt mode.
 pub fn sword_half_hearts(rules: &CombatRules, power: i8) -> i32 {
-    let lim = i32::from(rules.sword_power_limit);
-    i32::from(power).clamp(-lim, lim)
+    match rules.sword_power_store {
+        PowerStore::Limited => {
+            let lim = i32::from(rules.sword_power_limit);
+            i32::from(power).clamp(-lim, lim)
+        }
+        PowerStore::Raw6Bit => i32::from(power).rem_euclid(64),
+    }
 }
 
 /// The victim's judgement of a sword swing. `Ok` is the signed half hearts
@@ -428,10 +435,10 @@ fn packet_gates(
     }
     v.state.check()?;
     let at = attacker_at.ok_or(Reject::TooFar)?;
-    if v.ap == rules.immune_ap {
+    if rules.packet_victim_gates && v.ap == rules.immune_ap {
         return Err(Reject::Immune);
     }
-    if v.no_pk {
+    if rules.packet_victim_gates && v.no_pk {
         return Err(Reject::NoPkZone);
     }
     if rules.judge_throttle && g.repeat {
@@ -1022,7 +1029,7 @@ impl OfflineSession {
 mod tests {
     use super::*;
     use crate::life::LifeEvent;
-    use crate::protocol::{ClientVersion, SessionState, COMBAT_205, DEATH_205, PROFILES};
+    use crate::protocol::{ClientVersion, SessionState, COMBAT_200, COMBAT_201, COMBAT_205, DEATH_205, PROFILES};
 
     const R: CombatRules = COMBAT_205;
 
@@ -1140,6 +1147,38 @@ mod tests {
         assert_eq!(sword_half_hearts(&R, -100), -20);
         let unknown = Swinger { sword_power: None, ..swinger(3, sw(8, 3)) };
         assert_eq!(judge_sword(&R, &unknown, &v), Err(Reject::UnknownPower));
+    }
+
+    #[test]
+    fn before_203_the_sword_power_is_kept_in_6_bits_and_never_heals() {
+        let v = victim(22.0, 20.0);
+        for (power, half) in [(0i8, 0), (3, 3), (20, 20), (63, 63), (64, 0), (-1, 63), (-20, 44)] {
+            let s = Swinger { sword_power: Some(power), ..swinger(3, sw(8, 3)) };
+            assert_eq!(judge_sword(&COMBAT_201, &s, &v), Ok(half), "2.01, power {power}");
+            assert_eq!(judge_sword(&COMBAT_200, &s, &v), Ok(half), "2.00, power {power}");
+        }
+        // From 2.03 the same powers are limited and a negative one heals.
+        assert_eq!(sword_half_hearts(&COMBAT_205, -1), -1);
+        assert_eq!(sword_half_hearts(&COMBAT_205, 63), 20);
+    }
+
+    #[test]
+    fn the_200_hurt_packet_skips_the_ap_100_and_no_kill_gates() {
+        let mut v = victim(20.0, 20.0);
+        v.ap = 100;
+        v.no_pk = true;
+        assert_eq!(judge_hurtplayer(&COMBAT_200, &hurt(1, 2), Some((20.0, 20.0)), &v), Ok(2));
+        assert_eq!(judge_hurtplayer(&COMBAT_201, &hurt(1, 2), Some((20.0, 20.0)), &v), Err(Reject::Immune));
+        v.ap = 50;
+        assert_eq!(judge_hurtplayer(&COMBAT_201, &hurt(1, 2), Some((20.0, 20.0)), &v), Err(Reject::NoPkZone));
+        // 2.00 keeps the hurtable, guild and range gates, and the sword keeps
+        // its own AP and no-kill tests.
+        let friendly = PacketGates { friendly: true, ..PacketGates::default() };
+        assert_eq!(judge_hurtplayer_gated(&COMBAT_200, &hurt(1, 2), Some((20.0, 20.0)), &v, friendly), Err(Reject::Friendly));
+        assert_eq!(judge_hurtplayer(&COMBAT_200, &hurt(1, 2), Some((30.5, 20.0)), &v), Err(Reject::TooFar));
+        let s = swinger(3, sw(8, 3));
+        assert_eq!(judge_sword(&COMBAT_200, &s, &Victim { no_pk: true, ..victim(22.0, 20.0) }), Err(Reject::NoPkZone));
+        assert_eq!(judge_sword(&COMBAT_200, &s, &Victim { ap: 100, ..victim(22.0, 20.0) }), Err(Reject::Immune));
     }
 
     #[test]
@@ -1309,7 +1348,7 @@ mod tests {
         assert_eq!(big[big.len() - 2], 0x20 + 2);
         assert_eq!(hurtplayer_message(v, (20.0, 20.0), &target(40.0, 20.0), (0.0, 0.0), 2), Err(Reject::TooFar));
         assert_eq!(hurtplayer_message(v, (20.0, 20.0), &target(21.0, 20.0), (0.0, 0.0), 0), Err(Reject::NoDamage));
-        for old in [ClientVersion::V133, ClientVersion::V139, ClientVersion::V200, ClientVersion::V204] {
+        for old in [ClientVersion::V133, ClientVersion::V139, ClientVersion::V142] {
             assert_eq!(hurtplayer_message(old, (20.0, 20.0), &target(21.0, 20.0), (0.0, 0.0), 2), Err(Reject::NotInBuild), "{old:?}");
         }
     }
@@ -1319,16 +1358,22 @@ mod tests {
     #[test]
     fn combat_follows_the_profile() {
         for p in PROFILES {
-            assert_eq!(p.life.combat.is_some(), p.life.death.is_some(), "{}: combat and death rows go together", p.label);
+            // 2.00 to 2.04 have a traced combat row but no death row yet.
+            assert!(p.life.death.is_none() || p.life.combat.is_some(), "{}: a death row comes with a combat row", p.label);
             if let Some(c) = p.life.combat {
                 assert!(c.swing_sprite_first <= c.swing_sprite_last, "{}", p.label);
                 assert!(c.reach_min_half <= c.reach_max_half, "{}", p.label);
             }
         }
-        for v in [ClientVersion::V133, ClientVersion::V139, ClientVersion::V200, ClientVersion::V204] {
+        for v in [ClientVersion::V133, ClientVersion::V139, ClientVersion::V142] {
             assert!(v.combat_rules().is_none(), "{}", v.label());
         }
-        for v in [ClientVersion::V205, ClientVersion::V217, ClientVersion::V222, ClientVersion::V231] {
+        // Read in each binary (Graal_analysis `client-internals/combat-200-204.md`).
+        assert_eq!(ClientVersion::V200.combat_rules(), Some(COMBAT_200));
+        for v in [ClientVersion::V201, ClientVersion::V202, ClientVersion::V202R2] {
+            assert_eq!(v.combat_rules(), Some(COMBAT_201), "{}", v.label());
+        }
+        for v in [ClientVersion::V203, ClientVersion::V204, ClientVersion::V205, ClientVersion::V217, ClientVersion::V222, ClientVersion::V231] {
             assert_eq!(v.combat_rules(), Some(COMBAT_205), "{}", v.label());
         }
         assert_eq!(COMBAT_205.immune_ap, 100);
@@ -1856,7 +1901,7 @@ mod tests {
         assert!(matches!(st.hits[0], IncomingHit::Hurt(h) if h.attacker == 12 && h.half == 2));
         assert!(matches!(st.hits[1], IncomingHit::Objects(h) if h.attacker == 12 && h.x == 20.0));
         // A build without the rules decodes nothing and counts the ids as unhandled.
-        for v in [ClientVersion::V133, ClientVersion::V139, ClientVersion::V200, ClientVersion::V204] {
+        for v in [ClientVersion::V133, ClientVersion::V139, ClientVersion::V142] {
             let mut st = SessionState::for_version(v);
             st.apply_body(&m40(12));
             st.apply_body(&m46);
@@ -1866,6 +1911,17 @@ mod tests {
             st.apply_body(&plo8(5, &sw_props));
             assert!(st.swings.is_empty(), "{}: no swing is noticed", v.label());
         }
+        // 2.00 has the rules but no id 46 (added in 2.01): 40 is decoded, 46
+        // is not.
+        let mut st = SessionState::for_version(ClientVersion::V200);
+        st.apply_body(&m40(12));
+        st.apply_body(&m46);
+        assert_eq!(st.hits.len(), 1);
+        assert!(matches!(st.hits[0], IncomingHit::Hurt(h) if h.attacker == 12));
+        let mut st = SessionState::for_version(ClientVersion::V201);
+        st.apply_body(&m40(12));
+        st.apply_body(&m46);
+        assert_eq!(st.hits.len(), 2);
     }
 
     // ---- packet gates, id 46 and knockback (damage-respawn leftovers) ----

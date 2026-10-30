@@ -547,9 +547,10 @@ pub const DEATH_21: DeathRules = DeathRules { entry_name_group: false, ..DEATH_2
 /// victim's side of combat). Sources: `decomp-findings-2026-10-24/
 /// 04-sword-hitbox.md`, `01-death-respawn.md`, `constants-205.tsv` (2.05
 /// rev 2, derived), and Graal_analysis `protocol/packet-layouts.md` "Hits".
-/// Later builds take the same row as an inference, the builds before 2.05
-/// have none because their handler was not traced. Distances are in half
-/// tiles, the wire scale.
+/// Later builds take the same row as an inference. 2.00 to 2.04 were read
+/// in their own binaries (Graal_analysis `client-internals/combat-200-204.md`):
+/// 2.03 and 2.04 judge as 2.05, 2.00 to 2.02 differ in the fields below.
+/// Distances are in half tiles, the wire scale.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CombatRules {
     /// The attacker's sprite number (SPRITE prop 17 is `dir + 4 * S`) is a
@@ -595,6 +596,27 @@ pub struct CombatRules {
     /// client's second-of-day clock; later ones in the same second are
     /// dropped.
     pub judge_throttle: bool,
+    /// How the victim keeps another player's sword power (see
+    /// [`PowerStore`]).
+    pub sword_power_store: PowerStore,
+    /// The hurt packets (40, 46) are refused, as a sword hit is, when the
+    /// victim's AP is 100 or the level ran `noplayerkilling` (2.01 on). The
+    /// 2.00 handler tests neither; it has only the hurtable, guild and range
+    /// gates.
+    pub packet_victim_gates: bool,
+}
+
+/// How the victim's client stores another player's sword power. Every build
+/// keeps it in a 6-bit slot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PowerStore {
+    /// 2.03 on: limited to plus or minus `sword_power_limit` and stored with
+    /// that offset, so a negative power survives (and heals).
+    Limited,
+    /// 2.00 to 2.02: the received power as is, in 6 bits, so it reads back
+    /// as 0 to 63. A negative power wraps (63 for -1) and never heals; the
+    /// wrap is inferred from the store's bit mask, not seen.
+    Raw6Bit,
 }
 
 /// The 2.05 rev 2 values.
@@ -614,7 +636,20 @@ pub const COMBAT_205: CombatRules = CombatRules {
     heal_min_ap: 40,
     attacker_blocked_status: 0x22,
     judge_throttle: true,
+    sword_power_store: PowerStore::Limited,
+    packet_victim_gates: true,
 };
+
+/// 2.01 and 2.02: as 2.05, but the sword power is stored without the offset
+/// and limit. (Their kick test and the no-kill flag on the player, not the
+/// level, change nothing Seihai checks.)
+pub const COMBAT_201: CombatRules = CombatRules { sword_power_store: PowerStore::Raw6Bit, ..COMBAT_205 };
+
+/// 2.00: as 2.01, and the hurt packet has only the hurtable, guild and range
+/// gates: no AP 100 immunity, no no-kill test and no once-a-second limit.
+/// The sword judge has no once-a-second stamp either (no build read has one
+/// there), so `judge_throttle` is off.
+pub const COMBAT_200: CombatRules = CombatRules { judge_throttle: false, packet_victim_gates: false, ..COMBAT_201 };
 
 /// Health, death and combat.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

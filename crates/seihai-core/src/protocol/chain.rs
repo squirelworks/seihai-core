@@ -24,7 +24,7 @@
 use super::profile::{
     Basis, BuiltIn, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, Levels, ListKind, Listserver, LoginShape, PortStatus, Props, Protocol, ServerList, ShapeBasis, Ui,
     BUILT_IN_14921, BUILT_IN_14922,
-    ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, TAMPER_217, TAMPER_222,
+    ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, TAMPER_217, TAMPER_222,
     TAMPER_230, TAMPER_231,
 };
 use super::login::{LoginInfo, LOGIN_217, LOGIN_222, LOGIN_231, LOGIN_304, LOGIN_3153};
@@ -624,11 +624,13 @@ pub const CHAIN: &[Step] = &[
                 Listserver::new(ListKind::Legacy, PortStatus::Assumed, Some(BUILT_IN_14921), None).shape(LoginShape::NewmainOnly, ShapeBasis::Captured),
             )),
             plo: IdDelta::plus(&[154, 155]),
+            combat: Some(Some(COMBAT_200)),
             gs1_commands: Some(142),
             ..Delta::NONE
         },
-        source: "binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142; list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)",
+        source: "binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, combat rules read in r0; list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)",
         unknown: &[
+            Unknown { area: "life", what: "combat read in 2.00 r0 only (Graal_analysis client-internals/combat-200-204.md); r1 to r3 assumed the same. Not run against a real client" },
             Unknown { area: "login", what: "props sent at login (verified for 2.05 only)" },
             Unknown { area: "listserver", what: "Seihai now sends the real 2.00 frame (shape A, captured in the lab: id 0 `newmain` only, no account). That frame has not been run on the public service. The 2026-10-25 matrix used Seihai's older classic login (shape B), which 14923 answered with a plain zlib id-0 list (4 rows) while 14922 stayed silent; the port is assumed for shape A until a run. A real 2.00's reply was not captured" },
             Unknown { area: "token", what: "the token is not in gs2lib, so a stock GServer-v2 does not know it" },
@@ -648,10 +650,11 @@ pub const CHAIN: &[Step] = &[
             )),
             plo: IdDelta::plus(&[46, 156]),
             pli: IdDelta::plus(&[35, 36]),
+            combat: Some(Some(COMBAT_201)),
             gs1_commands: Some(144),
             ..Delta::NONE
         },
-        source: "binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144",
+        source: "binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144; the hurt packet gains the AP 100, no-kill and once-a-second gates",
         unknown: &[Unknown { area: "listserver", what: "2.01 to 2.04 (and 2.02 rev 2): login frame inferred, not captured. Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; no real client of these builds was captured and no run on the public service has used shape A, so the port is assumed. The 2026-10-25 matrix used Seihai's older shape B: a legacy list on 14923, nothing on 14922. 14921, the port the build carries, is dead" }],
     },
     Step {
@@ -690,10 +693,11 @@ pub const CHAIN: &[Step] = &[
         delta: Delta {
             plo: IdDelta::plus(&[48, 165]),
             pli: IdDelta::plus(&[38]),
+            combat: Some(Some(COMBAT_205)),
             gs1_commands: Some(148),
             ..Delta::NONE
         },
-        source: "binary: TRIGGERACTION (38) sent, PLO 48 and 165, GS1 146 to 148",
+        source: "binary: TRIGGERACTION (38) sent, PLO 48 and 165, GS1 146 to 148; sword power stored limited to -20..20, as 2.05",
         unknown: &[],
     },
     Step {
@@ -729,13 +733,12 @@ pub const CHAIN: &[Step] = &[
             gmap: Some(true),
             cached_links: Some(true),
             death: Some(Some(DEATH_205)),
-            combat: Some(Some(COMBAT_205)),
             server_in_title: Some(true),
             gs1_commands: Some(161),
             mannerisms: Some(MANNER_205),
             ..Delta::NONE
         },
-        source: "binary (rev 1 and rev 2) and lab: .nw and .gmap levels, PLO 168, server name in the title, GS1 157 to 161; death and combat rules traced here",
+        source: "binary (rev 1 and rev 2) and lab: .nw and .gmap levels, PLO 168, server name in the title, GS1 157 to 161; death rules traced here (combat as 2.03, traced in both)",
         unknown: &[
             Unknown { area: "listserver", what: "this profile now sends the real 2.05 frame (shape A, captured in the lab: id 0 `newmain` only). No public run has used it: the 2026-10-25 matrix binary sent the gen-5 login for 2.05 (the saved-version override, since fixed) and both 14922 and 14923 answered that. 14923 answered the older classic login (shape B) of every other classic profile, so 14923 is assumed here" },
         ],
@@ -1219,6 +1222,8 @@ fn combat_text(c: &Option<super::profile::CombatRules>) -> String {
     match c {
         None => "none".into(),
         Some(c) if *c == COMBAT_205 => "2.05 rules".into(),
+        Some(c) if *c == COMBAT_201 => "2.01 rules (raw sword power)".into(),
+        Some(c) if *c == COMBAT_200 => "2.00 rules (raw sword power, fewer packet gates)".into(),
         Some(_) => "custom".into(),
     }
 }
@@ -1427,6 +1432,9 @@ mod tests {
     /// (classic login 14923, gen-5 login 14922; the old rows had the bare port the
     /// build carries, mostly the dead 14921). 2.17 then got its id 24
     /// sender (lab, 2026-10-30, `documentation/difftest-217.md` item 3).
+    /// 2.00 to 2.04 then got combat rows read in their own binaries, and
+    /// every combat row two more fields (`sword_power_store`,
+    /// `packet_victim_gates`; Graal_analysis `client-internals/combat-200-204.md`).
     #[test]
     fn chain_equals_the_hand_written_rows() {
         let mut seen = 0;
