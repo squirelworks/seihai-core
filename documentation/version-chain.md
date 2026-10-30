@@ -155,6 +155,7 @@ Generated; do not edit between the markers.
 - ui: **ganis**: no -> yes
 - ui: **chat_text**: ChatText { face: Helvetica, height: 24 } -> ChatText { face: TempusSans, height: 24 }
 - ui: **gs1_commands**: 126 -> 134
+- mannerisms: **mannerisms**: 1.39 (blink after the hurt pose, hide keeps the carry poses, 4-tile knockback) -> NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses)
 - unknown (listserver): built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured
 - unknown (listserver): login frame inferred, not captured: Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; a real 1.42 frame was never captured, and no run on the public service has used shape A, so the port is assumed
 - source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134
@@ -219,6 +220,7 @@ Generated; do not edit between the markers.
 - life: **combat**: none -> 2.05 rules
 - ui: **server_in_title**: no -> yes
 - ui: **gs1_commands**: 157 -> 161
+- mannerisms: **mannerisms**: NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses) -> 2.05 (hidden ganis, pull stays, swim runs on)
 - unknown (listserver): this profile now sends the real 2.05 frame (shape A, captured in the lab: id 0 `newmain` only). No public run has used it: the 2026-10-25 matrix binary sent the gen-5 login for 2.05 (the saved-version override, since fixed) and both 14922 and 14923 answered that. 14923 answered the older classic login (shape B) of every other classic profile, so 14923 is assumed here
 - source: binary (rev 1 and rev 2) and lab: .nw and .gmap levels, PLO 168, server name in the title, GS1 157 to 161; death and combat rules traced here
 
@@ -311,6 +313,7 @@ Generated; do not edit between the markers.
 - protocol: **udp_off_by_default**: no -> yes
 - levels: **link_boxes**: no -> yes
 - ui: **server_list**: 2 tabs -> 3 tabs
+- mannerisms: **mannerisms**: 2.05 (hidden ganis, pull stays, swim runs on) -> 2.22 (as 2.05, swim restarts at the stop)
 - unknown (pli): send sites of ids 36, 42 and 45 were not matched in the binary, so 36 and 45 are not sent
 - unknown (framing): a client-originated bz2 frame (0x1000 and over) was never seen
 - source: binary and lab and public servers: client type 5 and gen 5 framing, listserver id 7 with GNW30123, PLO 186, PLI 36, 45 and 81 not sent, id 24 about every 5.1 s, post-login frame with OS and code page props, links tested with a per-direction probe box
