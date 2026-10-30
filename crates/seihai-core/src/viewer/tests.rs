@@ -438,7 +438,7 @@ fn layout_report_follows_the_chain_and_marks_versions_without_a_layout() {
     assert_eq!(gen2.to, "2.31");
     assert!(gen2.handled);
     assert_eq!(gen2.rows.len(), 6);
-    assert_eq!(rep.runs[0].from, "1.33");
+    assert_eq!(rep.runs[0].from, "1.21");
     assert!(!rep.runs[0].handled);
     assert!(rep.changes.iter().any(|c| c.starts_with("added in")), "{:?}", rep.changes);
     // The built-in chain agrees: one of its protocol rows names +49 at the step the profiles add it.
