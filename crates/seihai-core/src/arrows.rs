@@ -41,7 +41,10 @@
 //! shield stopping or sending back a shot, and flag 4 of `PLO_ARROWADD`
 //! (it removes a shot flying the other way on the same line; the line test
 //! is not legible in the decompile). Which way a shot knocks the player is
-//! not legible either; Seihai pushes along the flight (inferred).
+//! not legible either; Seihai pushes along the flight, the normal 5 ticks
+//! of 1 tile. A real 2.00 hit by Seihai's west arrow did the same (lab
+//! 2026-10-30: half a heart, GANI `hurt`, then about 5 tiles west over
+//! 5 ticks, 4 when it ran into something).
 
 /// The first arrow sprite; `+ dir` for the others.
 pub const ARROW_SPRITE: u16 = 107;
