@@ -280,6 +280,21 @@ pub fn is_swing_gani(gani: &str) -> bool {
     SWING_GANIS.contains(&name)
 }
 
+/// Whether the build sends its own swing as an animation name in prop 10
+/// (the pre-2.1 bow slot, [`crate::net::bow_slot_message`]) and keeps SPRITE
+/// on the direction. The lab decodes of the real 2.00 and 2.05 (2026-10-30)
+/// show exactly that: `sword` as the swing starts (2.00 then `idle` about
+/// 250 ms later), and SPRITE only ever the direction, or 128 + direction
+/// while hurt. 2.01 to 2.04 lie between the two and are taken to do the
+/// same (not captured). A real 2.00 took no damage from Seihai's sprite
+/// swing (S 6 to 10) in the same lab.
+pub fn swing_in_bow_slot(v: ClientVersion) -> bool {
+    matches!(
+        v,
+        ClientVersion::V200 | ClientVersion::V201 | ClientVersion::V202 | ClientVersion::V202R2 | ClientVersion::V203 | ClientVersion::V204 | ClientVersion::V205
+    )
+}
+
 /// The attacker is on a swing: a swing sprite (2.05), or a swing GANI (2.1+).
 pub fn is_swinging(rules: &CombatRules, s: &Swinger) -> bool {
     s.swing_gani || is_swing_sprite(rules, s.sprite)
@@ -999,6 +1014,28 @@ impl OfflineSession {
         self.sprite_value_for(false)
     }
 
+    /// The animation a bow-slot build ([`swing_in_bow_slot`]) names in prop
+    /// 10 now: `sword` during a swing, `spin` during the spin, else `idle`.
+    pub fn bow_slot_anim(&self) -> &'static str {
+        if self.combat.spin_elapsed_ms().is_some() {
+            "spin"
+        } else if self.combat.is_swinging() {
+            "sword"
+        } else {
+            "idle"
+        }
+    }
+
+    /// The SPRITE (17) a bow-slot build sends: the swing is in prop 10, so
+    /// a swing frame goes out as the plain direction.
+    pub fn bow_slot_sprite(&self, gani_client: bool) -> u8 {
+        if self.combat.is_swinging() {
+            self.player_dir % 4
+        } else {
+            self.sprite_value_for(gani_client)
+        }
+    }
+
     /// [`Self::sprite_value`] as the client sends it. A GANI client
     /// (`gani_client`, 2.1+) plays the push and pull poses from its own
     /// GANIs and sends SPRITE only when it changes
@@ -1662,6 +1699,32 @@ mod tests {
         assert_eq!(seen, vec![sw(6, 3), sw(7, 3), sw(8, 3), sw(9, 3), sw(10, 3), 3]);
         assert!(!s.combat.is_swinging());
         assert!(s.start_swing(), "and again once it is over");
+    }
+
+    #[test]
+    fn a_20x_build_swings_with_sword_in_the_bow_slot_and_a_plain_sprite() {
+        // The real 2.00 and 2.05 (lab decodes, 2026-10-30): prop 10
+        // `c(10 + 5)` + `sword`, then `idle`; SPRITE stays the direction.
+        for v in [ClientVersion::V200, ClientVersion::V201, ClientVersion::V204, ClientVersion::V205] {
+            assert!(swing_in_bow_slot(v), "{}", v.label());
+        }
+        for v in [ClientVersion::V142, ClientVersion::V139, ClientVersion::V210, ClientVersion::V217, ClientVersion::V222] {
+            assert!(!swing_in_bow_slot(v), "{}", v.label());
+        }
+        assert_eq!(crate::net::bow_slot_message("sword"), [&[2 + 0x20, 10 + 0x20, 0x20 + 15][..], b"sword", b"\n"].concat());
+        assert_eq!(crate::net::bow_slot_message("idle"), [&[2 + 0x20, 10 + 0x20, 0x20 + 14][..], b"idle", b"\n"].concat());
+        let mut s = session();
+        s.player_dir = 1;
+        assert_eq!((s.bow_slot_anim(), s.bow_slot_sprite(true)), ("idle", 1));
+        assert!(s.start_swing());
+        assert_eq!((s.bow_slot_anim(), s.bow_slot_sprite(true)), ("sword", 1));
+        for _ in 0..20 {
+            s.tick_combat(50);
+        }
+        assert_eq!(s.bow_slot_anim(), "idle");
+        // Hurt mode still goes out in SPRITE: 128 + direction, as the real ones send it.
+        s.combat.start_hurt();
+        assert_eq!(s.bow_slot_sprite(true), 128 + 1);
     }
 
     #[test]
