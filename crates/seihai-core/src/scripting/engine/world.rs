@@ -279,6 +279,10 @@ pub struct ScriptWorld {
     pub core: Core,
     objects: Vec<Option<ScriptObject>>,
     acc_ms: u64,
+    /// Levels left on a gmap that are still loaded as neighbours: their NPC
+    /// objects and `level.` variables, by lower-case level name, until the
+    /// player walks back in ([`Self::park_level`]).
+    parked: HashMap<String, (Vec<ScriptObject>, HashMap<String, Val>)>,
 }
 
 impl ScriptWorld {
@@ -310,6 +314,7 @@ impl ScriptWorld {
             },
             objects: Vec::new(),
             acc_ms: 0,
+            parked: HashMap::new(),
         }
     }
 
@@ -387,6 +392,39 @@ impl ScriptWorld {
     /// Ids of the live objects, in creation order.
     pub fn ids(&self) -> Vec<ObjId> {
         self.objects.iter().flatten().filter(|o| !o.destroyed).map(|o| o.id).collect()
+    }
+
+    /// Set the current level's NPCs and `level.` variables aside under
+    /// `name` instead of dropping them (a gmap crossing: the level stays
+    /// loaded as a neighbour). [`Self::unpark_level`] brings them back with
+    /// their state, so `created` does not run again. Weapons stay.
+    pub fn park_level(&mut self, name: &str) {
+        let mut objs = Vec::new();
+        for o in self.objects.iter_mut() {
+            if o.as_ref().is_some_and(|o| o.kind == ObjKind::Npc) {
+                objs.extend(o.take());
+            }
+        }
+        let vars = std::mem::take(&mut self.core.level_vars);
+        self.core.pending.retain(|p| !matches!(p.target, Target::Npc(_)));
+        self.parked.insert(name.to_ascii_lowercase(), (objs, vars));
+    }
+
+    /// Bring back the NPCs parked under `name` (new ids, same state). False
+    /// when nothing is parked under it.
+    pub fn unpark_level(&mut self, name: &str) -> bool {
+        let Some((objs, vars)) = self.parked.remove(&name.to_ascii_lowercase()) else { return false };
+        for mut o in objs {
+            o.id = self.objects.len();
+            self.objects.push(Some(o));
+        }
+        self.core.level_vars = vars;
+        true
+    }
+
+    /// Keep only the parked levels `keep` says yes to (lower-case names).
+    pub fn retain_parked(&mut self, mut keep: impl FnMut(&str) -> bool) {
+        self.parked.retain(|n, _| keep(n));
     }
 
     /// Drop every level NPC and the `level.` variables (a level change).

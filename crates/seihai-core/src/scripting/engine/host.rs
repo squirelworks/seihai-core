@@ -43,12 +43,36 @@ impl SessionScripts {
     /// Replace the level's scripts with those of `session`'s current
     /// level, run `created` on each NPC, then `playerenters` on all
     /// objects (weapons included).
+    ///
+    /// On a gmap a level the player left stays loaded as a neighbour, and
+    /// so do its scripts: walking back in brings them back as they were,
+    /// without a second `created` (the real 2.22 sends no `PLI_NPCPROPS`
+    /// when it walks back into a gmap level, lab 2026-10-30; a second
+    /// `created` re-ran `setcharani` and resent GANI and BODY).
     pub fn load_level(&mut self, session: &mut OfflineSession, level_name: &str) {
-        self.world.clear_level();
+        let left = std::mem::take(&mut self.world.core.level);
+        match &session.gmap {
+            Some(w) if !left.is_empty() => {
+                self.world.park_level(&left);
+                // Only levels still loaded (the player's and the neighbours') keep theirs.
+                let loaded: Vec<String> = std::iter::once(w.cell)
+                    .chain(w.levels.keys().copied())
+                    .filter_map(|(x, y)| w.map.level_at(x, y))
+                    .map(str::to_ascii_lowercase)
+                    .collect();
+                self.world.retain_parked(|n| loaded.iter().any(|l| l == n));
+            }
+            Some(_) => self.world.clear_level(),
+            None => {
+                self.world.clear_level();
+                self.world.retain_parked(|_| false);
+            }
+        }
         self.world.core.level = level_name.to_string();
         // A weapon's images belong to the level the player was on.
         session.player_images.clear();
-        if let Some(level) = &session.current_level {
+        let resumed = session.gmap.is_some() && self.world.unpark_level(level_name);
+        if let (false, Some(level)) = (resumed, &session.current_level) {
             for (i, n) in level.npcs.iter().enumerate() {
                 let mut spec = ObjSpec::npc(&n.image, n.x as f64, n.y as f64, &n.script).with_tag(i);
                 spec.kind = ObjKind::Npc;
@@ -956,6 +980,43 @@ mod tests {
         s.player_x = 30.5;
         sc.tick(&mut s, 50);
         assert_eq!(sent(&mut s), [set("gr.x", "30.5")]);
+    }
+
+    /// Lab 2026-10-30: walking back into a gmap level still loaded as a
+    /// neighbour does not run `created` again (Seihai re-ran `setcharani`
+    /// and resent GANI and BODY; the real 2.22 sent no NPC props). A level
+    /// no longer loaded starts afresh, and off the gmap nothing is kept.
+    #[test]
+    fn re_entering_a_loaded_gmap_level_resumes_its_scripts() {
+        const NPC: &str = "GLEVNW01\nNPC - 30 30\nif (created) { showcharacter; setcharani idle,; }\nNPCEND\n";
+        let grid = "GRMAP001\nWIDTH 2\nHEIGHT 1\nLEVELNAMES\n\"a.nw\",\"b.nw\",\nLEVELNAMESEND\n";
+        let mut s = session(NPC);
+        s.enter_gmap("g.gmap".into(), crate::gmap::Gmap::parse(grid).unwrap(), (0, 0));
+        let mut sc = SessionScripts::new(ClientVersion::V222);
+        sc.load_level(&mut s, "a.nw");
+        let calls = |s: &OfflineSession| s.current_level.as_ref().unwrap().npcs[0].ani_calls;
+        assert_eq!(calls(&s), 1);
+        // East into b.nw; a.nw stays as the neighbour.
+        let a = s.current_level.replace(Level::parse("GLEVNW01\n").unwrap()).unwrap();
+        let w = s.gmap.as_mut().unwrap();
+        w.levels.insert((0, 0), a);
+        w.cell = (1, 0);
+        sc.load_level(&mut s, "b.nw");
+        assert!(sc.world.ids().iter().all(|&i| sc.world.obj(i).unwrap().kind != ObjKind::Npc));
+        // And back west.
+        let a = s.gmap.as_mut().unwrap().levels.remove(&(0, 0)).unwrap();
+        let b = s.current_level.replace(a).unwrap();
+        let w = s.gmap.as_mut().unwrap();
+        w.levels.insert((1, 0), b);
+        w.cell = (0, 0);
+        sc.load_level(&mut s, "a.nw");
+        assert_eq!(calls(&s), 1, "created did not run again");
+        assert_eq!(sc.world.ids().iter().filter(|&&i| sc.world.obj(i).unwrap().kind == ObjKind::Npc).count(), 1);
+
+        // Off the gmap: the level is new again.
+        s.leave_gmap();
+        sc.load_level(&mut s, "a.nw");
+        assert_eq!(calls(&s), 2);
     }
 
     #[test]
