@@ -19,10 +19,11 @@
 //!   `hiddenstill` / `hidden` and draw only the object, where the player
 //!   stands; 1.39 and NewMain 1.41 keep the carry poses.
 //! * **Wire.** `hiddenstill` is sprite 18, the same as `carrystill`;
-//!   `hidden` walks 19, 20, 19, 18. A 2.00 to 2.05 build also names the
-//!   pose in prop 10 (`bow_slot_anim`): a real 2.05 watcher draws the
-//!   object only for those gani names, so with `idle` there the hidden
-//!   player showed nothing at all, not even the bush.
+//!   `hidden` walks 19, 20, 19, 18. A 2.00 to 2.05 build sends neither:
+//!   the real 2.00 keeps `carrystill` / `carry` in prop 10 and plain
+//!   SPRITE, and only STATUS changes (`bow_slot_anim`). A real 2.00
+//!   watcher draws a hidden player as the object on the ground at its
+//!   feet, and nothing at all with `idle`, `hidden` or `hiddenstill`.
 
 use super::OfflineSession;
 

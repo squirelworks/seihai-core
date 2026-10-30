@@ -179,6 +179,14 @@ impl WalkCadence {
     }
 }
 
+/// How often a build without a [`WalkCadence`] sends its walk props, if
+/// it holds them back at all. The real 2.00 (lab, 2026-10-30, a carry walk
+/// next to Seihai's): at most every 100 ms, so a whole tile apart at the
+/// 0.5 tile per 50 ms walk. 2.01 to 2.05 were not captured.
+pub fn walk_props_every_ms(v: ClientVersion) -> Option<u64> {
+    (v == ClientVersion::V200).then_some(100)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
