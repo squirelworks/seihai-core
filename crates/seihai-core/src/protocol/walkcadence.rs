@@ -24,6 +24,16 @@
 //! `idle` in the next slot (`X=36`, then `GANI=idle, X=35.5` 100 ms later),
 //! and a stop on a whole tile sends `idle` alone in the next slot.
 //!
+//! A gmap edge crossing (real 2.22, lab 2026-10-24, Graal_analysis
+//! `protocol/lab-checks-2026-10-24.md`, and the `gmap_cross` difftest in
+//! `documentation/gmap-order.md`): the tamper check and the `gr` flag go in
+//! the frame of the step that crosses; the cell prop (`GMAPLEVELX` 43 or
+//! `GMAPLEVELY` 44) goes with the next props message, next to the wrapped
+//! coordinate of its axis. When the crossing step is also a send slot the
+//! two are one frame (`X=0, 43=1`); otherwise the props come a step later
+//! (`Y=0.5, 44=1` south, `X=63, 43=0` west, `X=0.5, 43=1` east). See
+//! [`WalkCadence::cross`].
+//!
 //! The 2.31 client sends `X2`/`Y2` every 50 ms instead, and is not handled
 //! here.
 
@@ -71,6 +81,9 @@ pub struct WalkCadence {
     pos: (u8, u8),
     moved_tick: u32,
     idle_after: u32,
+    /// Cell props of a gmap crossing not sent yet: the new cell x (43) and
+    /// cell y (44).
+    cell: (Option<u8>, Option<u8>),
 }
 
 impl WalkCadence {
@@ -82,13 +95,32 @@ impl WalkCadence {
             ClientVersion::V304 => IDLE_AFTER_TICKS_304,
             _ => return None,
         };
-        Some(Self { sent: None, tick: 0, sent_tick: None, pos: (0, 0), moved_tick: 0, idle_after })
+        Some(Self { sent: None, tick: 0, sent_tick: None, pos: (0, 0), moved_tick: 0, idle_after, cell: (None, None) })
     }
 
     /// The last props sent had `walk` as the GANI: the server knows the
     /// player is walking.
     pub fn walk_sent(&self) -> bool {
         self.sent.as_ref().is_some_and(|s| s.gani == Some("walk"))
+    }
+
+    /// The player crossed a gmap edge: the next props message carries the
+    /// new cell prop of each axis that changed (43 for x, 44 for y) with that
+    /// axis's coordinate, even when the coordinate equals the last one sent.
+    /// It waits for the next send slot like any other change. A second
+    /// crossing before it goes replaces the cell of its axis.
+    pub fn cross(&mut self, c: &crate::gmap::Crossing) {
+        if c.x_changed() {
+            self.cell.0 = Some(c.to.0 as u8);
+        }
+        if c.y_changed() {
+            self.cell.1 = Some(c.to.1 as u8);
+        }
+    }
+
+    /// A crossing's cell prop is still waiting for a send slot.
+    pub fn crossing_pending(&self) -> bool {
+        self.cell != (None, None)
     }
 
     /// One 50 ms tick: the props message to send in this tick's frame, if
@@ -109,7 +141,8 @@ impl WalkCadence {
         // A stop keeps `walk` for a tick or two after the last step.
         let settling = last.gani == Some("walk") && n.wrapping_sub(self.moved_tick) < self.idle_after;
         let gani = cur.gani.filter(|g| last.gani != Some(*g) && !(settling && *g == "idle"));
-        if gani.is_none() && cur.x == last.x && cur.y == last.y && cur.sprite == last.sprite {
+        let (cell_x, cell_y) = self.cell;
+        if gani.is_none() && cur.x == last.x && cur.y == last.y && cur.sprite == last.sprite && cell_x.is_none() && cell_y.is_none() {
             return None;
         }
         if self.sent_tick.is_some_and(|t| n.wrapping_sub(t) < INTERVAL_TICKS) {
@@ -121,15 +154,24 @@ impl WalkCadence {
             m.push(g.len() as u8 + 0x20);
             m.extend(g.as_bytes());
         }
-        if cur.x != last.x {
+        // Ascending ids: GANI 10, X 15, Y 16, SPRITE 17, then the cell props
+        // 43 and 44 (the real 2.22's `X, GMAPLEVELX`).
+        if cur.x != last.x || cell_x.is_some() {
             m.extend([15 + 0x20, cur.x.wrapping_add(0x20)]);
         }
-        if cur.y != last.y {
+        if cur.y != last.y || cell_y.is_some() {
             m.extend([16 + 0x20, cur.y.wrapping_add(0x20)]);
         }
         if cur.sprite != last.sprite {
             m.extend([17 + 0x20, cur.sprite.wrapping_add(0x20)]);
         }
+        if let Some(cx) = cell_x {
+            m.extend([43 + 0x20, cx.wrapping_add(0x20)]);
+        }
+        if let Some(cy) = cell_y {
+            m.extend([44 + 0x20, cy.wrapping_add(0x20)]);
+        }
+        self.cell = (None, None);
         m.push(b'\n');
         self.sent = Some(WalkState { gani: gani.or(last.gani), ..cur });
         self.sent_tick = Some(n);
@@ -263,5 +305,98 @@ mod tests {
     fn a_sword_swing_sends_its_gani_without_a_sprite() {
         assert_eq!(run(30.0, &[(30.0, "sword"), (30.0, "sword")], 2), vec![(0, "*%sword".to_string())]);
         assert!(WalkCadence::for_version(ClientVersion::V231).is_none());
+    }
+
+    /// Walk a 2.22 player over `steps` (x, y, crossing) after a long idle at
+    /// `start`; a crossing is given to the sender before that step's tick,
+    /// as the main loop does. The result is (step, props bytes) of each
+    /// message.
+    fn walk_222(start: (f32, f32), sprite: u8, steps: &[(f32, f32, Option<crate::gmap::Crossing>)]) -> Vec<(usize, Vec<u8>)> {
+        let mut c = WalkCadence::for_version(ClientVersion::V222).unwrap();
+        for _ in 0..11 {
+            assert_eq!(c.tick(WalkState::new(start.0, start.1, 2, Some("idle"))), None);
+        }
+        steps
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &(x, y, cross))| {
+                if let Some(k) = cross {
+                    c.cross(&k);
+                }
+                c.tick(WalkState::new(x, y, sprite, Some("walk"))).map(|m| (i, m[1..m.len() - 1].to_vec()))
+            })
+            .collect()
+    }
+
+    fn crossing(from: (i32, i32), to: (i32, i32), x: f32, y: f32) -> Option<crate::gmap::Crossing> {
+        Some(crate::gmap::Crossing { from, to, local_x: x, local_y: y })
+    }
+
+    /// Props bytes from (id, value) pairs; GANI 10 takes `walk`.
+    fn p(pairs: &[(u8, f32)]) -> Vec<u8> {
+        let mut v = Vec::new();
+        for &(id, val) in pairs {
+            v.push(id + 0x20);
+            match id {
+                10 => v.extend([4 + 0x20, b'w', b'a', b'l', b'k']),
+                15 | 16 => v.push(encode_pos_classic(val).wrapping_add(0x20)),
+                _ => v.push(val as u8 + 0x20),
+            }
+        }
+        v
+    }
+
+    /// Lab 2026-10-24, real 2.22 east: the crossing step is a send slot, so
+    /// the wrapped `X=0` and `GMAPLEVELX=1` go in that step's message.
+    #[test]
+    fn a_crossing_on_a_send_slot_carries_the_cell_prop_at_once() {
+        let east = crossing((0, 0), (1, 0), 0.0, 30.0);
+        let got = walk_222((62.5, 30.0), 3, &[(63.0, 30.0, None), (63.5, 30.0, None), (0.0, 30.0, east), (0.5, 30.0, None), (1.0, 30.0, None)]);
+        assert_eq!(got, vec![(0, p(&[(10, 0.0), (15, 63.0), (17, 3.0)])), (2, p(&[(15, 0.0), (43, 1.0)])), (4, p(&[(15, 1.0)]))]);
+    }
+
+    /// The `gmap_cross` difftest, real 2.22 east (`documentation/gmap-order.md`):
+    /// the crossing step falls between two slots; the cell prop waits for the
+    /// next one and goes with `X=0.5`.
+    #[test]
+    fn a_crossing_between_slots_waits_for_the_next_one() {
+        let east = crossing((0, 0), (1, 0), 0.0, 30.0);
+        let got = walk_222((62.0, 30.0), 3, &[(62.5, 30.0, None), (63.0, 30.0, None), (63.5, 30.0, None), (0.0, 30.0, east), (0.5, 30.0, None)]);
+        assert_eq!(got, vec![(0, p(&[(10, 0.0), (15, 62.5), (17, 3.0)])), (2, p(&[(15, 63.5)])), (4, p(&[(15, 0.5), (43, 1.0)]))]);
+    }
+
+    /// Lab 2026-10-24, real 2.22 south: `Y=0.5, GMAPLEVELY=1` in the frame
+    /// after the crossing step.
+    #[test]
+    fn south_sends_y_and_the_cell_y_prop() {
+        let south = crossing((0, 0), (0, 1), 30.0, 0.0);
+        let got = walk_222((30.0, 62.0), 2, &[(30.0, 62.5, None), (30.0, 63.0, None), (30.0, 63.5, None), (30.0, 0.0, south), (30.0, 0.5, None)]);
+        assert_eq!(got, vec![(0, p(&[(10, 0.0), (16, 62.5)])), (2, p(&[(16, 63.5)])), (4, p(&[(16, 0.5), (44, 1.0)]))]);
+    }
+
+    /// Lab 2026-10-24, real 2.22 west: the crossing at 63.5, then `X=63,
+    /// GMAPLEVELX=0` in the next message.
+    #[test]
+    fn west_sends_the_cell_back_to_zero() {
+        let west = crossing((1, 0), (0, 0), 63.5, 30.0);
+        let got = walk_222((1.5, 30.0), 1, &[(1.0, 30.0, None), (0.5, 30.0, None), (0.0, 30.0, None), (63.5, 30.0, west), (63.0, 30.0, None)]);
+        assert_eq!(got, vec![(0, p(&[(10, 0.0), (15, 1.0), (17, 1.0)])), (2, p(&[(15, 0.0)])), (4, p(&[(15, 63.0), (43, 0.0)]))]);
+    }
+
+    /// The cell prop goes out once, and with its coordinate even when that
+    /// coordinate was already sent.
+    #[test]
+    fn the_cell_prop_goes_once_and_names_its_axis() {
+        let mut c = WalkCadence::for_version(ClientVersion::V222).unwrap();
+        c.tick(WalkState::new(0.0, 30.0, 3, Some("idle")));
+        c.tick(WalkState::new(0.0, 30.0, 3, Some("idle")));
+        c.cross(&crossing((0, 0), (1, 0), 0.0, 30.0).unwrap());
+        assert!(c.crossing_pending());
+        let m = c.tick(WalkState::new(0.0, 30.0, 3, Some("idle"))).unwrap();
+        assert_eq!(&m[1..m.len() - 1], &p(&[(15, 0.0), (43, 1.0)])[..]);
+        assert!(!c.crossing_pending());
+        for _ in 0..4 {
+            assert_eq!(c.tick(WalkState::new(0.0, 30.0, 3, Some("idle"))), None);
+        }
     }
 }
