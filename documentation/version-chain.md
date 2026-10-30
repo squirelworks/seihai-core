@@ -350,4 +350,38 @@ Generated; do not edit between the markers.
 - unknown (live): no game-server login on a public server; only the list reply was checked (2026-10-25)
 - source: binary (same code as 2.22) and lab: its own tampercheck constant and timer re-send, id 24 every 5.13 s whether or not others are in the level, post-login frame without the idle.gani request
 
+#### 3.04 (`G3D03014`, binary)
+
+- protocol: **listserver**: listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape C (login frame captured from a real client)
+- protocol: **plo (server ids handled)**: +44 HASNPCSERVER, +101 BOARDPACKET, +102 FILE; -170 GHOSTMODE, -177 NEWWORLDMODE, -182 LISTPROCESSES, -183 HASPROCESSRUNNING, -189 MOVE2 (81 -> 79 ids)
+- protocol: **pli (client ids sent)**: +21 PUTNPC, +36 HITOBJECTS, +81 PROFILESET; -39 TAMPERCHECK, -44 PROCESSLIST, -46 ENTERLEVEL (42 -> 42 ids)
+- protocol: **tampercheck**: yes -> no
+- protocol: **tamper**: known words, re-send Timer -> none
+- protocol: **showimg (id 24)**: every 5130 ms -> none
+- protocol: **login frame**: files, process list, props with OS and code page, status icons -> none
+- protocol: **udp_off_by_default**: yes -> no
+- props: **own-player props**: -33 ADDITFLAGS, -78 X2, -79 Y2, -80 Z2 (75 -> 71 ids)
+- props: **other-player props**: -78 X2, -79 Y2, -80 Z2 (67 -> 64 ids)
+- props: **npc_max**: 77 -> 73
+- props: **precise_pos**: yes -> no
+- unknown (listserver): port 14922 and the G3D token were checked against the lab listserver only, never the public one
+- unknown (login): the first props (0, 18, 31, 33, 52, 75, 76, OSTYPE linux) are not sent: no post-login frame is modelled for this build
+- unknown (ui): the Torque front end (start window, options, themes, chat as white text with a blue shadow) is not modelled; the 2.31 UI row is kept
+- unknown (other props): the props it parses for other players are taken as 2.31's without 78-80
+- source: binary (Linux i386 ELF) and one lab run on GServer-v2 (Graal_analysis version-profiles/lab-304-linux-2026-10-30.md): PLO and PLI sets, props up to 76 (parsed to 74), NPC props to 73, no tampercheck, no showimg timer (UDP 15 instead), listserver id 7 with G3D30123
+
+#### 3.153 (`G3D28015`, binary)
+
+- protocol: **plo (server ids handled)**: +67 RC_FILEBROWSER_MESSAGE, +74 RC_CHAT, +82 SERVERTEXT, +104 UNKNOWN104, +131 NPCBYTECODE, +132 UNKNOWN132, +133 UNKNOWN133, +134 GANISCRIPT, +187 UPDATEPACKAGEISUPDATED, +189 MOVE2; -44 HASNPCSERVER (79 -> 88 ids)
+- protocol: **pli (client ids sent)**: +46 ENTERLEVEL, +50 RAWDATA, +93 RC_FILEBROWSER_UP, +96 RC_FILEBROWSER_MOVE, +97 RC_FILEBROWSER_DELETE, +98 RC_FILEBROWSER_RENAME, +152 REQUESTTEXT, +154 SENDTEXT, +155 RC_LARGEFILESTART, +156 RC_LARGEFILEEND, +157 UPDATEGANI, +158 UPDATESCRIPT (42 -> 54 ids)
+- protocol: **udp_off_by_default**: no -> yes
+- props: **own-player props**: +78 X2, +79 Y2, +80 Z2 (71 -> 74 ids)
+- props: **other-player props**: +78 X2, +79 Y2, +80 Z2 (64 -> 67 ids)
+- props: **npc_max**: 73 -> 77
+- props: **precise_pos**: no -> yes
+- unknown (pli): 2, 3, 15, 24, 29 and 80 are taken from 3.04; the PPC scan did not resolve those call sites
+- unknown (live): never run
+- unknown (3d): the 3D mode (Torque GameConnection on port 28000) is not modelled
+- source: binary (Mac OS X PPC Mach-O), not run: PLO 67, 74, 82, 104, 131-134, 187 and MOVE2 (189) in, 44 out; RC file browser, script upload and text request ids; X2/Y2/Z2; UDP off in the shipped prefs
+
 <!-- version-chain:end -->
