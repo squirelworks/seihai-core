@@ -3,6 +3,9 @@
 # From arrays 0 to 6 of the Graal 2.22 arrays.dat (tools/graal_tile_lists.txt):
 # 0 open, 3 chair, 4 bed top, 5 bed bottom, 11 water, 12 lava, 13 lava floor,
 # 20 wall that thrown objects fly over, 22 wall. documentation/tile-types.md.
+# Bed tops are walls in arrays.dat, so they keep 22 and are listed here too
+# (the sleep pose asks this list; documentation/sitting.md).
+bedtop: 708-711
 # ids 0 to 511: sheet columns 0 to 15
 0,0,20,20,22,22,22,22,0,22,22,22,22,22,22,0
 0,20,20,20,22,22,22,22,0,22,22,22,22,22,22,0
