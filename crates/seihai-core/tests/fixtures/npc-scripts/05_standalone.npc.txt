@@ -1,0 +1,5229 @@
+// PACK 05_standalone  files=79
+
+// ===== 05_standalone/balloon_fight/balloonz__000__33_37.npc.txt =====
+// extracted-from: balloon fight/balloonz.nw
+// npc-index: 0
+// header: NPC - 33 37
+// image: -
+// tile: 33,37
+// recovered-from-binary: false
+// body-hash: 3ff1ca9ebd5d
+
+NPC - 33 37
+// NPC made by Onijustin and Kondie and Tricxta :o
+if(playerenters){
+  addtiledef2 vinland_bf-tiles.gif,balloonz,1440,80;
+  play Balloon_Fight_2.mid;
+  disabledefmovement;
+  timereverywhere;
+  playerdir=3;
+  setstring xvecmax,6;
+  setstring xgrmax,3;
+  setstring xvec,0;
+  setstring dir,3;
+  setplayerprop #P5,2;
+  this.hurttiles={0xA9A};
+  timeout=0.05;
+}
+if(timeout){
+  playerhearts=playerfullhearts;
+
+  setstring yvec,#v(strtofloat(#s(yvec))+.05);
+
+  triggeraction playerx+1.5,playery+4,Pop,;
+  triggeraction playerx+1.5+vecx(playerdir),playery+4,Pop,;
+  showimg 70,block.png,playerx+.5,playery+4;
+
+  if(keydown(1)){
+    playerdir = 1;
+    if (!onwall(playerx-1,playery)){
+      playerx -= .05;
+    }
+  }
+  if(keydown(3)){
+    playerdir = 3;
+    if (!onwall(playerx+2.5,playery)){
+      playerx +=.05;
+    }
+  }
+  if (keydown(5)){
+    if (!onwall(playerx+.5,playery)){
+      playery -= .05;
+    }
+  }
+  if((onwall(playerx+1.5,playery+3)||onwall(playerx+0.5,playery+3)||onwall(playerx+1.5,playery+3))&&strtofloat(#s(yvec))=>0){
+
+    setstring yvec,0;
+
+    playery=int(playery);
+
+    if(keydown(1)){
+      if(pumping=0){
+        if(strtofloat(#s(dir))==1){
+
+          setstring xvec,#v(strtofloat(#s(xvec))+2);
+        }else{
+          setstring xvec,#v(strtofloat(#s(xvec))-2);
+        }
+        if(strtofloat(#s(xvec))=<0){setstring dir,1;}
+      }
+    }
+
+    if(keydown(3)){
+      if(pumping=0){
+        if(strtofloat(#s(dir))==3){
+
+          setstring xvec,#v(strtofloat(#s(xvec))+0.5);
+        }else{
+          setstring xvec,#v(strtofloat(#s(xvec))-0.5);
+        }
+        if(strtofloat(#s(xvec))=<0){setstring dir,3;}
+      }
+    }
+
+
+    if(!keydown(3)&&!keydown(1)){
+      if(strtofloat(#s(xvec))>0){
+        setstring xvec,#v(strtofloat(#s(xvec))-0.25);
+      }
+    }
+
+    if(keydown(6)&&playerflap==0){
+      setani idle,;
+      setstring yvec,#v(strtofloat(#s(yvec))-2);
+      playerflap=1;
+    }
+
+    if(strtofloat(#s(xvec))>strtofloat(#s(xgrmax)))setstring xvec,#v(strtofloat(#s(xgrmax)));
+  }
+
+  if(keydown(6)&&playerflap=0){
+
+    if(keydown(1)){
+
+      if(strtofloat(#s(dir))==1){
+
+        setstring xvec,#v(strtofloat(#s(xvec))+0.5);
+      }else{
+        setstring xvec,#v(strtofloat(#s(xvec))-0.5);
+      }
+      if(strtofloat(#s(xvec))=<0){setstring dir,1;}
+    }
+
+    if(keydown(3)){
+
+      if(strtofloat(#s(dir))==3){
+
+        setstring xvec,#v(strtofloat(#s(xvec))+0.5);
+      }else{
+        setstring xvec,#v(strtofloat(#s(xvec))-0.5);
+      }
+      if(strtofloat(#s(xvec))=<0){setstring dir,3;}
+    }
+
+    setstring yvec,#v(strtofloat(#s(yvec))-0.30);
+    playerflap=1;
+
+    if(strtofloat(#s(xvec))>strtofloat(#s(xvecmax)))setstring xvec,#v(strtofloat(#s(xvecmax)));
+  }
+
+  if(!keydown(6)){playerflap=0;}
+
+  for(i=0.5;i<2.5;i++){
+    if(onwall(playerx+i,playery-2)){setstring yvec,0.9;}
+  }
+
+  for(i=-2;i<2;i++){
+    if(onwall(playerx+0.5,playery+i)){setstring dir,3;}
+    if(onwall(playerx+2.5,playery+i)){setstring dir,1;}
+  }
+  if(strtofloat(#s(xvec))<0)setstring xvec,0;
+
+  playery+=strtofloat(#s(yvec))/16*3;
+  if(strtofloat(#s(dir))==3){
+    playerx+=strtofloat(#s(xvec))/16*3;
+  }else{
+    playerx-=strtofloat(#s(xvec))/16*3;}
+
+  while (onwall(playerx+1.5,playery+2.5))playery-=1/16;//debug so player never gets caught on a wall
+
+  if (strtofloat(#P5)<=0)Gameover();
+
+  if (tiles[playerx+1.5,playery+2] in this.hurttiles)triggeraction playerx+1.5,playery+2,Pop,;
+
+  if (playerx>61)playerx=(playerx+4)%64;
+  else if (playerx<1)playerx=(playerx-4+64)%64;
+
+  draw_Balloons();
+
+  timeout = 0.05;
+}
+
+function draw_Balloons(){
+  hideimgs 300,300+(playerscount*20);
+  for (this.pl=0;this.pl<playerscount;this.pl++){
+    for (this.i=0;this.i<strtofloat(#P5(this.pl));this.i++){
+      this.placex=players[this.pl].x+1.2-(strtofloat(#P5(this.pl))/2)+this.i;
+      showimg 300+(this.pl*20)+this.i,balloon1.gif,this.placex,players[this.pl].y-2.5;
+      changeimgpart 300+(this.pl*20)+this.i,1,1,24,29;
+      showpoly 300+(this.pl*20)+10+this.i,{this.placex+.75,players[this.pl].y-.7,players[this.pl].x+1.45,players[this.pl].y};
+    }
+  }
+}
+
+function Gameover(){
+  setplayerprop #c,oh shit!;
+  sleep 1;
+  while (!onwall(playerx+1.5,playery+3)){
+    for (this.i=0;this.i<2;this.i+=1/16){
+      if (!onwall(playerx+1.5,playery+3))playery+=1/16;
+      else break;
+    }
+    sleep .05;
+  }
+  setani dead,;
+  showpoly 300,{0,0,screenwidth,0,screenwidth,screenheight,0,screenheight};
+  changeimgvis 300,4;
+  changeimgcolors 300,0,0,0,0;
+  showtext 301,screenwidth/2,screenheight/2,arial,c,Game over loser!;
+  changeimgvis 301,5;
+  for (this.i=3;this.i>0;this.i--){
+    showtext 302,screenwidth/2,screenheight/2+50,arial,c,Respawning in:#v(this.i);
+    changeimgvis 302,5;
+    changeimgzoom 302,.7;
+    sleep 1;
+  }
+  hideimgs 300,302;
+  callnpc 0,Playerenters,;
+  setplayerprop #P5,2;
+  timeout=0.05;
+}
+
+NPCEND
+
+// ===== 05_standalone/balloon_fight/balloonz__001__38_37.npc.txt =====
+// extracted-from: balloon fight/balloonz.nw
+// npc-index: 1
+// header: NPC - 38 37
+// image: -
+// tile: 38,37
+// recovered-from-binary: false
+// body-hash: 7b2c84094868
+
+NPC - 38 37
+//NPC made by tricxta
+if (playerenters && !isweapon){
+  toweapons -popdetection;
+  timeout = .05;
+}
+
+if (actionPop){
+  if (strtofloat(#P5) > 0 && this.cooldown<=0){
+    setplayerprop #P5,#v(strtofloat(#P5)-1);
+    this.cooldown = 1;
+    setplayerprop #c,Ouch!;
+    timeout=0.05;
+  }
+}
+
+if (Timeout && isweapon){
+  if (this.cooldown>0){
+    this.cooldown -= .1;
+  }
+  else break;
+  timeout=0.1;
+}
+
+NPCEND
+
+// ===== 05_standalone/balloon_fight/balloonz__002__30_43.npc.txt =====
+// extracted-from: balloon fight/balloonz.nw
+// npc-index: 2
+// header: NPC - 30 43
+// image: -
+// tile: 30,43
+// recovered-from-binary: false
+// body-hash: f36c5711ffe5
+
+NPC - 30 43
+// Graal2002 NPC by Stefan Knorr
+if (created) {
+  // Initialize the attributes
+  showcharacter;
+  setcharprop #3,head0.png;
+  setcharprop #C0,orange;
+  setcharprop #C1,white;
+  setcharprop #C2,blue;
+  setcharprop #C3,red;
+  setcharprop #C4,black;
+  setcharprop #2,shield1.gif;
+  shieldpower = 1;
+  dir = 2;
+  timereverywhere;
+}
+
+if (actionPop){
+  message owe!;
+  sleep 1;
+  message ;
+}
+
+NPCEND
+
+// ===== 05_standalone/balloon_fight/balloonz__003__55_37.npc.txt =====
+// extracted-from: balloon fight/balloonz.nw
+// npc-index: 3
+// header: NPC - 55 37
+// image: -
+// tile: 55,37
+// recovered-from-binary: false
+// body-hash: 406575282db5
+
+NPC - 55 37
+// NPC made by tricxta
+if (mousewheel && strequals(#a,tricxta)){
+  this.newlife=strtofloat(#P5)+mousewheeldelta;
+  if (this.newlife>0 && this.newlife<6)setplayerprop #P5,#v(this.newlife);
+}
+
+NPCEND
+
+// ===== 05_standalone/balloon_fight/balloonz__004__33_31.npc.txt =====
+// extracted-from: balloon fight/balloonz.nw
+// npc-index: 4
+// header: NPC - 33 31
+// image: -
+// tile: 33,31
+// recovered-from-binary: false
+// body-hash: 32da358bd5fb
+
+NPC - 33 31
+// NPC made by tricxta
+if (playerenters){
+  timereverywhere;
+  setcharprop #P1,vinland_bf-birdsprites.gif;
+  setcharprop #P2,1;
+  setcharani vinland_bf-bird_fly,;
+  this.blocktiles={0xA8A,0xA9A};//blocking non-blocking tiles :o
+  this.speed=.4;
+  timeout=0.05;
+}
+
+if (timeout){
+  draw_Balloons();
+  if (this.cooldown>0)this.cooldown-=1;
+  if (isleader){
+    if (strtofloat(#P2(-1))<=0)fall();
+    if (this.move<=0){
+      this.move=int(random(0,10));
+      this.angle=random(0,pi*2);
+      dir=(this.angle>pi/2 && this.angle<(pi*1.5))?1:3;
+    }
+    else {
+      this.checkx=x+cos(this.angle)*this.speed;
+      this.checky=y+sin(this.angle)*this.speed;
+      if (!onwall(this.checkx+1.5,this.checky+1) && !tiles[this.checkx,this.checky] == 0xA9A){
+        x=this.checkx;
+        y=this.checky;
+        this.move-=this.speed;
+      }
+      else this.move=0;
+    }
+  }
+  else if (strtofloat(#P2(-1))<=0)break;
+  timeout=0.05;
+}
+
+if (actionPop){
+  if (this.cooldown<=0){
+    if (strtofloat(#P2(-1))==-1)points();
+    else {
+      setcharprop #P2,#v(strtofloat(#P2(-1))-1);
+      this.cooldown=1;
+    }
+  }
+  timeout=0.05;
+}
+
+function draw_Balloons(){
+  hideimgs 300,340;
+  for (this.i=0;this.i<strtofloat(#P2(-1));this.i++){
+    this.placex=x+1.2-(strtofloat(#P2(-1))/2)+this.i;
+    showimg 300++this.i,balloon2.gif,this.placex,y-2.5;
+    changeimgpart 300+this.i,1,1,24,29;
+    showpoly 320+10+this.i,{this.placex+.75,y-.7,x+1.45,y+.5};
+  }
+}
+
+function fall(){
+  while (!onwall(x+1,y+3)){
+    hideimgs 300,340;
+    y+=1;
+    if (tiles[x+1,y+2] in this.blocktiles)points();
+    sleep .05;
+  }
+  setcharprop #P2,-1;
+}
+
+function points(){
+  //will put point shit here eventually...
+  hide;
+  break;
+}
+
+if (playerchats && strequals(#c,/drop))fall();
+
+NPCEND
+
+// ===== 05_standalone/delt_hud/hud__000__34_30.npc.txt =====
+// extracted-from: delt hud/hud.nw
+// npc-index: 0
+// header: NPC - 34 30
+// image: -
+// tile: 34,30
+// recovered-from-binary: false
+// body-hash: 46afff3fc1f2
+
+NPC - 34 30
+// NPC made by tricxta
+if (Playerenters){
+  if (!isweapon)toweapons -hud;
+  showstats 1024;
+  playerrupees = 100;
+  playermp = 10;
+  setstring this.sheet,skoopadeltgui1.png;
+  timeout = 0.05;
+}
+
+if (timeout && isweapon){
+  this.drawC = {screenwidth-200,40};//draw coordinates
+
+  this.stats = {playerhearts/playerfullhearts,playermp/100,playerap/100};
+
+  showimg 300,#s(this.sheet),this.drawC[0],this.drawC[1];//main image
+  changeimgpart 300,0,0,141,175;
+
+  //health
+  if (this.stats[0] > 0){
+    showimg 301,#s(this.sheet),this.drawC[0]+4,this.drawC[1]+11;
+    changeimgpart 301,2,186,97*this.stats[0],19;
+  }
+  else hideimg 301;
+
+  //mana
+  if (this.stats[1] > 0){
+    showimg 302,#s(this.sheet),this.drawC[0]+4,this.drawC[1]+41;
+    changeimgpart 302,2,214,97*this.stats[1],19;
+  }
+  else hideimg 302;
+
+  //ap
+  if (this.stats[2] > 0){
+    showimg 303,#s(this.sheet),this.drawC[0]+105,this.drawC[1]+11;
+    changeimgpart 303,112,195,15,49*this.stats[2];
+  }
+  else hideimg 303;
+
+  //glove
+  showimg 304,sprites.png,this.drawC[0]+64,this.drawC[1]+108;
+  changeimgpart 304,28-(playerglovepower == 3)*28,212,28,32;
+  showimg 307,#s(this.sheet),this.drawC[0]+79,this.drawC[1]+122;
+  changeimgpart 307,playerglovepower*14,263,14,16;
+
+  //sword
+  showimg 305,#1,this.drawC[0]+104,this.drawC[1]+108;
+  changeimgpart 305,14,48,24,28;
+  showimg 308,#s(this.sheet),this.drawC[0]+119,this.drawC[1]+122;
+  changeimgpart 308,playerswordpower*14,263,14,16;
+
+  //weapon
+  showimg 306,#W,this.drawC[0]+4,this.drawC[1]+71;
+
+  //bombs
+  showimg 309,#s(this.sheet),this.drawC[0]+71,this.drawC[1]+83;
+  changeimgpart 309,int(playerbombs/10)*14,263,14,16;
+  showimg 310,#s(this.sheet),this.drawC[0]+83,this.drawC[1]+83;
+  changeimgpart 310,(playerbombs%10)*14,263,14,16;
+
+  //arrows
+  showimg 311,#s(this.sheet),this.drawC[0]+101,this.drawC[1]+83;
+  changeimgpart 311,int(playerdarts/10)*14,263,14,16;
+  showimg 312,#s(this.sheet),this.drawC[0]+113,this.drawC[1]+83;
+  changeimgpart 312,(playerdarts%10)*14,263,14,16;
+
+  //rupees
+  hideimgs 313,320;//assume the player will get no more then 1000000 graalats
+  for (this.r = 0; this.r < int(log(10,playerrupees))+1; this.r++){
+    showimg 313+this.r,#s(this.sheet),this.drawC[0]+29+this.r*14,this.drawC[1]+146;
+    changeimgpart 313+this.r,(strtofloat(   #e(this.r,1,#v(playerrupees))   )%10)*14,263,14,16;
+  }
+
+
+  for (this.i = 0; this.i < 20; this.i++)
+    changeimgvis 300+this.i,(this.i < 6)?4:5;
+
+  timeout = 0.05;
+}
+
+NPCEND
+
+// ===== 05_standalone/farm_server/planting__000__37_36.npc.txt =====
+// extracted-from: farm server/planting.nw
+// npc-index: 0
+// header: NPC - 37 36
+// image: -
+// tile: 37,36
+// recovered-from-binary: false
+// body-hash: d88ac1306fd2
+
+NPC - 37 36
+// NPC made by tricxta
+if (playerenters){
+  timereverywhere;
+  pi=3.142857142857143;
+  this.farmtiles={0xAA};
+
+  setstring this.stateTool,Hoe,"Watering Bucket";
+  timeout=0.05;
+}
+
+if (timeout){
+  this.checkx=int(mousex/2)*2;
+  this.checky=int(mousey/2)*2;
+  this.distx=(this.checkx-(int((playerx+.5)/2)*2))/2;
+  this.disty=(this.checky-(int((playery+1)/2)*2))/2;
+  this.dist=abs(this.distx)+abs(this.disty);
+  if (this.dist==1)check();
+  else hideimgs 300,303;
+  timeout=0.05;
+}
+
+if (mousedown && this.dist==1 && playerfreezetime<=-1){
+  check();
+  if (this.check==0){
+    playerdir=(((getangle(this.distx,this.disty)*(180/pi))/90)+3)%4;
+    callweapon selectedweapon,weaponfired;
+  }
+}
+
+function check(){
+  hideimgs 300,303;
+  this.check=0;
+  for (this.i=0;this.i<4;this.i++){
+    showimg 300+this.i,farm-shit_place.png,this.checkx+(this.i%2),this.checky+int(this.i/2);
+     this.tNpc = testnpc(this.checkx+(this.i%2),this.checky+int(this.i/2));
+
+    this.canFarm = (tiles[this.checkx+(this.i%2),this.checky+int(this.i/2)] in this.farmtiles && npcs[this.tNpc].save[3] == lindexof(#w(selectedweapon),this.stateTool));
+
+    changeimgpart 300+this.i,(1-this.canFarm)*16,0,16,16;
+    changeimgmode 300+this.i,1;
+    if (lighteffectsenabled)changeimgcolors 300+this.i,1,1,1,.5;
+    changeimgvis 300+this.i,2;
+
+    if (this.canFarm == 0)this.check = 1;
+  }
+}
+
+NPCEND
+
+// ===== 05_standalone/farm_server/planting__001__52_30.npc.txt =====
+// extracted-from: farm server/planting.nw
+// npc-index: 1
+// header: NPC - 52 30
+// image: -
+// tile: 52,30
+// recovered-from-binary: false
+// body-hash: b32850e6858d
+
+NPC - 52 30
+if(playerenters) {
+  toweapons MovementSys;
+  this.jumptile = {4060,4062,4063}; // Some Cliff Tiles
+  this.field = {420,421,436,437}; // Swamp Tiles
+  this.PC_Step = 5; // How long (x 0.05sec) it takes to move.
+  setarray this.key,10;
+  PC_Snap(); // Snap to Grid
+  timeout = 0.05;
+}
+
+if(playerchats) freezeplayer 3;
+
+if (timeout && isweapon) {
+  disabledefmovement;
+  GrabKeys();
+  //if(playerfreezetime > -1) setplayerprop #c,#v(playerfreezetime);
+  //Movement
+  if(this.moving == -1 && this.Sou_bump > 0) this.Sou_bump = 0;
+  if(playerfreezetime < 0 && !this.moving < 0) PC_Move();
+  else if(this.moving < 0) if(strequals(#m,walk) || strequals(#m,ride)) setani idle,;
+
+  timeout = 0.05;
+}
+
+//Grab Key Status
+function GrabKeys() {
+  this.moving = -1; // Moving Reset
+  this.move_h = 0;
+  for(this.ktest=0; this.ktest<10; this.ktest++) {
+    if(keydown(this.ktest)) {
+      if(this.ktest<4) this.moving = this.ktest; // Moving in this Direction
+      if(this.key[this.ktest] < 1) {
+        this.key[this.ktest] = 1; // Pressed
+      } else {
+        this.key[this.ktest] = 2; // Held
+        if(this.moving < 4) this.move_h = 1;
+      }
+    } else {
+      if(this.key[this.ktest] > 0) {
+        this.key[this.ktest] = -1; // Unpressed
+      } else {
+        this.key[this.ktest] = 0; // Unheld
+      }
+    }
+  }
+}
+
+
+//Snap to Grid (2x2)
+function PC_Snap() {
+  playerx = int((playerx + 0.5) / 2)*2 - 0.5;
+  playery = int((playery + 1.5) / 2)*2 - 1;
+}
+
+
+//MovementSys
+function PC_Move() {
+  if(this.key[5] < 1 && (strequals(#m,idle) || strequals(#m,ride))) setani walk,; //Walk ani
+  if(this.key[5] > 0 && (strequals(#m,idle) || strequals(#m,walk))) setani ride,; //Run ani
+
+  if(playerdir == this.moving) this.move_h = 1;
+  else {playerdir = this.moving % 4; this.Sou_bump = 0; } // Turning
+
+  if(this.canwalk > 0 || this.move_h == 0) Ran_Encounter(); // Random Encounter
+
+  if(this.move_h == 1) { // Direction Key is Held, Lets Try Moving
+    if(this.key[5] > 0) { this.PC_Step = 3; // [S] key, Held or Pressed
+    } else { this.PC_Step = 5; }// [S] key, Released or Unheld
+
+    for(this.i=0;this.i<4;this.i++){
+      if(onwall(playerx+0.5+vecx(playerdir)*2+this.i%2,playery+1+vecy(playerdir)*2+int(this.i/2))) this.i=4;
+      if(playerdir == 2 && tiles[playerx+0.5+vecx(playerdir)*2+this.i%2,playery+1+vecy(playerdir)*2+1] in this.jumptile) this.i=6;
+    }
+    this.canwalk = abs(this.i - 5);
+
+    // if ( this.canwalk > 0 ) { } , insert "steps" shit around here (eg: Repel & Pedometer)
+
+    if(this.canwalk == 1) { // Can walk.
+      if(this.PC_Step < 1) this.PC_Step = 1;
+      for(this.i = 0; this.i < this.PC_Step; this.i++) {
+        playerx += vecx(playerdir) * (2/this.PC_Step);
+        playery += vecy(playerdir) * (2/this.PC_Step);
+        if(this.i + 1 < this.PC_Step) sleep 0.05;
+      }
+      PC_Snap(); //Finished Moving, Snap to Grid
+    } else if(this.canwalk == 2 && playerdir == 2) { // Jumping
+      freezeplayer 0.3;
+      setani walk,;
+      sleep 0.1;
+      play jump.wav;
+      setani sit,;
+      for(this.i = 0; this.i < 6; this.i++) {
+        playery += vecy(2) * 2/3;
+        if(this.i + 1 < this.PC_Step) sleep 0.05;
+      }
+      setani idle,;
+      PC_Snap(); //Finished Moving, Snap to Grid
+    } else { // Path is Blocked
+      if(strequals(#m,walk) || strequals(#m,ride)) setani idle,;
+      if(this.Sou_bump == 0) play put.wav;
+      this.Sou_bump = (this.Sou_bump+0.05) % 0.6;
+    }
+  } else sleep 0.05;
+}
+
+
+//Wild Pokemon
+function Ran_Encounter() {
+  setplayerprop #c,;
+  if(tiles[playerx+0.5,playery+1] in this.field) { // Encounter System
+    for(this.m=0; this.m < int(arraylen(PC_Encounter)/3); this.m++) {
+      if(PC_Encounter[this.m*3+2] > random(0,100)) { // Random Chance
+        this.move_h = 0; // Turn off Walking
+        for(this.i=0;this.i<weaponscount;this.i++) {
+          if(strequals(#w(this.i),BattleSys)) //Find "BattleSys" to Trigger
+            callweapon this.i,Battle,wild,#v(PC_Encounter[this.m*3]),#v(PC_Encounter[this.m*3+1]),#v(PC_Encounter[this.m*3+2]); //index,Battle,"type","monID","monLv","Chance?";
+        }
+        break;
+      }
+    }
+  }
+}
+
+NPCEND
+
+// ===== 05_standalone/farm_server/planting__002__48_18.npc.txt =====
+// extracted-from: farm server/planting.nw
+// npc-index: 2
+// header: NPC xialza_water-bucket-icon.png 48 18
+// image: xialza_water-bucket-icon.png
+// tile: 48,18
+// recovered-from-binary: false
+// body-hash: af131da3c860
+
+NPC xialza_water-bucket-icon.png 48 18
+if (playerenters && !isweapon){toweapons Watering Bucket;}
+if (weaponfired){
+  triggeraction playerx+1.5+vecx(playerdir)*2,playery+2+vecy(playerdir)*2,Water,;
+  triggeraction playerx+1.5+vecx(playerdir)*2,playery+1.5+vecy(playerdir)*2,Water,;
+  setani xialza_pour-water,;
+  freezeplayer 1.5;
+  sleep 1.5;
+  setani idle,;
+}
+
+if (getdescription)setstring client.description,Watering Bucket:You can use this to wet plowed plant patches.;
+
+NPCEND
+
+// ===== 05_standalone/farm_server/planting__003__51_18.npc.txt =====
+// extracted-from: farm server/planting.nw
+// npc-index: 3
+// header: NPC xialza_hoe-icon.png 51 18
+// image: xialza_hoe-icon.png
+// tile: 51,18
+// recovered-from-binary: false
+// body-hash: d3a33e5ef623
+
+NPC xialza_hoe-icon.png 51 18
+if (playerenters && !isweapon){toweapons Hoe;}
+if (weaponfired){
+  setani xialza_hoe,;
+  triggeraction playerx+1.5+vecx(playerdir)*2,playery+2+vecy(playerdir)*2,Hoe,;
+  triggeraction playerx+1.5+vecx(playerdir)*2,playery+1.5+vecy(playerdir)*2,Hoe,;
+  freezeplayer 2;
+  sleep 2;
+  setani idle,;
+}
+
+if (getdescription)setstring client.description,Hoe:Use this on a plant patch to partly prepare the soil for planting.;
+
+NPCEND
+
+// ===== 05_standalone/farm_server/planting__004__26_26.npc.txt =====
+// extracted-from: farm server/planting.nw
+// npc-index: 4
+// header: NPC farm-shit_dirt.png 26 26
+// image: farm-shit_dirt.png
+// tile: 26,26
+// recovered-from-binary: false
+// body-hash: 4a04e7df2d93
+
+NPC farm-shit_dirt.png 26 26
+// NPC made by tricxta
+if (playerenters){
+  setstring this.img,farm-shit_dirt.png, farm-shit_plowed-dirt.png, farm-shit_watered-dirt.png;
+  drawunderplayer;
+  save[3] = 0;//state
+  updateframe();
+}
+
+if (actionHoe && save[3]==0){
+  save[3] = 1;
+  updateframe();
+}
+
+if (actionWater && save[3]==1){
+  save[3]=2;
+  updateframe();
+}
+
+function updateframe(){
+  setimg #I(this.img,save[3]);
+}
+
+NPCEND
+
+// ===== 05_standalone/iControl/icontrol__000__29_27.npc.txt =====
+// extracted-from: iControl/icontrol.nw
+// npc-index: 0
+// header: NPC - 29 27
+// image: -
+// tile: 29,27
+// recovered-from-binary: false
+// body-hash: 96f288965852
+
+NPC - 29 27
+if (playerenters) {
+  playery=y;
+  if (!isweapon) toweapons iMove;
+  this.pcrds = {10,(screenheight-120),(screenwidth-50),(screenheight/2)};
+  this.bw = 40;
+  this.bh = 40;
+
+  for (this.i=0;this.i<weaponscount;this.i++){//fetch the weapon index
+    if (strequals(#w(this.i),iMove)){
+      this.index=this.i;
+      break;
+    }
+  }
+
+  this.speed = 0.5;//player movement speed
+  drawgui();
+}
+
+function drawgui() {
+  this.drawx = this.pcrds[0]+40;
+  this.drawy = this.pcrds[1]+40;
+  for (this.i=0;this.i<4;this.i++) {
+    showimg 300+this.i,classiciphone_virtualkey#v(this.i)_blue.png,this.drawx+vecx(this.i)*this.bw,this.drawy+vecy(this.i)*this.bh;
+    changeimgzoom 300+this.i,1;
+    changeimgvis 300+this.i,4;
+  }
+  showimg 304,classiciphone_virtualkey_sword_blue.png,this.pcrds[2],this.pcrds[3];
+  changeimgzoom 304,1;
+  changeimgvis 304,4;
+}
+
+if (mousedown && isweapon) {
+  if (mousescreenx in |this.pcrds[0],this.pcrds[0]+(this.bw*3)| && mousescreeny in |this.pcrds[1],this.pcrds[1]+(this.bh*3)|) {
+    this.drawx = this.pcrds[0]+40;
+    this.drawy = this.pcrds[1]+40;
+    for (this.i=0;this.i<4;this.i++) {
+      while (leftmousebutton && mousescreenx in |this.drawx+vecx(this.i)*this.bw,this.drawx+vecx(this.i)*this.bw+this.bw| && mousescreeny in |this.drawy+vecy(this.i)*this.bh,this.drawy+vecy(this.i)*this.bh+this.bh|) {
+        changeimgzoom 300+this.i,1.5;
+        callweapon this.index,move,#v(this.i);
+        sleep .05;
+      }
+    }
+  }
+  else if (mousescreenx in |this.pcrds[2],this.pcrds[2]+this.bw| && mousescreeny in |this.pcrds[3],this.pcrds[3]+this.bh|) {
+    changeimgzoom 304,1.5;
+    callweapon this.index,sword,;
+    while (leftmousebutton) sleep 0.05;//no easy sword spamming
+  }
+  drawgui();
+}
+
+if (move){
+  setplayerprop #c,#v(strtofloat(#p(0)));
+  this.j=strtofloat(#p(0));
+  if (!onwall(playerx+1.5+vecx(this.j),playery+2+vecy(this.j))){
+    playerdir=this.j;
+    setani walk,;
+    playerx+=vecx(this.j)*this.speed;
+    playery+=vecy(this.j)*this.speed;
+  }
+}
+
+if (sword) {
+  freezeplayer 1;
+  setani sword,;
+}
+
+NPCEND
+
+// ===== 05_standalone/parallax_scrolling/ssa_scroller__000__14_12.npc.txt =====
+// extracted-from: parallax scrolling/ssa_scroller.nw
+// npc-index: 0
+// header: NPC - 14 12
+// image: -
+// tile: 14,12
+// recovered-from-binary: false
+// body-hash: 5bbb85fb977b
+
+NPC - 14 12
+// NPC made by tricxta
+if (playerenters){
+  addtiledef ssa_game-tiles.gif,ssa_,1;
+  setmap ,bmap.txt,x,y;
+}
+
+NPCEND
+
+// ===== 05_standalone/parallax_scrolling/ssa_scroller__001__12_13.npc.txt =====
+// extracted-from: parallax scrolling/ssa_scroller.nw
+// npc-index: 1
+// header: NPC - 12 13
+// image: -
+// tile: 12,13
+// recovered-from-binary: false
+// body-hash: 9bbb4786b885
+
+NPC - 12 13
+//Made by tricxta
+if (playerenters){
+  if (level.islobby == 1)break;
+  if (!isweapon)toweapons -movement;
+  disabledefmovement;
+  this.player.speed = .75;
+  this.player.offsetX = 1.5;
+  this.player.offsetY = 3;
+  this.player.orgFallSpeed = 1;
+  this.player.FallSpeed = this.player.orgFallSpeed;
+  this.player.FallAdd = 0.05;
+  this.player.maxFallSpeed = 2.5;
+  this.player.normalJumpHeight=10;
+  this.climbTiles = {0x486,0x487,0x496,0x497};
+  this.keysDown = {0,0,0,0,0,0,0};//1 held, else 0
+
+  setstring this.Ganis,idle,walk,ssa_climbidle,ssa_climb;
+  timeout=0.05;
+}
+
+if (isweapon && timeout){
+  if (!movementdisabled){
+    this.canClimb = (tiles[playerx+this.player.offsetX,playery+1] in this.climbTiles);
+
+    this.keyPressed = 0;
+    this.check = 0;
+
+    for (this.i=0;this.i<4;this.i++){
+      if (keydown(this.i)){
+        this.key = this.i;
+        this.keyPressed = 1;
+
+        if ((this.i+1)%2==0){//horizontal movement
+          playerdir = this.i;
+          this.gani = 1;
+          for (this.j=0;this.j<this.player.speed;this.j+=1/16){
+            this.checkX = playerx+1.5+vecx(this.i)*17/16;
+            if (onwall(this.checkX,playery+1)){playertouchsme();break;}
+            if (onwall(this.checkX,playery+2) && !this.fall==0)break;
+            playerx+=vecx(this.i)*1/16;
+          }
+        }
+        else {//vertical movement
+          if (this.canClimb == 1){//Climbing the vine
+            this.gani = 3;
+            this.check = (this.i == 0 && !onwall(playerx+this.player.offsetX,playery) && tiles[playerx+this.player.offsetX,playery] in this.climbTiles);
+            this.divis = (this.i==0)?2:1;
+            if (this.i == 2 || this.check == 1)playery+= vecy(this.i)*this.player.speed/this.divis;
+          }
+          else if (this.keysDown[0] == 0){
+            this.keysDown[0] = 1;
+            triggeraction playerx+this.player.offsetX,playery+2,Interface,#a;//Npc interaction
+          }
+        }
+      }
+    }
+
+    //Gani set
+    if (this.canClimb == 1)playerdir = 0;
+
+    if (this.keyPressed == 0)this.gani = (this.canClimb == 1)?2:0;
+
+    if (!strequals(#m,#I(this.Ganis,this.gani)))setani #I(this.Ganis,this.gani),;
+    //--------------------------------------
+
+    //Jump trigger
+    if (keydown(6) && this.jump==0 && onwall(playerx+this.player.offsetX,playery+this.player.offsetY+1/16) && !onwall(playerx+this.player.offsetX,playery) && this.keysDown[6] == 0){
+      play jump.wav;
+      this.keysDown[6] = 1;
+      this.jump=1;
+      this.jumpHeight = this.player.normalJumpHeight;
+      this.player.FallSpeed = this.player.orgFallSpeed;
+    }
+
+    //Key handler
+    for (this.i=0;this.i<7;this.i++){
+      if (!keydown(this.i))this.keysDown[this.i] = 0;
+    }
+
+    checkHeadOnwall();//Check if the head is onwall
+    if (this.jump>0 && this.jump<this.jumpHeight && this.how == 0){this.jump++;playery-=(this.jumpHeight-this.jump)*.2;}
+    else if (this.jump>0 || this.how>0){
+      this.jump=-1;
+      if (this.how>0){
+        for (this.i=0;this.i<npcscount;this.i++){
+          if (playerx+1.5 in |npcs[this.i].x,npcs[this.i].x+npcs[this.i].width| && playery in |npcs[this.i].y,npcs[this.i].y+npcs[this.i].height|)callnpc this.i,playerhitbottom,#v(playerdir);
+        }
+      }
+    }
+
+    if (!onwall(playerx+this.player.offsetX,playery+this.player.offsetY-1/16) && this.jump<=0 && this.canClimb == 0){
+      this.i=1/16;
+      while (!onwall(playerx+this.player.offsetX,playery+this.player.offsetY+this.i))this.i+=1/16;
+      if (this.i<2)playery+=this.i;
+      else {
+        playery+=this.player.FallSpeed;
+        if (this.player.FallSpeed < this.player.maxFallSpeed)this.player.FallSpeed += this.player.FallAdd;
+      }
+    }
+    if (onwall(playerx+this.player.offsetX,playery+this.player.offsetY)){
+      this.jump=0;
+      for (this.i=0;this.i<npcscount;this.i++){
+        if (playerx+1.5 in |npcs[this.i].x,npcs[this.i].x+npcs[this.i].width| && playery+3.5 in |npcs[this.i].y,npcs[this.i].y+npcs[this.i].height|)callnpc this.i,playerontop,#v(playerdir);
+      }
+      while (onwall(playerx+this.player.offsetX,playery+this.player.offsetY))playery-=1/16;
+    }
+  }
+  timeout=0.05;
+}
+
+function checkHeadOnwall(){
+  this.how = 0;
+  for (this.k=0;this.k<2;this.k++)this.how+=(onwall(playerx+0.5+this.k,playery-.5));
+}
+
+function playertouchsme(){
+  for (this.i=0;this.i<npcscount;this.i++){
+    if (playerx+vecx(playerdir)*2 in |npcs[this.i].x,npcs[this.i].x+npcs[this.i].width|)callnpc this.i,playertouchsme,#v(playerdir);
+  }
+}
+
+if (actionBounce){
+  this.jump = 1;
+  play jump.wav;
+  this.jumpHeight = strtofloat(#p(0));
+  this.player.FallSpeed = this.player.orgFallSpeed;
+}
+
+NPCEND
+
+// ===== 05_standalone/parallax_scrolling/ssa_scroller__002__36_39.npc.txt =====
+// extracted-from: parallax scrolling/ssa_scroller.nw
+// npc-index: 2
+// header: NPC - 36 39
+// image: -
+// tile: 36,39
+// recovered-from-binary: false
+// body-hash: 5eda5dc6b2e0
+
+NPC - 36 39
+// NPC made by tricxta
+if (playerenters){
+  if (isweapon){
+    showstats 1024;
+    setstring this.backGround,Sky_back_layer.gif,6,dsa.gif,12;
+
+    this.drawC = {screenwidth/2-320,screenheight/2-240};
+    setstring this.tileset,ssa_game-tiles.gif;
+    this.transparentTiles = {0x0,0x400,0x410};
+    this.groundTile = 0x554;//in the case the tile trying to be draw doesn't have any data use this tile
+    this.liquidTiles = {0x440,0x450};
+    this.sSize = {40,30};//tile sample size:width,height
+    this.drawC = {screenwidth/2-320,screenheight/2-240};
+
+    showpoly 299,{0,0,screenwidth,0,screenwidth,screenheight,0,screenheight};
+    changeimgcolors 299,,,,;
+    changeimgvis 299,4;
+
+    timeout=0.05;
+  }
+  else toweapons parallaxHandler;
+}
+
+if (timeout && isweapon){
+  this.pC = {playerx-(this.sSize[0]/2),int(playery-this.sSize[1]/1.5)};
+  this.plOS = {(playerx-int(playerx))*16,(playery-int(playery))*16};//player rounded values offset
+
+  showtext 298,10,10,arial,l,#v(int(playerx)),#v(int(playery)),#v(onmapx(#L)*64+playerx),#v(this.plOS[1]);
+  changeimgvis 298,5;
+
+  this.plC = {this.drawC[0]+(playerx-this.pC[0])*16 ,this.drawC[1]+(playery-this.pC[1])*16 + (16-this.plOS[1])};
+
+  showani 300,this.plC[0],this.plC[1],playerdir,#m,;
+  changeimgvis 300,11;
+
+
+  drawBack();
+
+  drawTiles();
+
+  drawNpcs();
+
+  if (this.chatTimer > 0){
+    this.chatTimer -=0.05;
+    if (this.chatTimer <= 0)hideimg 297;
+    else {
+      showtext 297,this.plC[0]+24,this.plC[1]-16,arial,c,#s(this.pChat);
+      changeimgvis 297,11;
+    }
+  }
+  timeout = 0.05;
+}
+
+function drawNpcs(){
+  hideimgs 400,400+this.oldNCcount;
+  this.oldNCcount = npcscount;
+  for (this.i=0;this.i<npcscount;this.i++){
+    this.nC = {npcs[this.i].x,npcs[this.i].y,npcs[this.i].width,npcs[this.i].height};
+    if (!strequals(#f(this.i),) && (this.nC[0]+this.nC[2]/2) in |this.pC[0],this.pC[0]+this.sSize[0]| && (this.nC[1]+this.nC[3]/2) in |this.pC[1],this.pC[1]+this.sSize[1]|){
+      showimg 400+this.i,#f(this.i),this.drawC[0]+(this.nC[0]-this.pC[0])*16+this.plOS[0],this.drawC[1]+(this.nC[1]-this.pC[1])*16;
+      changeimgvis 400+this.i,npcs[this.i].save[0];
+    }
+    else hideimg 400+this.i;
+  }
+}
+
+function drawTiles(){
+  for (this.i=0;this.i< this.sSize[0] *  this.sSize[1];this.i++){
+    this.tile = tiles[this.pC[0] + (this.i%this.sSize[0]),this.pC[1] +int(this.i/this.sSize[0])];
+    if (this.tile in this.transparentTiles){
+      hideimg 500+this.i;
+    }
+    else {
+      if (this.tile == 32)this.tile = this.groundTile;//convert the invalid tile into a ground tile
+      showimg 500+this.i,#s(this.tileset),this.drawC[0] + (this.i%this.sSize[0])*16,this.drawC[1] + int(this.i/this.sSize[0])*16;
+      changeimgpart 500+this.i,256*int(this.tile/512)+16*(this.tile%16),int((this.tile%512)/16)*16,16,16;
+
+      if (this.tile in this.liquidTiles){
+        changeimgmode 500+this.i,1;
+        changeimgcolors 500+this.i,1,1,1,0.5;
+        changeimgvis 500+this.i,12;
+      }
+      else {
+        changeimgvis 500+this.i,9;
+        changeimgcolors 500+this.i,1,1,1,1;
+      }
+    }
+  }
+}
+
+function drawBack(){
+  for (this.i=0;this.i<sarraylen(this.backGround);this.i+=2){
+    this.dist = strtofloat(#I(this.backGround,this.i+1));
+
+    this.px = onmapx(#L)*64+playerx;
+
+    showimg 301+this.i,#I(this.backGround,this.i),this.drawC[0]+640-(this.px*this.dist)%(this.sSize[0]*16),this.drawC[1];
+    changeimgpart 301+this.i,0,480,(this.px*this.dist)%(this.sSize[0]*16),480;
+    changeimgvis 301+this.i,5+(this.i/2);
+
+
+    this.sX =(this.px*this.dist)%(this.sSize[0]*16);
+    if (this.sX>=1){
+      showimg 302+this.i,#I(this.backGround,this.i),this.drawC[0],this.drawC[1];
+      changeimgpart 302+this.i,this.sX,480,640-this.sX,480;
+      changeimgvis 302+this.i,5+(this.i/2);
+    }
+    else hideimg 302;
+  }
+}
+
+if (playerchats){
+  this.chatTimer = 5;
+  setstring this.pChat,#c;
+}
+
+NPCEND
+
+// ===== 05_standalone/parallax_scrolling/ssa_scroller__003__38_58.npc.txt =====
+// extracted-from: parallax scrolling/ssa_scroller.nw
+// npc-index: 3
+// header: NPC personalchest.png 38 58
+// image: personalchest.png
+// tile: 38,58
+// recovered-from-binary: false
+// body-hash: 2b8476250021
+
+NPC personalchest.png 38 58
+// NPC made by tricxta
+if (playerenters){
+  dontblock;
+  save[0] = 7;
+}
+
+NPCEND
+
+// ===== 05_standalone/parallax_scrolling/ssa_scroller__004__41_48.npc.txt =====
+// extracted-from: parallax scrolling/ssa_scroller.nw
+// npc-index: 4
+// header: NPC personalchest.png 41 48
+// image: personalchest.png
+// tile: 41,48
+// recovered-from-binary: false
+// body-hash: 1b20ab7bfb17
+
+NPC personalchest.png 41 48
+// NPC made by tricxta
+if (playerenters){
+  dontblock;
+  save[0] = 10;
+}
+
+NPCEND
+
+// ===== 05_standalone/parallax_scrolling/ssa_scroller__005__45_48.npc.txt =====
+// extracted-from: parallax scrolling/ssa_scroller.nw
+// npc-index: 5
+// header: NPC personalchest.png 45 48
+// image: personalchest.png
+// tile: 45,48
+// recovered-from-binary: false
+// body-hash: f71ff7800e67
+
+NPC personalchest.png 45 48
+// NPC made by tricxta
+if (playerenters){
+dontblock;
+  save[0] = 13;
+}
+
+NPCEND
+
+// ===== 05_standalone/parallax_scrolling/ssa_scroller__006__62_49.npc.txt =====
+// extracted-from: parallax scrolling/ssa_scroller.nw
+// npc-index: 6
+// header: NPC ssa_game-tiles.gif 62 49
+// image: ssa_game-tiles.gif
+// tile: 62,49
+// recovered-from-binary: false
+// body-hash: a6cd5e8fe004
+
+NPC ssa_game-tiles.gif 62 49
+// NPC made by tricxta
+if (playerenters){
+  drawunderplayer;
+  setimgpart ssa_game-tiles.gif,528,16,32,16;
+  setcoloreffect ,,,;
+}
+
+NPCEND
+
+// ===== 05_standalone/rpg_project/trpg_battle__000__16_26.npc.txt =====
+// extracted-from: rpg project/trpg_battle.nw
+// npc-index: 0
+// header: NPC - 16 26
+// image: -
+// tile: 16,26
+// recovered-from-binary: false
+// body-hash: ceaff9d000f9
+
+NPC - 16 26
+// NPC made by tricxta
+if (Playerenters){
+  playerx = 0;
+  playery = 0;
+  disabledefmovement;
+  setarray this.key,10;
+  this.screenSize = {500,300};
+  this.tl = {screenwidth/2-this.screenSize[0]/2,screenheight/2-this.screenSize[1]/2};
+  setstring this.img,test_rpg.gif;
+  setstring this.pointerImg,zold_icon_arrow_02.png;
+  setstring this.commands,Attack,Escape,Item,Switch;
+  setstring this.font,tempus sans ITC;
+  this.currentHero = 0;
+
+  this.bounds = {0,0,this.tl[0],0,this.tl[0],this.tl[1]+this.screenSize[1],this.tl[0]+this.screenSize[0],this.tl[1]+this.screenSize[1],this.tl[0]+this.screenSize[0],this.tl[1],this.tl[0],this.tl[1],this.tl[0],0,screenwidth,0,screenwidth,screenheight,0,screenheight};
+  showpoly 299,this.bounds;
+  changeimgcolors 299,,,,;
+  changeimgvis 299,4;
+
+  //intial focus handling
+  this.originalFocus = {36,38};
+  this.focus = {this.originalFocus[0],this.originalFocus[1],this.originalFocus[0],this.originalFocus[1]};//current 1,current 1,dest. x,dest. y
+  setfocus this.focus[0],this.focus[1];
+  //---------
+
+  //Hero information, will be relocated in time
+  setstring this.heroes,//name,head,class,id
+    Barry,head0.png,warrior,1,
+    John,head1.png,warrior,2,
+    Kondie,head2.png,warrior,3;
+
+  setstring this.userItems,
+    Drugs,tricxta_mushroom.gif,"Receive a 10% strength boost to your current hero.",1,0,0,//name,icon,description,number of heroes affected,damage,special cost
+    "Health Potion",tricxta_health-potion.gif,"Heals one hero for 1 hp.",1,0,0;
+
+  setarray this.npcID,sarraylen(this.heroes)/4;
+  this.npcID[0] = -1;
+
+  setstring this.enemies,//enemy id's >= 50, (name,head,class,id)
+    Noob1,head0.png,warrior,50,
+    Noob1,head0.png,warrior,51;
+
+  setarray this.enemyIDs,sarraylen(this.enemies)/4;
+
+  //----------------------------
+  drawCommands();
+
+  timeout = 0.05;
+}
+
+if (timeout){
+  if (this.npcID[0] == -1){//try again since no npcs were found
+    getIDs();
+    getEnemies();
+    drawStats();
+    enterHeroes();
+  }
+  get_Keys();
+
+  for (this.i = 0; this.i < 4; this.i++){
+    if (this.key[this.i] == 1 && this.i%2 == 0){
+      play item2.wav;
+      if (this.menuFocus == 0){//main menu
+        this.commandSel = (this.commandSel+vecy(this.i))%4;
+        drawCommands();
+        drawStats();
+      }
+      else if (this.menuFocus == 1){//attack menu
+        this.itemSel = max(0,min(sarraylen(this.items)/3-1,this.itemSel+vecy(this.i)));
+        drawMenu();
+      }
+      else if (this.menuFocus == 2){//choose target
+        this.targetSel = (this.targetSel+vecy(this.i))%(sarraylen(this.enemies)/4);
+        this.focus[2] = npcs[this.enemyIDs[this.targetSel]].x;
+        this.focus[3] = npcs[this.enemyIDs[this.targetSel]].y;
+        shiftFocus();
+        drawPointer();
+      }
+    }
+  }
+
+  if (this.key[5] == 1 && this.menuFocus >= 0){
+    play sign.wav;
+    if (this.menuFocus == 0){
+      if (this.commandSel == 0){//open the attack menu
+        this.menuFocus = 1;
+        this.itemSel = 0;
+        callnpc this.npcID[this.currentHero],getAttacks,;
+      }
+      else if (this.commandSel == 2){
+        this.menuFocus = 1;
+        this.itemSel = 0;
+        setstring this.items,#s(this.userItems);
+        drawMenu();
+      }
+      else if (this.commandSel == 3){
+        this.currentHero = (this.currentHero+1)%(sarraylen(this.heroes)/4);
+        enterHeroes();
+      }
+    }
+    else if (this.menuFocus == 1){
+      this.menuFocus = 0;
+      hideimgs 350,400;
+      if (this.commandSel == 2){
+
+      }
+      else if (this.commandSel == 0){
+        this.menuFocus = 2;
+        this.targetSel = 0;
+        this.focus[2] = npcs[this.enemyIDs[this.targetSel]].x;
+        this.focus[3] = npcs[this.enemyIDs[this.targetSel]].y;
+        shiftFocus();
+
+        drawPointer();
+      }
+    }
+    else if (this.menuFocus == 2){
+      if (this.commandSel == 0){
+        callnpc this.npcID[this.currentHero],#I(this.items,this.itemSel*6),
+          #v(npcs[this.enemyIDs[this.targetSel]].x+npcs[this.enemyIDs[this.targetSel]].width/2),
+          #v(npcs[this.enemyIDs[this.targetSel]].y+npcs[this.enemyIDs[this.targetSel]].height/2),
+          #I(this.items,this.itemSel*6+4);
+        this.menuFocus = -1;//disable control
+        hideimgs 350,400;
+      }
+    }
+  }
+
+  if (this.key[6] == 1 && this.menuFocus >= 0){
+    revertControl();
+  }
+
+  timeout = 0.05;
+}
+
+function drawCommands(){
+  for (this.i = 0; this.i < sarraylen(this.commands); this.i++){
+    this.bInd = 300+this.i*3;
+    showimg this.bInd,#s(this.img),this.tl[0],this.tl[1]+this.i*36;
+    changeimgpart this.bInd,0,(this.i == this.commandSel)*38,92,36;
+    changeimgvis this.bInd,4;
+
+    showimg this.bInd+1,#s(this.img),this.tl[0]+5,this.tl[1]+11+this.i*36;
+    changeimgpart this.bInd+1,1+this.i*16,79,14,14;
+    changeimgvis this.bInd+1,5;
+
+    showtext this.bInd+2,this.tl[0]+20,this.tl[1]+4+this.i*36,#s(this.font),lb,#I(this.commands,this.i);
+    changeimgcolors this.bInd+2,203/255,172/255,65/255,;
+    changeimgvis this.bInd+2,5;
+  }
+}
+
+function drawStats(){
+  for (this.i = 0; this.i < sarraylen(this.heroes)/4; this.i++){
+    this.bInd = 320+this.i*6;
+    this.drawX = this.tl[0]+this.screenSize[0]/2-(sarraylen(this.heroes)/8)*54 + this.i*54;
+    showimg this.bInd,#s(this.img),this.drawX,this.tl[1];//main
+    changeimgpart this.bInd,1,97,52,52;
+    changeimgvis this.bInd,4;
+
+    showimg this.bInd+1,#I(this.heroes,this.i*4+1),this.drawX+10,this.tl[1]+10;//head
+    changeimgpart this.bInd+1,0,64,32,32;
+    changeimgvis this.bInd+1,5;
+
+    //health
+    showimg this.bInd+2,#s(this.img),this.drawX+16,this.tl[1]+5;
+    changeimgpart this.bInd+2,6,156,20,5;
+    changeimgvis this.bInd+2,6;
+
+    this.healthP = npcs[this.npcID[this.i]].hearts/npcs[this.npcID[this.i]].save[1];
+
+    if (this.healthP > 0){
+      showimg this.bInd+3,#s(this.img),this.drawX+16,this.tl[1]+5;
+      changeimgpart this.bInd+3,6,163,this.healthP*20,5;
+      changeimgvis this.bInd+3,7;
+    }
+    else hideimg this.bInd+3;
+
+    //special
+    showimg this.bInd+4,#s(this.img),this.drawX+16,this.tl[1]+38;
+    changeimgpart this.bInd+4,6,156,20,5;
+    changeimgvis this.bInd+4,6;
+
+    this.specialP = npcs[this.npcID[this.i]].hearts/npcs[this.npcID[this.i]].save[1];
+
+    if (this.specialP > 0){
+      showimg this.bInd+5,#s(this.img),this.drawX+16,this.tl[1]+38;
+      changeimgpart this.bInd+5,6,170,this.specialP*20,5;
+      changeimgvis this.bInd+5,7;
+    }
+    else hideimg this.bInd+3;
+  }
+}
+
+function drawMenu(){
+  this.mC = {screenwidth/2-106,screenheight/2-98};
+  showimg 350,#s(this.img),this.mC[0],this.mC[1];
+  changeimgpart 350,93,0,217,200;
+
+  for (this.item = 0; this.item < 5; this.item++){
+    showimg 352+this.item*2,#I(this.items,this.item*6+1),this.mC[0]+5,this.mC[1]+4+this.item*32;
+    showtext 353+this.item*2,this.mC[0]+40,this.mC[1]+10+this.item*32,#s(this.font),lb,#I(this.items,this.item*6);
+    changeimgcolors 353+this.item*2,203/255,172/255,65/255,;
+    if (this.item == this.itemSel){
+      showimg 351,#s(this.img),this.mC[0]+5,this.mC[1]+4+this.item*32;
+      changeimgpart 351,30,157,32,32;
+    }
+  }
+
+  //draw description
+  hideimgs 370,375;
+  setstring this.text,#I(this.items,this.itemSel*6+2);
+  if (this.commandSel == 0)//attack description
+    setstring this.text,#s(this.text)Damage=#I(this.items,this.itemSel*6+4),Mana Cost=#I(this.items,this.itemSel*6+5);
+  wraptext 40,,#s(this.text);
+  for (this.d = 0; this.d < tokenscount;this.d++){
+    showtext 364+this.d,this.mC[0]+8,this.mC[1]+154+this.d*10,#s(this.font),l,#t(this.d);
+    changeimgcolors 364+this.d,203/255,172/255,65/255,;
+    changeimgzoom 364+this.d,0.6;
+  }
+
+  for (this.v = 0; this.v < 14+this.d; this.v++)changeimgvis 350+this.v,(this.v==0)?5:6;
+  changeimgvis 351,7;//cursor
+}
+
+function get_Keys(){
+  this.moveKey = 0;
+  for (this.keyCheck = 0;this.keyCheck < 10; this.keyCheck++){
+    if (keydown(this.keyCheck))
+      this.key[this.keyCheck] = (this.key[this.keyCheck] == 0)?1:2;//1 = pressed,2 = held
+    else
+      this.key[this.keyCheck] = (this.key[this.keyCheck]>0)?-1:0;//-1 = released, 0 = not held
+
+    this.moveKey += (this.keyCheck < 4 && this.key[this.keyCheck] > 0)?1:0;
+  }
+
+  this.moveKey = (this.moveKey>0)?1:0;
+}
+
+function getIDs(){
+  for (this.h = 0; this.h <sarraylen(this.heroes)/4; this.h++){
+    for (this.n = 0; this.n <npcscount;this.n++){
+      if (npcs[this.n].save[0] == strtofloat(#I(this.heroes,this.h*4+3))){
+        this.npcID[this.h] = this.n;
+        this.n = npcscount;
+      }
+    }
+  }
+}
+
+function getEnemies(){
+  for (this.e = 0; this.e <sarraylen(this.enemies)/4; this.e++){
+    for (this.n = 0; this.n <npcscount;this.n++){
+      if (npcs[this.n].save[0] == strtofloat(#I(this.enemies,this.e*4+3)) && npcs[this.n].hearts > 0){//npc not found or dead
+        this.enemyIDs[this.e] = this.n;
+        this.n = npcscount;
+      }
+      else this.enemyIDs[this.e] = -1;
+    }
+  }
+}
+
+function shiftFocus(){
+  for (this.n = 0; this.n < npcscount;this.n++)
+    callnpc this.n,shiftFocus,#v(this.focus[0]),#v(this.focus[1]),#v(this.focus[2]),#v(this.focus[3]);
+  this.focus[0] = this.focus[2];
+  this.focus[1] = this.focus[3];
+}
+
+function revertControl(){
+  this.focus[2] = this.originalFocus[0];
+  this.focus[3] = this.originalFocus[1];
+  shiftFocus();
+
+  hideimgs 350,400;
+  this.menuFocus = 0;
+}
+
+function drawPointer(){
+  showimg 350,#s(this.pointerImg),npcs[this.enemyIDs[this.targetSel]].x+npcs[this.enemyIDs[this.targetSel]].width/2-0.5,npcs[this.enemyIDs[this.targetSel]].y-1;
+}
+
+if (revertControl){//assumed that control's reverted from enemies
+  getEnemies();
+  enterHeroes();
+  revertControl();
+}
+
+function enterHeroes(){
+  for (this.i = 0; this.i < sarraylen(this.heroes)/4; this.i++){
+    callnpc this.npcID[this.i],moveTo,#v((this.i==this.currentHero)?30:27),#v((this.i==this.currentHero)?37:34+this.i*3);
+  }
+}
+
+if (setAttacks){
+  setstring this.items,;
+  for (this.i = 0; this.i < strtofloat(#p(0));this.i++)
+      addstring this.items,#p(1+this.i);
+  drawMenu();
+}
+
+NPCEND
+
+// ===== 05_standalone/rpg_project/trpg_battle__001__18_34.npc.txt =====
+// extracted-from: rpg project/trpg_battle.nw
+// npc-index: 1
+// header: NPC - 18 34
+// image: -
+// tile: 18,34
+// recovered-from-binary: false
+// body-hash: a872d15ca1ee
+
+NPC - 18 34
+// Graal2002 NPC by Stefan Knorr
+if (created) {
+  // Initialize the attributes
+  showcharacter;
+  setcharprop #3,head0.png;
+  setcharprop #C0,orange;
+  setcharprop #C1,white;
+  setcharprop #C2,blue;
+  setcharprop #C3,red;
+  setcharprop #C4,black;
+  setcharprop #2,shield1.gif;
+  shieldpower = 1;
+  dir = 3;
+  hearts = 3;
+  this.walkSpeed = 0.4;
+  this.attackSpeed = 0.6;
+  save[0] = 1;//id
+  save[1] = 3;//max life
+  setstring this.attacks,
+    Payout,tricxta_axe.gif,"A vicious axe based attack.",1,2,0;//name,icon,description,targets,damage,special cost
+}
+
+if (getAttacks){
+  for (this.i = 0; this.i < npcscount;this.i++){
+    callnpc this.i,setAttacks,#v(sarraylen(this.attacks)),#s(this.attacks);
+  }
+}
+
+if (moveTo){
+  this.newX = (strtofloat(#p(0)) >= 0)?strtofloat(#p(0)):x;
+  this.newY = (strtofloat(#p(1)) >= 0)?strtofloat(#p(1)):y;
+  moveTo();
+}
+
+function moveTo(){
+  this.dist = ((x-this.newX)^2+(y-this.newY)^2)^0.5;
+  this.angle = getangle(this.newX-x,y-this.newY);
+  setcharani walk,;
+  for (this.i = 0; this.i < this.dist; this.i+=this.walkSpeed){
+    x += cos(this.angle)*this.walkSpeed;
+    y += sin(this.angle)*this.walkSpeed;
+    sleep 0.05;
+  }
+  setcharani idle,;
+}
+
+if (Payout){
+  this.damage = strtofloat(#p(2));
+  this.npcInd = testnpc(strtofloat(#p(0)),strtofloat(#p(1)));
+  this.newX = npcs[this.npcInd].x-npcs[this.npcInd].width;
+  this.newY = npcs[this.npcInd].y;
+  moveTo();
+  setcharani spin,;
+
+  sleep 0.2;
+  callnpc this.npcInd,wasHit,#v(this.damage);
+  sleep 0.4;
+
+  revertControl();
+}
+
+function revertControl(){
+  for (this.n = 0; this.n < npcscount; this.n++)
+    callnpc this.n,revertControl,;
+}
+
+NPCEND
+
+// ===== 05_standalone/rpg_project/trpg_battle__002__18_37.npc.txt =====
+// extracted-from: rpg project/trpg_battle.nw
+// npc-index: 2
+// header: NPC - 18 37
+// image: -
+// tile: 18,37
+// recovered-from-binary: false
+// body-hash: 39d0d92558ed
+
+NPC - 18 37
+// Graal2002 NPC by Stefan Knorr
+if (created) {
+  // Initialize the attributes
+  showcharacter;
+  setcharprop #3,head1.png;
+  setcharprop #C0,orange;
+  setcharprop #C1,white;
+  setcharprop #C2,blue;
+  setcharprop #C3,red;
+  setcharprop #C4,black;
+  setcharprop #2,shield1.gif;
+  shieldpower = 1;
+  dir = 3;
+  hearts = 2;
+
+  this.walkSpeed = 0.4;
+  this.attackSpeed = 0.6;
+
+  save[0] = 2;
+  save[1] = 4;
+
+  setstring this.attacks,
+    Vengance,tricxta_skull.gif,"A devasting attack resulting in black magic!",1,0,1,
+    Payout,tricxta_axe.gif,"A vicious axe based attack.",1,2,0,
+    Shoot,tricxta_normalbow-icon.gif,"A basic arrow attack.",1,2,0;
+}
+
+if (getAttacks){
+  for (this.i = 0; this.i < npcscount;this.i++){
+    callnpc this.i,setAttacks,#v(sarraylen(this.attacks)),#s(this.attacks);
+  }
+}
+
+if (moveTo){
+  this.newX = (strtofloat(#p(0)) >= 0)?strtofloat(#p(0)):x;
+  this.newY = (strtofloat(#p(1)) >= 0)?strtofloat(#p(1)):y;
+  moveTo();
+}
+
+if (Shoot){
+  this.npcInd = testnpc(strtofloat(#p(0)),strtofloat(#p(1)));
+  this.shootX = npcs[this.npcInd].x-npcs[this.npcInd].width;
+  this.shootY = npcs[this.npcInd].y;
+
+  this.angle = getangle(this.shootX-x,this.shootY-y);
+
+  setshootparams damage,2;
+  setcharani tricxta_bowshoot,wbow1.png;
+  shoot x+vecx(dir)*1.5,y+vecy(dir)*1.5,z,this.angle,0,0,tricxta_arrow1,tricxta_weakarrows.gif;
+}
+
+function moveTo(){
+  this.dist = ((x-this.newX)^2+(y-this.newY)^2)^0.5;
+  this.angle = getangle(this.newX-x,y-this.newY);
+  setcharani walk,;
+  for (this.i = 0; this.i < this.dist; this.i+=this.walkSpeed){
+    x += cos(this.angle)*this.walkSpeed;
+    y += sin(this.angle)*this.walkSpeed;
+    sleep 0.05;
+  }
+  setcharani idle,;
+}
+
+NPCEND
+
+// ===== 05_standalone/rpg_project/trpg_battle__003__18_40.npc.txt =====
+// extracted-from: rpg project/trpg_battle.nw
+// npc-index: 3
+// header: NPC - 18 40
+// image: -
+// tile: 18,40
+// recovered-from-binary: false
+// body-hash: 3a765881adc6
+
+NPC - 18 40
+// Graal2002 NPC by Stefan Knorr
+if (created) {
+  // Initialize the attributes
+  showcharacter;
+  setcharprop #3,head2.png;
+  setcharprop #C0,orange;
+  setcharprop #C1,white;
+  setcharprop #C2,blue;
+  setcharprop #C3,red;
+  setcharprop #C4,black;
+  setcharprop #2,shield1.gif;
+  shieldpower = 1;
+  dir = 3;
+  hearts = 2;
+
+  this.walkSpeed = 0.4;
+  this.attackSpeed = 0.6;
+
+  save[0] = 3;
+  save[1] = 4;
+
+  setstring this.attacks,
+    Brag,tricxta_medal.png,"Brag about your shiny medal.",1,0,0,
+    Payback,xialza_coins.png,"Increase gold yield by 5% at the end of the fight.",1,0,1;
+}
+
+if (getAttacks){
+  for (this.i = 0; this.i < npcscount;this.i++){
+    callnpc this.i,setAttacks,#v(sarraylen(this.attacks)),#s(this.attacks);
+  }
+}
+
+if (moveTo){
+  this.newX = (strtofloat(#p(0)) >= 0)?strtofloat(#p(0)):x;
+  this.newY = (strtofloat(#p(1)) >= 0)?strtofloat(#p(1)):y;
+  moveTo();
+}
+
+function moveTo(){
+  this.dist = ((x-this.newX)^2+(y-this.newY)^2)^0.5;
+  this.angle = getangle(this.newX-x,y-this.newY);
+  setcharani walk,;
+  for (this.i = 0; this.i < this.dist; this.i+=this.walkSpeed){
+    x += cos(this.angle)*this.walkSpeed;
+    y += sin(this.angle)*this.walkSpeed;
+    sleep 0.05;
+  }
+  setcharani idle,;
+}
+
+NPCEND
+
+// ===== 05_standalone/rpg_project/trpg_battle__004__44_33.npc.txt =====
+// extracted-from: rpg project/trpg_battle.nw
+// npc-index: 4
+// header: NPC - 44 33
+// image: -
+// tile: 44,33
+// recovered-from-binary: false
+// body-hash: dd30cac7357a
+
+NPC - 44 33
+// Graal2002 NPC by Stefan Knorr
+if (created) {
+  // Initialize the attributes
+  showcharacter;
+  setcharprop #3,head0.png;
+  setcharprop #C0,orange;
+  setcharprop #C1,white;
+  setcharprop #C2,blue;
+  setcharprop #C3,red;
+  setcharprop #C4,black;
+  setcharprop #2,shield1.gif;
+  shieldpower = 1;
+  dir = 1;
+  hearts = 3;
+  save[0] = 50;//enemy IDs >= 50
+}
+
+if (wasHit){
+  hearts -= strtofloat(#p(0));
+  setcharani hurt,;
+  checkDeath();
+}
+
+if (actionProjectile){
+  if (strequals(#p(0),damage)){
+    hearts -= strtofloat(#p(1));
+    setcharani hurt,;
+    checkDeath();
+  }
+}
+
+function checkDeath(){
+  if (hearts <= 0)setcharani dead,;
+}
+
+NPCEND
+
+// ===== 05_standalone/rpg_project/trpg_battle__005__44_40.npc.txt =====
+// extracted-from: rpg project/trpg_battle.nw
+// npc-index: 5
+// header: NPC - 44 40
+// image: -
+// tile: 44,40
+// recovered-from-binary: false
+// body-hash: d3091be5a511
+
+NPC - 44 40
+// Graal2002 NPC by Stefan Knorr
+if (created) {
+  // Initialize the attributes
+  showcharacter;
+  setcharprop #3,head0.png;
+  setcharprop #C0,orange;
+  setcharprop #C1,white;
+  setcharprop #C2,blue;
+  setcharprop #C3,red;
+  setcharprop #C4,black;
+  setcharprop #2,shield1.gif;
+  shieldpower = 1;
+  dir = 1;
+  hearts = 5;
+  save[0] = 51;//enemy IDs >= 50
+}
+
+if (wasHit){
+  hearts--;
+  setcharani hurt,;
+  checkDeath();
+}
+
+if (actionProjectile){
+  if (strequals(#p(0),damage)){
+    hearts -= strtofloat(#p(1));
+    setcharani hurt,;
+    checkDeath();
+  }
+}
+
+function checkDeath(){
+  if (hearts <= 0)setcharani dead,;
+}
+
+NPCEND
+
+// ===== 05_standalone/rpg_project/trpg_battle__006__16_21.npc.txt =====
+// extracted-from: rpg project/trpg_battle.nw
+// npc-index: 6
+// header: NPC - 16 21
+// image: -
+// tile: 16,21
+// recovered-from-binary: false
+// body-hash: 429f8b8bedd2
+
+NPC - 16 21
+// NPC made by tricxta
+if (playerenters){
+  this.focus = {-1,-1,-1,-1};
+  this.transTime = 0.5;
+}
+
+if (forceFocus){
+  this.focus[2] = strtofloat(#p(0));
+  this.focus[3] = strtofloat(#p(1));
+}
+
+if (shiftFocus){
+  this.focus[0] = strtofloat(#p(0));
+  this.focus[1] = strtofloat(#p(1));
+  this.focus[2] = strtofloat(#p(2));
+  this.focus[3] = strtofloat(#p(3));
+
+  //perform the shift in focus
+  this.fX1 = this.focus[0];
+  this.fY1 = this.focus[1];
+  this.fX2 = this.focus[2];
+  this.fY2 = this.focus[3];
+
+  for (this.i=0;this.i<=this.transTime;this.i+=0.05){
+    this.fP = (this.i/this.transTime);//focus percentage
+    this.focusX = this.focus[0] + (this.focus[2]-this.focus[0])*this.fP;
+    this.focusY = this.focus[1] + (this.focus[3]-this.focus[1])*this.fP;
+    setfocus this.focusX,this.focusY;
+
+    if (this.focus[2]-this.focus[0]==0 && this.focus[3]-this.focus[1]==0)this.i = this.transTime;//no need to shift focus
+    else sleep .05;
+  }
+}
+
+NPCEND
+
+// ===== 05_standalone/rpg_project/trpg_battle__007__28_20.npc.txt =====
+// extracted-from: rpg project/trpg_battle.nw
+// npc-index: 7
+// header: NPC - 28 20
+// image: -
+// tile: 28,20
+// recovered-from-binary: false
+// body-hash: a5094412d095
+
+NPC - 28 20
+// NPC made by tricxta
+removetiledefs;
+addtiledef xialza_tiles.gif,trpg_,1;
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/qmenu__000__26_31.npc.txt =====
+// extracted-from: serenity_qmenu/qmenu.nw
+// npc-index: 0
+// header: NPC - 26 31
+// image: -
+// tile: 26,31
+// recovered-from-binary: false
+// body-hash: 6e60620a366e
+
+NPC - 26 31
+// NPC made by tricxta
+if (playerenters){
+  if (!isweapon)toweapons -qmenu;
+  this.originx=screenwidth/2-225;
+  this.originy=screenheight/2-163.5;
+  disableselectweapons;
+  this.selectweapon=-1;
+  //weapon search variables
+  //------------------------
+  setstring this.category0,Swords,Shields,Hammers,Bows,Daggers,Spears,Staffs,Wands;
+  setstring this.category1,Potions;
+  setstring this.category2,Misc,Ore;
+  setstring this.category3,Quest;
+  //------------------------
+}
+
+if (keypressed && strtofloat(#p(0))==81 && this.key==0){
+  this.key=1;
+  if (this.menu==0){
+    this.menu=1;
+    showimg 300,riley_exoticqmenu01.gif,this.originx,this.originy;
+    changeimgpart 300,0,0,425,345;
+    changeimgvis 300,4;
+    showimg 301,riley_exoticqmenu01.gif,this.originx+425,this.originy+3;
+    changeimgpart 301,425,3,16,125;
+    changeimgvis 301,4;
+    this.money=playerrupees;
+    showtext 303,this.originx+135,this.originy+108,arial,r,#v(int(this.money/10000));
+    changeimgzoom 303,.5;
+    changeimgvis 303,5;
+    this.money=this.money%10000;
+    showtext 304,this.originx+135,this.originy+86,arial,r,#v(int(this.money/100));
+    changeimgzoom 304,.5;
+    changeimgvis 304,5;
+    this.money=this.money%100;
+    showtext 305,this.originx+135,this.originy+66,arial,r,#v(this.money);
+    changeimgzoom 305,.5;
+    changeimgvis 305,5;
+    showcategory();
+    drawweapons();
+    drawbags();
+    while (keydown2(81,true))sleep .05;
+    this.key=0;
+    timeout=0.05;
+  }
+  else close();
+}
+
+if (timeout && this.menu==1){
+  this.mouseover=0;
+  if (mousescreenx in |this.originx+157,this.originx+340| && mousescreeny in |this.originy+329,this.originy+343| && this.menu2==0){
+    for (this.i=0;this.i<5;this.i++){
+      if (mousescreenx in |this.originx+157+(this.i*37),this.originx+189+(this.i*37)|){
+        this.mouseover=1;
+        showimg 306,riley_exoticqmenu01.gif,this.originx+157+(this.i*37),this.originy+329;
+        changeimgpart 306,158+(this.i*37),349,35,14;
+        changeimgvis 306,5;
+      }
+    }
+  }
+  if (this.mouseover==0)hideimg 306;
+  if (leftmousebutton && this.menu2==0){
+    if (mousescreenx in |this.originx+164,this.originx+406| && mousescreeny in |this.originy+23,this.originy+307|){
+      tokenize #s(this.weaponindexes);
+      for (this.i=0;this.i<tokenscount;this.i++){
+        if (mousescreenx in |this.originx+164+((this.i%6)*42),this.originx+196+((this.i%6)*42)| && mousescreeny in |this.originy+23+(int(this.i/6)*42),this.originy+55+(int(this.i/6)*42)|){
+          showimg 307,riley_exoticitemselect.gif,this.originx+164+((this.i%6)*42),this.originy+23+(int(this.i/6)*42);
+          changeimgvis 307,6;
+          this.selectweapon=strtofloat(#t(this.i));
+          break;
+        }
+      }
+    }
+  }
+  else if (rightmousebutton && this.menu2==0){
+    if (mousescreenx in |this.originx+164,this.originx+406| && mousescreeny in |this.originy+23,this.originy+307|){
+      tokenize #s(this.weaponindexes);
+      for (this.i=0;this.i<tokenscount;this.i++){
+        if (mousescreenx in |this.originx+164+((this.i%6)*42),this.originx+196+((this.i%6)*42)| && mousescreeny in |this.originy+23+(int(this.i/6)*42),this.originy+55+(int(this.i/6)*42)|){
+          showimg 307,riley_exoticitemselect.gif,this.originx+164+((this.i%6)*42),this.originy+23+(int(this.i/6)*42);
+          changeimgvis 307,6;
+          this.selectweapon=strtofloat(#t(this.i));
+          selectedweapon=strtofloat(#t(this.i));
+          break;
+        }
+      }
+    }
+  }
+  this.mouseover=0;
+  if (mousescreeny in |this.originy+173.5,this.originy+190.5| && this.menu2==1){
+    for (this.i=0;this.i<2;this.i++){
+      if (mousescreenx in |this.originx+164+(this.i*80),this.originx+206+(this.i*80)|){
+        this.mouseover=1;
+        showimg 312,riley_exoticrandomgui01.gif,this.originx+164+(this.i*80),this.originy+173.5;
+        changeimgpart 312,0,142+(this.i*23),42,17;
+        changeimgvis 312,7;
+      }
+    }
+  }
+  if (this.mouseover==0)hideimg 312;
+  timeout=0.05;
+}
+
+if (mousedown && this.menu==1){
+  if (mousescreenx in |this.originx+425,this.originx+441| && mousescreeny in |this.originy+3,this.originy+128| && this.menu2==0){
+    for (this.i=0;this.i<4;this.i++){
+      if (mousescreeny in |this.originy+3+(this.i*32),this.originy+35+(this.i*32)|){
+        if (!this.category==this.i){
+          this.selectweapon=-1;
+          hideimg 307;
+        }
+        this.category=this.i;
+        showcategory();
+        drawweapons();
+        break;
+      }
+    }
+  }
+  else if (mousescreeny in |this.originy+330,this.originy+342| && this.menu2==0){
+    if (mousescreenx in |this.originx+158,this.originx+191|)typesort();
+    else if (mousescreenx in |this.originx+195,this.originx+228|)alphasort();
+    else if (mousescreenx in |this.originx+232,this.originx+265|)deleteweapon();
+  }
+  if (mousescreeny in |this.originy+173.5,this.originy+190.5| && this.menu2==1){
+    if (mousescreenx in |this.originx+164,this.originx+206|){
+      triggeraction 0,0,gr.deleteweapon,#w(this.selectweapon);
+      close();
+    }
+    else if (mousescreenx in |this.originx+244,this.originx+286|){
+      hideimgs 308,312;
+      this.menu2=0;
+    }
+  }
+}
+
+function close(){
+  hideimgs 300,315;
+  hideimgs 400,400+this.weaponcount;
+  this.menu=0;
+  this.menu2=0;
+  while (keydown2(81,true))sleep .05;
+  this.key=0;
+  break;
+}
+
+function showcategory(){
+  showimg 302,riley_exoticqmenu01.gif,this.originx+425,this.originy+3+(this.category*31);
+  changeimgpart 302,459,3+(this.category*31),32,32;
+  changeimgvis 302,5;
+}
+
+function drawweapons(){
+  hideimgs 400,400+this.weaponcount;
+  this.weaponcount=0;
+  setstring this.weaponindexes,;
+  for (this.i=0;this.i<weaponscount;this.i++){
+    tokenize2 /,#w(this.i);
+    if (strcontains(#s(this.category#v(this.category)),#t(0)) && !startswith(-,#w(this.i))){
+      setstring this.weaponindexes,#s(this.weaponindexes)#v(this.i),;
+      showimg 400+this.weaponcount,#W(this.i),this.originx+164+((this.weaponcount%6)*42),this.originy+23+(int(this.weaponcount/6)*42);
+      changeimgvis 400+this.weaponcount,5;
+      this.weaponcount++;
+    }
+  }
+}
+
+function typesort(){
+  setstring this.tempindexes,#s(this.weaponindexes);
+  set moved;
+  while (moved){
+    tokenize #s(this.tempindexes);
+    unset moved;
+    for (this.i=0;this.i<tokenscount-1;this.i++){
+      tokenize #s(this.tempindexes);
+      setstring this.compare1,#w(strtofloat(#t(this.i)));
+      setstring this.compare2,#w(strtofloat(#t(this.i+1)));
+      if (!strequals(#e(0,3,#s(this.compare1)),#e(0,3,#s(this.compare2)))){
+        for (this.a=0;this.a<3;this.a++){
+          if (!strequals(#e(this.a,1,#s(this.compare1)),#e(this.a,1,#s(this.compare2))))this.char=this.a;
+        }
+        if (ascii(#e(this.char,1,#s(this.compare1)))>ascii(#e(this.char,1,#s(this.compare2)))){
+          setstring this.tempindexes,;
+          for (this.a=0;this.a<this.i;this.a++)setstring this.tempindexes,#s(this.tempindexes)#t(this.a),;
+          setstring this.tempindexes,#s(this.tempindexes)#t(this.i+1),;
+          setstring this.tempindexes,#s(this.tempindexes)#t(this.i),;
+          for (this.a=this.i+2;this.a<tokenscount;this.a++)setstring this.tempindexes,#s(this.tempindexes)#t(this.a),;
+          set moved;
+        }
+      }
+    }
+  }
+  setstring this.weaponindexes,#s(this.tempindexes);
+  drawweapons2();
+}
+
+function alphasort(){
+  setstring this.tempindexes,#s(this.weaponindexes);
+  set moved;
+  while (moved){
+    tokenize #s(this.tempindexes);
+    unset moved;
+    for (this.i=0;this.i<tokenscount-1;this.i++){
+      tokenize #s(this.tempindexes);
+      this.index=strtofloat(#t(this.i));
+      tokenize2 /,#w(this.index);
+      setstring this.compare1,#t(1);
+      tokenize #s(this.tempindexes);
+      this.index=strtofloat(#t(this.i+1));
+      tokenize2 /,#w(this.index);
+      setstring this.compare2,#t(1);
+      tokenize #s(this.tempindexes);
+      if (!strequals(#e(0,3,#s(this.compare1)),#e(0,3,#s(this.compare2)))){
+        for (this.a=0;this.a<3;this.a++){
+          if (!strequals(#e(this.a,1,#s(this.compare1)),#e(this.a,1,#s(this.compare2))))this.char=this.a;
+        }
+        if (ascii(#e(this.char,1,#s(this.compare1)))>ascii(#e(this.char,1,#s(this.compare2)))){
+          setstring this.tempindexes,;
+          for (this.a=0;this.a<this.i;this.a++)setstring this.tempindexes,#s(this.tempindexes)#t(this.a),;
+          setstring this.tempindexes,#s(this.tempindexes)#t(this.i+1),;
+          setstring this.tempindexes,#s(this.tempindexes)#t(this.i),;
+          for (this.a=this.i+2;this.a<tokenscount;this.a++)setstring this.tempindexes,#s(this.tempindexes)#t(this.a),;
+          set moved;
+        }
+      }
+    }
+  }
+  setstring this.weaponindexes,#s(this.tempindexes);
+  drawweapons2();
+}
+
+function drawweapons2(){
+  hideimgs 400,400+this.weaponcount;
+  tokenize #s(this.weaponindexes);
+  for (this.i=0;this.i<tokenscount;this.i++){
+    showimg 400+this.i,#W(strtofloat(#t(this.i))),this.originx+164+((this.i%6)*42),this.originy+23+(int(this.i/6)*42);
+    changeimgvis 400+this.i,5;
+  }
+}
+
+function deleteweapon(){
+  if (this.selectweapon>-1){
+    showimg 308,riley_exoticrandomgui01.gif,this.originx+126,this.originy+120.5;
+    changeimgpart 308,0,0,198,86;
+    changeimgvis 308,6;
+    showimg 309,riley_exoticrandomgui01.gif,this.originx+164,this.originy+173.5;
+    changeimgpart 309,0,96,42,17;
+    changeimgvis 309,6;
+    showimg 310,riley_exoticrandomgui01.gif,this.originx+244,this.originy+173.5;
+    changeimgpart 310,0,119,42,17;
+    changeimgvis 310,6;
+    showtext 311,this.originx+227,this.originy+150,arial,c,Would you like to delete this?;
+    changeimgzoom 311,.5;
+    changeimgvis 311,7;
+    this.menu2=1;
+  }
+}
+
+function drawbags(){
+  for (this.i=0;this.i<3;this.i++){
+    showimg 313+this.i,riley_exoticqmenu01.gif,this.originx+19+(this.i*42),this.originy+22;
+    changeimgpart 313+this.i,459,149,32,32;
+    changeimgvis 313+this.i,6;
+  }
+}
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/serenity_qmenu__000__18_20.npc.txt =====
+// extracted-from: serenity_qmenu/serenity_qmenu.nw
+// npc-index: 0
+// header: NPC - 18 20
+// image: -
+// tile: 18,20
+// recovered-from-binary: false
+// body-hash: 83e59192a984
+
+NPC - 18 20
+// NPC made by tricxta
+if (playerenters){
+  if (!isweapon)toweapons -qmenu;
+  this.originx=screenwidth/2-225;
+  this.originy=screenheight/2-163.5;
+  disableselectweapons;
+  this.selectweapon=-1;
+  //weapon search variables
+  //------------------------
+  setstring this.category0,sword,shield,Blunt;
+  setstring this.category1,Bag;
+  setstring this.category2,shield,sword;
+  setstring this.category3,Blunt;
+  //------------------------
+}
+
+if (keypressed && strtofloat(#p(0))==81 && this.key==0){
+  this.key=1;
+  if (this.menu==0){
+  setstring this.equip,block.png,block.png,block.png,block.png,block.png,block.png,block.png,block.png,block.png,block.png,block.png,block.png;
+    this.menu=1;
+    showimg 300,riley_exoticqmenu01.gif,this.originx,this.originy;
+    changeimgpart 300,0,0,425,345;
+    changeimgvis 300,4;
+    showimg 301,riley_exoticqmenu01.gif,this.originx+425,this.originy+3;
+    changeimgpart 301,425,3,16,125;
+    changeimgvis 301,4;
+    this.money=playerrupees;
+    showtext 303,this.originx+135,this.originy+108,arial,r,#v(int(this.money/10000));
+    changeimgzoom 303,.5;
+    changeimgvis 303,5;
+    this.money=this.money%10000;
+    showtext 304,this.originx+135,this.originy+86,arial,r,#v(int(this.money/100));
+    changeimgzoom 304,.5;
+    changeimgvis 304,5;
+    this.money=this.money%100;
+    showtext 305,this.originx+135,this.originy+66,arial,r,#v(this.money);
+    changeimgzoom 305,.5;
+    changeimgvis 305,5;
+    showcategory();
+    drawweapons();
+    drawbags();
+    drawequip();
+    while (keydown2(81,true))sleep .05;
+    this.key=0;
+    timeout=0.05;
+  }
+  else close();
+}
+
+if (timeout && this.menu==1){
+  this.mouseover=0;
+  if (mousescreenx in |this.originx+157,this.originx+340| && mousescreeny in |this.originy+329,this.originy+343| && this.menu2==0){
+    for (this.i=0;this.i<5;this.i++){
+      if (mousescreenx in |this.originx+157+(this.i*37),this.originx+189+(this.i*37)|){
+        this.mouseover=1;
+        showimg 306,riley_exoticqmenu01.gif,this.originx+157+(this.i*37),this.originy+329;
+        changeimgpart 306,158+(this.i*37),349,35,14;
+        changeimgvis 306,5;
+      }
+    }
+  }
+  if (this.mouseover==0)hideimg 306;
+  if (leftmousebutton && this.menu2==0){
+    if (mousescreenx in |this.originx+164,this.originx+406| && mousescreeny in |this.originy+23,this.originy+307|){
+      tokenize #s(this.weaponindexes);
+      for (this.i=0;this.i<tokenscount;this.i++){
+        if (mousescreenx in |this.originx+164+((this.i%6)*42),this.originx+196+((this.i%6)*42)| && mousescreeny in |this.originy+23+(int(this.i/6)*42),this.originy+55+(int(this.i/6)*42)|){
+          showimg 307,riley_exoticitemselect.gif,this.originx+164+((this.i%6)*42),this.originy+23+(int(this.i/6)*42);
+          changeimgvis 307,6;
+          this.selectweapon=strtofloat(#t(this.i));
+          break;
+        }
+      }
+    }
+  }
+  else if (rightmousebutton && this.menu2==0){
+    if (mousescreenx in |this.originx+164,this.originx+406| && mousescreeny in |this.originy+23,this.originy+307|){
+      tokenize #s(this.weaponindexes);
+      for (this.i=0;this.i<tokenscount;this.i++){
+        if (mousescreenx in |this.originx+164+((this.i%6)*42),this.originx+196+((this.i%6)*42)| && mousescreeny in |this.originy+23+(int(this.i/6)*42),this.originy+55+(int(this.i/6)*42)|){
+          showimg 307,riley_exoticitemselect.gif,this.originx+164+((this.i%6)*42),this.originy+23+(int(this.i/6)*42);
+          changeimgvis 307,6;
+          this.selectweapon=strtofloat(#t(this.i));
+          selectedweapon=strtofloat(#t(this.i));
+          break;
+        }
+      }
+    }
+  }
+  this.mouseover=0;
+  if (mousescreeny in |this.originy+173.5,this.originy+190.5| && this.menu2==1){
+    for (this.i=0;this.i<2;this.i++){
+      if (mousescreenx in |this.originx+164+(this.i*80),this.originx+206+(this.i*80)|){
+        this.mouseover=1;
+        showimg 312,riley_exoticrandomgui01.gif,this.originx+164+(this.i*80),this.originy+173.5;
+        changeimgpart 312,0,142+(this.i*23),42,17;
+        changeimgvis 312,7;
+      }
+    }
+  }
+  if (this.mouseover==0)hideimg 312;
+  timeout=0.05;
+}
+
+if (mousedown && this.menu==1){
+  if (mousescreenx in |this.originx+425,this.originx+441| && mousescreeny in |this.originy+3,this.originy+128| && this.menu2==0){
+    for (this.i=0;this.i<4;this.i++){
+      if (mousescreeny in |this.originy+3+(this.i*32),this.originy+35+(this.i*32)|){
+        if (!this.category==this.i){
+          this.selectweapon=-1;
+          hideimg 307;
+        }
+        this.category=this.i;
+        showcategory();
+        drawweapons();
+        break;
+      }
+    }
+  }
+  else if (mousescreeny in |this.originy+330,this.originy+342| && this.menu2==0){
+    if (mousescreenx in |this.originx+158,this.originx+191|)typesort();
+    else if (mousescreenx in |this.originx+195,this.originx+228|)alphasort();
+    else if (mousescreenx in |this.originx+232,this.originx+265|)deleteweapon();
+  }
+  if (mousescreeny in |this.originy+173.5,this.originy+190.5| && this.menu2==1){
+    if (mousescreenx in |this.originx+164,this.originx+206|){
+      triggeraction 0,0,gr.deleteweapon,#w(this.selectweapon);
+      close();
+    }
+    else if (mousescreenx in |this.originx+244,this.originx+286|){
+      hideimgs 308,312;
+      this.menu2=0;
+    }
+  }
+}
+
+function close(){
+  hideimgs 300,327;
+  hideimgs 400,400+this.weaponcount;
+  this.menu=0;
+  this.menu2=0;
+  while (keydown2(81,true))sleep .05;
+  this.key=0;
+  break;
+}
+
+function showcategory(){
+  showimg 302,riley_exoticqmenu01.gif,this.originx+425,this.originy+3+(this.category*31);
+  changeimgpart 302,459,3+(this.category*31),32,32;
+  changeimgvis 302,5;
+}
+
+function drawweapons(){
+  hideimgs 400,400+this.weaponcount;
+  this.weaponcount=0;
+  setstring this.weaponindexes,;
+  for (this.i=0;this.i<weaponscount;this.i++){
+    tokenize2 _,#w(this.i);
+    if (strcontains(#s(this.category#v(this.category)),#t(0)) && !startswith(-,#w(this.i))){
+      setstring this.weaponindexes,#s(this.weaponindexes)#v(this.i),;
+      showimg 400+this.weaponcount,#W(this.i),this.originx+164+((this.weaponcount%6)*42),this.originy+23+(int(this.weaponcount/6)*42);
+      changeimgvis 400+this.weaponcount,5;
+      this.weaponcount++;
+    }
+  }
+}
+
+function typesort(){
+  setstring this.tempindexes,#s(this.weaponindexes);
+  set moved;
+  while (moved){
+    tokenize #s(this.tempindexes);
+    unset moved;
+    for (this.i=0;this.i<tokenscount-1;this.i++){
+      tokenize #s(this.tempindexes);
+      setstring this.compare1,#w(strtofloat(#t(this.i)));
+      setstring this.compare2,#w(strtofloat(#t(this.i+1)));
+      if (!strequals(#e(0,3,#s(this.compare1)),#e(0,3,#s(this.compare2)))){
+        for (this.a=0;this.a<3;this.a++){
+          if (!strequals(#e(this.a,1,#s(this.compare1)),#e(this.a,1,#s(this.compare2))))this.char=this.a;
+        }
+        if (ascii(#e(this.char,1,#s(this.compare1)))>ascii(#e(this.char,1,#s(this.compare2)))){
+          setstring this.tempindexes,;
+          for (this.a=0;this.a<this.i;this.a++)setstring this.tempindexes,#s(this.tempindexes)#t(this.a),;
+          setstring this.tempindexes,#s(this.tempindexes)#t(this.i+1),;
+          setstring this.tempindexes,#s(this.tempindexes)#t(this.i),;
+          for (this.a=this.i+2;this.a<tokenscount;this.a++)setstring this.tempindexes,#s(this.tempindexes)#t(this.a),;
+          set moved;
+        }
+      }
+    }
+  }
+  setstring this.weaponindexes,#s(this.tempindexes);
+  drawweapons2();
+}
+
+function alphasort(){
+  setstring this.tempindexes,#s(this.weaponindexes);
+  set moved;
+  while (moved){
+    tokenize #s(this.tempindexes);
+    unset moved;
+    for (this.i=0;this.i<tokenscount-1;this.i++){
+      tokenize #s(this.tempindexes);
+      this.index=strtofloat(#t(this.i));
+      tokenize2 _,#w(this.index);
+      setstring this.compare1,#t(1);
+      tokenize #s(this.tempindexes);
+      this.index=strtofloat(#t(this.i+1));
+      tokenize2 _,#w(this.index);
+      setstring this.compare2,#t(1);
+      tokenize #s(this.tempindexes);
+      if (!strequals(#e(0,3,#s(this.compare1)),#e(0,3,#s(this.compare2)))){
+        for (this.a=0;this.a<3;this.a++){
+          if (!strequals(#e(this.a,1,#s(this.compare1)),#e(this.a,1,#s(this.compare2))))this.char=this.a;
+        }
+        if (ascii(#e(this.char,1,#s(this.compare1)))>ascii(#e(this.char,1,#s(this.compare2)))){
+          setstring this.tempindexes,;
+          for (this.a=0;this.a<this.i;this.a++)setstring this.tempindexes,#s(this.tempindexes)#t(this.a),;
+          setstring this.tempindexes,#s(this.tempindexes)#t(this.i+1),;
+          setstring this.tempindexes,#s(this.tempindexes)#t(this.i),;
+          for (this.a=this.i+2;this.a<tokenscount;this.a++)setstring this.tempindexes,#s(this.tempindexes)#t(this.a),;
+          set moved;
+        }
+      }
+    }
+  }
+  setstring this.weaponindexes,#s(this.tempindexes);
+  drawweapons2();
+}
+
+function drawweapons2(){
+  hideimgs 400,400+this.weaponcount;
+  tokenize #s(this.weaponindexes);
+  for (this.i=0;this.i<tokenscount;this.i++){
+    showimg 400+this.i,#W(strtofloat(#t(this.i))),this.originx+164+((this.i%6)*42),this.originy+23+(int(this.i/6)*42);
+    changeimgvis 400+this.i,5;
+  }
+}
+
+function deleteweapon(){
+  if (this.selectweapon>-1){
+    showimg 308,riley_exoticrandomgui01.gif,this.originx+126,this.originy+120.5;
+    changeimgpart 308,0,0,198,86;
+    changeimgvis 308,6;
+    showimg 309,riley_exoticrandomgui01.gif,this.originx+164,this.originy+173.5;
+    changeimgpart 309,0,96,42,17;
+    changeimgvis 309,6;
+    showimg 310,riley_exoticrandomgui01.gif,this.originx+244,this.originy+173.5;
+    changeimgpart 310,0,119,42,17;
+    changeimgvis 310,6;
+    showtext 311,this.originx+227,this.originy+150,arial,c,Would you like to delete this?;
+    changeimgzoom 311,.5;
+    changeimgvis 311,7;
+    this.menu2=1;
+  }
+}
+
+function drawbags(){
+  for (this.i=0;this.i<3;this.i++){
+    showimg 313+this.i,riley_exoticqmenu01.gif,this.originx+19+(this.i*42),this.originy+22;
+    changeimgpart 313+this.i,459,149,32,32;
+    changeimgvis 313+this.i,6;
+  }
+}
+
+function drawequip(){
+  tokenize #s(this.equip);
+  for (this.i=0;this.i<12;this.i++){
+    showimg 316+this.i,#t(this.i),this.originx+19+((this.i%3)*42),this.originy+149+(int(this.i/3)*42);
+    changeimgvis 316+this.i,5;
+  }
+}
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/serenity_qmenu__001__53_26.npc.txt =====
+// extracted-from: serenity_qmenu/serenity_qmenu.nw
+// npc-index: 1
+// header: NPC riley_exoticswordicon1.gif 53 26
+// image: riley_exoticswordicon1.gif
+// tile: 53,26
+// recovered-from-binary: false
+// body-hash: f2976798222a
+
+NPC riley_exoticswordicon1.gif 53 26
+// NPC made by tricxta
+if (!isweapon)toweapons sword_1;
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/serenity_qmenu__002__53_28.npc.txt =====
+// extracted-from: serenity_qmenu/serenity_qmenu.nw
+// npc-index: 2
+// header: NPC riley_exoticswordicon2.gif 53 28
+// image: riley_exoticswordicon2.gif
+// tile: 53,28
+// recovered-from-binary: false
+// body-hash: 1f0050d9dc77
+
+NPC riley_exoticswordicon2.gif 53 28
+// NPC made by tricxta
+if (!isweapon)toweapons sword_2;
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/serenity_qmenu__003__53_30.npc.txt =====
+// extracted-from: serenity_qmenu/serenity_qmenu.nw
+// npc-index: 3
+// header: NPC riley_exoticswordicon3.gif 53 30
+// image: riley_exoticswordicon3.gif
+// tile: 53,30
+// recovered-from-binary: false
+// body-hash: 15f4432d69b1
+
+NPC riley_exoticswordicon3.gif 53 30
+// NPC made by tricxta
+if (!isweapon)toweapons sword_3;
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/serenity_qmenu__004__53_32.npc.txt =====
+// extracted-from: serenity_qmenu/serenity_qmenu.nw
+// npc-index: 4
+// header: NPC riley_exoticswordicon4.gif 53 32
+// image: riley_exoticswordicon4.gif
+// tile: 53,32
+// recovered-from-binary: false
+// body-hash: 9b2895c0033f
+
+NPC riley_exoticswordicon4.gif 53 32
+// NPC made by tricxta
+if (!isweapon)toweapons sword_4;
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/serenity_qmenu__005__53_34.npc.txt =====
+// extracted-from: serenity_qmenu/serenity_qmenu.nw
+// npc-index: 5
+// header: NPC riley_exoticswordicon5.gif 53 34
+// image: riley_exoticswordicon5.gif
+// tile: 53,34
+// recovered-from-binary: false
+// body-hash: 04818f9ce683
+
+NPC riley_exoticswordicon5.gif 53 34
+// NPC made by tricxta
+if (!isweapon)toweapons sword_5;
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/serenity_qmenu__006__53_36.npc.txt =====
+// extracted-from: serenity_qmenu/serenity_qmenu.nw
+// npc-index: 6
+// header: NPC riley_exoticswordicon6.gif 53 36
+// image: riley_exoticswordicon6.gif
+// tile: 53,36
+// recovered-from-binary: false
+// body-hash: 003395b597a8
+
+NPC riley_exoticswordicon6.gif 53 36
+// NPC made by tricxta
+if (!isweapon)toweapons sword_6;
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/serenity_qmenu__007__53_38.npc.txt =====
+// extracted-from: serenity_qmenu/serenity_qmenu.nw
+// npc-index: 7
+// header: NPC riley_exoticswordicon7.gif 53 38
+// image: riley_exoticswordicon7.gif
+// tile: 53,38
+// recovered-from-binary: false
+// body-hash: bac77779753b
+
+NPC riley_exoticswordicon7.gif 53 38
+// NPC made by tricxta
+if (!isweapon)toweapons sword_7;
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/serenity_qmenu__008__53_40.npc.txt =====
+// extracted-from: serenity_qmenu/serenity_qmenu.nw
+// npc-index: 8
+// header: NPC riley_exoticswordicon8.gif 53 40
+// image: riley_exoticswordicon8.gif
+// tile: 53,40
+// recovered-from-binary: false
+// body-hash: 4267c9442bb4
+
+NPC riley_exoticswordicon8.gif 53 40
+// NPC made by tricxta
+if (!isweapon)toweapons sword_8;
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/serenity_qmenu__009__53_42.npc.txt =====
+// extracted-from: serenity_qmenu/serenity_qmenu.nw
+// npc-index: 9
+// header: NPC riley_exoticshieldicon1.gif 53 42
+// image: riley_exoticshieldicon1.gif
+// tile: 53,42
+// recovered-from-binary: false
+// body-hash: 6e981cb0d43b
+
+NPC riley_exoticshieldicon1.gif 53 42
+// NPC made by tricxta
+if (!isweapon)toweapons shield_1;
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/serenity_qmenu__010__29_34.npc.txt =====
+// extracted-from: serenity_qmenu/serenity_qmenu.nw
+// npc-index: 10
+// header: NPC - 29 34
+// image: -
+// tile: 29,34
+// recovered-from-binary: false
+// body-hash: eee09d63351b
+
+NPC - 29 34
+message #K(122) #v(ascii(z));
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/serenity_qmenu__011__53_45.npc.txt =====
+// extracted-from: serenity_qmenu/serenity_qmenu.nw
+// npc-index: 11
+// header: NPC block.png 53 45
+// image: block.png
+// tile: 53,45
+// recovered-from-binary: false
+// body-hash: 5b33f5f2c66b
+
+NPC block.png 53 45
+// NPC made by tricxta
+if (!isweapon)toweapons sword_9;
+
+NPCEND
+
+// ===== 05_standalone/serenity_qmenu/serenity_qmenu__012__53_48.npc.txt =====
+// extracted-from: serenity_qmenu/serenity_qmenu.nw
+// npc-index: 12
+// header: NPC plant.png 53 48
+// image: plant.png
+// tile: 53,48
+// recovered-from-binary: false
+// body-hash: e6e9461eb06c
+
+NPC plant.png 53 48
+// NPC made by tricxta
+if (!isweapon)toweapons Blunt_Hammer;
+
+NPCEND
+
+// ===== 05_standalone/shadowCasting/lightthing__000__27_21.npc.txt =====
+// extracted-from: shadowCasting/lightthing.nw
+// npc-index: 0
+// header: NPC - 27 21
+// image: -
+// tile: 27,21
+// recovered-from-binary: false
+// body-hash: de6230dec6c7
+
+NPC - 27 21
+// NPC made by tricxta
+if (playerenters){
+  replaceani idle,xialza_lamp_idle;
+  replaceani walk,xialza_lamp_walk;
+  seteffect 0,0,0.1,0.5;
+  timereverywhere;
+  noplayerkilling;
+  this.quality = 10;
+
+  this.lightRad = 20;//actually is the diameter
+
+  timeout = 0.05;
+}
+
+if (timeout){
+  setstring this.cRec,;
+  //top left
+  addstring this.cRec,0;
+  addstring this.cRec,0;
+
+  //top centre
+  addstring this.cRec,#v(playerx);
+  addstring this.cRec,0;
+
+  for (this.degrees = 360; this.degrees >= 0; this.degrees-=this.quality){
+    this.radians = (this.degrees/360)*(2*pi) - (pi/2);
+    this.lightOnwall = 0;
+    for (this.r = 0; this.r < (this.lightRad/2); this.r+= (this.quality/10)){
+     if (!lighteffectsenabled)continue;
+      this.sampleCoords = {playerx+1.5+cos(this.radians)*this.r,playery+1.5+sin(this.radians)*this.r};
+      if (onwall(this.sampleCoords[0],this.sampleCoords[1])){
+        this.lightOnwall = 1;
+      }
+      else if (this.lightOnwall == 1){
+        this.r = this.lightRad;
+      }
+    }
+    addstring this.cRec,#v(this.sampleCoords[0]);
+    addstring this.cRec,#v(this.sampleCoords[1]);
+  }
+
+  //finish the loop
+  addstring this.cRec,#I(this.cRec,4);
+  addstring this.cRec,#I(this.cRec,5);
+
+  //top centre
+  addstring this.cRec,#v(playerx);
+  addstring this.cRec,0;
+
+  //top right
+  addstring this.cRec,64;
+  addstring this.cRec,0;
+
+  //bottom right
+  addstring this.cRec,64;
+  addstring this.cRec,64;
+
+  //bottom left
+  addstring this.cRec,0;
+  addstring this.cRec,64;
+
+  setarray this.poly,sarraylen(this.cRec);
+  for (this.i = 0; this.i < sarraylen(this.cRec); this.i++)
+    this.poly[this.i] = strtofloat(#I(this.cRec,this.i));
+
+  showpoly 300,this.poly;
+  changeimgcolors 300,0,0,0,0;
+
+  timeout = 0.05;
+}
+
+if (mousewheel){
+  this.quality = max(2,min(20,this.quality+mousewheeldelta));
+  setplayerprop #c,quality:#v(this.quality);
+}
+
+NPCEND
+
+// ===== 05_standalone/shadowCasting/lightthing__001__29_11.npc.txt =====
+// extracted-from: shadowCasting/lightthing.nw
+// npc-index: 1
+// header: NPC - 29 11
+// image: -
+// tile: 29,11
+// recovered-from-binary: false
+// body-hash: bd841368e26b
+
+NPC - 29 11
+if (playerenters){
+  timereverywhere;
+  // Initialize the attributes
+  showcharacter;
+  setcharprop #3,head0.png;
+  setcharprop #C0,orange;
+  setcharprop #C1,white;
+  setcharprop #C2,blue;
+  setcharprop #C3,red;
+  setcharprop #C4,black;
+  setcharprop #2,shield1.gif;
+  shieldpower = 1;
+  dir = 1;
+  this.speed = 0.4;
+  setcharani walk,;
+  timeout = 0.05;
+}
+
+if (timeout){
+  if (isleader){
+    if (this.count <= 0){
+      this.count = 10;
+      dir = (dir+2)%4;
+    }
+    else {
+      x += vecx(dir)*this.speed;
+      this.count -=this.speed;
+    }
+  }
+
+  timeout = 0.05;
+}
+
+NPCEND
+
+// ===== 05_standalone/shadowCasting/lightthing__003__41_9.npc.txt =====
+// extracted-from: shadowCasting/lightthing.nw
+// npc-index: 3
+// header: NPC - 41 9
+// image: -
+// tile: 41,9
+// recovered-from-binary: false
+// body-hash: ee083b9dbd65
+
+NPC - 41 9
+if (playerenters){
+  timereverywhere;
+  // Initialize the attributes
+  showcharacter;
+  setcharprop #3,head0.png;
+  setcharprop #C0,orange;
+  setcharprop #C1,white;
+  setcharprop #C2,blue;
+  setcharprop #C3,red;
+  setcharprop #C4,black;
+  setcharprop #2,shield1.gif;
+  shieldpower = 1;
+  dir = 3;
+  this.speed = 0.4;
+  setcharani walk,;
+  timeout = 0.05;
+}
+
+if (timeout){
+  if (isleader){
+    if (this.count <= 0){
+      this.count = 10;
+      dir = (dir+2)%4;
+    }
+    else {
+      x += vecx(dir)*this.speed;
+      this.count -=this.speed;
+    }
+  }
+
+  timeout = 0.05;
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_game-over__000__41_47.npc.txt =====
+// extracted-from: side scroller/ssa_game-over.nw
+// npc-index: 0
+// header: NPC - 41 47
+// image: -
+// tile: 41,47
+// recovered-from-binary: false
+// body-hash: 2652bac0fb05
+
+NPC - 41 47
+// NPC made by tricxta
+if (playerenters){
+  level.NoMap = 1;
+  stopmidi;
+  if (!musicdisabled)play ssa_smbd_gameover.mid;
+  setstring this.font,Tempus Sans ITC;
+  if (strtofloat(#s(client.lives))>0)setstring this.options,Retry,;
+  setstring this.options,#s(this.options)Quit;
+  showstats 1024;
+  disabledefmovement;
+  showpoly 300,{0,0,screenwidth,0,screenwidth,screenheight,0,screenheight};
+  changeimgcolors 300,,,,;
+  changeimgvis 300,4;
+  showtext 301,screenwidth/2,screenheight/2-100,#s(this.font),cb,Game over;
+  changeimgzoom 301,1;
+  changeimgvis 301,5;
+  showtext 302,screenwidth/2,screenheight/2-10,#s(this.font),cb,Lives :#s(client.lives);
+  changeimgzoom 302,.6;
+  changeimgvis 302,5;
+  showimg 303,ssa_sprites.gif,screenwidth/2-16,screenheight/2-60;
+  changeimgpart 303,0,0,32,32;
+  changeimgvis 303,5;
+  tokenize #s(this.options);
+  for (this.i=0;this.i<tokenscount;this.i++){
+    showtext 304+this.i,screenwidth/2,screenheight/2+40+(this.i*20),#s(this.font),cb,#t(this.i);
+    changeimgzoom 304+this.i,.6;
+    changeimgvis 304+this.i,5;
+  }
+  this.select=0;
+  timeout=0.05;
+}
+
+if (timeout){
+  if (keydown(0))if (this.select>0){this.select--;play extra.wav;}
+  else if (keydown(2))if (this.select < tokenscount-1){this.select++;play extra.wav;}
+  if (keydown(5)){
+    play extra.wav;
+    sleep .5;
+    if (strequals(#t(this.select),retry)){
+      tokenize #s(client.respawn);
+      setlevel2 #t(0),strtofloat(#t(1)),strtofloat(#t(2));
+    }
+    else setlevel ssa_world1-lobby.nw;
+  }
+  showtext 306,screenwidth/2-8-(textwidth(.6,#s(this.font),c,#t(this.select))/2),screenheight/2+40+(this.select*20),#s(this.font),cb,>;
+  changeimgzoom 306,1.2;
+  changeimgvis 306,5;
+  timeout=0.05;
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_item-menu__000__42_51.npc.txt =====
+// extracted-from: side scroller/ssa_item-menu.nw
+// npc-index: 0
+// header: NPC - 42 51
+// image: -
+// tile: 42,51
+// recovered-from-binary: false
+// body-hash: da27ec6094eb
+
+NPC - 42 51
+// NPC made by tricxta
+if (playerenters){
+  enablefeatures 0x40+0x80+0x200+0x800+0x1000;
+  setstring this.img,ssa_item-menu.gif;
+  this.keydown = 0;
+}
+
+if (keypressed && strtofloat(#p(0)) == 81 && this.keydown==0){
+  findWeapons();
+  this.keydown = 1;
+  this.menu = (this.menu+1)%2;
+  if (this.menu == 1)draw();
+  else close();
+  while (keydown2(81,true))sleep .05;
+  this.keydown = 0;
+}
+
+if (mousewheel && this.menu == 1 && this.weaponscount > 25){
+  this.startIndex += mousewheeldelta*5;
+  if (this.startIndex < 0)this.startIndex = 0;
+  else if(this.startIndex>this.weaponscount-25)this.startIndex = this.weaponscount-25;
+  draw();
+}
+
+function draw(){
+  this.px = screenwidth/2-137;
+  this.py = screenheight/2-120;
+  showimg 300,#s(this.img),this.px,this.py;//main menu
+  changeimgpart 300,0,0,274,240;
+
+  showimg 301,#s(this.img),this.px+229,this.py+35;//scroll bg
+  changeimgpart 301,295,0,24,170;
+
+  this.dist=(this.weaponscount>25)?((this.startIndex/this.weaponscount)*167):0;
+  this.height=(this.weaponscount>25)?((25/this.weaponscount)*167):167;
+  showimg 302,#s(this.img),this.px+231,this.py+37+this.dist;//scroll bar
+  changeimgpart 302,273,1,20,this.height;
+  showimg 303,#s(this.img),this.px+231,this.py+34+this.dist+this.height;
+  changeimgpart 303,273,165,20,3;
+
+  this.limit = this.weaponscount;
+  if (this.limit>25)this.limit = 25;
+
+  for (this.i = 0;this.i<this.limit;this.i++){//weapons disp
+    showimg 310+this.i,#W(strtofloat(#I(this.wI,this.i)) + this.startIndex),this.px+20+(this.i%5)*40,this.py+26+int(this.i/5)*40;
+  }
+
+  for (this.i=300;this.i<335;this.i++)changeimgvis this.i,(this.i==300)?4:5;
+  changeimgvis 302,6;
+  changeimgvis 303,7;
+}
+
+function findWeapons(){
+  this.weaponscount = 0;
+  setstring this.wI,;
+  for (this.i=0;this.i<weaponscount;this.i++){
+    if (!startswith(-,#w(this.i))){
+      setstring this.wI,#s(this.wI)#v(this.i),;
+      this.weaponscount++;
+    }
+  }
+}
+
+function close(){
+  hideimgs 300,335;
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_item-menu__001__44_43.npc.txt =====
+// extracted-from: side scroller/ssa_item-menu.nw
+// npc-index: 1
+// header: NPC block.png 44 43
+// image: block.png
+// tile: 44,43
+// recovered-from-binary: false
+// body-hash: e0fd0e208f10
+
+NPC block.png 44 43
+// NPC made by tricxta
+if (!isweapon)toweapons block;
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_lighting-test__000__13_39.npc.txt =====
+// extracted-from: side scroller/ssa_lighting-test.nw
+// npc-index: 0
+// header: NPC - 13 39
+// image: -
+// tile: 13,39
+// recovered-from-binary: false
+// body-hash: 5f07bf96cd67
+
+NPC - 13 39
+// NPC made by tricxta
+if (mousedown){
+  this.cx = mousex;
+  this.cy = mousey;
+  hideimgs 0,this.imgcount;
+  this.imgcount = 0;
+  for (this.i=0;this.i<(pi*2);this.i+=.05){
+    for (this.j=0;this.j<8;this.j+=0.25){
+      this.tx = this.cx + cos(this.i)*this.j;
+      this.ty = this.cy + sin(this.i)*this.j;
+      if (onwall(this.tx,this.ty))this.j = 8;
+      else {
+        showimg this.imgcount,tricxta_light-test.gif,this.tx,this.ty;
+        changeimgmode this.imgcount,1;
+        changeimgcolors this.imgcount,1,1,1,0.1;
+        this.imgcount++;
+      }
+    }
+  }
+  timeout=0.05;
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_mutliplayer-lobby__002__22_10.npc.txt =====
+// extracted-from: side scroller/ssa_mutliplayer-lobby.nw
+// npc-index: 2
+// header: NPC - 22 10
+// image: -
+// tile: 22,10
+// recovered-from-binary: false
+// body-hash: 3f1dd4a0953f
+
+NPC - 22 10
+// NPC made by tricxta
+//Hud
+
+if (playerenters || timeout){
+  if (!isweapon)toweapons -hud;
+  if (level.isLobby==1)break;
+  showstats 1024;
+  showimg 300,ssa_sprites.gif,10,10;
+  changeimgpart 300,0,0,32,32;
+  changeimgvis 300,4;
+  showtext 301,50,25,TEMPUS SANS ITC,bc,x #s(client.lives);
+  changeimgzoom 301,.7;
+  changeimgvis 301,4;
+  showimg 302,ssa_sprites.gif,100,10;
+  changeimgpart 302,32,0,32,32;
+  changeimgvis 302,4;
+  showtext 303,150,25,TEMPUS SANS ITC,bc,x #v(playerrupees);
+  changeimgzoom 303,.7;
+  changeimgvis 303,4;
+  timeout=0.05;
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_mutliplayer-lobby__003__19_10.npc.txt =====
+// extracted-from: side scroller/ssa_mutliplayer-lobby.nw
+// npc-index: 3
+// header: NPC - 19 10
+// image: -
+// tile: 19,10
+// recovered-from-binary: false
+// body-hash: ff9560423f12
+
+NPC - 19 10
+// NPC made by tricxta
+//Cloud generator
+
+if (playerenters){
+  if (!isweapon)toweapons -cloudgen;
+  seteffect ,,,;
+  timereverywhere;
+  this.clouds=20;
+  setarray this.cloudx,this.clouds;
+  setarray this.cloudy,this.clouds;
+  setarray this.cloudzoom,this.clouds;
+  setarray this.cloudspeed,this.clouds;
+  this.toggle=1;
+  for (this.i=0;this.i<this.clouds;this.i++)initialize();
+  this.toggle=0;
+  timeout=0.05;
+}
+
+if (isweapon && timeout){
+  for (this.i=0;this.i<this.clouds;this.i++){
+    this.cloudx[this.i]+=this.cloudspeed[this.i];
+    showimg 300+this.i,ssa_cloud1.png,this.cloudx[this.i]-this.movex,this.cloudy[this.i];
+    changeimgvis 300+this.i,3;
+    changeimgzoom 300+this.i,this.cloudzoom[this.i];
+    changeimgcolors 300+this.i,.1,.1,.1,this.clouda;
+    if (this.cloudx[this.i]-this.movex>=30+(screenwidth/2/16))initialize();
+  }
+  timeout=0.05;
+}
+
+function initialize(){
+  this.cloudx[this.i]=(this.toggle==1)?random(-15-(screenwidth/2/16),50):(-15-(screenwidth/2/16));
+  this.cloudy[this.i]=random(0,30);
+  this.cloudzoom[this.i]=random(.1,.3);
+  this.cloudspeed[this.i]=random(.3,.7);
+  this.clouda[this.i]=random(.4,.6);
+}
+
+if (reset){
+  this.set=0;
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_mutliplayer-lobby__004__16_13.npc.txt =====
+// extracted-from: side scroller/ssa_mutliplayer-lobby.nw
+// npc-index: 4
+// header: NPC - 16 13
+// image: -
+// tile: 16,13
+// recovered-from-binary: false
+// body-hash: d3c45cb54e4b
+
+NPC - 16 13
+//Made by tricxta
+if (playerenters){
+  addtiledef ssa_game-tiles.gif,ssa_,1;
+  if (level.islobby == 1)break;
+  if (!isweapon)toweapons -movement;
+  disabledefmovement;
+  this.player.speed = .75;
+  this.player.offsetX = 1.5;
+  this.player.offsetY = 3;
+  this.player.orgFallSpeed = 1;
+  this.player.FallSpeed = this.player.orgFallSpeed;
+  this.player.FallAdd = 0.05;
+  this.player.maxFallSpeed = 2.5;
+  this.player.normalJumpHeight=10;
+  this.climbTiles = {0x486,0x487,0x496,0x497};
+  this.keysDown = {0,0,0,0,0,0,0};//1 held, else 0
+
+  setstring this.Ganis,idle,walk,ssa_climbidle,ssa_climb;
+  timeout=0.05;
+}
+
+if (isweapon && timeout){
+  if (!movementdisabled){
+    this.canClimb = (tiles[playerx+this.player.offsetX,playery+1] in this.climbTiles);
+
+    this.keyPressed = 0;
+    this.check = 0;
+
+    for (this.i=0;this.i<4;this.i++){
+      if (keydown(this.i)){
+        this.key = this.i;
+        this.keyPressed = 1;
+
+        if ((this.i+1)%2==0){//horizontal movement
+          playerdir = this.i;
+          this.gani = 1;
+          for (this.j=0;this.j<this.player.speed;this.j+=1/16){
+            this.checkX = playerx+1.5+vecx(this.i)*17/16;
+            if (onwall(this.checkX,playery+1)){playertouchsme();break;}
+            if (onwall(this.checkX,playery+2) && !this.fall==0)break;
+            playerx+=vecx(this.i)*1/16;
+          }
+        }
+        else {//vertical movement
+          if (this.canClimb == 1){//Climbing the vine
+            this.gani = 3;
+            this.check = (this.i == 0 && !onwall(playerx+this.player.offsetX,playery) && tiles[playerx+this.player.offsetX,playery] in this.climbTiles);
+            this.divis = (this.i==0)?2:1;
+            if (this.i == 2 || this.check == 1)playery+= vecy(this.i)*this.player.speed/this.divis;
+          }
+          else if (this.keysDown[0] == 0){
+            this.keysDown[0] = 1;
+            triggeraction playerx+this.player.offsetX,playery+2,Interface,#a;//Npc interaction
+          }
+        }
+      }
+    }
+
+    //Gani set
+    if (this.canClimb == 1)playerdir = 0;
+
+    if (this.keyPressed == 0)this.gani = (this.canClimb == 1)?2:0;
+
+    if (!strequals(#m,#I(this.Ganis,this.gani)))setani #I(this.Ganis,this.gani),;
+    //--------------------------------------
+
+    //Jump trigger
+    if (keydown(6) && this.jump==0 && onwall(playerx+this.player.offsetX,playery+this.player.offsetY+1/16) && !onwall(playerx+this.player.offsetX,playery) && this.keysDown[6] == 0){
+      play jump.wav;
+      this.keysDown[6] = 1;
+      this.jump=1;
+      this.jumpHeight = this.player.normalJumpHeight;
+      this.player.FallSpeed = this.player.orgFallSpeed;
+    }
+
+    //Key handler
+    for (this.i=0;this.i<7;this.i++){
+      if (!keydown(this.i))this.keysDown[this.i] = 0;
+    }
+
+    checkHeadOnwall();//Check if the head is onwall
+    if (this.jump>0 && this.jump<this.jumpHeight && this.how == 0){this.jump++;playery-=(this.jumpHeight-this.jump)*.2;}
+    else if (this.jump>0 || this.how>0){
+      this.jump=-1;
+      if (this.how>0){
+        for (this.i=0;this.i<npcscount;this.i++){
+          if (playerx+1.5 in |npcs[this.i].x,npcs[this.i].x+npcs[this.i].width| && playery in |npcs[this.i].y,npcs[this.i].y+npcs[this.i].height|)callnpc this.i,playerhitbottom,#v(playerdir);
+        }
+      }
+    }
+
+    if (!onwall(playerx+this.player.offsetX,playery+this.player.offsetY-1/16) && this.jump<=0 && this.canClimb == 0){
+      this.i=1/16;
+      while (!onwall(playerx+this.player.offsetX,playery+this.player.offsetY+this.i))this.i+=1/16;
+      if (this.i<2)playery+=this.i;
+      else {
+        playery+=this.player.FallSpeed;
+        if (this.player.FallSpeed < this.player.maxFallSpeed)this.player.FallSpeed += this.player.FallAdd;
+      }
+    }
+    if (onwall(playerx+this.player.offsetX,playery+this.player.offsetY)){
+      this.jump=0;
+      for (this.i=0;this.i<npcscount;this.i++){
+        if (playerx+1.5 in |npcs[this.i].x,npcs[this.i].x+npcs[this.i].width| && playery+3.5 in |npcs[this.i].y,npcs[this.i].y+npcs[this.i].height|)callnpc this.i,playerontop,#v(playerdir);
+      }
+      while (onwall(playerx+this.player.offsetX,playery+this.player.offsetY))playery-=1/16;
+    }
+  }
+  timeout=0.05;
+}
+
+function checkHeadOnwall(){
+  this.how = 0;
+  for (this.k=0;this.k<2;this.k++)this.how+=(onwall(playerx+0.5+this.k,playery-.5));
+}
+
+function playertouchsme(){
+  for (this.i=0;this.i<npcscount;this.i++){
+    if (playerx+vecx(playerdir)*2 in |npcs[this.i].x,npcs[this.i].x+npcs[this.i].width|)callnpc this.i,playertouchsme,#v(playerdir);
+  }
+}
+
+if (actionBounce){
+  this.jump = 1;
+  play jump.wav;
+  this.jumpHeight = strtofloat(#p(0));
+  this.player.FallSpeed = this.player.orgFallSpeed;
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_mutliplayer-lobby__005__16_16.npc.txt =====
+// extracted-from: side scroller/ssa_mutliplayer-lobby.nw
+// npc-index: 5
+// header: NPC - 16 16
+// image: -
+// tile: 16,16
+// recovered-from-binary: false
+// body-hash: 371827464dd7
+
+NPC - 16 16
+// NPC made by tricxta
+if (playerenters){
+  unset movementdisabled;
+  level.NoMap = 1;
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_mutliplayer-lobby__006__19_13.npc.txt =====
+// extracted-from: side scroller/ssa_mutliplayer-lobby.nw
+// npc-index: 6
+// header: NPC - 19 13
+// image: -
+// tile: 19,13
+// recovered-from-binary: false
+// body-hash: e22d5b88dcbb
+
+NPC - 19 13
+// NPC made by tricxta
+if (playerenters){
+  seteffect ,,,;
+  if (!isweapon)toweapons -hurt;
+}
+
+if (actionHurt){
+  set movementdisabled;
+  setani dead,;
+  showstats;
+  for (this.i=0;this.i<1;this.i+=.02){
+    seteffect ,,,this.i;
+    sleep .05;
+  }
+  setstring client.lives,#v(strtofloat(#s(client.lives))-1);
+  setlevel ssa_game-over.nw;
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_mutliplayer-lobby__007__12_51.npc.txt =====
+// extracted-from: side scroller/ssa_mutliplayer-lobby.nw
+// npc-index: 7
+// header: NPC ssa_game-tiles.gif 12 51
+// image: ssa_game-tiles.gif
+// tile: 12,51
+// recovered-from-binary: false
+// body-hash: 033e9a3ff59c
+
+NPC ssa_game-tiles.gif 12 51
+// NPC made by tricxta
+if (playerenters){
+  drawunderplayer;
+  setimgpart ssa_game-tiles.gif,560,16,32,16;
+  setcoloreffect ,,,;
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_mutliplayer-lobby__011__16_10.npc.txt =====
+// extracted-from: side scroller/ssa_mutliplayer-lobby.nw
+// npc-index: 11
+// header: NPC - 16 10
+// image: -
+// tile: 16,10
+// recovered-from-binary: false
+// body-hash: 3d2f5d30069a
+
+NPC - 16 10
+// NPC made by tricxta
+if (playerenters){
+  enablefeatures 0x40+0x80+0x200+0x800+0x1000;
+  this.screenCover = 3/4;//deafult percentage of screen hidden by map vertically
+  this.panSpeed = 10;//10 pixels per 0.05 seconds
+  setstring this.checkPointImg,ssa_flag.gif;
+  if (!isweapon)toweapons -map;
+}
+
+if (keypressed && strtofloat(#p(0)) == 77 && this.keyPressed == 0 && isweapon){
+  if (level.NoMap == 1 || mapdisabled || level.isLobby)return;
+  this.keyPressed = 1;
+  this.mapOpen = (this.mapOpen+1)%2;
+  this.viewX = 0;
+  this.viewY = 0;
+
+  showimg 301,#s(client.mapImage),0,0;
+
+  this.screenZoom = screenheight*this.screenCover/imgheight(#s(client.mapImage));
+  this.zoom = this.screenZoom;
+
+  set movementdisabled;
+  drawMap();
+
+  if (this.mapOpen == 1)timeout=0.05;
+  else close();
+
+  while (keydown2(77,true))sleep .05;
+  this.keyPressed = 0;
+  if (this.mapOpen == 0)break;
+}
+
+if (timeout && this.mapOpen == 1){
+  this.zoom += mousewheeldelta*0.1;
+  if (this.zoom < this.screenZoom)this.zoom = this.screenZoom;
+  if (this.zoom > 1.3)this.zoom = 1.3;//Some weird bug makes it vanish after 1.3
+  for (this.i=0;this.i<4;this.i++){
+    if (keydown(this.i)){
+      this.viewX -= vecx(this.i)*this.panSpeed;
+      this.viewY -= vecy(this.i)*this.panSpeed;
+    }
+  }
+  if (this.viewX > 0)this.viewX = 0;
+  else if (abs(this.viewX- screenwidth) > imgwidth(#s(client.mapImage))/2)this.viewX = (this.zoom * imgwidth(#s(client.mapImage))/2 - screenwidth)*-1;
+  this.max = (imgheight(#s(client.mapImage))*this.zoom-screenheight)/2;
+
+  if (this.zoom * imgheight(#s(client.mapImage)) < screenheight)this.viewY = 0;
+  else if (this.viewY > this.max - 10)this.viewY = this.max-10;
+  else if (this.viewY < this.max*-1)this.viewY = this.max*-1;
+  drawMap();
+  timeout=0.05;
+}
+
+function drawMap(){
+  this.mapPlaceX = 0 - (1-this.zoom)*imgwidth(#s(client.mapImage))/2;
+  this.mapPlaceY = screenheight/2 - imgheight(#s(client.mapImage))/2;
+
+  showpoly 300,{0,0,screenwidth,0,screenwidth,screenheight,0,screenheight};//black background
+  changeimgcolors 300,0,0,0,0;
+  changeimgvis 300,4;
+
+  showimg 301,#s(client.mapImage),this.mapPlaceX+this.viewX,this.mapPlaceY+this.viewY;//map image
+  changeimgzoom 301,this.zoom;
+  changeimgvis 301,5;
+
+  showtext 302,screenwidth/2,screenheight - 50,verdana,c,Zoom:#e(0,3,#v(this.zoom))%;
+  changeimgzoom 302,.8;
+  changeimgvis 302,5;
+
+  showimg 303,ssa_map-progress.gif,screenwidth/2-200,20;
+  changeimgvis 303,5;
+
+  this.playerProgress = (lindexof(#e(strlen(#L)-5,2,#L),client.mapLevels)*64+playerx)/(sarraylen(client.mapLevels)*64);
+
+  showimg 304,#3,screenwidth/2-200+this.playerProgress*400,23;
+  changeimgpart 304,0,96,32,32;
+  changeimgvis 304,6;
+
+  for (this.i=0;this.i<sarraylen(client.checkPoints);this.i++){
+    showimg 312+this.i,#s(this.checkPointImg),strtofloat(#I(client.checkPoints,this.i*2))*16*this.zoom+this.viewX,screenheight/2+this.viewY+strtofloat(#I(client.checkPoints,this.i*2+1))*16*this.zoom;
+    //changeimgzoom 312+this.i,this.zoom;
+    changeimgvis 312+this.i,6;
+  }
+}
+
+function close(){
+  hideimgs 300,311+sarraylen(client.checkPoints);
+  unset movementdisabled;
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_mutliplayer-lobby__012__31_49.npc.txt =====
+// extracted-from: side scroller/ssa_mutliplayer-lobby.nw
+// npc-index: 12
+// header: NPC - 31 49
+// image: -
+// tile: 31,49
+// recovered-from-binary: false
+// body-hash: 3c27631b681e
+
+NPC - 31 49
+// NPC made by tricxta
+if (playerenters){
+  setcharprop #P1,ssa_troompa.png;
+  timereverywhere;
+  if (!isleader)return;
+  setcharprop #P2,3;
+  this.speed = .025;
+  dir = 3;
+  setcharani ssa_troompa-walk,;
+  this.mode  = 0;
+  timeout=0.05;
+}
+
+if (timeout && this.mode == 0){
+  if (this.travel <= 0){
+    this.travel = random(6,12);
+    setcharprop #P2,#v((strtofloat(#P2(-1))+2)%4);
+  }
+  this.travel-=0.05;
+  dir = strtofloat(#P2(-1));
+  x += vecx(dir)*this.speed;
+
+  while(!onwall(x+1,y+3))y+=1/16;
+  timeout=0.05;
+}
+
+if (playertouchsme){
+  triggeraction playerx+.5,playery+1,Hurt,#v(dir);
+}
+
+if (playerontop){
+  setcharani ssa_troompa-flattened,;
+  dontblock;
+  this.mode=-1;
+  triggeraction playerx+1,playery+2,Bounce,6;
+  sleep 1;
+  destroy;
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_shopgui__000__36_56.npc.txt =====
+// extracted-from: side scroller/ssa_shopgui.nw
+// npc-index: 0
+// header: NPC door.png 36 56
+// image: door.png
+// tile: 36,56
+// recovered-from-binary: false
+// body-hash: 8b5fe9bd6517
+
+NPC door.png 36 56
+// NPC made by tricxta
+if (playerenters){
+  showcharacter;
+  timereverywhere;
+  dontblock;
+drawunderplayer;
+}
+
+if (actionInterface){
+  set movementdisabled;
+  setani idle,;
+  this.menu=1;
+  showimg 300,seeker_shopgui01.gif,x-2,y-3;
+  changeimgpart 300,231,384,120,49;
+  changeimgvis 300,2;
+  timeout=0.05;
+}
+
+if (timeout && this.menu==1){
+  this.check=0;
+  if (mousex in |x-2+(7/16),x+5+(7/16)| && mousey in |y-3+(10/16),y-1+(10/16)|){
+    for (this.i=0;this.i<3;this.i++){
+      if (mousex in |x-2+(7/16)+(this.i*(37/16)),x+(7/16)+(this.i*(37/16))|){
+        this.check=1;
+        showimg 301,seeker_shopgui01.gif,x-2+(7/16)+(this.i*(37/16)),y-3+(10/16);
+        changeimgpart 301,238+(this.i*37),442,32,32;
+        changeimgvis 301,3;
+      }
+    }
+  }
+  if (this.check==0)hideimg 301;
+  timeout=0.05;
+}
+
+if (mousedown && this.menu==1){
+  if (mousex in |x-2+(7/16),x+5+(7/16)| && mousey in |y-3+(10/16),y-1+(10/16)|){
+    for (this.i=0;this.i<3;this.i++){
+      if (mousex in |x-2+(7/16)+(this.i*(37/16)),x+(7/16)+(this.i*(37/16))|){
+        if (this.i==0){
+          getIndex();
+          hideimgs 300,301;
+          this.menu=0;
+          callnpc this.i,chat;
+        }
+        else if (this.i==1){
+          getIndex();
+          hideimgs 300,301;
+          this.menu=0;
+          callnpc this.i,shop;
+        }
+        else if (this.i==2){
+          close();
+        }
+      }
+    }
+  }
+}
+
+if (chat){
+  this.originx=screenwidth/2-175.5;
+  this.originy=screenheight/2-161;
+  getIndex();
+  for (this.i=0;this.i<weaponscount;this.i++){
+    if (strequals(#w(this.i),-chatsystem)){
+      setstring this.message,"Hey, how are you today? Can I help you?";
+      setstring this.answer0,"Sure!,answer0";
+      setstring this.answer1,"Sure...,answer0";
+      setstring this.answer2,"Bye,answer3";
+      setstring this.answer3,"NO!!!,answer4";
+      setstring this.answer4,"NO!!!!!!!,answer4";
+      this.answercount=5;
+      callweapon this.i,setInfo,#s(this.message),#v(this.answercount),#s(this.answer0),#s(this.answer1),#s(this.answer2),#s(this.answer3),#s(this.answer4);
+      callweapon this.i,setHead,head419.png,0,64,32,32;
+      callweapon this.i,opengui,#v(this.originx),#v(this.originy),#v(this.index);
+      break;
+    }
+  }
+}
+
+if (shop){
+  this.originx=screenwidth/2-175.5;
+  this.originy=screenheight/2-161;
+  getIndex();
+  for (this.i=0;this.i<weaponscount;this.i++){
+    if (strequals(#w(this.i),-shopsystem)){
+      setstring this.message,"Hey, how are you today? Can I help you?";
+      setstring this.answer0,"Sure!,answer0";
+      setstring this.answer1,"Sure...,answer0";
+      setstring this.answer2,"Bye,answer3";
+      setstring this.answer3,"NO!!!,answer4";
+      setstring this.answer4,"NO!!!!!!!,answer4";
+      this.answercount=5;
+      checkweapons();
+      sleep .05;
+      callweapon this.i,setInfo,#s(this.message),#v(this.answercount),#s(this.answer0),#s(this.answer1),#s(this.answer2),#s(this.answer3),#s(this.answer4);
+      callweapon this.i,setHead,head419.png,0,64,32,32;
+      callweapon this.i,opengui,#v(this.originx),#v(this.originy),#v(this.index);
+      break;
+    }
+  }
+}
+
+if (answer0){
+  setstring this.message,Sorry I forgot what I was going to say....;
+  setstring this.answer0,"Thats ok,answer2";
+  this.answercount=1;
+  callweapon this.i,setInfo,#s(this.message),#v(this.answercount),#s(this.answer0);
+}
+
+if (answer2){
+  setstring this.message,Great come back later!;
+  setstring this.answer0,"Bye,answer3";
+  this.answercount=1;
+  callweapon this.i,setInfo,#s(this.message),#v(this.answercount),#s(this.answer0);
+}
+
+if (answer3){
+  callweapon this.i,close,;
+}
+
+if (answer4){
+  setstring this.message,You seem mad... What happened?;
+  setstring this.answer0,"Never mind,answer6";
+  setstring this.answer1,"Well...,answer5";
+  this.answercount=2;
+  callweapon this.i,setHead,head419.png,0,463,32,32;
+  callweapon this.i,setInfo,#s(this.message),#v(this.answercount),#s(this.answer0),#s(this.answer1);
+}
+
+if (answer5){
+  setstring this.message,"Oh no wonder... poor guy, oh well... Buy these weapons and it will never happen again!";
+  setstring this.answer0,"Bye,answer3";
+  setstring this.answer1,"Ok,answer0";
+  this.answercount=2;
+  callweapon this.i,setHead,head419.png,0,64,32,32;
+  callweapon this.i,setInfo,#s(this.message),#v(this.answercount),#s(this.answer0),#s(this.answer1);
+}
+
+if (answer6){
+  setstring this.message,"Alrite, I hope you sort your problems out.";
+  setstring this.answer0,"Bye,answer3";
+  this.answercount=1;
+  callweapon this.i,setHead,head419.png,0,64,32,32;
+  callweapon this.i,setInfo,#s(this.message),#v(this.answercount),#s(this.answer0);
+}
+
+if (reject){
+  setstring this.message,"Sorry, you do not have enough for this item...";
+  setstring this.answer0,"Thats ok,answer2";
+  this.answercount=1;
+  callweapon this.i,setInfo,#s(this.message),#v(this.answercount),#s(this.answer0);
+}
+
+function getIndex(){
+  for (this.i=0;this.i<npcscount;this.i++){
+    if (npcs[this.i].x==x && npcs[this.i].y==y){this.index=this.i;break;}
+  }
+}
+
+function checkweapons(){
+  if (!hasweapon(Swords/Relic Sword))callweapon this.i,setWeapons,riley_exoticswordicon1.gif,120,"Relic Sword: A crude and battered sword from times long ago. It must have quite the history.","Swords/Relic Sword";
+
+  if (!hasweapon(Swords/Gladius Sword))callweapon this.i,setWeapons,"riley_exoticswordicon2.gif",200,"Gladius: A common sword for the warrior. Strong steel, and double edged it's ready for battle!","Swords/Gladius Sword";
+
+  if (!hasweapon(Swords/Save The Queen Sword))callweapon this.i,setWeapons,"riley_exoticswordicon5.gif",700,"Save The Queen: A sword that has been passed down through the royal knights for generations.","Swords/Save The Queen Sword";
+
+  if (!hasweapon(Swords/Split Sword))callweapon this.i,setWeapons,"riley_exoticswordicon6.gif",250,"Split Sword: A sword design from a far away kingdom. It can be considered a foreign Gladius.","Swords/Split Sword";
+
+  if (!hasweapon(Swords/Dragons Scale Sword))callweapon this.i,setWeapons,"riley_exoticswordicon7.gif",1000,"Dragon's Scale: A sword made from a single dragon scale crafted over a period of 40 years time.","Swords/Dragons Scale Sword";
+}
+
+function close(){
+  unset movementdisabled;
+  hideimgs 300,301;
+  this.menu=0;
+  break;
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_shopgui__001__43_45.npc.txt =====
+// extracted-from: side scroller/ssa_shopgui.nw
+// npc-index: 1
+// header: NPC - 43 45
+// image: -
+// tile: 43,45
+// recovered-from-binary: false
+// body-hash: 92b9554b4112
+
+NPC - 43 45
+//Made by tricxta
+if (playerenters){
+  if (!isweapon)toweapons -shopsystem;
+}
+
+if (opengui){
+  this.originx=strtofloat(#p(0));
+  this.originy=strtofloat(#p(1));
+  this.npcindex=strtofloat(#p(2));
+  this.scroll=0;
+  this.dropdown=0;
+  drawmessage();
+  disabledefmovement;
+  this.menu=1;
+  setani idle,;
+  showimg 280,seeker_shopgui01.gif,this.originx+28,this.originy+200;
+  changeimgpart 280,50,288,301,85;
+  changeimgvis 280,4;
+  showimg 300,seeker_shopgui01.gif,this.originx,this.originy;
+  changeimgpart 300,22,0,361,174;
+  changeimgvis 300,4;
+  drawitems();
+  timeout=0.05;
+}
+
+if (timeout && this.menu==1){
+  if (mousescreenx in |this.originx+33,this.originx+324| && mousescreeny in |this.originy+9,this.originy+9+(((this.weaponcount>3)?3:this.weaponcount)*53)|){
+    for (this.i=0;this.i<((this.weaponcount>3)?3:this.weaponcount);this.i++){
+      if (mousescreeny in |this.originy+9+(this.i*53),this.originy+9+(this.i*53)+53|){
+        showimg 299,seeker_shopgui01.gif,this.originx+33,this.originy+9+(this.i*53);
+        changeimgpart 299,55,218,291,54;
+        changeimgvis 299,5;
+        if (mousescreenx in |this.originx+85,this.originx+127| && mousescreeny in |this.originy+18+(this.i*53),this.originy+35+(this.i*53)|){
+          showimg 298,seeker_shopgui01.gif,this.originx+85,this.originy+20+(this.i*53);
+          changeimgpart 298,168,188,42,17;
+          changeimgvis 298,6;
+        }
+        else hideimg 298;
+        break;
+      }
+    }
+  }
+  else hideimgs 298,299;
+  if (mousescreenx in |this.originx+45,this.originx+104| && mousescreeny in |this.originy+268,this.originy+268+((((this.answercount+this.scroll3)>4)?4:this.answercount)*19)| && this.dropdown==1){
+    for (this.i=0;this.i<(((this.answercount+this.scroll3)>4)?4:this.answercount);this.i++){
+      if (mousescreeny in |this.originy+269+(this.i*19),this.originy+289+(this.i*19)|){
+        showimg 274,seeker_shopgui01.gif,this.originx+45,this.originy+269+(this.i*19);
+        changeimgpart 274,134,408,49,19;
+        changeimgvis 274,8;
+      }
+    }
+  }
+  else hideimg 274;
+  if (keydown(0) && this.scroll>0 && this.key==0){
+    this.key=1;
+    this.scroll--;
+    drawitems();
+  }
+  if (keydown(2) && this.scroll<this.weaponcount-3 && this.key==0){
+    this.key=1;
+    this.scroll++;
+    drawitems();
+  }
+
+  while ((keydown(0) || keydown(2)) && this.key==1)sleep .05;
+  this.key=0;
+  if (keydown(6))close();
+  timeout=0.05;
+}
+
+if (mousedown && this.menu==1){
+  if (mousescreenx in |this.originx+86,this.originx+126|)buyitem();
+  else if (mousescreenx in |this.originx+333,this.originx+356| && mousescreeny in |this.originy+10,this.originy+33|)close();
+  if (mousescreenx in |this.originx+39,this.originx+100| && mousescreeny in |this.originy+268,this.originy+285| && this.dropdown==0){
+    drawdropmenu();
+    this.dropdown=1;
+  }
+  else if (mousescreenx in |this.originx+39,this.originx+100| && mousescreeny in |this.originy+345,this.originy+357| && this.dropdown==1){
+    hideimgs 260,273;
+    this.dropdown=0;
+  }
+  else if (mousescreenx in |this.originx+39,this.originx+100| && mousescreeny in |this.originy+268,this.originy+350| && this.dropdown==1){
+    for (this.i=0;this.i<4;this.i++){
+      if (mousescreeny in |this.originy+269+(this.i*19),this.originy+289+(this.i*19)|){
+        tokenize #s(this.answer#v(this.i+this.scroll3));
+        callnpc this.npcindex,#t(tokenscount-1);
+      }
+    }
+  }
+}
+
+if (mousewheel && this.menu==1){
+  if (mousescreenx in |this.originx+33,this.originx+324| && mousescreeny in |this.originy+9,this.originy+169|){
+    if (this.scroll+(mousewheeldelta/abs(mousewheeldelta)) in |0,(this.weaponcount-3)|){
+      this.scroll+=(mousewheeldelta/abs(mousewheeldelta));
+      drawitems();
+    }
+  }
+  else if (mousescreenx in |this.originx+110,this.originx+313| && mousescreeny in |this.originy+219,this.originy+255|){
+    wraptext 36,,#s(this.message);
+    if (this.scroll2+(mousewheeldelta/abs(mousewheeldelta)) in |0,(tokenscount-3)|){
+      this.scroll2+=(mousewheeldelta/abs(mousewheeldelta));
+      drawmessage();
+    }
+  }
+  if (mousescreenx in |this.originx+39,this.originx+100| && mousescreeny in |this.originy+268,this.originy+350| && this.dropdown==1){
+    if (this.scroll3+(mousewheeldelta/abs(mousewheeldelta)) in |0,(this.answercount-4)|){
+      this.scroll3+=(mousewheeldelta/abs(mousewheeldelta));
+      drawdropmenu();
+    }
+  }
+}
+
+
+function drawitems(){
+  this.dist=(this.weaponcount>3)?((this.scroll/this.weaponcount)*167):0;
+  this.calc=(this.weaponcount>3)?((3/this.weaponcount)*167):167;
+  showimg 301,seeker_shopgui01.gif,this.originx+2,this.originy+this.dist;
+  changeimgpart 301,0,0,20,this.calc;
+  changeimgvis 301,5;
+  showimg 302,seeker_shopgui01.gif,this.originx+2,this.originy+this.dist+this.calc;
+  changeimgpart 302,0,169,20,3;
+  changeimgvis 302,6;
+  showimg 303,seeker_shopgui01.gif,this.originx+6,this.originy+this.dist+(this.calc/2);
+  changeimgpart 303,4,183,12,9;
+  changeimgvis 303,6;
+  hideimgs 304,304+this.imgcount;
+  this.imgcount=0;
+  for (this.i=0;this.i<((this.weaponcount>3)?3:this.weaponcount);this.i++){
+    tokenize #s(this.weapon#v(this.scroll+this.i));
+    showimg 304+this.imgcount,#t(0),this.originx+47,this.originy+21+(this.i*53);
+    changeimgvis 304+this.imgcount,6;
+    this.imgcount++;
+    showtext 304+this.imgcount,this.originx+106,this.originy+44+(this.i*53),arial,c,#t(1)c;
+    changeimgzoom 304+this.imgcount,.5;
+    changeimgvis 304+this.imgcount,6;
+    this.imgcount++;
+    wraptext 36,,#s(this.weapon#v(this.scroll+this.i)info);//36 is the line length in pixels
+    for (this.t=0;this.t<tokenscount;this.t++){
+      showtext 304+this.imgcount,this.originx+137,this.originy+19+(this.t*10)+(this.i*53),arial,l,#t(this.t);
+      changeimgzoom 304+this.imgcount,.5;
+      changeimgvis 304+this.imgcount,6;
+      this.imgcount++;
+    }
+  }
+}
+
+function buyitem(){
+  for (this.i=0;this.i<((this.weaponcount>3)?3:this.weaponcount);this.i++){
+    if (mousescreeny in |this.originy+21+(this.i*53),(this.originy+21+(this.i*53))+15|){
+      tokenize #s(this.weapon#v(this.scroll+this.i));
+      if (playerrupees>=strtofloat(#t(1))){
+        triggeraction 0,0,gr.addweapon,#s(this.weapon#v(this.scroll+this.i)weapon);
+        playerrupees-=strtofloat(#t(1));
+        close();
+      }
+      else callnpc this.npcindex,reject;
+    }
+  }
+}
+
+function close(){
+  this.weaponcount=0;
+  this.menu=0;
+  unset movementdisabled;
+  hideimgs 260,304+this.imgcount;
+  break;
+}
+
+function drawmessage(){
+  wraptext 36,,#s(this.message);
+  this.dist2=(tokenscount>3)?((this.scroll2/tokenscount)*(38-3)):0;
+  this.calc2=(tokenscount>3)?((3/tokenscount)*(38-3)):35;
+  showimg 282,seeker_shopgui01.gif,this.originx+97,this.originy+218+this.dist2;
+  changeimgpart 282,27,306,8,this.calc2;
+  changeimgvis 282,5;
+  showimg 283,seeker_shopgui01.gif,this.originx+97,this.originy+218+this.dist2+this.calc2;
+  changeimgpart 283,27,341,8,3;
+  changeimgvis 283,6;
+  hideimgs 284,287;
+  for (this.i=0;this.i<3;this.i++){
+    showtext 284+this.i,this.originx+115,this.originy+219+(this.i*10),arial,l,#t(this.i + this.scroll2);
+    changeimgzoom 284+this.i,.5;
+    changeimgvis 284+this.i,6;
+  }
+}
+
+function drawdropmenu(){
+  hideimgs 260,273;
+  this.dist3=(this.answercount>4)?((this.scroll3/this.answercount)*76):0;
+  this.calc3=(this.answercount>4)?((4/this.answercount)*76):76;
+  showimg 260,seeker_shopgui01.gif,this.originx+28,this.originy+268;
+  changeimgpart 260,50,384,72,82;
+  changeimgvis 260,6;
+  showimg 261,seeker_shopgui01.gif,this.originx+39,this.originy+345;
+  changeimgpart 261,61,356,61,17;
+  changeimgvis 261,4;
+  showimg 262,seeker_shopgui01.gif,this.originx+30,this.originy+271+this.dist3;
+  changeimgpart 262,27,387,8,this.calc3;
+  changeimgvis 262,6;
+  showimg 263,seeker_shopgui01.gif,this.originx+30,this.originy+271+this.dist3+this.calc3;
+  changeimgpart 263,27,460,8,3;
+  changeimgvis 263,6;
+  for (this.i=0;this.i<((this.answercount>4)?4:this.answercount);this.i++){
+    tokenize #s(this.answer#v(this.i+this.scroll3));
+    setstring this.response,#t(0);
+    if (tokenscount>2)setstring this.response,#s(this.response) #t(1);
+    showimg 264+this.i,seeker_shopgui01.gif,this.originx+45,this.originy+269+(this.i*19);
+    changeimgpart 264+this.i,134,384,49,19;
+    changeimgvis 264+this.i,7;
+    showtext 269+this.i,this.originx+69.5,this.originy+278+(this.i*19),arial,c,#s(this.response);
+    changeimgzoom 269+this.i,.5;
+    changeimgvis 269+this.i,9;
+  }
+}
+
+function resetmessage(){
+  this.scroll2=0;
+  this.scroll3=0;
+  hideimg 274;
+  drawmessage();
+  if (this.dropdown==1)drawdropmenu();
+}
+
+if (setInfo){
+  setstring this.message,#p(0);
+  this.answercount=strtofloat(#p(1));
+  for (this.i=0;this.i<this.answercount;this.i++)setstring this.answer#v(this.i),#p(this.i+2);
+  if (this.menu==1)resetmessage();
+}
+
+if (setHead){
+  showimg 281,#p(0),this.originx+48,this.originy+222;
+  changeimgpart 281,strtofloat(#p(1)),strtofloat(#p(2)),strtofloat(#p(3)),strtofloat(#p(4));
+  changeimgvis 281,5;
+}
+
+if (setWeapons){
+  setstring this.weapon#v(this.weaponcount),#p(0),#p(1);
+  setstring this.weapon#v(this.weaponcount)info,#p(2);
+  setstring this.weapon#v(this.weaponcount)weapon,#p(3);
+  this.weaponcount++;
+}
+
+if (close){
+  close();
+}
+
+NPCEND
+
+// ===== 05_standalone/side_scroller/ssa_shopgui__002__37_45.npc.txt =====
+// extracted-from: side scroller/ssa_shopgui.nw
+// npc-index: 2
+// header: NPC - 37 45
+// image: -
+// tile: 37,45
+// recovered-from-binary: false
+// body-hash: f76d7474d1f2
+
+NPC - 37 45
+//Made by tricxta
+if (playerenters){
+  if (!isweapon)toweapons -chatsystem;
+}
+
+if (opengui){
+  this.originx=strtofloat(#p(0));
+  this.originy=strtofloat(#p(1))-200;
+  this.npcindex=strtofloat(#p(2));
+  this.dropdown=0;
+  drawmessage();
+  disabledefmovement;
+  this.menu=1;
+  setani idle,;
+  showimg 280,seeker_shopgui01.gif,this.originx+28,this.originy+200;
+  changeimgpart 280,50,288,301,85;
+  changeimgvis 280,4;
+  timeout=0.05;
+}
+
+if (timeout && this.menu==1){
+  if (mousescreenx in |this.originx+45,this.originx+104| && mousescreeny in |this.originy+268,this.originy+268+((((this.answercount+this.scroll3)>4)?4:this.answercount)*19)| && this.dropdown==1){
+    for (this.i=0;this.i<(((this.answercount+this.scroll3)>4)?4:this.answercount);this.i++){
+      if (mousescreeny in |this.originy+269+(this.i*19),this.originy+289+(this.i*19)|){
+        showimg 274,seeker_shopgui01.gif,this.originx+45,this.originy+269+(this.i*19);
+        changeimgpart 274,134,408,49,19;
+        changeimgvis 274,8;
+      }
+    }
+  }
+  else hideimg 274;
+  if (keydown(6))close();
+  timeout=0.05;
+}
+
+if (mousedown && this.menu==1){
+  if (mousescreenx in |this.originx+333,this.originx+356| && mousescreeny in |this.originy+10,this.originy+33|)close();
+  if (mousescreenx in |this.originx+39,this.originx+100| && mousescreeny in |this.originy+268,this.originy+285| && this.dropdown==0){
+    drawdropmenu();
+    this.dropdown=1;
+  }
+  else if (mousescreenx in |this.originx+39,this.originx+100| && mousescreeny in |this.originy+345,this.originy+357| && this.dropdown==1){
+    hideimgs 260,273;
+    this.dropdown=0;
+  }
+  else if (mousescreenx in |this.originx+39,this.originx+100| && mousescreeny in |this.originy+268,this.originy+350| && this.dropdown==1){
+    for (this.i=0;this.i<4;this.i++){
+      if (mousescreeny in |this.originy+269+(this.i*19),this.originy+289+(this.i*19)|){
+        tokenize #s(this.answer#v(this.i+this.scroll3));
+        callnpc this.npcindex,#t(tokenscount-1);
+      }
+    }
+  }
+}
+
+if (mousewheel && this.menu==1){
+  if (mousescreenx in |this.originx+110,this.originx+313| && mousescreeny in |this.originy+219,this.originy+255|){
+    wraptext 36,,#s(this.message);
+    if (this.scroll2+(mousewheeldelta/abs(mousewheeldelta)) in |0,(tokenscount-3)|){
+      this.scroll2+=(mousewheeldelta/abs(mousewheeldelta));
+      drawmessage();
+    }
+  }
+  if (mousescreenx in |this.originx+39,this.originx+100| && mousescreeny in |this.originy+268,this.originy+350| && this.dropdown==1){
+    if (this.scroll3+(mousewheeldelta/abs(mousewheeldelta)) in |0,(this.answercount-4)|){
+      this.scroll3+=(mousewheeldelta/abs(mousewheeldelta));
+      drawdropmenu();
+    }
+  }
+}
+
+
+
+function close(){
+  this.weaponcount=0;
+  this.menu=0;
+  unset movementdisabled;
+  hideimgs 260,304+this.imgcount;
+  break;
+}
+
+function drawmessage(){
+  wraptext 36,,#s(this.message);
+  this.dist2=(tokenscount>3)?((this.scroll2/tokenscount)*(38-3)):0;
+  this.calc2=(tokenscount>3)?((3/tokenscount)*(38-3)):35;
+  showimg 282,seeker_shopgui01.gif,this.originx+97,this.originy+218+this.dist2;
+  changeimgpart 282,27,306,8,this.calc2;
+  changeimgvis 282,5;
+  showimg 283,seeker_shopgui01.gif,this.originx+97,this.originy+218+this.dist2+this.calc2;
+  changeimgpart 283,27,341,8,3;
+  changeimgvis 283,6;
+  hideimgs 284,287;
+  for (this.i=0;this.i<3;this.i++){
+    showtext 284+this.i,this.originx+115,this.originy+219+(this.i*10),arial,l,#t(this.i + this.scroll2);
+    changeimgzoom 284+this.i,.5;
+    changeimgvis 284+this.i,6;
+  }
+}
+
+function drawdropmenu(){
+  hideimgs 260,273;
+  this.dist3=(this.answercount>4)?((this.scroll3/this.answercount)*76):0;
+  this.calc3=(this.answercount>4)?((4/this.answercount)*76):76;
+  showimg 260,seeker_shopgui01.gif,this.originx+28,this.originy+268;
+  changeimgpart 260,50,384,72,82;
+  changeimgvis 260,6;
+  showimg 261,seeker_shopgui01.gif,this.originx+39,this.originy+345;
+  changeimgpart 261,61,356,61,17;
+  changeimgvis 261,4;
+  showimg 262,seeker_shopgui01.gif,this.originx+30,this.originy+271+this.dist3;
+  changeimgpart 262,27,387,8,this.calc3;
+  changeimgvis 262,6;
+  showimg 263,seeker_shopgui01.gif,this.originx+30,this.originy+271+this.dist3+this.calc3;
+  changeimgpart 263,27,460,8,3;
+  changeimgvis 263,6;
+  for (this.i=0;this.i<((this.answercount>4)?4:this.answercount);this.i++){
+    tokenize #s(this.answer#v(this.i+this.scroll3));
+    setstring this.response,#t(0);
+    if (tokenscount>2)setstring this.response,#s(this.response) #t(1);
+    showimg 264+this.i,seeker_shopgui01.gif,this.originx+45,this.originy+269+(this.i*19);
+    changeimgpart 264+this.i,134,384,49,19;
+    changeimgvis 264+this.i,7;
+    showtext 269+this.i,this.originx+69.5,this.originy+278+(this.i*19),arial,c,#s(this.response);
+    changeimgzoom 269+this.i,.5;
+    changeimgvis 269+this.i,9;
+  }
+}
+
+function resetmessage(){
+  this.scroll2=0;
+  this.scroll3=0;
+  hideimg 274;
+  drawmessage();
+  if (this.dropdown==1)drawdropmenu();
+}
+
+if (setInfo){
+  setstring this.message,#p(0);
+  this.answercount=strtofloat(#p(1));
+  for (this.i=0;this.i<this.answercount;this.i++)setstring this.answer#v(this.i),#p(this.i+2);
+  if (this.menu==1)resetmessage();
+}
+
+if (setHead){
+  showimg 281,#p(0),this.originx+48,this.originy+222;
+  changeimgpart 281,strtofloat(#p(1)),strtofloat(#p(2)),strtofloat(#p(3)),strtofloat(#p(4));
+  changeimgvis 281,5;
+}
+
+if (close){
+  close();
+}
+
+NPCEND
+
+// ===== 05_standalone/snow-fall/snowing__000__24_30.npc.txt =====
+// extracted-from: snow-fall/snowing.nw
+// npc-index: 0
+// header: NPC - 24 30
+// image: -
+// tile: 24,30
+// recovered-from-binary: false
+// body-hash: e9b1a68cd13d
+
+NPC - 24 30
+// NPC made by tricxta
+if (Playerenters){
+  this.snow=200;//max amount of snow flakes on the screen at one time
+  setstring this.snow_img,g4_particle_snowflake.png;
+
+  this.fall_speed={5,10};//5-10 pixels per .05 seconds
+  this.wind={7,8};//min,max wind speed:is random
+  this.alpha=.6;//transparency on the snow image
+
+
+  //Don't touch anything below here!
+  //=======================================
+  setarray this.speed,this.snow;//falling speed
+  setarray this.side,this.snow;//wind
+  setarray this.sx,this.snow;//x
+  setarray this.sy,this.snow;//y
+  for (this.i=0;this.i<this.snow;this.i++)this.speed[this.i]=-1;//used to check for first time
+
+  timeout=0.05;
+}
+
+if (timeout){
+  for (this.i=0;this.i<this.snow;this.i++){
+    if (this.speed[this.i]==-1){
+      new();
+      this.i=this.snow;
+    }
+    else {
+      this.sx[this.i]+=this.side[this.i];
+      this.sy[this.i]+=this.speed[this.i];
+      if (this.sx[this.i] >=screenwidth || this.sy[this.i] >=screenheight)new();
+      else draw();
+    }
+  }
+  timeout=0.05;
+}
+
+function new(){
+  if (random(0,100)>50){
+    this.sx[this.i]=random(0,screenwidth);
+    this.sy[this.i]=0;
+  }
+  else {
+    this.sx[this.i]=0;
+    this.sy[this.i]=random(0,screenheight);
+  }
+  this.speed[this.i]=random(this.fall_speed[0],this.fall_speed[1]);
+  this.side[this.i]=random(this.wind[0],this.wind[1]);
+  draw();
+}
+
+function draw(){
+  showimg 300+this.i,#s(this.snow_img),this.sx[this.i],this.sy[this.i];
+  changeimgvis 300+this.i,4;
+  changeimgmode 300+this.i,1;
+  changeimgcolors 300+this.i,1,1,1,this.alpha;
+}
+
+NPCEND
+
+// ===== 05_standalone/spike_block/spikeblock__000__27_29.npc.txt =====
+// extracted-from: spike block/spikeblock.nw
+// npc-index: 0
+// header: NPC spikeblock1.gif 27 29
+// image: spikeblock1.gif
+// tile: 27,29
+// recovered-from-binary: false
+// body-hash: cb334e59a531
+
+NPC spikeblock1.gif 27 29
+// NPC made by Tricxta
+if (playerenters){
+  this.ox = 27;//original x
+  this.oy = 29;//original y
+
+  //Debug reasons
+  snap();
+
+  this.speed = 1;//speed at which the npc moves
+
+  //Don't touch from here on in
+  this.dist = 0;
+  this.chase = 0;//keeps track of the state of the npc
+  this.moved = 0;
+  timeout=0.05;
+}
+
+if (timeout){
+  if ((playerx in |x-2,x+2| || playery in |y-2,y+2|) && this.chase == 0){//look for the player
+    this.chase = 1;
+    this.pAngle = getangle((playerx-x+1),(playery-y+1));
+    this.dir = (int((this.pAngle+(pi*2/8))/(pi*2/4))+3)%4;
+  }
+  else if (this.chase == 1){//try to attack the player
+    if (onwall(x+1+vecx(this.dir)*1.5,y+1+vecy(this.dir)*1.5)){
+      this.chase = -1;
+      this.dir = (this.dir+2)%4;
+      if (this.dist > 0){this.moved = 1;play spikeblockclang.wav;}
+    }
+    else {
+      move();
+      this.dist += this.speed;
+    }
+  }
+  else if (this.chase == -1){//retreat
+    if (this.dist<=0){
+      if (this.moved == 1){play spikeblockclang.wav;this.moved = 0;}
+      this.chase = 0;
+      snap();
+    }
+    else {
+      move();
+      this.dist -= this.speed;
+    }
+  }
+  timeout=0.05;
+}
+
+function move(){
+  x+=vecx(this.dir)*this.speed;
+  y+=vecy(this.dir)*this.speed;
+  hitobjects 1,x+1+vecx(this.dir)*2,y+1+vecy(this.dir)*2;
+}
+
+function snap(){
+  x = this.ox;
+  y = this.oy;
+}
+
+NPCEND
+
+// ===== 05_standalone/spike_block/spikeblock__001__45_29.npc.txt =====
+// extracted-from: spike block/spikeblock.nw
+// npc-index: 1
+// header: NPC spikeblock1.gif 45 29
+// image: spikeblock1.gif
+// tile: 45,29
+// recovered-from-binary: false
+// body-hash: 434fb73798e0
+
+NPC spikeblock1.gif 45 29
+// NPC made by Tricxta
+if (playerenters){
+  this.ox = 45;//original x
+  this.oy = 29;//original y
+  this.oDir = 2;//Direction in which it moves, 0 up, 1 left, 2 down, 3 right
+
+  //Debug reasons
+  snap();
+
+  this.speed = 1;//speed at which the npc moves
+
+
+  //Don't touch from here on in
+  this.dist = 0;
+  this.chase = 0;//keeps track of the state of the npc
+  timeout=0.05;
+}
+
+if (timeout){
+  if (this.chase == 0){
+    this.chase = 1;
+    this.dir = this.oDir;
+  }
+  else if (this.chase == 1){//try to attack the player
+    if (onwall(x+1+vecx(this.dir)*1.5,y+1+vecy(this.dir)*1.5)){
+      this.chase = -1;
+      this.dir = (this.dir+2)%4;
+      if (this.dist > 0){this.moved = 1;play spikeblockclang.wav;}
+    }
+    else {
+      move();
+      this.dist += this.speed;
+    }
+  }
+  else if (this.chase == -1){//retreat
+    if (this.dist<=0){
+      if (this.moved == 1){play spikeblockclang.wav;this.moved = 0;}
+      this.chase = 0;
+      snap();
+    }
+    else {
+      move();
+      this.dist -= this.speed;
+    }
+  }
+  timeout=0.05;
+}
+
+function move(){
+  x+=vecx(this.dir)*this.speed;
+  y+=vecy(this.dir)*this.speed;
+  hitobjects 1,x+1+vecx(this.dir)*2,y+1+vecy(this.dir)*2;
+}
+
+function snap(){
+  x = this.ox;
+  y = this.oy;
+}
+
+NPCEND
+
+// ===== 05_standalone/tileanimation/tileanimationsv2__000__33_40.npc.txt =====
+// extracted-from: tileanimation/tileanimationsv2.nw
+// npc-index: 0
+// header: NPC - 33 40
+// image: -
+// tile: 33,40
+// recovered-from-binary: false
+// body-hash: 8edc5269907a
+
+NPC - 33 40
+// NPC made by tricxta
+if (playerenters){
+  timereverywhere;
+  setstring this.tileset,pics1.png;//tileset  used to show the animations
+  this.speed=.25;//speed at which the tiles cycle
+  this.sequence={0x64F,0x65F,0x66F,0x64F};//store cycle tiles
+  this.sequencestep={2,2,2};//store sequence lengths
+  this.sequencepos={0,1,2};//store tile positions
+  this.sequences=3;//number of different sequences
+  setarray this.ts,4096;//store all level tile data
+  this.count=0;
+  for (this.i=0;this.i<4096;this.i++){
+    for (this.a=0;this.a<this.sequences;this.a++){//remember to change the count
+      if (tiles[this.i%64,int(this.i/64)]==this.sequence[this.sequencepos[this.a]]){
+        this.ts[this.count]=this.i%64;
+        this.ts[this.count+1]=int(this.i/64);
+        this.ts[this.count+2]=this.sequencepos[this.a];
+        this.ts[this.count+3]=this.sequencestep[this.a];
+        this.count+=4;
+      }
+      if (this.i%(64*32)==0)sleep .05;
+    }
+  }
+  timeout=0.05;
+}
+
+if (timeout){
+  this.step++;
+  for (this.i=0;this.i<this.count;this.i+=4){
+    this.tile=this.sequence[this.ts[this.i+2]+(this.step%this.ts[this.i+3])];
+    showimg 300+(this.ts[this.i+1]*64)+this.ts[this.i],#s(this.tileset),this.ts[this.i],this.ts[this.i+1];
+    changeimgpart 300+(this.ts[this.i+1]*64)+this.ts[this.i],256*int(this.tile/512)+16*(this.tile%16),int((this.tile%512)/16)*16,16,16;
+    changeimgvis 300+(this.ts[this.i+1]*64)+this.ts[this.i],0;
+  }
+  timeout=this.speed;
+}
+
+NPCEND
+
+// ===== 05_standalone/tileanimation/tileanimationsv2__001__49_33.npc.txt =====
+// extracted-from: tileanimation/tileanimationsv2.nw
+// npc-index: 1
+// header: NPC - 49 33
+// image: -
+// tile: 49,33
+// recovered-from-binary: false
+// body-hash: edc3f08e9a26
+
+NPC - 49 33
+// NPC made by tricxta
+if (playerenters){
+  setmap ,bmap_tileanim.txt,x,y;
+}
+
+NPCEND
+
+// ===== 05_standalone/tileanimation/tileanimationsv2__002__17_48.npc.txt =====
+// extracted-from: tileanimation/tileanimationsv2.nw
+// npc-index: 2
+// header: NPC - 17 48
+// image: -
+// tile: 17,48
+// recovered-from-binary: false
+// body-hash: 65bbf01f0070
+
+NPC - 17 48
+if (playerenters){
+  this.test = {0x1ff, 0x3ff, 0x2ac, 0x002, 0x200,0x022, 0x3de, 0x1a4, 0x14a, 0x674};
+  for (this.i = 0; this.i < arraylen(this.test); this.i++){
+    this.tile = this.test[this.i];
+    showimg 300,pics1.png,x,y;
+    changeimgpart 300,256*int(this.tile/512)+16*(this.tile%16),int((this.tile%512)/16)*16,16,16;
+    changeimgvis 300,0;
+    message #v(this.i);
+    sleep 1;
+  }
+}
+
+if (playerchats){
+  this.tile = this.test[strtofloat(#c)];
+  showimg 300,pics1.png,x,y;
+  changeimgpart 300,256*int(this.tile/512)+16*(this.tile%16),int((this.tile%512)/16)*16,16,16;
+  changeimgvis 300,0;
+}
+
+NPCEND
+
+// ===== 05_standalone/tower_defense/level1-arrow-tower__000__0_0.npc.txt =====
+// extracted-from: tower defense/level1-arrow-tower.txt
+// npc-index: 0
+// header: NPC - 0 0
+// image: -
+// tile: 0,0
+// recovered-from-binary: false
+// body-hash: 4fcf4a32f966
+
+NPC - 0 0
+// NPC made by tricxta
+if (playerenters){
+  setstring this.friends,#f,block.png,ttd_level1turret.png,ttd_level2turret.png;
+  setshape 1,32,32;
+  this.radius=10;
+  this.firerate=2;//more like freeze rate
+  this.power=4;
+  timeout=0.1;
+}
+
+if (start){
+  this.set=1;
+  this.start=1;
+  this.pause=0;
+  timeout=0.05;
+}
+
+if (pause){
+  this.pause=1;
+  break;
+}
+
+if (timeout){
+  if (this.pause==0 && this.start==1){
+    if (this.fire==0){
+      for (this.i=1;this.i<npcscount;this.i++){
+        this.dist=(((npcs[this.i].x-x)^2)+((npcs[this.i].y-y)^2))^.5;
+        if (this.dist <=this.radius && !strcontains(#s(this.friends),#f(this.i)) && (npcs[this.i].x in |x-.5,x+.5| || npcs[this.i].y in |y-1,y|)){
+          this.angle=getangle(npcs[this.i].x-x+1,npcs[this.i].y-y+1);
+          setshootparams #v(this.power);
+          getdir();
+          shoot x-.5,y-1,0,this.angle,0,0,ttd-wooden-arrow,;
+          break;
+        }
+      }
+    }
+    this.fire=(this.fire+0.05)%this.firerate;
+  }
+  if ((strtofloat(#s(client.drag))==1 && this.select==1) || this.placed==0){
+    x=int(mousex/2)*2;
+    y=int(mousey/2)*2;
+    draw();
+    if (leftmousebutton){
+      checkonwall();
+      if (this.onwall==0){setstring client.drag,0;this.select=0;this.placed=1;}
+    }
+  }
+  timeout=0.05;
+}
+
+if (drag){
+  if (this.set==0){
+    this.select=1;
+    setstring client.drag,1;
+  }
+  timeout=0.05;
+}
+
+if (getinfo){
+  draw();
+  timeout=0.05;
+}
+
+if (hideinfo){
+  hideimgs 300,303;
+  timeout=0.05;
+}
+
+function draw(){
+  showimg 300,ttd_tower-radius.png,x,y;
+  changeimgmode 300,1;
+  changeimgcolors 300,1,1,1,.5;
+  changeimgzoom 300,-1+this.radius;
+  showtext 301,x+1,y-3,arial,c,Range:#v(this.radius);
+  showtext 302,x+1,y-2,arial,c,Power:#v(this.power);
+  showtext 303,x+1,y-1,arial,c,Fire Rate:#v(this.firerate);
+}
+
+function checkonwall(){
+  this.onwall=0;
+  for (this.wall=0;this.wall<4;this.wall++)this.onwall+=onwall(x+(this.wall%2),y+int(this.wall/2));
+}
+
+function getdir(){
+  this.distx=npcs[this.i].x-x;
+  this.disty=npcs[this.i].y-y;
+  dir=(abs(this.distx)>abs(this.disty))?2+this.distx/abs(this.distx):1+this.disty/abs(this.disty);
+}
+
+NPCEND
+
+// ===== 05_standalone/tower_defense/level1-cannon-tower__000__0_0.npc.txt =====
+// extracted-from: tower defense/level1-cannon-tower.txt
+// npc-index: 0
+// header: NPC - 0 0
+// image: -
+// tile: 0,0
+// recovered-from-binary: false
+// body-hash: f3740940dc13
+
+NPC - 0 0
+// NPC made by tricxta
+if (playerenters){
+  setstring this.friends,#f,block.png,ttd_level1-arrow-turret.png;
+  setshape 1,32,32;
+  this.radius=12;
+  this.firerate=1;
+  this.power=2;
+  timeout=0.1;
+}
+
+if (start){
+  this.set=1;
+  this.start=1;
+  this.pause=0;
+  timeout=0.05;
+}
+
+if (pause){
+  this.pause=1;
+  break;
+}
+
+if (timeout){
+  if (this.pause==0 && this.start==1){
+    if (this.fire==0){
+      for (this.i=1;this.i<npcscount;this.i++){
+        this.dist=(((npcs[this.i].x-x)^2)+((npcs[this.i].y-y)^2))^.5;
+        if (this.dist <=this.radius && !strcontains(#s(this.friends),#f(this.i))){
+          this.angle=getangle(npcs[this.i].x-x+1,npcs[this.i].y-y+1);
+          setshootparams #v(this.power);
+          shoot x-.5,y-1,0,this.angle,0,0,ttd_cannon-ball,;
+          break;
+        }
+      }
+    }
+    this.fire=(this.fire+0.05)%this.firerate;
+  }
+  if ((strtofloat(#s(client.drag))==1 && this.select==1) || this.placed==0){
+    x=int(mousex/2)*2;
+    y=int(mousey/2)*2;
+    draw();
+    if (leftmousebutton){
+      checkonwall();
+      if (this.onwall==0){setstring client.drag,0;this.select=0;this.placed=1;}
+    }
+  }
+  timeout=0.05;
+}
+
+if (drag){
+  this.select=1;
+  setstring client.drag,1;
+  timeout=0.05;
+}
+
+if (getinfo){
+  draw();
+  timeout=0.05;
+}
+
+if (hideinfo){
+  hideimgs 300,303;
+  timeout=0.05;
+}
+
+function draw(){
+  showimg 300,ttd_tower-radius.png,x,y;
+  changeimgmode 300,1;
+  changeimgcolors 300,1,1,1,.5;
+  changeimgzoom 300,-1+this.radius;
+  showtext 301,x+1,y-3,arial,c,Range:#v(this.radius);
+  showtext 302,x+1,y-2,arial,c,Power:#v(this.power);
+  showtext 303,x+1,y-1,arial,c,Fire Rate:#v(this.firerate);
+}
+
+function checkonwall(){
+  this.onwall=0;
+  for (this.wall=0;this.wall<4;this.wall++)this.onwall+=onwall(x+(this.wall%2),y+int(this.wall/2));
+}
+
+NPCEND
+
+// ===== 05_standalone/tower_defense/level1-noob__000__0_0.npc.txt =====
+// extracted-from: tower defense/level1-noob.txt
+// npc-index: 0
+// header: NPC - 0 0
+// image: -
+// tile: 0,0
+// recovered-from-binary: false
+// body-hash: a57631f81a79
+
+NPC - 0 0
+//NPC by tricxta
+if (playerenters){
+  showcharacter;
+  setcharprop #3,head0.png;
+  setcharprop #C0,orange;
+  setcharprop #C1,white;
+  setcharprop #C2,blue;
+  setcharprop #C3,red;
+  setcharprop #C4,black;
+  setcharprop #2,shield1.gif;
+  shieldpower = 1;
+  dir = 0;
+  this.pathtiles={0xAA};
+  x=int(x)+.5;
+  this.loot=3;
+  this.speed=.25;
+  setcharani walk,;
+  this.health=6;
+  timeout=0.05;
+}
+
+if (start){
+  setcharani walk,;
+  this.pause=0;
+  timeout=0.05;
+}
+
+if (pause){
+  setcharani idle,;
+  this.pause=1;
+  break;
+}
+
+if (timeout && this.pause==0){
+  //this.speed+=(mousewheeldelta*.05);
+  if (x>=61)score();
+  checktiles();
+  if (this.check==4){
+    x+=vecx(dir)*this.speed;
+    y+=vecy(dir)*this.speed;
+  }
+  else {
+    this.indir=(dir+2)%4;
+    dir=int(random(0,4));
+    checktiles();
+    while (this.indir==dir || this.check<4){dir=int(random(0,4));checktiles();}
+  }
+  timeout=0.05;
+}
+
+function checktiles(){
+  this.checkx=x+.5+vecx(dir);
+  this.checky=y+1+(vecy(dir)*.5);
+  if (dir==2)this.checky+=.5;
+  if (dir==1)this.checkx+=.5;
+  //showimg 300,block.png,this.checkx,this.checky;
+  this.check=0;
+  for (this.i=0;this.i<4;this.i++)
+    this.check+=tiles[this.checkx+(this.i%2),this.checky+int(this.i/2)] in this.pathtiles;
+}
+
+if (actionprojectile && this.health>0){
+  this.health-=strtofloat(#p(0));
+  if (this.health<=0){
+    setcharani dead,;
+    sleep 1;
+    hide;
+    playerrupees+=this.loot;
+    level.finish--;
+    destroy;
+  }
+  else timeout=0.05;
+}
+
+function score(){
+  level.lives--;
+  level.finish--;
+  destroy;
+}
+
+NPCEND
+
+// ===== 05_standalone/tower_defense/level1-thief__000__0_0.npc.txt =====
+// extracted-from: tower defense/level1-thief.txt
+// npc-index: 0
+// header: NPC - 0 0
+// image: -
+// tile: 0,0
+// recovered-from-binary: false
+// body-hash: 45c395f91474
+
+NPC - 0 0
+//NPC by tricxta
+if (playerenters){
+  showcharacter;
+  setcharprop #3,head72.png;
+  setcharprop #C0,orange;
+  setcharprop #C1,black;
+  setcharprop #C2,gray;
+  setcharprop #C3,gray;
+  setcharprop #C4,black;
+  setcharprop #2,shield1.gif;
+  shieldpower = 1;
+  dir = 0;
+  this.pathtiles={0xAA};
+  x=int(x)+.5;
+  this.speed=.5;
+  setcharani walk,;
+  this.loot=5;
+  this.health=3;
+  timeout=0.05;
+}
+
+if (start){
+  setcharani walk,;
+  this.pause=0;
+  timeout=0.05;
+}
+
+if (pause){
+  setcharani idle,;
+  this.pause=1;
+  break;
+}
+
+if (timeout && this.pause==0){
+  //this.speed+=(mousewheeldelta*.05);
+  if (x>=61)score();
+  checktiles();
+  if (this.check==4){
+    x+=vecx(dir)*this.speed;
+    y+=vecy(dir)*this.speed;
+  }
+  else {
+    this.indir=(dir+2)%4;
+    dir=int(random(0,4));
+    checktiles();
+    while (this.indir==dir || this.check<4){dir=int(random(0,4));checktiles();}
+  }
+  timeout=0.05;
+}
+
+function checktiles(){
+  this.checkx=x+.5+vecx(dir);
+  this.checky=y+1+(vecy(dir)*.5);
+  if (dir==2)this.checky+=.5;
+  if (dir==1)this.checkx+=.5;
+  //showimg 300,block.png,this.checkx,this.checky;
+  this.check=0;
+  for (this.i=0;this.i<4;this.i++)
+    this.check+=tiles[this.checkx+(this.i%2),this.checky+int(this.i/2)] in this.pathtiles;
+}
+
+if (actionprojectile && this.health>0){
+  this.health-=strtofloat(#p(0));
+  if (this.health<=0){
+    setcharani dead,;
+    sleep 1;
+    hide;
+    level.finish--;
+    playerrupees+=this.loot;
+    destroy;
+  }
+  else timeout=0.05;
+}
+
+function score(){
+  level.lives--;
+  level.finish--;
+  destroy;
+}
+
+NPCEND
+
+// ===== 05_standalone/tower_defense/level2-cannon-tower__000__0_0.npc.txt =====
+// extracted-from: tower defense/level2-cannon-tower.txt
+// npc-index: 0
+// header: NPC - 0 0
+// image: -
+// tile: 0,0
+// recovered-from-binary: false
+// body-hash: a6e2a1a60092
+
+NPC - 0 0
+// NPC made by tricxta
+if (playerenters){
+  setstring this.friends,#f,block.png,ttd_level1-arrow-turret.png;
+  setshape 1,32,32;
+  this.radius=12;
+  this.firerate=1.3;
+  this.power=3;
+  timeout=0.1;
+}
+
+if (start){
+  this.set=1;
+  this.start=1;
+  this.pause=0;
+  timeout=0.05;
+}
+
+if (pause){
+  this.pause=1;
+  break;
+}
+
+if (timeout){
+  if (this.pause==0 && this.start==1){
+    if (this.fire==0){
+      for (this.i=1;this.i<npcscount;this.i++){
+        this.dist=(((npcs[this.i].x-x)^2)+((npcs[this.i].y-y)^2))^.5;
+        if (this.dist <=this.radius && !strcontains(#s(this.friends),#f(this.i))){
+          this.angle=getangle(npcs[this.i].x-x+1,npcs[this.i].y-y+1);
+          setshootparams #v(this.power);
+          shoot x-.5+(cos(this.angle)*2),y-1+(sin(this.angle)*2),0,this.angle,0,0,ttd_cannon-ball,;
+          break;
+        }
+      }
+    }
+    this.fire=(this.fire+0.05)%this.firerate;
+  }
+  if ((strtofloat(#s(client.drag))==1 && this.select==1) || this.placed==0){
+    x=int(mousex/2)*2;
+    y=int(mousey/2)*2;
+    draw();
+    if (leftmousebutton){
+      checkonwall();
+      if (this.onwall==0){setstring client.drag,0;this.select=0;this.placed=1;}
+    }
+  }
+  timeout=0.05;
+}
+
+if (drag){
+  this.select=1;
+  setstring client.drag,1;
+  timeout=0.05;
+}
+
+if (getinfo){
+  draw();
+  timeout=0.05;
+}
+
+if (hideinfo){
+  hideimgs 300,303;
+  timeout=0.05;
+}
+
+function draw(){
+  showimg 300,ttd_tower-radius.png,x,y;
+  changeimgmode 300,1;
+  changeimgcolors 300,1,1,1,.5;
+  changeimgzoom 300,-1+this.radius;
+  showtext 301,x+1,y-3,arial,c,Range:#v(this.radius);
+  showtext 302,x+1,y-2,arial,c,Power:#v(this.power);
+  showtext 303,x+1,y-1,arial,c,Fire Rate:#v(this.firerate);
+}
+
+function checkonwall(){
+  this.onwall=0;
+  for (this.wall=0;this.wall<4;this.wall++)this.onwall+=onwall(x+(this.wall%2),y+int(this.wall/2));
+}
+
+NPCEND
+
+// ===== 05_standalone/tower_defense/random-path__000__38_34.npc.txt =====
+// extracted-from: tower defense/random-path.nw
+// npc-index: 0
+// header: NPC - 38 34
+// image: -
+// tile: 38,34
+// recovered-from-binary: false
+// body-hash: 3dcb6fb7b427
+
+NPC - 38 34
+// NPC made by tricxta
+if (playerenters){
+  this.stage=1;
+  this.corners=1;
+  this.pcorners=0;
+  this.maxstraight=16;//excludes end straight
+
+  this.pathtiles={0xAA};
+  this.startx=int(random(10,20))*2;//no odds allowed
+  this.starty=62;
+  this.endx=62;
+  this.endy=int(random(5,15))*2;
+
+  this.checkx=this.startx;
+  this.checky=this.starty;
+  this.dir=0;
+
+  while (this.pcorners<this.corners){
+    this.straight=0;
+    this.fcx=this.checkx+(vecx(this.dir)*2);
+    this.fcy=this.checky+(vecy(this.dir)*2);
+    while (this.straight<this.maxstraight && this.fcx in |0,62| && this.fcy in |0,62| && !tiles[this.fcx,this.fcy]==0xAA){
+      Place();
+      this.checkx+=vecx(this.dir)*2;
+      this.checky+=vecy(this.dir)*2;
+      this.straight+=2;
+    }
+    if (this.straight>0)this.pcorners++;
+    this.dir+=((random(0,100)>50)?1:3)%4;
+    message #v(this.pcorners);
+    sleep .1;
+  }
+  this.dir=(this.endy<this.checky)?0:2;
+  while (this.checky != this.endy){
+    this.checky+=vecy(this.dir)*2;
+    Place();
+  }
+  this.dir=(this.endx<this.checkx)?1:3;
+  while (this.checkx!= this.endx){
+    this.checkx+=vecx(this.dir)*2;
+    Place();
+  }
+}
+
+function Place(){
+  for (this.i=0;this.i<4;this.i++)
+    tiles[this.checkx+(this.i%2),this.checky+int(this.i/2)]=this.pathtiles[0];
+  updateboard this.checkx,this.checky,2,2;
+}
+
+NPCEND
+
+// ===== 05_standalone/tower_defense/random-path__001__20_46.npc.txt =====
+// extracted-from: tower defense/random-path.nw
+// npc-index: 1
+// header: NPC - 20 46
+// image: -
+// tile: 20,46
+// recovered-from-binary: false
+// body-hash: 5759c42e1f50
+
+NPC - 20 46
+// NPC made by tricxta
+message place obstacles randomly and use 'A star' to find path;
+
+NPCEND
+
+// ===== 05_standalone/tower_defense/tower-defense__000__47_55.npc.txt =====
+// extracted-from: tower defense/tower-defense.nw
+// npc-index: 0
+// header: NPC block.png 47 55
+// image: block.png
+// tile: 47,55
+// recovered-from-binary: false
+// body-hash: b5fffdeb307c
+
+NPC block.png 47 55
+// NPC made by tricxta
+if (playerenters){
+  hide;
+  level.lives=5;
+}
+
+if (start){
+  timeout=0.05;
+}
+
+if (timeout){
+  message #v(level.lives);
+  if (level.finish<=0 || level.lives<=0){
+    if (level.finish<=0)clear();
+    else gameover();
+    break;
+  }
+  timeout=0.05;
+}
+
+function clear(){
+  showpoly 300,{0,0,screenwidth,0,screenwidth,screenheight,0,screenheight};
+  changeimgcolors 300,0,0,0,;
+  showtext 301,screenwidth/2,screenheight/2,arial,c,Stage Cleared!;
+  for (this.i=0;this.i<2;this.i++){
+    changeimgvis 300+this.i,(this.i==0)?4:5;
+    changeimgzoom 300+this.i,(this.i==0)?1:2;
+  }
+}
+
+function gameover(){
+  for (this.i=0;this.i<npcscount;this.i++)callnpc this.i,pause,;
+  showpoly 300,{0,0,screenwidth,0,screenwidth,screenheight,0,screenheight};
+  changeimgcolors 300,0,0,0,;
+  showtext 301,screenwidth/2,screenheight/2,arial,c,Game over;
+  for (this.i=0;this.i<2;this.i++){
+    changeimgvis 300+this.i,(this.i==0)?4:5;
+    changeimgzoom 300+this.i,(this.i==0)?1:2;
+  }
+}
+
+NPCEND
+
+// ===== 05_standalone/tower_defense/tower-defense__001__47_58.npc.txt =====
+// extracted-from: tower defense/tower-defense.nw
+// npc-index: 1
+// header: NPC block.png 47 58
+// image: block.png
+// tile: 47,58
+// recovered-from-binary: false
+// body-hash: 34850dd3cc98
+
+NPC block.png 47 58
+// NPC made by tricxta
+if (playerenters){
+  hide;
+  this.placex=13;
+  this.placey=61;
+  setstring this.mob,level1-thief,level1-noob;
+  this.spawnrate=2;
+  this.limit=35;
+  this.spawned=0;
+  level.finish=this.limit;
+}
+
+if (start){
+  this.pause=0;
+  timeout=0.05;
+}
+
+if (pause){
+  this.pause=1;
+  break;
+}
+
+if (timeout && this.spawned<this.limit && this.pause==0){
+  this.spawned++;
+  tokenize #s(this.mob);
+  putnpc ,#t(int(random(0,tokenscount))).txt,this.placex,this.placey;
+  timeout=this.spawnrate;
+}
+
+NPCEND
+
+// ===== 05_standalone/tower_defense/tower-defense__002__47_52.npc.txt =====
+// extracted-from: tower defense/tower-defense.nw
+// npc-index: 2
+// header: NPC block.png 47 52
+// image: block.png
+// tile: 47,52
+// recovered-from-binary: false
+// body-hash: 86b0a296f033
+
+NPC block.png 47 52
+// NPC made by tricxta
+if (playerenters){
+  setstring client.drag,0;
+  playerrupees=100;
+  hide;
+  showimg 300,ttd_start.png,screenwidth-80,screenheight-32;
+  changeimgvis 300,4;
+  showimg 301,ttd_add.png,screenwidth-32,0;
+  changeimgvis 301,4;
+  this.pause=1;
+  showstats;
+  this.focusx=30;
+  this.focusy=30;
+  disabledefmovement;
+  setstring this.towerimages,ttd_level1turret.png,ttd_level2turret.png,ttd_level1-arrow-turret.png;
+  setstring this.towerscript,level1-cannon-tower,level2-cannon-tower,level1-arrow-tower;
+  setstring this.towernames,"level 1 cannon", "level 2 cannon", "level 1 arrow";
+  this.prices={50,70,30};
+  timeout=0.05;
+}
+
+if (timeout){
+  showtext 298,10,10,arial,l,Coins:#v(playerrupees)   Lives:#v(level.lives);
+  changeimgvis 298,4;
+  for (this.i=0;this.i<4;this.i++){
+    if (keydown(this.i)){
+      this.focusx+=vecx(this.i)*.5;
+      this.focusy+=vecy(this.i)*.5;
+    }
+  }
+  setfocus this.focusx,this.focusy;
+  timeout=0.05;
+}
+
+if (mousedown){
+  this.npc=testnpc(int(mousex),int(mousey));
+  if (this.npc>=0){
+    if (strtofloat(#s(client.drag))==0 && strequals(#p(0),right))callnpc this.npc,drag,;
+    else for (this.i=0;this.i<npcscount;this.i++){
+      if (this.i==this.npc)callnpc this.i,getinfo,;
+      else callnpc this.i,hideinfo,;
+    }
+  }
+  else for (this.i=0;this.i<npcscount;this.i++)callnpc this.i,hideinfo,;
+
+  if (mousescreenx in |screenwidth-80,screenwidth| && mousescreeny in |screenheight-32,screenheight|)toggle();
+  else if (mousescreenx in |screenwidth-32,screenwidth| && mousescreeny in |0,32| && this.towertoggle==0){
+    this.pause=0;
+    toggle();
+    this.towertoggle=1;
+    tokenize #s(this.towernames);
+    this.towercount=tokenscount;
+    for (this.i=0;this.i<tokenscount;this.i++){
+      showimg 302+this.i,ttd_menu-tab.png,screenwidth-120,40+(this.i*32);
+      changeimgvis 302+this.i,4;
+      showtext 302+tokenscount+this.i,screenwidth-5,50+(this.i*32),arial,r,#t(this.i),Price:#v(this.prices[this.i]);
+      changeimgvis 302+tokenscount+this.i,5;
+      changeimgzoom 302+tokenscount+this.i,.45;
+      showimg 302+tokenscount*2+this.i,#I(this.towerimages,this.i),screenwidth-120,40+(this.i*32);
+      changeimgvis 302+tokenscount*2+this.i,5;
+    }
+  }
+  else if (this.towertoggle==1 && mousescreenx in |screenwidth-120,screenwidth| && mousescreeny in |40,72+(this.towercount*32)|){
+    for (this.i=0;this.i<this.towercount;this.i++){
+      if (mousescreeny in |40+(this.i*32),72+(this.i*32)| && playerrupees>=this.prices[this.i]){
+        this.towerselect=this.i;
+        playerrupees-=this.prices[this.i];
+        putnpc #I(this.towerimages,this.towerselect),#I(this.towerscript,this.towerselect).txt,mousex,mousey;
+      }
+    }
+  }
+  else {hideimgs 302,305+(this.towercount*2);this.towertoggle=0;}
+  timeout=0.05;
+}
+
+function toggle(){
+  this.pause=(this.pause+1)%2;
+  if (this.pause==0){
+    showimg 300,ttd_pause.png,screenwidth-80,screenheight-32;
+    changeimgvis 300,4;
+    setstring this.command,start;
+  }
+  else {
+    showimg 300,ttd_start.png,screenwidth-80,screenheight-32;
+    changeimgvis 300,4;
+    setstring this.command,pause;
+  }
+  for (this.i=1;this.i<npcscount;this.i++)callnpc this.i,#s(this.command),;
+}
+
+NPCEND
+
+// ===== 05_standalone/tower_defense/tower-defense__003__12_52.npc.txt =====
+// extracted-from: tower defense/tower-defense.nw
+// npc-index: 3
+// header: NPC - 12 52
+// image: -
+// tile: 12,52
+// recovered-from-binary: false
+// body-hash: 138fd4b0cfc2
+
+NPC - 12 52
+if (playerenters){
+  // Initialize the attributes
+  showcharacter;
+  setcharprop #3,head0.png;
+  setcharprop #C0,orange;
+  setcharprop #C1,white;
+  setcharprop #C2,blue;
+  setcharprop #C3,red;
+  setcharprop #C4,black;
+  setcharprop #2,shield1.gif;
+  shieldpower = 1;
+  dir = 2;
+  setcharani sit,;
+  x = int(x)+0.5;
+
+  setstring this.phrases,"You suck","You're aweful", "bite me", "Mish is very beautiful";
+
+  timeout = 0.05;
+}
+
+if (timeout){
+  if (random(0,100) > 80)
+    message #R(#s(this.phrases));
+  else
+    message ;
+
+  timeout = random(2,6);
+}
+
+NPCEND
+
+// ===== 05_standalone/trumpet/trumpet__000__23_31.npc.txt =====
+// extracted-from: trumpet/trumpet.nw
+// npc-index: 0
+// header: NPC trumpeticon.png 23 31
+// image: trumpeticon.png
+// tile: 23,31
+// recovered-from-binary: false
+// body-hash: c509e25fd8aa
+
+NPC trumpeticon.png 23 31
+// NPC made by tricxta
+if (playerenters){
+  if (!isweapon)toweapons trumpet;
+  this.trumpet={1,4,-1,3,3,2,-1,-1,5};//-1 note doesnt exist
+}
+
+if (weaponfired){
+  this.play=(this.play+1)%2;
+  if (this.play==1){
+    setplayerprop #P2,trumpet0.png;
+    setani playtrump,;
+  }
+  else {
+    setani idle,;
+    enabledefmovement;
+  }
+}
+
+if (keypressed && this.play==1){
+  if (strtofloat(#p(0))==32){
+    this.note=0;
+    if (keydown2(65,true))this.note+=8;
+    if (keydown2(70,true))this.note+=1;
+    if (keydown2(71,true))this.note+=2;
+    if (keydown2(72,true))this.note+=4;
+    setani playtrump2,;
+    play trumpet#v(this.trumpet[this.note]).wav;
+    sleep .5;
+    setani playtrump,;
+  }
+}
+
+NPCEND
+
+// ===== 05_standalone/trumpet/trumpet__001__33_30.npc.txt =====
+// extracted-from: trumpet/trumpet.nw
+// npc-index: 1
+// header: NPC - 33 30
+// image: -
+// tile: 33,30
+// recovered-from-binary: false
+// body-hash: ddad261f5d1d
+
+NPC - 33 30
+// NPC made by tricxta
+if (keypressed)message #p(0);
+
+NPCEND
+
+// ===== 05_standalone/zeldaWarpEffect/imagewarpeffect__000__0_0.npc.txt =====
+// extracted-from: zeldaWarpEffect/imagewarpeffect.nw
+// npc-index: 0
+// header: NPC effecttest.gif 0 0
+// image: effecttest.gif
+// tile: 0,0
+// recovered-from-binary: false
+// body-hash: 8d4c0c41ef90
+
+NPC effecttest.gif 0 0
+// NPC made by tricxta
+if (playerenters){
+  timereverywhere;
+  this.waveSpeed = 0.7;
+  this.waves = 0.1;
+  showimg 300,#f,x,y;
+  this.iHeight = height*16;
+  this.iWidth = width*16;
+  hide;
+  hideimg 300;
+}
+
+if ((playerchats && strequals(#c,/warp)) ||timeout){
+  this.wave+=this.waveSpeed;
+  this.waves += this.waveSpeed/4;
+
+  for (this.i = 0;this.i<this.iHeight;this.i++){
+    showimg 300+this.i,#f,x+cos(this.i/this.iHeight*this.waves + this.wave),y+this.i/16;
+    changeimgpart 300+this.i,0,this.i,this.iWidth,1;
+    changeimgvis 300+this.i,0;
+  }
+
+  timeout = 0.05;
+}
+
+NPCEND
