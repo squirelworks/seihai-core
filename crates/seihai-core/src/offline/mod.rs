@@ -290,6 +290,13 @@ pub struct OfflineSession {
     /// Set when a script or chat line changed `looks`, so the game loop
     /// can tell the server; cleared by the loop.
     pub looks_changed: bool,
+    /// Chat text a script set outside a typed line (`setplayerprop #c,...`
+    /// or `player.chat = ...` from a timeout, `created` and so on), for the
+    /// server: online it goes out as CURCHAT the way typed chat does, so
+    /// the other players see it. A typed line's rewrite is not here: it is
+    /// [`crate::scripting::engine::host::SessionScripts::chat`]'s answer.
+    /// Taken by the game loop.
+    pub chat_out: Option<String>,
     /// Player flags a script set (`Some(value)`, empty for a plain `set`) or
     /// cleared (`None`) whose value changed, for the server: online they go
     /// out as `PLI_FLAGSET` (18) and `PLI_FLAGDEL` (19). Taken by the game
@@ -561,6 +568,7 @@ impl OfflineSession {
             shield_power: 1,
             looks: crate::looks::Looks::default(),
             looks_changed: false,
+            chat_out: None,
             flags_out: Vec::new(),
             // 2.05 starts every player at glove 1 (enough for a pot), as
             // GServer's default account does (`GLOVEP 1`).
@@ -1587,6 +1595,9 @@ impl OfflineSession {
                     if let (crate::scripting::Value::Str(name), crate::scripting::Value::Str(val)) =
                         (&args[0], &args[1])
                     {
+                        if name.trim() == "#c" {
+                            self.chat_out = Some(val.clone());
+                        }
                         self.props.insert(name.clone(), val.clone());
                     }
                 }

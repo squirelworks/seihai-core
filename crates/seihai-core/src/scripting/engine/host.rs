@@ -243,6 +243,8 @@ impl SessionScripts {
         self.sync_player(session);
         self.world.chat(text);
         self.apply(session);
+        // The answer goes out as the typed line, not a second time.
+        session.chat_out = None;
         session.props.remove("#c").unwrap_or_else(|| text.to_string())
     }
 
@@ -482,6 +484,9 @@ impl SessionScripts {
                         _ => false,
                     };
                     s.looks_changed |= changed;
+                    if code.trim() == "#c" {
+                        s.chat_out = Some(value.clone());
+                    }
                     s.props.insert(code, value);
                 }
                 // `noplayerkilling`: other players' hits do nothing in this level.
@@ -1085,6 +1090,45 @@ mod tests {
         assert_eq!(sc.chat(&mut s, "hello there"), "hello there");
         // And the answer is not kept for the next line.
         assert!(!s.props.contains_key("#c"));
+    }
+
+    /// The lab probe in minipw_2_1.nw: a timeout sets the player's chat to
+    /// the position every second. A real client sends that as CURCHAT, so
+    /// the session hands it to the game loop to send.
+    const CHAT_PROBE: &str = "GLEVNW01\n\
+        NPC - 10 50\n\
+        //#CLIENTSIDE\n\
+        if (created || timeout) { setplayerprop #c,px #v(playerx) py #v(playery); timeout = 1; }\n\
+        NPCEND\n";
+
+    #[test]
+    fn a_chat_a_script_sets_goes_out_for_the_server() {
+        let mut s = session(CHAT_PROBE);
+        s.player_x = 30.0;
+        s.player_y = 31.0;
+        let mut sc = SessionScripts::new(ClientVersion::V205);
+        sc.load_level(&mut s, "minipw_2_1.nw");
+        assert_eq!(s.chat_out.take().as_deref(), Some("px 30 py 31"));
+        s.player_x = 32.0;
+        for _ in 0..20 {
+            sc.tick(&mut s, 50);
+        }
+        assert_eq!(s.chat_out.take().as_deref(), Some("px 32 py 31"));
+        // `player.chat = ...` (2.1 on) is the same prop.
+        let mut s = session("GLEVNW01\nNPC - 1 1\n//#CLIENTSIDE\nif (created) { player.chat = \"hello\"; }\nNPCEND\n");
+        let mut sc = SessionScripts::new(ClientVersion::V222);
+        sc.load_level(&mut s, "a.nw");
+        assert_eq!(s.chat_out.as_deref(), Some("hello"));
+    }
+
+    #[test]
+    fn a_typed_line_rewrite_is_not_sent_twice() {
+        let mut s = session(UNSTICK_JAIL);
+        let mut sc = SessionScripts::new(ClientVersion::V222);
+        sc.load_level(&mut s, "jail.nw");
+        assert_eq!(sc.chat(&mut s, "unstick me"), "Cant use unstick me here!");
+        // The typed path sends the answer itself.
+        assert_eq!(s.chat_out, None);
     }
 
     #[test]
