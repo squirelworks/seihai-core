@@ -300,11 +300,11 @@ fn load(r: &AssetResolver, kind: NeedKind, p: &Path) -> Result<String, String> {
     match kind {
         NeedKind::Image | NeedKind::ImageIn(_) => {
             let data = fs::read(p).map_err(|e| e.to_string())?;
-            if ext == "png" {
+            if ext == "png" || ext == "gif" {
                 let (w, h, _) = read_png_rgba(&data).map_err(|e| e.to_string())?;
-                Ok(format!("png {w}x{h}"))
+                Ok(format!("{ext} {w}x{h}"))
             } else {
-                // GIF and MNG have no decoder here.
+                // MNG has no decoder here.
                 Ok(format!("{ext}, {} bytes, not decoded", data.len()))
             }
         }
@@ -477,6 +477,21 @@ mod tests {
         let rep = check_folder(&AssetRoot::new(&d), p(ClientVersion::V222));
         let f = rep.findings.iter().find(|f| f.need.name == "new1.nw").unwrap();
         assert!(matches!(f.status, Status::BadFile(_)), "{:?}", f.status);
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    /// A GIF build's player art is decoded and its size reported, and a
+    /// broken GIF is a bad file, not a pass.
+    #[test]
+    fn gif_player_art_is_decoded() {
+        let d = synthetic("gif");
+        let body = fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/default/bodies/body.gif")).unwrap();
+        fs::write(d.join("levels/bodies/body.gif"), &body).unwrap();
+        fs::write(d.join("levels/heads/head0.gif"), b"GIF89a broken").unwrap();
+        let rep = check_folder(&AssetRoot::new(&d), p(ClientVersion::V205));
+        let get = |n: &str| rep.findings.iter().find(|f| f.need.name.starts_with(n)).unwrap();
+        assert_eq!(get("body").status, Status::Ok("gif 128x720".into()));
+        assert!(matches!(get("head0").status, Status::BadFile(_)), "{:?}", get("head0").status);
         let _ = fs::remove_dir_all(&d);
     }
 
