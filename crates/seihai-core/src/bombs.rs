@@ -23,9 +23,21 @@
 //!   piece's `(x + 1, y + 1)` on both axes loses half a heart (a whole
 //!   heart for power 3), knocked along the piece's arm.
 //!
+//! * Other players' bombs and explosions come as `PLO_BOMBADD` (11) and
+//!   `PLO_EXPLOSION` (36) after the sender's id ([`parse_bomb_add`],
+//!   [`parse_explosion`]). The bomb goes through `putbomb` without a send
+//!   and burns the fuse it carries; the explosion is one cross of its reach
+//!   (at most 15) and type, power `& 7` read as 1 to 3. With bit 8 set the
+//!   sender owns the bomb or explosion, and so every piece of it.
+//! * An owned piece counts as a player's only while the owner is still in
+//!   the player list ([`player_owner`]). A player's piece does not hurt on
+//!   a level that said `noplayerkilling`, and when its hit leaves 0 hearts
+//!   the owner is the killer. A piece of nobody's, or of a player who left,
+//!   always hurts.
+//!
 //! Not done yet: pieces blowing up bushes and other breakable tiles,
-//! chaining into other bombs, the `exploded` NPC event, other players'
-//! bombs (`PLO_BOMBADD`), and hitting baddies.
+//! chaining into other bombs, the `exploded` NPC event, and hitting
+//! baddies.
 
 /// Ticks a scripted `putbomb` burns.
 pub const FUSE_TICKS: i32 = 60;
@@ -94,12 +106,14 @@ pub struct Bomb {
     /// Ticks left on the fuse.
     pub fuse: i32,
     pub sprite: u16,
+    /// The player who owns it (a received bomb with bit 8).
+    pub owner: Option<u16>,
 }
 
 impl Bomb {
     pub fn new(x: f32, y: f32, power: u8, fuse: i32) -> Bomb {
         let sprite = pair(power).map_or(DEFAULT_SPRITE, |p| p[0]);
-        Bomb { x, y, power, fuse, sprite }
+        Bomb { x, y, power, fuse, sprite, owner: None }
     }
 
     /// One tick of the fuse. Returns true when the bomb goes off.
@@ -115,11 +129,7 @@ impl Bomb {
 
     /// The sound of the bang.
     pub fn sound(&self) -> &'static str {
-        if self.power == 3 {
-            "thunder.wav"
-        } else {
-            "bomb.wav"
-        }
+        sound(self.power)
     }
 
     /// The pieces the bang leaves.
@@ -133,8 +143,88 @@ impl Bomb {
         } else {
             cross(&mut out, self.x, self.y, 2, self.power);
         }
+        for p in &mut out {
+            p.owner = self.owner;
+        }
         out
     }
+}
+
+/// The bang of power `power`: `thunder.wav` for 3, else `bomb.wav`.
+pub fn sound(power: u8) -> &'static str {
+    if power == 3 {
+        "thunder.wav"
+    } else {
+        "bomb.wav"
+    }
+}
+
+/// One cross of `radius` (at most 15) and type `power` at `(x, y)`, every
+/// piece owned by `owner`: `putexplosion` and `PLO_EXPLOSION`.
+pub fn explosion_pieces(radius: i32, x: f32, y: f32, power: u8, owner: Option<u16>) -> Vec<Piece> {
+    let mut out = Vec::new();
+    cross(&mut out, x, y, radius, power);
+    for p in &mut out {
+        p.owner = owner;
+    }
+    out
+}
+
+/// The owner a hit names: the piece's owner while that player is still in
+/// the player list (`present`), else nobody.
+pub fn player_owner(owner: Option<u16>, present: impl Fn(u16) -> bool) -> Option<u16> {
+    owner.filter(|&id| present(id))
+}
+
+/// `PLO_BOMBADD` (11) after the sender's id.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BombAdd {
+    pub x: f32,
+    pub y: f32,
+    pub power: u8,
+    pub fuse: i32,
+    /// Bit 8 of the power byte: the bomb is the sender's.
+    pub owned: bool,
+}
+
+/// `x*2`, `y*2`, power (`& 7`, bit 8 owned), fuse in ticks; 4 bytes or more.
+pub fn parse_bomb_add(b: &[u8]) -> Option<BombAdd> {
+    if b.len() < 4 {
+        return None;
+    }
+    let v = |i: usize| b[i].wrapping_sub(0x20);
+    Some(BombAdd { x: f32::from(v(0)) / 2.0, y: f32::from(v(1)) / 2.0, power: v(2) & 7, fuse: i32::from(v(3)), owned: v(2) & 8 != 0 })
+}
+
+/// `PLO_BOMBDEL` (12), no player id: `x*2`, `y*2`.
+pub fn parse_bomb_del(b: &[u8]) -> Option<(f32, f32)> {
+    if b.len() < 2 {
+        return None;
+    }
+    Some((f32::from(b[0].wrapping_sub(0x20)) / 2.0, f32::from(b[1].wrapping_sub(0x20)) / 2.0))
+}
+
+/// `PLO_EXPLOSION` (36) after the sender's id.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Explosion {
+    pub radius: i32,
+    pub x: f32,
+    pub y: f32,
+    /// 1 to 3.
+    pub power: u8,
+    /// Bit 8 of the power byte: the explosion is the sender's.
+    pub owned: bool,
+}
+
+/// Reach, `x*2`, `y*2`, power (`& 7`, 0 read as 1 and above 3 as 3, bit 8
+/// owned); 4 bytes or more.
+pub fn parse_explosion(b: &[u8]) -> Option<Explosion> {
+    if b.len() < 4 {
+        return None;
+    }
+    let v = |i: usize| b[i].wrapping_sub(0x20);
+    let power = (v(3) & 7).clamp(1, 3);
+    Some(Explosion { radius: i32::from(v(0)), x: f32::from(v(1)) / 2.0, y: f32::from(v(2)) / 2.0, power, owned: v(3) & 8 != 0 })
 }
 
 fn pair(power: u8) -> Option<[u16; 2]> {
@@ -162,11 +252,13 @@ pub struct Piece {
     pub power: u8,
     pub life: i32,
     pub sprite: u16,
+    /// The player who owns it (see [`player_owner`]).
+    pub owner: Option<u16>,
 }
 
 impl Piece {
     pub fn new(kind: usize, x: f32, y: f32, power: u8) -> Piece {
-        Piece { kind, x, y, power, life: PIECE_TICKS, sprite: PIECE_SPRITES[kind][0] }
+        Piece { kind, x, y, power, life: PIECE_TICKS, sprite: PIECE_SPRITES[kind][0], owner: None }
     }
 
     /// Whether the player at `(px, py)` stands in this piece.
@@ -267,5 +359,48 @@ mod tests {
         assert!(builtin_script(8).unwrap().contains("putbomb 1,"));
         assert!(builtin_script(23).unwrap().contains("putbomb 3,"));
         assert!(builtin_script(7).is_none());
+    }
+
+    #[test]
+    fn a_received_bomb_reads_power_owner_and_fuse() {
+        // the lab bomb as the server relays it: `6e 3c 29 57` after the id
+        let b = parse_bomb_add(&[0x6e, 0x3c, 0x29, 0x57]).unwrap();
+        assert_eq!(b, BombAdd { x: 39.0, y: 14.0, power: 1, fuse: 55, owned: true });
+        assert!(!parse_bomb_add(&[0x6e, 0x3c, 0x21, 0x57]).unwrap().owned);
+        assert_eq!(parse_bomb_add(&[0x6e, 0x3c, 0x29]), None);
+        assert_eq!(parse_bomb_del(&[0x6e, 0x3c]), Some((39.0, 14.0)));
+    }
+
+    #[test]
+    fn an_explosions_power_is_1_to_3_and_bit_8_is_the_owner() {
+        let e = |p: u8| parse_explosion(&[0x22, 0x40, 0x40, 0x20 + p]).unwrap();
+        assert_eq!((e(0).power, e(1).power, e(3).power, e(5).power, e(7).power), (1, 1, 3, 3, 3));
+        assert_eq!((e(2).radius, e(2).x, e(2).y, e(2).owned), (2, 16.0, 16.0, false));
+        assert!(e(8 + 2).owned);
+        assert_eq!(e(8 + 2).power, 2);
+        assert_eq!(parse_explosion(&[0x22, 0x40, 0x40]), None);
+    }
+
+    #[test]
+    fn an_explosion_is_one_cross_even_for_power_2() {
+        let p = explosion_pieces(2, 10.0, 10.0, 2, Some(7));
+        assert_eq!(p.len(), 9);
+        assert!(p.iter().all(|p| p.owner == Some(7) && p.power == 2));
+        assert_eq!(explosion_pieces(40, 10.0, 10.0, 1, None).len(), 1 + 4 * 15);
+    }
+
+    #[test]
+    fn a_bombs_pieces_carry_its_owner() {
+        let mut b = Bomb::new(10.0, 10.0, 2, 0);
+        b.owner = Some(3);
+        assert!(b.pieces().iter().all(|p| p.owner == Some(3)));
+        assert!(Bomb::new(10.0, 10.0, 1, 0).pieces().iter().all(|p| p.owner.is_none()));
+    }
+
+    #[test]
+    fn an_owner_who_left_counts_as_nobody() {
+        assert_eq!(player_owner(Some(3), |id| id == 3), Some(3));
+        assert_eq!(player_owner(Some(3), |_| false), None);
+        assert_eq!(player_owner(None, |_| true), None);
     }
 }

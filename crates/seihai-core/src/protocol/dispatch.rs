@@ -356,6 +356,17 @@ pub struct ChatLine {
     pub born_ms: u64,
 }
 
+/// A bomb, explosion or shot another player put in the level. `sender` is
+/// the player id in front of it (none for `PLO_BOMBDEL`); the coordinates
+/// are the sender's level's.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LevelObject {
+    Bomb { sender: u16, bomb: crate::bombs::BombAdd },
+    BombDel { x: f32, y: f32 },
+    Explosion { sender: u16, explosion: crate::bombs::Explosion },
+    Arrow { sender: u16, arrow: crate::arrows::ArrowAdd },
+}
+
 /// Lines kept in the chat history.
 pub const CHAT_HISTORY: usize = 200;
 
@@ -451,6 +462,9 @@ pub struct SessionState {
     /// they were when the message came (with their carried sprite), drained
     /// by the game loop. Their carry is cleared on receipt.
     pub throws: Vec<OtherPlayer>,
+    /// Other players' bombs, explosions and shots (ids 11, 12, 36 and 19),
+    /// in the order they came, drained by the game loop.
+    pub level_objects: Vec<LevelObject>,
     /// Messages dropped because this version has no handler for them.
     pub ignored: HashMap<u8, usize>,
     /// Text of `PLO_DISCMESSAGE` (16). The server closes after it.
@@ -920,6 +934,30 @@ impl SessionState {
                         self.throws.push(o.clone());
                         o.carry = None;
                     }
+                }
+            }
+            11 => {
+                // PLO_BOMBADD: GSHORT player, then the bomb.
+                if let (Some(sender), Some(bomb)) = (read_gshort(&msg.payload), msg.payload.get(2..).and_then(crate::bombs::parse_bomb_add)) {
+                    self.level_objects.push(LevelObject::Bomb { sender, bomb });
+                }
+            }
+            12 => {
+                // PLO_BOMBDEL: x*2, y*2, no player id.
+                if let Some((x, y)) = crate::bombs::parse_bomb_del(&msg.payload) {
+                    self.level_objects.push(LevelObject::BombDel { x, y });
+                }
+            }
+            36 => {
+                // PLO_EXPLOSION: GSHORT player, then the explosion.
+                if let (Some(sender), Some(explosion)) = (read_gshort(&msg.payload), msg.payload.get(2..).and_then(crate::bombs::parse_explosion)) {
+                    self.level_objects.push(LevelObject::Explosion { sender, explosion });
+                }
+            }
+            19 => {
+                // PLO_ARROWADD: GSHORT player, then the shot.
+                if let (Some(sender), Some(arrow)) = (read_gshort(&msg.payload), msg.payload.get(2..).and_then(crate::arrows::parse_arrow_add)) {
+                    self.level_objects.push(LevelObject::Arrow { sender, arrow });
                 }
             }
             10 => self.is_leader = true,
@@ -2234,6 +2272,30 @@ mod tests {
         // A player the client does not know throws nothing.
         st.apply_body(&[&[21 + 0x20][..], &gs(9), b"\n"].concat());
         assert_eq!(st.throws.len(), 1);
+    }
+
+    #[test]
+    fn bombs_explosions_and_shots_of_other_players_are_queued_for_the_game_loop() {
+        let mut st = SessionState::default();
+        // the lab bomb as relayed: player 200, then `6e 3c 29 57`
+        st.apply_body(&[&[11 + 0x20][..], &gs(200), &[0x6e, 0x3c, 0x29, 0x57], b"\n"].concat());
+        st.apply_body(&[&[12 + 0x20][..], &[0x6e, 0x3c], b"\n"].concat());
+        st.apply_body(&[&[36 + 0x20][..], &gs(200), &[0x22, 0x40, 0x40, 0x20 + 8 + 3], b"\n"].concat());
+        st.apply_body(&[&[19 + 0x20][..], &gs(200), &[0x60, 0x40, 0x20 + 8 + 2, 0x20 + 109, 0x21 + 3], b"\n"].concat());
+        // too short: dropped
+        st.apply_body(&[&[19 + 0x20][..], &gs(200), &[0x60, 0x40, 0x22, 0x20 + 109], b"\n"].concat());
+        assert!(st.unhandled.is_empty(), "{:?}", st.unhandled);
+        use crate::arrows::ArrowAdd;
+        use crate::bombs::{BombAdd, Explosion};
+        assert_eq!(
+            st.level_objects,
+            vec![
+                LevelObject::Bomb { sender: 200, bomb: BombAdd { x: 39.0, y: 14.0, power: 1, fuse: 55, owned: true } },
+                LevelObject::BombDel { x: 39.0, y: 14.0 },
+                LevelObject::Explosion { sender: 200, explosion: Explosion { radius: 2, x: 16.0, y: 16.0, power: 3, owned: true } },
+                LevelObject::Arrow { sender: 200, arrow: ArrowAdd { x: 32.0, y: 16.0, dir: 2, replaces: false, owned: true, sprite: 109, kind: 3 } },
+            ]
+        );
     }
 
     #[test]

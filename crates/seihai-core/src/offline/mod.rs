@@ -168,6 +168,10 @@ pub struct OfflineSession {
     arrow_ms: u64,
     /// `PLI_ARROWADD` messages since the last [`Self::take_arrow_sends`].
     arrow_sends: Vec<Vec<u8>>,
+    /// The ids in the server's player list, online (empty offline). A
+    /// bomb's piece or a shot names its owner only while the owner is here
+    /// ([`crate::bombs::player_owner`]).
+    pub present_players: Vec<u16>,
     /// NPCs an arrow hit since the last [`Self::take_shots`].
     shots: Vec<usize>,
     /// Landings since the last [`Self::take_landings`].
@@ -502,6 +506,7 @@ impl OfflineSession {
             arrows: Vec::new(),
             arrow_ms: 0,
             arrow_sends: Vec::new(),
+            present_players: Vec::new(),
             shots: Vec::new(),
             landings: Vec::new(),
             throw_ms: 0,
@@ -1277,9 +1282,12 @@ impl OfflineSession {
         for p in std::mem::take(&mut self.blast) {
             let mut p = p;
             if self.victim().state == crate::combat::Vulnerability::Hurtable && p.hits_player(self.player_x, self.player_y) {
-                self.damage_half(p.damage_half(), None);
-                self.combat.start_hurt_knock(Some(crate::throwing::throw_knock(p.knock_dir())));
-                self.throw_hurt = true;
+                let owner = self.owner_named(p.owner);
+                if !(self.no_pk && owner.is_some()) {
+                    self.damage_half(p.damage_half(), owner);
+                    self.combat.start_hurt_knock(Some(crate::throwing::throw_knock(p.knock_dir())));
+                    self.throw_hurt = true;
+                }
             }
             if p.tick() {
                 self.blast.push(p);
@@ -1296,13 +1304,69 @@ impl OfflineSession {
         }
     }
 
+    /// The owner a hit names: `owner` while that player is in the server's
+    /// player list, else nobody.
+    fn owner_named(&self, owner: Option<u16>) -> Option<u16> {
+        crate::bombs::player_owner(owner, |id| self.present_players.contains(&id))
+    }
+
+    /// Another player's bomb (`PLO_BOMBADD`), in this level's coordinates:
+    /// `putbomb` with no send, the fuse it carries, and the sender as the
+    /// owner when bit 8 says so.
+    pub fn receive_bomb(&mut self, b: &crate::bombs::BombAdd, sender: Option<u16>) {
+        if self.throw_in_water(b.x + 1.0, b.y + 1.0) {
+            self.spawn_leap(crate::throwing::LEAP_SPLASH, b.x, b.y);
+            return;
+        }
+        let mut bomb = crate::bombs::Bomb::new(b.x, b.y, b.power, b.fuse);
+        bomb.owner = sender.filter(|_| b.owned);
+        self.placed_bombs.push(bomb);
+    }
+
+    /// `PLO_BOMBDEL`: the bomb at exactly `(x, y)` is gone.
+    pub fn remove_bomb(&mut self, x: f32, y: f32) {
+        self.placed_bombs.retain(|b| (b.x, b.y) != (x, y));
+    }
+
+    /// Another player's explosion (`PLO_EXPLOSION`), in this level's
+    /// coordinates: its sound and one cross. The sound names are taken to be
+    /// a bomb's (inferred).
+    pub fn receive_explosion(&mut self, e: &crate::bombs::Explosion, sender: Option<u16>) {
+        use crate::bombs as b;
+        self.sound_events.push(SoundEvent { file: b::sound(e.power).into(), x: e.x + 1.0, y: e.y + 1.0 });
+        let room = b::MAX_PIECES.saturating_sub(self.blast.len());
+        let owner = sender.filter(|_| e.owned);
+        self.blast.extend(b::explosion_pieces(e.radius, e.x, e.y, e.power, owner).into_iter().take(room));
+    }
+
+    /// Another player's shot (`PLO_ARROWADD`), in this level's coordinates.
+    pub fn receive_arrow(&mut self, a: &crate::arrows::ArrowAdd, sender: Option<u16>) {
+        self.arrows.push(crate::arrows::Arrow::received(a, sender, self.no_pk));
+    }
+
+    /// A shot hit this player: the hearts and the push unless it is a
+    /// player's on a `noplayerkilling` level, then its blast if it has one.
+    fn shot_hit(&mut self, a: &crate::arrows::Arrow, w: i32, h: i32) {
+        let owner = self.owner_named(a.owner);
+        if !(self.no_pk && owner.is_some()) {
+            self.damage_half(a.damage_half(), owner);
+            self.combat.start_hurt_knock(Some(crate::throwing::throw_knock(a.dir())));
+            self.throw_hurt = true;
+        }
+        if let Some((bx, by)) = a.blast_at(w, h) {
+            let room = crate::bombs::MAX_PIECES.saturating_sub(self.blast.len());
+            self.blast.extend(crate::bombs::explosion_pieces(2, bx, by, 1, a.owner).into_iter().take(room));
+        }
+    }
+
     /// `shootarrow dir` from a shooter `w` x `h` tiles at `(x, y)`: the
     /// arrow, `arrow.wav`, and a queued `PLI_ARROWADD`. `from_weapon`
     /// marks a weapon's arrow.
     pub fn shoot_arrow(&mut self, x: f32, y: f32, w: f32, h: f32, dir: u8, from_weapon: bool) {
         use crate::arrows as a;
         let (sx, sy) = a::start(x, y, w, h, dir);
-        let arrow = a::Arrow::new(sx, sy, dir);
+        let mut arrow = a::Arrow::new(sx, sy, dir);
+        arrow.harmless = from_weapon;
         self.sound_events.push(SoundEvent { file: "arrow.wav".into(), x: sx + 0.5, y: sy + 0.5 });
         self.arrow_sends.push(a::arrow_add_message(sx, sy, dir, from_weapon, arrow.sprite, 0));
         self.arrows.push(arrow);
@@ -1334,9 +1398,21 @@ impl OfflineSession {
             moved = true;
             let tables = self.object_tables.as_ref();
             let mut kept = Vec::new();
+            let mut hits = Vec::new();
+            let mut hurt_now = false;
             for mut a in std::mem::take(&mut self.arrows) {
                 if a.step() == Step::Gone {
                     continue;
+                }
+                // The player is hit only by a shot whose size the sprite
+                // table gives, and once hurt (by an earlier shot of this
+                // tick too) no more.
+                if let Some((_, _, w, h)) = crate::throwing::sprite_rect(tables, a.sprite) {
+                    if !hurt_now && self.victim().state == crate::combat::Vulnerability::Hurtable && a.hits_player(w, h, self.player_x, self.player_y) {
+                        hurt_now = !(self.no_pk && self.owner_named(a.owner).is_some());
+                        hits.push((a, w, h));
+                        continue;
+                    }
                 }
                 if a.reflect < 0 {
                     let (w, h) = crate::throwing::sprite_rect(tables, a.sprite).map_or((16, 16), |(_, _, w, h)| (w, h));
@@ -1349,6 +1425,9 @@ impl OfflineSession {
                 kept.push(a);
             }
             self.arrows = kept;
+            for (a, w, h) in hits {
+                self.shot_hit(&a, w, h);
+            }
         }
         moved
     }
@@ -4667,5 +4746,150 @@ mod tests {
         s.apply_pickup(crate::items::REDRUPEE);
         s.apply_pickup(19);
         assert_eq!(s.rupees, 130);
+    }
+
+    /// The player at (14, 30) with 3 hearts, combat rules on, and player 7
+    /// in the player list.
+    fn bombed() -> OfflineSession {
+        let mut s = pelted();
+        s.thrown.clear();
+        s.present_players = vec![7];
+        s
+    }
+
+    fn explosion(owned: bool) -> crate::bombs::Explosion {
+        // one cross of reach 2 whose centre piece covers the player:
+        // (13.5 + 1, 32 + 1) against (14 + 1.5, 30 + 2)
+        crate::bombs::Explosion { radius: 2, x: 14.0, y: 31.0, power: 1, owned }
+    }
+
+    #[test]
+    fn another_players_explosion_hurts_and_names_the_owner() {
+        let mut s = bombed();
+        s.receive_explosion(&explosion(true), Some(7));
+        assert_eq!(s.blast.len(), 9);
+        assert_eq!(s.take_sound_events().first().map(|e| e.file.clone()), Some("bomb.wav".into()));
+        s.tick_bombs(50);
+        assert_eq!(s.hearts_half(), 5);
+        assert!(s.combat.is_hurt());
+        s.set_hearts_half(1);
+        s.combat = crate::combat::CombatState::new(Some(crate::protocol::COMBAT_205));
+        s.blast.clear();
+        s.receive_explosion(&explosion(true), Some(7));
+        s.tick_bombs(50);
+        let events = s.tick_life(50);
+        assert!(events.contains(&LifeEvent::Died { attacker: Some(7) }), "{events:?}");
+    }
+
+    #[test]
+    fn on_a_no_player_killing_level_an_owned_piece_does_not_hurt() {
+        let mut s = bombed();
+        s.no_pk = true;
+        s.receive_explosion(&explosion(true), Some(7));
+        s.tick_bombs(50);
+        assert_eq!(s.hearts_half(), 6);
+        assert!(!s.combat.is_hurt());
+    }
+
+    #[test]
+    fn an_unowned_piece_or_one_whose_owner_left_hurts_even_with_no_pk() {
+        for (owned, present) in [(false, vec![7]), (true, vec![])] {
+            let mut s = bombed();
+            s.no_pk = true;
+            s.present_players = present;
+            s.receive_explosion(&explosion(owned), Some(7));
+            s.tick_bombs(50);
+            assert_eq!(s.hearts_half(), 5, "owned {owned}");
+            s.set_hearts_half(0);
+            let events = s.tick_life(50);
+            assert!(events.contains(&LifeEvent::Died { attacker: None }), "{events:?}");
+        }
+    }
+
+    #[test]
+    fn a_received_bomb_burns_its_own_fuse_then_hurts_and_bombdel_removes_it() {
+        let mut s = bombed();
+        let add = crate::bombs::BombAdd { x: 14.0, y: 31.0, power: 3, fuse: 2, owned: true };
+        s.receive_bomb(&add, Some(7));
+        assert_eq!(s.placed_bombs[0].owner, Some(7));
+        s.tick_bombs(2 * 50);
+        assert!(s.blast.is_empty(), "fuse 2: still burning after two ticks");
+        s.tick_bombs(50);
+        assert_eq!(s.blast.len(), 9);
+        s.tick_bombs(50);
+        assert_eq!(s.hearts_half(), 4, "power 3: a whole heart");
+        let mut s = bombed();
+        s.receive_bomb(&add, Some(7));
+        s.remove_bomb(13.5, 31.0);
+        assert_eq!(s.placed_bombs.len(), 1, "only exactly that point");
+        s.remove_bomb(14.0, 31.0);
+        assert!(s.placed_bombs.is_empty());
+    }
+
+    /// Sprite table entries of 16 x 16 pixels for the arrow sprites.
+    fn arrow_tables() -> ObjectTables {
+        let mut t = ObjectTables::default();
+        t.sprites = vec![0; 111];
+        for id in 107..=110 {
+            t.sprites[id] = (8 << 6) | 8;
+        }
+        t
+    }
+
+    fn shot(kind: u8, owned: bool) -> crate::arrows::ArrowAdd {
+        // flying east along y 31 from x 10, a tile a tick; its half-tile
+        // box is past the player's x + 0.5 = 14.5 first at x 15 (tick 5)
+        crate::arrows::ArrowAdd { x: 10.0, y: 31.0, dir: 3, replaces: false, owned, sprite: 110, kind }
+    }
+
+    #[test]
+    fn another_players_arrow_hits_once_its_box_is_on_the_body() {
+        let mut s = bombed();
+        s.object_tables = Some(arrow_tables());
+        s.receive_arrow(&shot(0, true), Some(7));
+        let none = |_: f32, _: f32| None;
+        s.tick_arrows(4 * 50, &none);
+        assert_eq!(s.hearts_half(), 6, "x 14: 14 + 0.5 is not past 14.5");
+        s.tick_arrows(50, &none);
+        assert_eq!(s.hearts_half(), 5);
+        assert!(s.arrows.is_empty(), "the shot is gone");
+        assert!(s.blast.is_empty(), "an arrow leaves no blast");
+    }
+
+    #[test]
+    fn a_nuke_takes_a_heart_and_leaves_a_blast() {
+        let mut s = bombed();
+        s.object_tables = Some(arrow_tables());
+        s.receive_arrow(&shot(3, true), Some(7));
+        s.tick_arrows(5 * 50, &|_, _| None);
+        assert_eq!(s.hearts_half(), 4);
+        assert_eq!(s.blast.len(), 9);
+        assert!(s.blast.iter().all(|p| p.owner == Some(7) && p.power == 1));
+        assert_eq!((s.blast[0].x, s.blast[0].y), (14.25, 30.25));
+    }
+
+    #[test]
+    fn arrows_on_a_no_pk_level_and_our_own_weapons_never_hit() {
+        let mut s = bombed();
+        s.object_tables = Some(arrow_tables());
+        s.no_pk = true;
+        s.receive_arrow(&shot(0, false), Some(7));
+        s.tick_arrows(5 * 50, &|_, _| None);
+        assert_eq!(s.hearts_half(), 6);
+        assert_eq!(s.arrows.len(), 1, "it flies on");
+        let mut s = bombed();
+        s.object_tables = Some(arrow_tables());
+        s.player_dir = DIR_WEST;
+        s.shoot_arrow(17.0, 30.0, 2.0, 2.0, DIR_WEST, true);
+        s.tick_arrows(3 * 50, &|_, _| None);
+        assert_eq!(s.hearts_half(), 6);
+    }
+
+    #[test]
+    fn without_a_sprite_table_a_shot_does_not_hit_the_player() {
+        let mut s = bombed();
+        s.receive_arrow(&shot(0, true), Some(7));
+        s.tick_arrows(6 * 50, &|_, _| None);
+        assert_eq!(s.hearts_half(), 6);
     }
 }
