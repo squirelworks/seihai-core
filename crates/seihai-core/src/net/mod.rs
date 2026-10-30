@@ -275,6 +275,22 @@ pub fn power_props_message(cur_half: Option<u8>, gani: Option<&str>, sprite: Opt
     m
 }
 
+/// `PLI_PLAYERPROPS` (2) with ARROWSCOUNT (4) and BOMBSCOUNT (5), each
+/// only when given. The real 2.05 client sends ARROWSCOUNT after its
+/// ARROWADD and BOMBSCOUNT with its BOMBADD (lab, 2026-10-30: 19 after a
+/// shot, 14 after a bomb).
+pub fn count_props_message(arrows: Option<u8>, bombs: Option<u8>) -> Vec<u8> {
+    let mut m = vec![2 + 0x20];
+    if let Some(n) = arrows {
+        m.extend([4 + 0x20, n.min(99) + 0x20]);
+    }
+    if let Some(n) = bombs {
+        m.extend([5 + 0x20, n.min(99) + 0x20]);
+    }
+    m.push(b'\n');
+    m
+}
+
 /// `PLI_LEVELWARP` (0): `GCHAR x*2`, `GCHAR y*2` (tiles), level name.
 pub fn levelwarp_message(x: f32, y: f32, level: &str) -> Vec<u8> {
     let mut msg = vec![0x20];
@@ -1548,6 +1564,14 @@ mod tests {
     use crate::protocol::{parse_player_props, zlib_decompress};
     use std::io::Read;
     use std::net::TcpListener;
+
+    #[test]
+    fn count_props_carry_arrows_then_bombs() {
+        // the real 2.05 after a shot: ARROWSCOUNT 19; after a bomb: BOMBSCOUNT 14
+        assert_eq!(count_props_message(Some(19), None), vec![0x22, 0x24, 19 + 0x20, b'\n']);
+        assert_eq!(count_props_message(None, Some(14)), vec![0x22, 0x25, 14 + 0x20, b'\n']);
+        assert_eq!(count_props_message(Some(0), Some(3)), vec![0x22, 0x24, 0x20, 0x25, 0x23, b'\n']);
+    }
 
     fn read_frame(s: &mut TcpStream) -> Vec<u8> {
         let mut len = [0u8; 2];
