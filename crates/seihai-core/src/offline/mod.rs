@@ -1362,10 +1362,11 @@ impl OfflineSession {
 
     /// `shootarrow dir` from a shooter `w` x `h` tiles at `(x, y)`: the
     /// arrow, `arrow.wav`, and a queued `PLI_ARROWADD`. `from_weapon`
-    /// marks a weapon's arrow.
+    /// marks a weapon's arrow, which starts from the player
+    /// ([`crate::arrows::player_start`]; `w` and `h` are not used).
     pub fn shoot_arrow(&mut self, x: f32, y: f32, w: f32, h: f32, dir: u8, from_weapon: bool) {
         use crate::arrows as a;
-        let (sx, sy) = a::start(x, y, w, h, dir);
+        let (sx, sy) = if from_weapon { a::player_start(x, y, dir) } else { a::start(x, y, w, h, dir) };
         let mut arrow = a::Arrow::new(sx, sy, dir);
         arrow.harmless = from_weapon;
         self.sound_events.push(SoundEvent { file: "arrow.wav".into(), x: sx + 0.5, y: sy + 0.5 });
@@ -4884,6 +4885,23 @@ mod tests {
         s.shoot_arrow(17.0, 30.0, 2.0, 2.0, DIR_WEST, true);
         s.tick_arrows(3 * 50, &|_, _| None);
         assert_eq!(s.hearts_half(), 6);
+    }
+
+    /// The Bow's `PLI_ARROWADD` as a real 2.00 sent it, in all four
+    /// directions (lab, 2026-10-30): shooter (30, 31) up, (30, 31.5) down,
+    /// (48.5, 34) west, (53, 40.5) east.
+    #[test]
+    fn a_weapon_arrow_sends_the_real_2_00_bytes() {
+        let sent = |x: f32, y: f32, dir: u8| {
+            let mut s = OfflineSession::new();
+            s.shoot_arrow(x, y, 2.0, 2.0, dir, true);
+            s.take_arrow_sends().remove(0)
+        };
+        let body = |b: &[u8]| -> Vec<u8> { [&[9 + 0x20][..], b, b"\n"].concat() };
+        assert_eq!(sent(30.0, 31.0, 0), body(&[0x5e, 0x60, 0x28, 0x8b, 0x21]));
+        assert_eq!(sent(30.0, 31.5, 2), body(&[0x5e, 0x61, 0x2a, 0x8d, 0x21]));
+        assert_eq!(sent(48.5, 34.0, 1), body(&[0x82, 0x67, 0x29, 0x8c, 0x21]));
+        assert_eq!(sent(53.0, 40.5, 3), body(&[0x8b, 0x74, 0x2b, 0x8e, 0x21]));
     }
 
     #[test]

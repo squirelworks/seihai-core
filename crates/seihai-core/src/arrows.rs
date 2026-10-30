@@ -15,12 +15,13 @@
 //!   back for 3 more ticks, then ends. A weapon's own arrow never hits the
 //!   player who shot it.
 //!
-//! Where the arrow starts is inferred, not lab-checked: from the shooter's
+//! A weapon's arrow starts at a fixed place on the player
+//! ([`player_start`], lab-checked on 2.00 and 2.05). For an NPC's arrow
+//! the start is inferred, not lab-checked: from the shooter's
 //! `(x, y)` it moves back by `(0.3125, 0.9375)` facing up or down and
 //! `(0.9375, 0.3125)` facing left or right, then by half the shooter's
 //! width (up, down), half its height (left, right), its height (down) or its
-//! width (right). For a weapon the shooter is the player, taken here as 2 x
-//! 2 tiles.
+//! width (right).
 //!
 //! Other players' shots come as `PLO_ARROWADD` (19) after the sender's id
 //! ([`parse_arrow_add`]): `x*2`, `y*2`, flags (`& 3` the direction, 8 the
@@ -65,6 +66,18 @@ pub fn start(x: f32, y: f32, w: f32, h: f32, dir: u8) -> (f32, f32) {
         1 => (x - 0.9375, y - 0.3125 + h / 2.0),
         2 => (x - 0.3125 + w / 2.0, y - 0.9375 + h),
         _ => (x - 0.9375 + w, y - 0.3125 + h / 2.0),
+    }
+}
+
+/// Where a weapon's arrow starts, from the player's `(x, y)`: one tile
+/// right and down facing up or down, half a tile right and one and a half
+/// down facing left or right. Read off the `PLI_ARROWADD` of a real 2.00
+/// and 2.05 shooting the built-in Bow in all four directions (lab,
+/// 2026-10-30); [`start`] gave the wrong place for the player.
+pub fn player_start(x: f32, y: f32, dir: u8) -> (f32, f32) {
+    match dir & 3 {
+        0 | 2 => (x + 1.0, y + 1.0),
+        _ => (x + 0.5, y + 1.5),
     }
 }
 
