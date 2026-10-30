@@ -147,7 +147,7 @@ step	label	token	basis	kind	area	field	detail
 22	2.17	GNW22122	binary	changed	protocol	tampercheck	no -> yes
 22	2.17	GNW22122	binary	changed	protocol	tamper	none -> known words, re-send Never
 22	2.17	GNW22122	binary	changed	protocol	showimg (id 24)	none -> every 5100 ms
-22	2.17	GNW22122	binary	changed	protocol	login frame	none -> files, process list, props, idle.gani at once, status icons, 96 ms after the level without 182
+22	2.17	GNW22122	binary	changed	protocol	login frame	none -> files, process list, props, idle.gani at once, status icons, language and tamper check in the login frame, 96 ms after the level without 182
 22	2.17	GNW22122	binary	changed	props	npc_max	43 -> 73
 22	2.17	GNW22122	binary	changed	levels	heights	no -> yes
 22	2.17	GNW22122	binary	unknown	props	-	other-player prop parser was not read; the 2.22 set is used
@@ -162,7 +162,7 @@ step	label	token	basis	kind	area	field	detail
 23	2.22	GNW03014	binary	changed	protocol	pli (client ids sent)	-36 HITOBJECTS, -45 PROCESSRUNNING, -81 PROFILESET (45 -> 42 ids)
 23	2.22	GNW03014	binary	changed	protocol	tamper	known words, re-send Never -> known words, re-send OnLevelChange
 23	2.22	GNW03014	binary	changed	protocol	showimg (id 24)	every 5100 ms -> every 5100 ms, only with others in the level
-23	2.22	GNW03014	binary	changed	protocol	login frame	files, process list, props, idle.gani at once, status icons, 96 ms after the level without 182 -> files, process list, props with OS wind and code page 1252, idle.gani at once, status icons
+23	2.22	GNW03014	binary	changed	protocol	login frame	files, process list, props, idle.gani at once, status icons, language and tamper check in the login frame, 96 ms after the level without 182 -> files, process list, props with OS wind and code page 1252, idle.gani at once, status icons
 23	2.22	GNW03014	binary	changed	protocol	udp_off_by_default	no -> yes
 23	2.22	GNW03014	binary	changed	levels	link_boxes	no -> yes
 23	2.22	GNW03014	binary	changed	ui	server_list	2 tabs -> 3 tabs

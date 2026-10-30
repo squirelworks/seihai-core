@@ -295,7 +295,7 @@ Generated; do not edit between the markers.
 - protocol: **tampercheck**: no -> yes
 - protocol: **tamper**: none -> known words, re-send Never
 - protocol: **showimg (id 24)**: none -> every 5100 ms
-- protocol: **login frame**: none -> files, process list, props, idle.gani at once, status icons, 96 ms after the level without 182
+- protocol: **login frame**: none -> files, process list, props, idle.gani at once, status icons, language and tamper check in the login frame, 96 ms after the level without 182
 - props: **npc_max**: 43 -> 73
 - levels: **heights**: no -> yes
 - unknown (props): other-player prop parser was not read; the 2.22 set is used
@@ -313,7 +313,7 @@ Generated; do not edit between the markers.
 - protocol: **pli (client ids sent)**: -36 HITOBJECTS, -45 PROCESSRUNNING, -81 PROFILESET (45 -> 42 ids)
 - protocol: **tamper**: known words, re-send Never -> known words, re-send OnLevelChange
 - protocol: **showimg (id 24)**: every 5100 ms -> every 5100 ms, only with others in the level
-- protocol: **login frame**: files, process list, props, idle.gani at once, status icons, 96 ms after the level without 182 -> files, process list, props with OS wind and code page 1252, idle.gani at once, status icons
+- protocol: **login frame**: files, process list, props, idle.gani at once, status icons, language and tamper check in the login frame, 96 ms after the level without 182 -> files, process list, props with OS wind and code page 1252, idle.gani at once, status icons
 - protocol: **udp_off_by_default**: no -> yes
 - levels: **link_boxes**: no -> yes
 - ui: **server_list**: 2 tabs -> 3 tabs
