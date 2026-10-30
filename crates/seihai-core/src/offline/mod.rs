@@ -668,7 +668,18 @@ impl OfflineSession {
         let dead = self.life.is_dead() || (half <= 0 && self.life.rules().is_some());
         let hurting = self.hurt_pose_on();
         let sprite = self.sprite_value();
-        self.power.report(half, dead, hurting, sprite)
+        let mut r = self.power.report(half, dead, hurting, sprite)?;
+        // The hit's first knockback step goes in the same message, on the
+        // axes it moved along (`combat::CombatState::knock_dir`).
+        if r.pose == Some(crate::life::ReportPose::Hurt) && self.knock_moved {
+            if let Some((ux, uy)) = self.combat.knock_dir() {
+                self.knock_moved = false;
+                let enc = crate::protocol::encode_pos_classic;
+                r.x = (ux != 0.0).then(|| enc(self.player_x));
+                r.y = (uy != 0.0).then(|| enc(self.player_y));
+            }
+        }
+        Some(r)
     }
 
     /// Hearts are at 0 but the death has not started yet (it starts at the
@@ -4197,7 +4208,11 @@ mod tests {
         let h = crate::combat::HurtPlayer { attacker: 2, dx: 1.0, dy: 0.0, half: 1, npc: None };
         assert!(s.receive_hurtplayer(&h, Some((s.player_x, s.player_y))).outcome.is_ok());
         let m = s.take_power_report().unwrap().message(v.profile().ui.ganis).unwrap();
-        assert_eq!(m, b"\x22\x22\x23\x2a\x24hurt\x31\xa3\n".to_vec());
+        // With the first knockback step: X 30 -> 31 (`2f 5e`), as run 2's
+        // `22 24 2a 24 "hurt" 2f 5f 31 a2`.
+        assert_eq!(s.player_x, 31.0);
+        assert_eq!(m, b"\x22\x22\x23\x2a\x24hurt\x2f\x5e\x31\xa3\n".to_vec());
+        assert!(!s.take_knock_moved(), "the hit's message carried the step");
         // The hurt pose (31 ticks) still on: nothing new.
         s.tick_combat(30 * 50);
         assert_eq!(s.take_power_report(), None);

@@ -247,6 +247,10 @@ pub struct PowerReport {
     pub pose: Option<ReportPose>,
     /// SPRITE, sent with the start of hurt mode (the hurt sprite).
     pub sprite: Option<u8>,
+    /// X and Y (half tiles) when the hit's first knockback step moved the
+    /// player along that axis: they go in the hit's message.
+    pub x: Option<u8>,
+    pub y: Option<u8>,
 }
 
 impl PowerReport {
@@ -257,7 +261,7 @@ impl PowerReport {
         if self.cur_half.is_none() && gani.is_none() && self.sprite.is_none() {
             return None;
         }
-        Some(crate::net::power_props_message(self.cur_half, gani, self.sprite))
+        Some(crate::net::power_props_message(self.cur_half, gani, (self.x, self.y), self.sprite))
     }
 }
 
@@ -327,7 +331,7 @@ impl PowerReporter {
         }
         self.reported_half = half;
         let sprite = (new_pose == Some(ReportPose::Hurt)).then_some(sprite);
-        Some(PowerReport { cur_half, pose: new_pose, sprite })
+        Some(PowerReport { cur_half, pose: new_pose, sprite, x: None, y: None })
     }
 }
 
@@ -568,7 +572,7 @@ mod tests {
         // 2.05 lab run 1, t = 130.962 s: 6 -> 5 half hearts, facing up.
         let mut p = PowerReporter::default();
         let r = p.report(5, false, true, 128).expect("a report");
-        assert_eq!(r, PowerReport { cur_half: Some(5), pose: Some(ReportPose::Hurt), sprite: Some(128) });
+        assert_eq!(r, PowerReport { cur_half: Some(5), pose: Some(ReportPose::Hurt), sprite: Some(128), x: None, y: None });
         let mut want = vec![0x22];
         want.extend_from_slice(b"\x22\x25\x2a\x24hurt\x31\xa0\n");
         assert_eq!(r.message(true).unwrap(), want);

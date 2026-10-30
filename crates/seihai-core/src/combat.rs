@@ -708,6 +708,12 @@ impl CombatState {
             self.hurt_acc_ms = 0;
             self.knock = knock.map(|(x, y)| knockback_unit(x, y));
             self.knock_steps.clear();
+            // The first step is taken in the tick of the hit: the real 2.00
+            // sends it with the hit's CURPOWER and GANI `hurt` (lab,
+            // 2026-10-30 run 2 and lan-200j).
+            if let Some(k) = self.knock {
+                self.knock_steps.push((1, k));
+            }
         }
     }
 
@@ -715,6 +721,11 @@ impl CombatState {
     /// number (1 for the first) and unit vector.
     pub fn take_knock_steps(&mut self) -> Vec<(u16, (f32, f32))> {
         std::mem::take(&mut self.knock_steps)
+    }
+
+    /// The unit vector of the knockback in progress, if any.
+    pub fn knock_dir(&self) -> Option<(f32, f32)> {
+        self.knock
     }
 
     /// Knockback steps per hit for this build.
@@ -766,8 +777,8 @@ impl CombatState {
                 }
                 self.hurt_left -= 1;
                 if let Some(k) = self.knock {
-                    if self.hurt_left + self.knockback_ticks.unwrap_or(KNOCKBACK_TICKS) >= r.hurt_ticks {
-                        self.knock_steps.push((r.hurt_ticks - self.hurt_left, k));
+                    if self.hurt_left + self.knockback_ticks.unwrap_or(KNOCKBACK_TICKS) > r.hurt_ticks {
+                        self.knock_steps.push((r.hurt_ticks - self.hurt_left + 1, k));
                     } else {
                         self.knock = None;
                     }
@@ -832,6 +843,7 @@ impl OfflineSession {
             self.set_hearts_half(healed);
         }
         self.combat.start_hurt_knock(Some(knock));
+        self.apply_knock_steps();
         Ok(applied)
     }
 
@@ -1008,6 +1020,12 @@ impl OfflineSession {
                 self.queue_sword_cues(step);
             }
         }
+        self.apply_knock_steps();
+        changed || cancelled
+    }
+
+    /// Take the knockback steps that came due.
+    fn apply_knock_steps(&mut self) {
         let last = self.combat.knockback_ticks();
         let every = self.knock_send_steps.max(1);
         for (i, (ux, uy)) in self.combat.take_knock_steps() {
@@ -1018,7 +1036,6 @@ impl OfflineSession {
                 self.knock_moved |= std::mem::take(&mut self.knock_unsent);
             }
         }
-        changed || cancelled
     }
 
     /// The SPRITE (17) value for the player's own walk and swing messages.
@@ -2129,7 +2146,6 @@ mod tests {
         let r = s.receive_hitobjects(&hits(22.5, 22.0, 1), Some((22.0, 20.0)));
         assert_eq!((r.kind, r.outcome), (HitKind::HitObjects, Ok(1)));
         assert_eq!(s.hearts_half(), 11);
-        s.tick_combat(50);
         assert_eq!((s.player_x, s.player_y), (23.0, 20.0), "pushed one tile east, away from a point to the west");
     }
 
@@ -2158,13 +2174,14 @@ mod tests {
         let mut s = open_session(30.0, 30.0);
         let h = HurtPlayer { dx: 2.0, dy: 0.0, ..hurt(1, 2) };
         assert_eq!(s.receive_hurtplayer(&h, Some((28.0, 30.0))).outcome, Ok(2));
-        assert_eq!(s.take_knock_moved(), false, "nothing has moved before the first tick");
+        assert_eq!(s.player_x, 31.0, "the first step is in the tick of the hit");
+        assert!(s.take_knock_moved());
         let mut seen = vec![];
-        for _ in 0..8 {
+        for _ in 0..6 {
             s.tick_combat(50);
             seen.push(s.player_x);
         }
-        assert_eq!(seen, vec![31.0, 32.0, 33.0, 34.0, 35.0, 35.0, 35.0, 35.0], "five tiles in 250 ms");
+        assert_eq!(seen, vec![32.0, 33.0, 34.0, 35.0, 35.0, 35.0], "five tiles in all, the last 200 ms after the hit");
         assert!(s.take_knock_moved(), "the caller is told to send the position");
         assert!(!s.take_knock_moved());
         assert!(s.combat.is_hurt(), "hurt mode runs on for 40 ticks");
@@ -2179,8 +2196,8 @@ mod tests {
         s.knock_send_steps = 2;
         let h = HurtPlayer { dx: 2.0, dy: 0.0, ..hurt(1, 2) };
         assert_eq!(s.receive_hurtplayer(&h, Some((28.0, 30.0))).outcome, Ok(2));
-        let mut sent = vec![];
-        for _ in 0..6 {
+        let mut sent = vec![s.take_knock_moved().then_some(s.player_x)];
+        for _ in 0..5 {
             s.tick_combat(50);
             sent.push(s.take_knock_moved().then_some(s.player_x));
         }
@@ -2200,8 +2217,8 @@ mod tests {
         t.types[1] = 22;
         s.tiletypes = Some(t);
         s.receive_hurtplayer(&HurtPlayer { dx: 1.0, dy: 0.0, ..hurt(1, 2) }, Some((28.0, 30.0)));
-        let mut sent = vec![];
-        for _ in 0..5 {
+        let mut sent = vec![s.take_knock_moved().then_some(s.player_x)];
+        for _ in 0..4 {
             s.tick_combat(50);
             sent.push(s.take_knock_moved().then_some(s.player_x));
         }
@@ -2212,11 +2229,12 @@ mod tests {
     fn knockback_steps_are_counted_in_whole_ticks_not_in_calls() {
         let mut s = open_session(30.0, 30.0);
         s.receive_hurtplayer(&HurtPlayer { dx: 0.0, dy: 3.0, ..hurt(1, 2) }, Some((30.0, 28.0)));
-        s.tick_combat(20);
-        s.tick_combat(20);
-        assert_eq!(s.player_y, 30.0, "40 ms is not a tick yet");
-        s.tick_combat(20);
         assert_eq!(s.player_y, 31.0);
+        s.tick_combat(20);
+        s.tick_combat(20);
+        assert_eq!(s.player_y, 31.0, "40 ms is not a tick yet");
+        s.tick_combat(20);
+        assert_eq!(s.player_y, 32.0);
         s.tick_combat(1_000);
         assert_eq!(s.player_y, 35.0, "one big step of time still pushes only five tiles");
     }
@@ -2248,7 +2266,6 @@ mod tests {
         // Attacker west of the victim, facing east.
         let sw = Swinger { pose: Pose { x: 28.0, y: 30.0, dir: 3 }, ..swinger(3, sw(8, 3)) };
         assert_eq!(s.receive_sword(Some(5), &sw, 1).outcome, Ok(1));
-        s.tick_combat(50);
         assert_eq!((s.player_x, s.player_y), (31.0, 30.0));
     }
 
