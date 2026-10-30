@@ -212,8 +212,10 @@ step	label	token	basis	kind	area	field	detail
 26	3.04	G3D03014	binary	unknown	ui	-	the Torque front end (start window, options, themes, chat as white text with a blue shadow) is not modelled; the 2.31 UI row is kept
 26	3.04	G3D03014	binary	unknown	other props	-	the props it parses for other players are taken as 2.31's without 78-80
 26	3.04	G3D03014	binary	source	-	-	binary (Linux i386 ELF) and one lab run on GServer-v2 (Graal_analysis version-profiles/lab-304-linux-2026-10-30.md): PLO and PLI sets, props up to 76 (parsed to 74), NPC props to 73, no tampercheck, no showimg timer (UDP 15 instead), listserver id 7 with G3D30123
+27	3.153	G3D28015	binary	changed	protocol	listserver	listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame captured from a real client) -> listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame inferred, not captured)
 27	3.153	G3D28015	binary	changed	protocol	plo (server ids handled)	+67 RC_FILEBROWSER_MESSAGE, +74 RC_CHAT, +82 SERVERTEXT, +104 UNKNOWN104, +131 NPCBYTECODE, +132 UNKNOWN132, +133 UNKNOWN133, +134 GANISCRIPT, +187 UPDATEPACKAGEISUPDATED, +189 MOVE2; -44 HASNPCSERVER (79 -> 88 ids)
 27	3.153	G3D28015	binary	changed	protocol	pli (client ids sent)	+46 ENTERLEVEL, +50 RAWDATA, +93 RC_FILEBROWSER_UP, +96 RC_FILEBROWSER_MOVE, +97 RC_FILEBROWSER_DELETE, +98 RC_FILEBROWSER_RENAME, +152 REQUESTTEXT, +154 SENDTEXT, +155 RC_LARGEFILESTART, +156 RC_LARGEFILEEND, +157 UPDATEGANI, +158 UPDATESCRIPT (42 -> 54 ids)
+27	3.153	G3D28015	binary	changed	protocol	login frame	head and default-weapon files, props without head or colours with OS linux and code page 1250, status icons -> head and default-weapon files, props without head or colours with OS mac and code page 1250, status icons
 27	3.153	G3D28015	binary	changed	protocol	udp_off_by_default	no -> yes
 27	3.153	G3D28015	binary	changed	props	own-player props	+78 X2, +79 Y2, +80 Z2 (71 -> 74 ids)
 27	3.153	G3D28015	binary	changed	props	other-player props	+78 X2, +79 Y2, +80 Z2 (64 -> 67 ids)
@@ -221,5 +223,7 @@ step	label	token	basis	kind	area	field	detail
 27	3.153	G3D28015	binary	changed	props	precise_pos	no -> yes
 27	3.153	G3D28015	binary	unknown	pli	-	2, 3, 15, 24, 29 and 80 are taken from 3.04; the PPC scan did not resolve those call sites
 27	3.153	G3D28015	binary	unknown	live	-	never run
+27	3.153	G3D28015	binary	unknown	listserver	-	shape D (id 7 and id 1 in one plain zlib frame at 78 9C) is 3.04's capture; the binary has the same G3D30123 token and gen-5 cipher
+27	3.153	G3D28015	binary	unknown	login	-	OSTYPE mac is from the binary; the code page (1250), the files in the first frame (bigmap.txt, minimap.txt) and the head and default-weapon checks are 3.04's
 27	3.153	G3D28015	binary	unknown	3d	-	the 3D mode (Torque GameConnection on port 28000) is not modelled
-27	3.153	G3D28015	binary	source	-	-	binary (Mac OS X PPC Mach-O), not run: PLO 67, 74, 82, 104, 131-134, 187 and MOVE2 (189) in, 44 out; RC file browser, script upload and text request ids; X2/Y2/Z2; UDP off in the shipped prefs
+27	3.153	G3D28015	binary	source	-	-	binary (Mac OS X PPC Mach-O), not run: OSTYPE mac; PLO 67, 74, 82, 104, 131-134, 187 and MOVE2 (189) in, 44 out; RC file browser, script upload and text request ids; X2/Y2/Z2; UDP off in the shipped prefs
