@@ -81,6 +81,12 @@ pub const HURT_WALK_AFTER_TICKS: u64 = 12;
 /// `hurt.gani` is loaded.
 pub const HURT_POSE_139_TICKS: usize = 10;
 
+/// The hurt pose when no `hurt.gani` is loaded: 31 ticks, the stock file's
+/// one step of `WAIT 30`. The real 2.00 sends GANI `idle` 1.35 to 1.55 s
+/// after the hit, while its hurt sprite stays on to the end of hurt mode
+/// (lab, 2026-10-30 run 2 and lan-200i).
+pub const HURT_POSE_TICKS: usize = 31;
+
 /// The loaded pose animations.
 #[derive(Debug, Clone, Default)]
 pub struct PoseGanis {
@@ -255,6 +261,20 @@ impl OfflineSession {
     pub fn set_mannerisms(&mut self, m: crate::protocol::Mannerisms) {
         self.mannerisms = m;
         self.combat.set_knockback_ticks(m.knockback_ticks);
+    }
+
+    /// The hurt pose is still on: hurt mode, no step taken since the hit,
+    /// and `hurt.gani` not yet run out (a `LOOP` file lasts the whole of
+    /// hurt mode). This is when the hearts report says GANI `hurt`; it
+    /// gives way to `idle` before hurt mode itself ends.
+    pub fn hurt_pose_on(&self) -> bool {
+        let Some(ms) = self.combat.hurt_elapsed_ms() else { return false };
+        let ticks = match &self.poses.hurt {
+            Some(g) if g.looped => return !self.hurt_walked,
+            Some(g) => g.total_ticks(),
+            None => HURT_POSE_TICKS,
+        };
+        !self.hurt_walked && ((ms / GANI_STEP_MS) as usize) < ticks
     }
 
     /// The hurt blink leaves the figure out this tick: only its shadow is
