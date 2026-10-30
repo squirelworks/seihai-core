@@ -240,6 +240,10 @@ pub struct Core {
     /// The same 64 by 64 layout, true on a liquid tile (water or lava: the
     /// 2.05 water test asks the liquid list, which holds both).
     pub water: Option<Vec<bool>>,
+    /// The tile ids of the current level, 64 by 64, row by row, for
+    /// `board[]` and `tiles[x,y]` (`documentation/board-reads.md`). `None`
+    /// when no level is loaded: both then read 0.
+    pub board: Option<Vec<u16>>,
     /// The map the current level is on (the gmap, else the big map), for
     /// `onmapx` / `onmapy`. `None` when there is none.
     pub map: Option<crate::gmap::Gmap>,
@@ -300,6 +304,7 @@ impl ScriptWorld {
                 pending: VecDeque::new(),
                 walls: None,
                 water: None,
+                board: None,
                 map: None,
                 rng: seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1,
             },

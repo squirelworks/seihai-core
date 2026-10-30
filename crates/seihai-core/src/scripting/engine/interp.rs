@@ -37,6 +37,18 @@ struct Place {
     base: String,
     key: String,
     index: Option<i64>,
+    /// The second index, for `tiles[x,y]`.
+    index2: Option<i64>,
+}
+
+/// The tile `tiles[x,y]` reads off the level (2.1 test 3): the board's
+/// out-of-level value.
+pub const TILES_OUTSIDE: u16 = 0x278;
+
+/// The real client's float-to-int for board and tile indexes:
+/// `floor(v + 0.0001)` (2.05 and 2.1 test 3).
+fn board_int(v: f64) -> i64 {
+    (v + 0.0001).floor() as i64
 }
 
 fn numeric_str(s: &str) -> Option<f64> {
@@ -246,11 +258,12 @@ impl<'a> Run<'a> {
 
     fn place(&mut self, v: &VarRef) -> Place {
         if v.index.is_empty() {
-            return Place { base: v.name.clone(), key: v.name.clone(), index: None };
+            return Place { base: v.name.clone(), key: v.name.clone(), index: None, index2: None };
         }
-        let idx: Vec<i64> = v.index.iter().map(|e| self.eval(e).num() as i64).collect();
+        let to_int = if self.is_board(&v.name) { board_int } else { |n: f64| n as i64 };
+        let idx: Vec<i64> = v.index.iter().map(|e| to_int(self.eval(e).num())).collect();
         let key = format!("{}[{}]", v.name, idx.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(","));
-        Place { base: v.name.clone(), key, index: Some(idx[0]) }
+        Place { base: v.name.clone(), key, index: Some(idx[0]), index2: idx.get(1).copied() }
     }
 
     fn event_flag(&self, name: &str) -> Option<bool> {
@@ -272,15 +285,38 @@ impl<'a> Run<'a> {
             if vocab::status_flag(&p.base, self.era()) {
                 return self.status_get(&p.base).into();
             }
-        } else if p.base == "board" || p.base == "tiles" {
-            // No level board is wired into the engine yet.
-            return Val::default();
+        } else if self.is_board(&p.base) {
+            return self.board_get(p).map_or(Val::default(), |t| Val::Num(f64::from(t)));
         } else if let (Some(i), Some(len)) = (p.index, self.store_get(&format!("{}#len", p.base))) {
             if i < 0 || i as f64 >= len.num() {
                 return Val::default();
             }
         }
         self.store_get(&p.key).unwrap_or_default()
+    }
+
+    /// `board` is the level board in every era; `tiles` is one from 2.1 (in
+    /// 2.05 it is not in the expression table, so it is a plain variable).
+    fn is_board(&self, name: &str) -> bool {
+        name == "board" || (name == "tiles" && self.era() >= Era::V21)
+    }
+
+    /// A `board[i]` or `tiles[x,y]` read (`documentation/board-reads.md`).
+    /// `board[i]`: the tile at index `i = x + 64*y`, 0 outside 0..4095.
+    /// `tiles[x,y]` (2.1 and later): the tile at `(x, y)`,
+    /// [`TILES_OUTSIDE`] off the level. Both read 0 with no level.
+    fn board_get(&self, p: &Place) -> Option<u16> {
+        let board = self.core.board.as_ref()?;
+        let i = p.index?;
+        if p.base == "board" {
+            return usize::try_from(i).ok().and_then(|i| board.get(i)).copied();
+        }
+        let j = p.index2?;
+        if (0..64).contains(&i) && (0..64).contains(&j) {
+            board.get((j * 64 + i) as usize).copied()
+        } else {
+            Some(TILES_OUTSIDE)
+        }
     }
 
     fn set(&mut self, p: &Place, v: Val) {
@@ -294,7 +330,7 @@ impl<'a> Run<'a> {
             if vocab::status_flag(&p.base, self.era()) || self.event_flag(&p.base).is_some() {
                 return;
             }
-        } else if p.base == "board" || p.base == "tiles" {
+        } else if self.is_board(&p.base) {
             return;
         } else if let (Some(i), Some(len)) = (p.index, self.store_get(&format!("{}#len", p.base))) {
             if i < 0 || i as f64 >= len.num() {
@@ -737,7 +773,7 @@ impl<'a> Run<'a> {
                     None => Some(String::new()),
                 },
                 ('s', Some(x)) => {
-                    let p = Place { base: x.trim().to_ascii_lowercase(), key: x.trim().to_ascii_lowercase(), index: None };
+                    let p = Place { base: x.trim().to_ascii_lowercase(), key: x.trim().to_ascii_lowercase(), index: None, index2: None };
                     Some(self.get(&p).text())
                 }
                 ('t', Some(x)) if era >= Era::V202 => {
