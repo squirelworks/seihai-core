@@ -294,14 +294,15 @@ Generated; do not edit between the markers.
 - protocol: **pli (client ids sent)**: +39 TAMPERCHECK, +40 SHOOT, +43 MUTEPLAYER, +44 PROCESSLIST, +45 PROCESSRUNNING (40 -> 45 ids)
 - protocol: **tampercheck**: no -> yes
 - protocol: **tamper**: none -> known words, re-send Never
+- protocol: **showimg (id 24)**: none -> every 5100 ms
 - protocol: **login frame**: none -> files, process list, props, idle.gani at once, status icons
 - props: **npc_max**: 43 -> 73
 - levels: **heights**: no -> yes
 - unknown (props): other-player prop parser was not read; the 2.22 set is used
 - unknown (ui): GS1 command count was not read; 161 is carried
 - unknown (login): the real 2.17.1 login to a lab listserver was captured: shape B (one plain zlib frame, id 0 `newmain` then id 1 with the account, no token), which Seihai sends. What the public service does for a real 2.17.1 was not observed; Seihai's frame got a legacy list on 14923 and no reply on 14922 on 2026-10-25 (with the default zlib header 78 9C; Seihai now sends 78 DA like the real client, not yet run)
-- unknown (showimg): the binary has the id 24 sender with 2.22's send test, and the solo 90 s capture saw none, as that test predicts; the period and a two-player run are not observed, so none is sent
-- source: binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, and the post-login frame seen in the lab (image checks, process list, props up to the language)
+- unknown (showimg): the binary reading gave 2.17.1 2.22's send test (others in the level), and a solo 90 s capture on 2026-10-25 saw no id 24; the five solo 2026-10-30 runs on two lab servers saw it every 5.1 s, so Seihai follows those. Why the two disagree is not known, and the gap while walking (6.5 to 9.3 s) is not modelled
+- source: binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, the post-login frame seen in the lab (image checks, process list, props up to the language), and id 24 about every 5.1 s when alone (lab, 2026-10-30)
 
 #### 2.22 (`GNW03014`, binary)
 
@@ -311,7 +312,7 @@ Generated; do not edit between the markers.
 - protocol: **plo (server ids handled)**: +186 BOARDMODIFY2 (79 -> 80 ids)
 - protocol: **pli (client ids sent)**: -36 HITOBJECTS, -45 PROCESSRUNNING, -81 PROFILESET (45 -> 42 ids)
 - protocol: **tamper**: known words, re-send Never -> known words, re-send OnLevelChange
-- protocol: **showimg (id 24)**: none -> every 5100 ms, only with others in the level
+- protocol: **showimg (id 24)**: every 5100 ms -> every 5100 ms, only with others in the level
 - protocol: **login frame**: files, process list, props, idle.gani at once, status icons -> files, process list, props with OS wind and code page 1252, idle.gani at once, status icons
 - protocol: **udp_off_by_default**: no -> yes
 - levels: **link_boxes**: no -> yes
