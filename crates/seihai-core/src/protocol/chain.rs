@@ -625,13 +625,15 @@ pub const CHAIN: &[Step] = &[
             )),
             plo: IdDelta::plus(&[154, 155]),
             combat: Some(Some(COMBAT_200)),
+            death: Some(Some(DEATH_205)),
             gs1_commands: Some(142),
             ..Delta::NONE
         },
-        source: "binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, combat rules read in r0; list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)",
+        source: "binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)",
         unknown: &[
             Unknown { area: "life", what: "combat read in 2.00 r0 only (Graal_analysis client-internals/combat-200-204.md); r1 to r3 assumed the same. Not run against a real client" },
             Unknown { area: "login", what: "props sent at login (verified for 2.05 only)" },
+            Unknown { area: "life", what: "death read in the 2.00 r0 decompile; 2.00 r1 to 2.04 checked by their constants only (timer cap, input gate, dead bit, respawn AP steps). No real 2.00 death was captured yet" },
             Unknown { area: "listserver", what: "Seihai now sends the real 2.00 frame (shape A, captured in the lab: id 0 `newmain` only, no account). That frame has not been run on the public service. The 2026-10-25 matrix used Seihai's older classic login (shape B), which 14923 answered with a plain zlib id-0 list (4 rows) while 14922 stayed silent; the port is assumed for shape A until a run. A real 2.00's reply was not captured" },
             Unknown { area: "token", what: "the token is not in gs2lib, so a stock GServer-v2 does not know it" },
         ],

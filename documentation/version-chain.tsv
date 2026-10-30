@@ -83,13 +83,15 @@ step	label	token	basis	kind	area	field	detail
 13	1.42	GNW08011	binary	source	-	-	binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)
 14	2.00	GNW24011	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
 14	2.00	GNW24011	binary	changed	protocol	plo (server ids handled)	+154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
+14	2.00	GNW24011	binary	changed	life	death	none -> 2.05 rules (name-group test)
 14	2.00	GNW24011	binary	changed	life	combat	none -> 2.00 rules (raw sword power, fewer packet gates)
 14	2.00	GNW24011	binary	changed	ui	gs1_commands	134 -> 142
 14	2.00	GNW24011	binary	unknown	life	-	combat read in 2.00 r0 only (Graal_analysis client-internals/combat-200-204.md); r1 to r3 assumed the same. Not run against a real client
 14	2.00	GNW24011	binary	unknown	login	-	props sent at login (verified for 2.05 only)
+14	2.00	GNW24011	binary	unknown	life	-	death read in the 2.00 r0 decompile; 2.00 r1 to 2.04 checked by their constants only (timer cap, input gate, dead bit, respawn AP steps). No real 2.00 death was captured yet
 14	2.00	GNW24011	binary	unknown	listserver	-	Seihai now sends the real 2.00 frame (shape A, captured in the lab: id 0 `newmain` only, no account). That frame has not been run on the public service. The 2026-10-25 matrix used Seihai's older classic login (shape B), which 14923 answered with a plain zlib id-0 list (4 rows) while 14922 stayed silent; the port is assumed for shape A until a run. A real 2.00's reply was not captured
 14	2.00	GNW24011	binary	unknown	token	-	the token is not in gs2lib, so a stock GServer-v2 does not know it
-14	2.00	GNW24011	binary	source	-	-	binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, combat rules read in r0; list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)
+14	2.00	GNW24011	binary	source	-	-	binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)
 15	2.01	GNW23021	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured)
 15	2.01	GNW23021	binary	changed	protocol	plo (server ids handled)	+46 HITOBJECTS, +156 SETACTIVELEVEL (53 -> 55 ids)
 15	2.01	GNW23021	binary	changed	protocol	pli (client ids sent)	+35 ADJACENTLEVEL, +36 HITOBJECTS (35 -> 37 ids)
@@ -121,7 +123,6 @@ step	label	token	basis	kind	area	field	detail
 20	2.05	GNW03081	binary	changed	levels	nw	no -> yes
 20	2.05	GNW03081	binary	changed	levels	gmap	no -> yes
 20	2.05	GNW03081	binary	changed	levels	cached_links	no -> yes
-20	2.05	GNW03081	binary	changed	life	death	none -> 2.05 rules (name-group test)
 20	2.05	GNW03081	binary	changed	ui	server_in_title	no -> yes
 20	2.05	GNW03081	binary	changed	ui	gs1_commands	157 -> 161
 20	2.05	GNW03081	binary	changed	mannerisms	mannerisms	NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses) -> 2.05 (hidden ganis, pull stays, swim runs on)

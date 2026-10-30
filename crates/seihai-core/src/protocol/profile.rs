@@ -518,12 +518,15 @@ pub struct DeathRules {
     /// whose level is in the same *name group* as the level left: the name
     /// without its folder, lower-cased, up to its last `§` or `$`
     /// (delimiter included; names with neither all share the empty group).
-    /// Only the 2.05 builds have this test; 2.1 test 2 and everything after
-    /// it keep just the gmap rule. See `documentation/health-death.md`.
+    /// Only the 2.00 to 2.05 builds have this test; 2.1 test 2 and everything
+    /// after it keep just the gmap rule. See `documentation/health-death.md`.
     pub entry_name_group: bool,
 }
 
-/// The 2.05 rev 2 values.
+/// The 2.05 rev 2 values. 2.00 to 2.04 use the same: the 2.00 r0 handler
+/// was read, and the timer cap, input gate, dead bit and respawn AP steps
+/// are the same instructions in all eleven 2.00 to 2.04 builds. 2.00 alone
+/// fires no `playerdies` (the script vocabulary already starts it at 2.01).
 pub const DEATH_205: DeathRules = DeathRules {
     timer_cap: 30,
     input_lock_until: 27,
