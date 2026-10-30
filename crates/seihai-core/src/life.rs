@@ -537,13 +537,19 @@ mod tests {
     #[test]
     fn profile_gates() {
         assert_eq!(ClientVersion::V205.death_rules(), Some(DEATH_205));
+        for v in [ClientVersion::V200, ClientVersion::V201, ClientVersion::V204] {
+            // 2.00 to 2.04 run the 2.05 sequence (read in 2.00, constants checked in all).
+            assert_eq!(v.death_rules(), Some(DEATH_205), "{}", v.label());
+            // A real 2.00 sent PLI_CLAIMPKER in its death frame (lab, 2026-10-30).
+            assert!(v.sends_claim(), "{}", v.label());
+        }
         for v in [ClientVersion::V205, ClientVersion::V217, ClientVersion::V222, ClientVersion::V231] {
             assert!(v.sends_claim(), "{}", v.label());
             // Only the save-entry name-group test differs between them.
             let d = v.death_rules().unwrap();
             assert_eq!(DeathRules { entry_name_group: true, ..d }, DEATH_205, "{}", v.label());
         }
-        for v in [ClientVersion::V133, ClientVersion::V139, ClientVersion::V200, ClientVersion::V204] {
+        for v in [ClientVersion::V133, ClientVersion::V139] {
             assert!(!v.sends_claim(), "{}", v.label());
             assert!(v.death_rules().is_none(), "{}", v.label());
         }

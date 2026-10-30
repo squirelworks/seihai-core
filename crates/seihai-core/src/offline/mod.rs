@@ -662,6 +662,13 @@ impl OfflineSession {
         self.power.report(half, dead, hurting, sprite)
     }
 
+    /// Hearts are at 0 but the death has not started yet (it starts at the
+    /// next [`Self::tick_life`]). The hearts report waits for it, so the
+    /// claim, CURPOWER 0 and GANI `dead` go out together.
+    pub fn death_pending(&self) -> bool {
+        self.life.rules().is_some() && !self.life.is_dead() && (self.player_health <= 0 || self.hearts_half() <= 0)
+    }
+
     /// Take damage in half hearts from `attacker` (a player id) or from
     /// nothing known. A player who is dead cannot be hurt. Returns false
     /// when the hit did nothing. The death itself starts at the next
@@ -753,7 +760,7 @@ impl OfflineSession {
     /// gmap's level list at an index above 0. (The client multiplies the
     /// two list indices, -1 for "not in the list", and saves on a negative
     /// product, so index 0 counts as "same side": a quirk, kept.) Otherwise
-    /// builds with [`DeathRules::entry_name_group`] (2.05) save only when
+    /// builds with [`DeathRules::entry_name_group`] (2.00 to 2.05) save only when
     /// the two names are in different name groups ([`name_group`]); later
     /// builds do not save. A session without death rules saves every entry.
     pub fn note_entry(&mut self, level: &str) {
@@ -1200,7 +1207,9 @@ impl OfflineSession {
             return;
         }
         let half = crate::throwing::throw_damage_half(self.hearts_half());
-        self.damage_half(half, o.thrower);
+        if self.damage_half(half, o.thrower) {
+            self.log_hurt("thrown object", o.thrower, half);
+        }
         self.combat.start_hurt_knock(Some(crate::throwing::throw_knock(o.dir)));
         self.throw_hurt = true;
     }
@@ -1285,7 +1294,9 @@ impl OfflineSession {
             if self.victim().state == crate::combat::Vulnerability::Hurtable && p.hits_player(self.player_x, self.player_y) {
                 let owner = self.owner_named(p.owner);
                 if !(self.no_pk && owner.is_some()) {
-                    self.damage_half(p.damage_half(), owner);
+                    if self.damage_half(p.damage_half(), owner) {
+                        self.log_hurt("explosion", owner, p.damage_half());
+                    }
                     self.combat.start_hurt_knock(Some(crate::throwing::throw_knock(p.knock_dir())));
                     self.throw_hurt = true;
                 }
@@ -1303,6 +1314,12 @@ impl OfflineSession {
             let room = crate::bombs::MAX_PIECES.saturating_sub(self.blast.len());
             self.blast.extend(bomb.pieces().into_iter().take(room));
         }
+    }
+
+    /// The stderr line for a hit that is not a sword or hit packet, so a lab
+    /// log shows where the hearts went.
+    fn log_hurt(&self, source: &str, owner: Option<u16>, half: i32) {
+        eprintln!("hurt by {source} (owner {owner:?}): {half} half hearts, now {}", self.hearts_half());
     }
 
     /// The owner a hit names: `owner` while that player is in the server's
@@ -1350,7 +1367,10 @@ impl OfflineSession {
     fn shot_hit(&mut self, a: &crate::arrows::Arrow, w: i32, h: i32) {
         let owner = self.owner_named(a.owner);
         if !(self.no_pk && owner.is_some()) {
-            self.damage_half(a.damage_half(), owner);
+            if self.damage_half(a.damage_half(), owner) {
+                let name = ["arrow", "fireball", "fireblast", "nuke"].get(usize::from(a.kind)).copied().unwrap_or("shot");
+                self.log_hurt(name, owner, a.damage_half());
+            }
             self.combat.start_hurt_knock(Some(crate::throwing::throw_knock(a.dir())));
             self.throw_hurt = true;
         }
@@ -3870,6 +3890,17 @@ mod tests {
         s
     }
 
+    #[test]
+    fn a_killing_hit_holds_the_hearts_report_for_the_death() {
+        let mut s = mortal();
+        assert!(s.damage_half(s.max_hearts, Some(6)));
+        assert!(s.death_pending(), "hearts 0, death not started");
+        s.tick_life(0);
+        assert!(!s.death_pending());
+        let r = s.take_power_report().expect("the death's report");
+        assert!(r.message(true).is_some());
+    }
+
     fn die(s: &mut OfflineSession, attacker: Option<u16>) -> Vec<LifeEvent> {
         assert!(s.damage_half(s.max_hearts, attacker));
         s.tick_life(0)
@@ -4056,9 +4087,11 @@ mod tests {
     }
 
     #[test]
-    fn the_name_group_test_is_the_2_05_builds_only() {
+    fn the_name_group_test_is_the_2_00_to_2_05_builds_only() {
         use crate::protocol::ClientVersion as V;
-        assert!(V::V205.death_rules().unwrap().entry_name_group);
+        for v in [V::V200, V::V201, V::V202, V::V202R2, V::V203, V::V204, V::V205] {
+            assert!(v.death_rules().unwrap().entry_name_group, "{}", v.label());
+        }
         for v in [V::V217, V::V222, V::V231] {
             assert!(!v.death_rules().unwrap().entry_name_group, "{}", v.label());
         }
