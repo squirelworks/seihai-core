@@ -1,4 +1,4 @@
-// hurt.gani: the pose Seihai shows for the first moments of hurt mode (1 step)
+// hurt.gani: the pose Seihai shows for the first moments of hurt mode (1 step, 31 ticks)
 // Original Seihai default animation; layout and numbers follow documentation/asset-reference.md.
 // A step is four direction rows (up, left, down, right) of 'sprite x y' placements.
 // The name and the use are Seihai's convention, not a documented real-client one.
@@ -24,4 +24,5 @@ ANI
 0 12 36, 249 12 16, 101 14 4, 41 2 -14
 0 12 34, 250 8 16, 102 7 4, 42 -1 -14
 0 12 36, 251 4 16, 103 2 4, 43 -2 -14
+WAIT 30
 ANIEND
