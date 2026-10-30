@@ -87,6 +87,8 @@ impl FileRequest {
 #[derive(Debug, Clone)]
 pub struct FileRequester {
     sends_update: bool,
+    /// Names as they were asked for (the case the level or the server gave
+    /// them), compared by [`key`]. A waiting name goes out in that case.
     wanted: Vec<String>,
     update_asked: Vec<(String, u32)>,
     settled: HashSet<String>,
@@ -117,10 +119,10 @@ impl FileRequester {
         }
         match local {
             None => {
-                if self.failed.contains(&k) || self.wanted.contains(&k) {
+                if self.failed.contains(&k) || self.wanted.iter().any(|n| key(n) == k) {
                     return Vec::new();
                 }
-                self.wanted.push(k);
+                self.wanted.push(name.trim().to_string());
                 if self.wanted.len() <= WINDOW {
                     vec![FileRequest::Want(name.trim().to_string())]
                 } else {
@@ -130,11 +132,11 @@ impl FileRequester {
             Some(mod_time) => {
                 if !self.sends_update
                     || self.settled.contains(&k)
-                    || self.update_asked.iter().any(|(n, _)| *n == k)
+                    || self.update_asked.iter().any(|(n, _)| key(n) == k)
                 {
                     return Vec::new();
                 }
-                self.update_asked.push((k, mod_time));
+                self.update_asked.push((name.trim().to_string(), mod_time));
                 if self.update_asked.len() <= WINDOW {
                     vec![FileRequest::Update { mod_time, name: name.trim().to_string() }]
                 } else {
@@ -149,13 +151,13 @@ impl FileRequester {
     pub fn done(&mut self, name: &str) -> Vec<FileRequest> {
         let k = key(name);
         let mut next = Vec::new();
-        if let Some(i) = self.wanted.iter().position(|n| *n == k) {
+        if let Some(i) = self.wanted.iter().position(|n| key(n) == k) {
             self.wanted.remove(i);
             if i < WINDOW && self.wanted.len() >= WINDOW {
                 next.push(FileRequest::Want(self.wanted[WINDOW - 1].clone()));
             }
         }
-        if let Some(i) = self.update_asked.iter().position(|(n, _)| *n == k) {
+        if let Some(i) = self.update_asked.iter().position(|(n, _)| key(n) == k) {
             self.update_asked.remove(i);
             if i < WINDOW && self.update_asked.len() >= WINDOW {
                 let (n, t) = self.update_asked[WINDOW - 1].clone();
@@ -728,6 +730,29 @@ mod tests {
         assert_eq!(names(&r.done("a.png")), ["f.png"]);
         assert!(r.done("c.png").is_empty());
         assert_eq!(r.wanted(), ["d.png", "e.png", "f.png"]);
+    }
+
+    #[test]
+    fn a_waiting_name_goes_out_as_the_server_named_it() {
+        // Names past the first four wait; when a slot frees, the one that
+        // goes out must keep the case the level or the server gave it (an
+        // older GServer-v2 fails a name asked for in another case).
+        let mut r = req(ClientVersion::V222);
+        for n in ["a.png", "b.png", "c.png", "d.png", "Block.PNG", "npcs/Sign.gif"] {
+            r.need(n, None);
+        }
+        assert_eq!(names(&r.done("a.png")), ["Block.PNG"]);
+        assert_eq!(names(&r.done("B.PNG")), ["npcs/Sign.gif"]);
+        assert_eq!(r.wanted(), ["c.png", "d.png", "Block.PNG", "npcs/Sign.gif"]);
+        // The same for the UPDATEFILE list.
+        for (i, n) in ["u1.png", "u2.png", "u3.png", "u4.png", "Door_Open.GIF"].iter().enumerate() {
+            r.need(n, Some(10 + i as u32));
+        }
+        assert_eq!(r.done("u1.png"), vec![FileRequest::Update { mod_time: 14, name: "Door_Open.GIF".into() }]);
+        assert_eq!(r.update_asked(), ["u2.png", "u3.png", "u4.png", "Door_Open.GIF"]);
+        // A reply in another case still settles the name.
+        assert!(r.done("door_open.gif").is_empty());
+        assert!(r.is_settled("DOOR_OPEN.GIF") && r.update_asked().len() == 3);
     }
 
     #[test]
