@@ -17,7 +17,7 @@ mod hide;
 mod pause;
 mod pushpull;
 mod servernpcs;
-pub use hide::{HIDDEN_STATUS, HIDE_KINDS};
+pub use hide::{HIDDEN_STATUS, HIDE_KINDS, LIFT_CARRIED_TICK};
 pub use pause::{focus_pauses, name_label, pause_message_bits, server_status_base, PAUSED_STATUS};
 pub use pushpull::{NpcMoved, Grab, Jump, PushPull, Trigger};
 pub use servernpcs::{block_flags, Linked, ServerNpcSync, NPC_SEND_INTERVAL};
@@ -203,7 +203,7 @@ pub struct OfflineSession {
     /// Ticks in the water, for the swim frame.
     pub(crate) swim_ticks: usize,
     /// Ticks since an object was picked up, while `lift.gani` may still
-    /// show; `None` after.
+    /// show or the object does not count as carried yet; `None` after.
     pub lift_ticks: Option<u32>,
     /// The 50 ms clock of [`Self::tick_poses`].
     pub(crate) pose_clock_ms: u64,
@@ -1059,8 +1059,9 @@ impl OfflineSession {
             return None;
         }
         let c = self.carried.take()?;
-        // S throws from hiding too.
+        // S throws from hiding too. A throw also ends the lift.
         self.hidden = false;
+        self.lift_ticks = None;
         // The 2.05 client puts a walking player back in the idle mode on a
         // throw (A or S): the carry walk stops, and a held arrow starts the
         // walk again on the next step.
