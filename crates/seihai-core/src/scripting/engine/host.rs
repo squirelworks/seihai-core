@@ -35,6 +35,14 @@ pub struct SessionScripts {
     pub rpg_messages: Vec<String>,
 }
 
+
+/// Where the player's cell starts in gmap coordinates (tiles); `(0, 0)` off
+/// a gmap.
+fn gmap_origin(s: &OfflineSession) -> (f64, f64) {
+    let side = crate::gmap::CELL_TILES as f64;
+    s.gmap.as_ref().map_or((0.0, 0.0), |w| (w.cell.0 as f64 * side, w.cell.1 as f64 * side))
+}
+
 impl SessionScripts {
     pub fn new(version: ClientVersion) -> Self {
         SessionScripts { world: ScriptWorld::new(Era::for_version(version)), was_reading: false, unhandled: Vec::new(), images_changed: false, rpg_messages: Vec::new() }
@@ -97,13 +105,18 @@ impl SessionScripts {
     }
 
     /// Copy the player's state into the world.
+    ///
+    /// On a gmap `playerx` and `playery` are gmap coordinates (cell * 64 +
+    /// local): the real 2.22's `gr.x`, set by `-gr_movement` from `playerx`,
+    /// runs past 128 in cell (2, 1) (lab, 2026-10-30).
     pub fn sync_player(&mut self, s: &OfflineSession) {
         // The board as it is now: cuts, lifts and the server's board
         // changes all show in `board[]` reads.
         self.world.core.board = s.current_level.as_ref().map(|l| (0..64 * 64).map(|i| l.tile_id_at(i % 64, i / 64).unwrap_or(0)).collect());
         let p = &mut self.world.core.player;
-        p.x = s.player_x as f64;
-        p.y = s.player_y as f64;
+        let (ox, oy) = gmap_origin(s);
+        p.x = s.player_x as f64 + ox;
+        p.y = s.player_y as f64 + oy;
         p.dir = s.player_dir as f64;
         p.hearts = s.player_health as f64 / 100.0 * s.max_hearts as f64 / 2.0;
         p.hp = p.hearts;
@@ -415,8 +428,8 @@ impl SessionScripts {
                     }
                 }
                 Effect::SetPlayerVar { name, value } => match name.as_str() {
-                    "playerx" => s.player_x = value as f32,
-                    "playery" => s.player_y = value as f32,
+                    "playerx" => s.player_x = (value - gmap_origin(s).0) as f32,
+                    "playery" => s.player_y = (value - gmap_origin(s).1) as f32,
                     "playerdir" => s.player_dir = value as u8 % 4,
                     "playerrupees" => s.rupees = value as i32,
                     "playerbombs" => s.bombs = value as i32,
@@ -956,6 +969,30 @@ mod tests {
         s.player_x = 30.5;
         sc.tick(&mut s, 50);
         assert_eq!(sent(&mut s), [set("gr.x", "30.5")]);
+    }
+
+    /// Lab 2026-10-30, real 2.22 in cell (2, 1) of a 3 x 3 gmap: the
+    /// `-gr_movement` flags carry gmap coordinates, and a script that sets
+    /// `playerx`/`playery` sets them in gmap coordinates too.
+    #[test]
+    fn on_a_gmap_playerx_and_playery_are_gmap_coordinates() {
+        const GR: &str = "if (playerenters || timeout) {\n  if (!gr.off) {\n    if (!gr.x.off) setstring gr.x,#v(int((playerx+0.25)*2)/2);\n    if (!gr.y.off) setstring gr.y,#v(int((playery+0.25)*2)/2);\n  }\n  timeout=0.05;\n}\n";
+        let grid = "GRMAP001\nWIDTH 3\nHEIGHT 3\nLEVELNAMES\n\"a.nw\",\"b.nw\",\"c.nw\",\n\"d.nw\",\"e.nw\",\"f.nw\",\n\"g.nw\",\"h.nw\",\"i.nw\",\nLEVELNAMESEND\n";
+        let mut s = session("GLEVNW01\n");
+        s.enter_gmap("g.gmap".into(), crate::gmap::Gmap::parse(grid).unwrap(), (2, 1));
+        s.player_x = 0.5;
+        s.player_y = 60.5;
+        let mut sc = SessionScripts::new(ClientVersion::V222);
+        sc.sync_weapons(&mut s, &[WeaponScript { name: "-gr_movement", image: "", script: GR }]);
+        sc.load_level(&mut s, "f.nw");
+        let set = |n: &str, v: &str| (n.to_string(), Some(v.to_string()));
+        assert_eq!(std::mem::take(&mut s.flags_out), [set("gr.x", "128.5"), set("gr.y", "124.5")]);
+
+        let mut s = session("GLEVNW01\n");
+        s.enter_gmap("g.gmap".into(), crate::gmap::Gmap::parse(grid).unwrap(), (2, 1));
+        let mut sc = SessionScripts::new(ClientVersion::V222);
+        sc.sync_weapons(&mut s, &[WeaponScript { name: "Mover", image: "", script: "if (created) { playerx = 130; playery = 70; }" }]);
+        assert_eq!((s.player_x, s.player_y), (2.0, 6.0));
     }
 
     #[test]

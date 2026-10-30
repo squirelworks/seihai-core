@@ -1133,6 +1133,14 @@ impl Connection {
             return;
         }
         self.flags_since.get_or_insert_with(Instant::now);
+        // A newer value of a flag still waiting for its frame replaces the
+        // older one: the real 2.22 sends one `gr.x` per frame (lab,
+        // 2026-10-30), never a stale value ahead of the new one.
+        if value.is_some() {
+            let mut key = vec![m[0]];
+            key.extend(name.as_bytes());
+            self.flags_out.retain(|q| !(q.starts_with(&key) && matches!(q.get(key.len()), Some(b'=' | b'\n'))));
+        }
         self.flags_out.push(m);
     }
 
@@ -1612,6 +1620,18 @@ mod tests {
     }
 
     /// A flag a script set rides ahead of the walk props in the same frame.
+    /// Two sets of one flag before its frame: only the last goes, in its
+    /// own place; a delete and other flags keep theirs.
+    #[test]
+    fn a_flag_set_twice_before_its_frame_goes_once() {
+        let (mut conn, _srv) = pair();
+        conn.queue_flag("gr.x", Some("128"));
+        conn.queue_flag("door", Some(""));
+        conn.queue_flag("gr.x", Some("127.5"));
+        conn.queue_flag("door", None);
+        assert_eq!(conn.take_flags(), [b"\x32door\n".to_vec(), b"\x32gr.x=127.5\n".to_vec(), b"\x33door\n".to_vec()]);
+    }
+
     #[test]
     fn script_flags_go_ahead_of_the_walk_props() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
