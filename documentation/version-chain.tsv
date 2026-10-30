@@ -23,8 +23,9 @@ step	label	token	basis	kind	area	field	detail
 6	1.39	GNW07080	binary	changed	props	own-player props	+34 ACCOUNTNAME (34 -> 35 ids)
 6	1.39	GNW07080	binary	changed	props	other-player props	+33 ADDITFLAGS (22 -> 23 ids)
 6	1.39	GNW07080	binary	changed	ui	chat_recall	no -> yes
+6	1.39	GNW07080	binary	changed	ui	chat_text	ChatText { face: Dialog, height: 28 } -> ChatText { face: Helvetica, height: 24 }
 6	1.39	GNW07080	binary	changed	ui	gs1_commands	109 -> 111
-6	1.39	GNW07080	binary	source	-	-	binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, GS1 109 to 111
+6	1.39	GNW07080	binary	source	-	-	binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111
 7	1.41	GNW13110	binary	changed	protocol	encryption	Gen2 -> Gen3
 7	1.41	GNW13110	binary	changed	protocol	listserver	none -> listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape B (login frame inferred, not captured; no evidence for this shape)
 7	1.41	GNW13110	binary	changed	protocol	pli (client ids sent)	-31 PACKETCOUNT (35 -> 34 ids)
@@ -46,10 +47,11 @@ step	label	token	basis	kind	area	field	detail
 8	1.42	GNW08011	binary	changed	life	death	2.05 rules (name-group test) -> none
 8	1.42	GNW08011	binary	changed	life	combat	2.05 rules -> none
 8	1.42	GNW08011	binary	changed	ui	ganis	no -> yes
+8	1.42	GNW08011	binary	changed	ui	chat_text	ChatText { face: Helvetica, height: 24 } -> ChatText { face: TempusSans, height: 24 }
 8	1.42	GNW08011	binary	changed	ui	gs1_commands	126 -> 134
 8	1.42	GNW08011	binary	unknown	listserver	-	built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured
 8	1.42	GNW08011	binary	unknown	listserver	-	login frame inferred, not captured: Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; a real 1.42 frame was never captured, and no run on the public service has used shape A, so the port is assumed
-8	1.42	GNW08011	binary	source	-	-	binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, GS1 126 to 134
+8	1.42	GNW08011	binary	source	-	-	binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134
 9	2.00	GNW24011	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
 9	2.00	GNW24011	binary	changed	protocol	plo (server ids handled)	+154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
 9	2.00	GNW24011	binary	changed	ui	gs1_commands	134 -> 142

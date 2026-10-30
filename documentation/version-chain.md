@@ -123,8 +123,9 @@ Generated; do not edit between the markers.
 - props: **own-player props**: +34 ACCOUNTNAME (34 -> 35 ids)
 - props: **other-player props**: +33 ADDITFLAGS (22 -> 23 ids)
 - ui: **chat_recall**: no -> yes
+- ui: **chat_text**: ChatText { face: Dialog, height: 28 } -> ChatText { face: Helvetica, height: 24 }
 - ui: **gs1_commands**: 109 -> 111
-- source: binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, GS1 109 to 111
+- source: binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111
 
 #### 1.41 (`GNW13110`, binary)
 
@@ -152,10 +153,11 @@ Generated; do not edit between the markers.
 - life: **death**: 2.05 rules (name-group test) -> none
 - life: **combat**: 2.05 rules -> none
 - ui: **ganis**: no -> yes
+- ui: **chat_text**: ChatText { face: Helvetica, height: 24 } -> ChatText { face: TempusSans, height: 24 }
 - ui: **gs1_commands**: 126 -> 134
 - unknown (listserver): built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured
 - unknown (listserver): login frame inferred, not captured: Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; a real 1.42 frame was never captured, and no run on the public service has used shape A, so the port is assumed
-- source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, GS1 126 to 134
+- source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134
 
 #### 2.00 (`GNW24011`, binary, linked 2001-02-01)
 
@@ -344,4 +346,5 @@ Generated; do not edit between the markers.
 - unknown (pli): the TOML's pli_changes (21 out, 46 in) disagrees with its pli_sent list, which lacks 44; a real client sent 44, so the row keeps it
 - unknown (live): no game-server login on a public server; only the list reply was checked (2026-10-25)
 - source: binary (same code as 2.22) and lab: its own tampercheck constant and timer re-send, id 24 every 5.13 s whether or not others are in the level, post-login frame without the idle.gani request
+
 <!-- version-chain:end -->
