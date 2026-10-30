@@ -309,7 +309,7 @@ Generated; do not edit between the markers.
 - protocol: **pli (client ids sent)**: -36 HITOBJECTS, -45 PROCESSRUNNING, -81 PROFILESET (45 -> 42 ids)
 - protocol: **tamper**: known words, re-send Never -> known words, re-send OnLevelChange
 - protocol: **showimg (id 24)**: none -> every 5100 ms, only with others in the level
-- protocol: **login frame**: files, process list, props, idle.gani at once, status icons -> files, process list, props with OS and code page, idle.gani at once, status icons
+- protocol: **login frame**: files, process list, props, idle.gani at once, status icons -> files, process list, props with OS wind and code page 1252, idle.gani at once, status icons
 - protocol: **udp_off_by_default**: no -> yes
 - levels: **link_boxes**: no -> yes
 - ui: **server_list**: 2 tabs -> 3 tabs
@@ -325,7 +325,7 @@ Generated; do not edit between the markers.
 - protocol: **pli (client ids sent)**: +46 ENTERLEVEL; -21 PUTNPC (42 -> 42 ids)
 - protocol: **tamper**: known words, re-send OnLevelChange -> unknown words, re-send Timer
 - protocol: **showimg (id 24)**: every 5100 ms, only with others in the level -> none
-- protocol: **login frame**: files, process list, props with OS and code page, idle.gani at once, status icons -> none
+- protocol: **login frame**: files, process list, props with OS wind and code page 1252, idle.gani at once, status icons -> none
 - props: **own-player props**: +78 X2, +79 Y2, +80 Z2 (72 -> 75 ids)
 - props: **other-player props**: +78 X2, +79 Y2, +80 Z2 (64 -> 67 ids)
 - props: **npc_max**: 73 -> 77
@@ -345,27 +345,27 @@ Generated; do not edit between the markers.
 - protocol: **listserver**: listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame inferred, not captured) -> listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client)
 - protocol: **tamper**: unknown words, re-send Timer -> known words, re-send Timer
 - protocol: **showimg (id 24)**: none -> every 5130 ms
-- protocol: **login frame**: none -> files, process list, props with OS and code page, status icons
+- protocol: **login frame**: none -> files, process list, props with OS wind and code page 1252, status icons
 - unknown (pli): the TOML's pli_changes (21 out, 46 in) disagrees with its pli_sent list, which lacks 44; a real client sent 44, so the row keeps it
 - unknown (live): no game-server login on a public server; only the list reply was checked (2026-10-25)
 - source: binary (same code as 2.22) and lab: its own tampercheck constant and timer re-send, id 24 every 5.13 s whether or not others are in the level, post-login frame without the idle.gani request
 
 #### 3.04 (`G3D03014`, binary)
 
-- protocol: **listserver**: listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape C (login frame captured from a real client)
+- protocol: **listserver**: listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +44 HASNPCSERVER, +101 BOARDPACKET, +102 FILE; -170 GHOSTMODE, -177 NEWWORLDMODE, -182 LISTPROCESSES, -183 HASPROCESSRUNNING, -189 MOVE2 (81 -> 79 ids)
 - protocol: **pli (client ids sent)**: +21 PUTNPC, +36 HITOBJECTS, +81 PROFILESET; -39 TAMPERCHECK, -44 PROCESSLIST, -46 ENTERLEVEL (42 -> 42 ids)
 - protocol: **tampercheck**: yes -> no
 - protocol: **tamper**: known words, re-send Timer -> none
 - protocol: **showimg (id 24)**: every 5130 ms -> none
-- protocol: **login frame**: files, process list, props with OS and code page, status icons -> none
+- protocol: **login frame**: files, process list, props with OS wind and code page 1252, status icons -> head and default-weapon files, props without head or colours with OS linux and code page 1250, status icons
 - protocol: **udp_off_by_default**: yes -> no
 - props: **own-player props**: -33 ADDITFLAGS, -78 X2, -79 Y2, -80 Z2 (75 -> 71 ids)
 - props: **other-player props**: -78 X2, -79 Y2, -80 Z2 (67 -> 64 ids)
 - props: **npc_max**: 77 -> 73
 - props: **precise_pos**: yes -> no
 - unknown (listserver): port 14922 and the G3D token were checked against the lab listserver only, never the public one
-- unknown (login): the first props (0, 18, 31, 33, 52, 75, 76, OSTYPE linux) are not sent: no post-login frame is modelled for this build
+- unknown (login): UDPPORT (31) is left out of the first props, as for every build (no UDP socket); the nickname is the account, where the real client sends the start window's nickname field
 - unknown (ui): the Torque front end (start window, options, themes, chat as white text with a blue shadow) is not modelled; the 2.31 UI row is kept
 - unknown (other props): the props it parses for other players are taken as 2.31's without 78-80
 - source: binary (Linux i386 ELF) and one lab run on GServer-v2 (Graal_analysis version-profiles/lab-304-linux-2026-10-30.md): PLO and PLI sets, props up to 76 (parsed to 74), NPC props to 73, no tampercheck, no showimg timer (UDP 15 instead), listserver id 7 with G3D30123
