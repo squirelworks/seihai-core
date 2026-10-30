@@ -35,6 +35,15 @@
 //!   the owner is the killer. A piece of nobody's, or of a player who left,
 //!   always hurts.
 //!
+//! * Bombs and their pieces are not cut from `sprites.png`. The sprite
+//!   table gives their rectangles in `bomb1.png`, or `bomb2.png` for power
+//!   3 (the Joltbomb and its lightning). A bomb first gets the shadow
+//!   (sprite 0 of `sprites.png`) at `(x + 0.25, y + 1.25)`, then its
+//!   sprite centred on `(x + 1, y + 1)`. A lifted, thrown or landed bomb
+//!   picks its sheet by sprite: 65, 66 and 321 from `bomb1.png`, 347 and
+//!   348 from `bomb2.png` ([`sheet_of_sprite`]). From the 2.00 and 2.05
+//!   rev 2 draw code. Which sheet the shadow is drawn from is inferred.
+//!
 //! Not done yet: pieces blowing up bushes and other breakable tiles,
 //! chaining into other bombs, the `exploded` NPC event, and hitting
 //! baddies.
@@ -227,6 +236,43 @@ pub fn parse_explosion(b: &[u8]) -> Option<Explosion> {
     Some(Explosion { radius: i32::from(v(0)), x: f32::from(v(1)) / 2.0, y: f32::from(v(2)) / 2.0, power, owned: v(3) & 8 != 0 })
 }
 
+/// Which bomb sheet a bomb or piece of `power` is drawn from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BombSheet {
+    /// `bomb1.png`.
+    One,
+    /// `bomb2.png`.
+    Two,
+}
+
+/// The sheet of a bomb on the ground: `bomb2.png` from power 3 up.
+pub fn sheet_of_bomb(power: u8) -> BombSheet {
+    if power >= 3 {
+        BombSheet::Two
+    } else {
+        BombSheet::One
+    }
+}
+
+/// The sheet of an explosion piece: `bomb2.png` for power 3 exactly.
+pub fn sheet_of_piece(power: u8) -> BombSheet {
+    if power == 3 {
+        BombSheet::Two
+    } else {
+        BombSheet::One
+    }
+}
+
+/// The sheet of a carried, thrown or landed object's sprite: a bomb's
+/// sprites come from the bomb sheets, everything else from `sprites.png`.
+pub fn sheet_of_sprite(id: u16) -> Option<BombSheet> {
+    match id {
+        65 | 66 | 321 => Some(BombSheet::One),
+        347 | 348 => Some(BombSheet::Two),
+        _ => None,
+    }
+}
+
 fn pair(power: u8) -> Option<[u16; 2]> {
     BOMB_SPRITES.get(usize::from(power).checked_sub(1)?).copied()
 }
@@ -302,6 +348,16 @@ pub fn bomb_add_message(x: f32, y: f32, power: u8, from_weapon: bool, fuse: i32)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bombs_and_pieces_pick_their_sheet() {
+        assert_eq!([1, 2, 3].map(sheet_of_bomb), [BombSheet::One, BombSheet::One, BombSheet::Two]);
+        assert_eq!([1, 2, 3].map(sheet_of_piece), [BombSheet::One, BombSheet::One, BombSheet::Two]);
+        assert_eq!(sheet_of_sprite(65), Some(BombSheet::One));
+        assert_eq!(sheet_of_sprite(321), Some(BombSheet::One));
+        assert_eq!(sheet_of_sprite(348), Some(BombSheet::Two));
+        assert_eq!(sheet_of_sprite(261), None);
+    }
 
     #[test]
     fn the_message_matches_the_real_205_bomb() {
