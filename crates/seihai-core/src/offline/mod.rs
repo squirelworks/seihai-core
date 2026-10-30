@@ -685,7 +685,6 @@ impl OfflineSession {
         self.life.tick(ms, zero);
         let events = self.life.take_events();
         if events.iter().any(|e| matches!(e, LifeEvent::Died { .. })) {
-            eprintln!("died (hearts {})", self.hearts_half());
             self.player_dir = DIR_SOUTH;
             self.reading = None;
         }

@@ -540,6 +540,8 @@ mod tests {
         for v in [ClientVersion::V200, ClientVersion::V201, ClientVersion::V204] {
             // 2.00 to 2.04 run the 2.05 sequence (read in 2.00, constants checked in all).
             assert_eq!(v.death_rules(), Some(DEATH_205), "{}", v.label());
+            // A real 2.00 sent PLI_CLAIMPKER in its death frame (lab, 2026-10-30).
+            assert!(v.sends_claim(), "{}", v.label());
         }
         for v in [ClientVersion::V205, ClientVersion::V217, ClientVersion::V222, ClientVersion::V231] {
             assert!(v.sends_claim(), "{}", v.label());
