@@ -1,13 +1,15 @@
 //! GS2 bytecode reader (Stage B of the GS2 plan).
 //!
 //! Reads the files the open-source gs2-parser compiler writes into segments,
-//! a string table and a list of instructions. It runs nothing. The layout,
+//! a string table and a list of instructions (`exec` runs them). The layout,
 //! the operand markers and the opcode numbers are in
 //! `documentation/gs2-opcodes.md`; `Op::doc_name` gives the name used there.
 //! An opcode value the table does not name is kept as `Op::Unknown`, so a
 //! later executor can log it and skip it.
 
 use std::fmt::{self, Write as _};
+
+pub mod exec;
 
 macro_rules! ops {
     ($($v:literal $name:ident $doc:literal,)*) => {

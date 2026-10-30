@@ -1,0 +1,16 @@
+// Calls into the script's own functions, parameters, return values,
+// warps and the loop limit.
+function add(a, b) {
+  return a + b;
+}
+function onCreated() {
+  this.sum = add(2, 3);
+  this.text = "n=" @ this.sum;
+  if (this.sum == 5 && this.text == "n=5") say2(this.text);
+  setlevel2("lab3x.nw", 30.5, 31);
+  unset("gs2seen");
+  this.k = 0;
+  while (true) {
+    this.k++;
+  }
+}

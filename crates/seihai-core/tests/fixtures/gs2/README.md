@@ -11,9 +11,12 @@ byte for byte. No byte here was written by hand.
   `hideimg`, `sleep`) and GS1-style arithmetic.
 - `control.gs2`: `for`, `while`, `switch`, `continue`/`break`, `&&`/`||`,
   `?:`, `in |a, b|`, and numbers that need `F3`, `F4` and `F5`.
+- `calls.gs2`: a function with parameters and a return value, `@`, `say2`,
+  `setlevel2`, `unset`, and a `while (true)` for the loop limit.
 - `objects.gs2`: a public function, `format`, an array literal, `for`-each,
   `@`/`SPC`, string methods, `new[3][2]`, `new TStaticVar()`, `with`, and
   some maths built-ins.
 
 The layout and opcodes are in `documentation/gs2-opcodes.md`;
-`tests/gs2_opcodes.rs` checks these files against it.
+`tests/gs2_opcodes.rs` checks these files against it, and
+`tests/gs2_exec.rs` runs them (`documentation/gs2-executor.md`).
