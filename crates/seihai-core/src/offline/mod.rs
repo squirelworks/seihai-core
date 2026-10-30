@@ -657,7 +657,7 @@ impl OfflineSession {
     pub fn take_power_report(&mut self) -> Option<crate::life::PowerReport> {
         let half = self.hearts_half();
         let dead = self.life.is_dead() || (half <= 0 && self.life.rules().is_some());
-        let hurting = self.combat.is_hurt();
+        let hurting = self.hurt_pose_on();
         let sprite = self.sprite_value();
         self.power.report(half, dead, hurting, sprite)
     }
@@ -4171,6 +4171,35 @@ mod tests {
         s.tick_combat(40 * 50);
         let r = s.take_power_report().unwrap();
         assert_eq!((r.cur_half, r.pose), (None, Some(crate::life::ReportPose::Idle)));
+    }
+
+    #[test]
+    fn a_200_hit_reports_curpower_hurt_and_the_hurt_sprite_then_idle_at_15_s() {
+        // The real 2.00 victim (lab, 2026-10-30 run 2 and lan-200i) sends
+        // `22 23 2a 24 "hurt" 31 a3` (after the message id) in the frame of the hit: CURPOWER,
+        // GANI `hurt`, SPRITE 128 + its own facing. GANI `idle` follows at
+        // about 1.5 s, the plain SPRITE at about 2 s.
+        let v = crate::protocol::ClientVersion::V200;
+        let mut s = mortal();
+        s.life.set_rules(v.death_rules());
+        s.combat.set_rules(v.combat_rules());
+        s.apply_server_power(Some(3), Some(4), Some(50));
+        s.player_dir = DIR_EAST;
+        let h = crate::combat::HurtPlayer { attacker: 2, dx: 1.0, dy: 0.0, half: 1, npc: None };
+        assert!(s.receive_hurtplayer(&h, Some((s.player_x, s.player_y))).outcome.is_ok());
+        let m = s.take_power_report().unwrap().message(v.profile().ui.ganis).unwrap();
+        assert_eq!(m, b"\x22\x22\x23\x2a\x24hurt\x31\xa3\n".to_vec());
+        // The hurt pose (31 ticks) still on: nothing new.
+        s.tick_combat(30 * 50);
+        assert_eq!(s.take_power_report(), None);
+        assert!(s.combat.is_hurt());
+        s.tick_combat(50);
+        let r = s.take_power_report().unwrap();
+        assert_eq!((r.cur_half, r.pose, r.sprite), (None, Some(crate::life::ReportPose::Idle), None));
+        assert!(s.combat.is_hurt(), "hurt mode, and its sprite, run on to 40 ticks");
+        s.tick_combat(9 * 50);
+        assert!(!s.combat.is_hurt());
+        assert_eq!(s.take_power_report(), None);
     }
 
     #[test]
