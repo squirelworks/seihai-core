@@ -122,6 +122,12 @@ pub fn wear_images(own_props: &[u8], accepted: Option<&IdSet>) -> Vec<String> {
     worn_images(own_props, accepted).into_iter().flatten().collect()
 }
 
+/// The head image of the own props, if the head prop names one.
+pub fn head_image(own_props: &[u8], accepted: Option<&IdSet>) -> Option<String> {
+    let [_, _, head, _] = worn_images(own_props, accepted);
+    head
+}
+
 /// The sword, shield, head and body images of [`wear_images`], each `None`
 /// when its prop has no image.
 fn worn_images(own_props: &[u8], accepted: Option<&IdSet>) -> [Option<String>; 4] {

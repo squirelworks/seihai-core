@@ -40,6 +40,7 @@
 //! | 2.22 | about 5.1 s | the TCP copy goes out only while another player is in the level (0 sends in 3 solo sessions); the client's UDP copy (2.05 UDP id 15) is the other way to reach players |
 //! | 2.31 | median 5.13 s (5.11 to 5.17) | always, idle or walking, in every level used |
 //! | 2.17.1 | 5.07 to 5.11 s while idle (lab, 2026-10-30) | always: alone in the level in all five runs, on both lab servers, the first one at the end of the post-login frame |
+//! | 4.04r2 | 5.142 to 5.151 s (lab, 2026-10-31) | always: alone in the level, the first at the end of the after-burst frames; 4.20r6 and 4.20r8 take it (4.20r8 sent it with the same period in the first 4.x live run) |
 //!
 //! GServer-v2 relays the payload unchanged to the other players in the
 //! level as `PLO_SHOWIMG` (32, `GSHORT sender id` plus the client's bytes).
@@ -369,7 +370,11 @@ mod tests {
         }
         let with: Vec<&str> =
             PROFILES.iter().filter(|p| p.protocol.showimg.is_some()).map(|p| p.label).collect();
-        assert_eq!(with, ["2.17", "2.22", "2.31"]);
+        assert_eq!(with, ["2.17", "2.22", "2.31", "4.04r2", "4.20r6", "4.20r8"]);
+        let i404 = ClientVersion::V404R2.profile().protocol.showimg.unwrap();
+        assert!(!i404.needs_others);
+        assert_eq!(i404.period, MS(5145));
+        assert!(ClientVersion::V500R7.profile().protocol.showimg.is_none());
         let i222 = ClientVersion::V222.profile().protocol.showimg.unwrap();
         let i231 = ClientVersion::V231.profile().protocol.showimg.unwrap();
         assert!(i222.needs_others && !i231.needs_others);

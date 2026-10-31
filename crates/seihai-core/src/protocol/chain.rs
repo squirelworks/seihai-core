@@ -24,10 +24,10 @@
 use super::profile::{
     Basis, BuiltIn, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, Levels, ListKind, Listserver, LoginShape, PortStatus, Props, Protocol, ServerList, ShapeBasis, Ui,
     BUILT_IN_14921, BUILT_IN_14922,
-    ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, TAMPER_217, TAMPER_222,
+    ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222,
     TAMPER_230, TAMPER_231,
 };
-use super::lobby::{Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_512};
+use super::lobby::{Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512};
 use super::login::{LoginInfo, LOGIN_217, LOGIN_222, LOGIN_231, LOGIN_304, LOGIN_3153};
 use super::showimg::ShowImgInfo;
 use super::tampercheck::TamperInfo;
@@ -1060,11 +1060,14 @@ pub const CHAIN: &[Step] = &[
             plo: IdDelta::plus(&[105, 106, 170, 182, 183, 190, 191, 193, 194, 195]),
             // The send ids read in the 4.x engine, with the ids 3.153 and 5.00r7
             // both send taken as sent; 40 and 43 are in neither 4.x nor 5.00r7.
-            pli: IdDelta::plus_minus(&[44, 79, 92, 130, 161], &[40, 43]),
+            // 47 (VERIFYWANTSEND) for a cached update package, seen live
+            // (2026-10-31).
+            pli: IdDelta::plus_minus(&[44, 47, 79, 92, 130, 161], &[40, 43]),
             // No listserver: the game server named `Login` serves the list.
             listserver: Some(None),
             login: Some(None),
             lobby: Some(Some(LOBBY_404)),
+            showimg: Some(Some(SHOWIMG_404)),
             server_list: Some(ServerList::Direct { default: "loginserver.graalonline.com:14900" }),
             chat_text: Some(ChatText { face: ChatFace::Arial, height: 24 }),
             ..Delta::NONE
@@ -1073,8 +1076,8 @@ pub const CHAIN: &[Step] = &[
         unknown: &[
             Unknown { area: "pli", what: "the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34, 38 and 46 seen in the lab; the 2026-10-31 live run saw 2, 4, 9, 23, 24, 34, 37, 38, 44, 46, 152, 154 and 157, all in the set)" },
             Unknown { area: "login", what: "Seihai sends the three machine fields as an empty quoted string, as for 5.00r7; the real client sends three MD5s" },
-            Unknown { area: "login", what: "the base-file requests after the language (basepackage.gupd, bigmap.txt), 152 and 154 (PM and lister setup) and the own props burst are not sent" },
-            Unknown { area: "walk", what: "SPRITE, X2 and Y2 go out with every step; the real client sends only what changed and GANI walk/idle (lab, 2026-10-31)" },
+            Unknown { area: "login", what: "the after-login messages follow the real client (lab, 2026-10-31), but the nickname is Seihai's setting (default the account), 44 lists Seihai's own window title, and the client's file checks of its GUI images (plisticon, plistcat, state.png, pics1.png) are not sent" },
+            Unknown { area: "walk", what: "the 50 ms X2/Y2 cadence with GANI walk/idle follows the lab; pushing, grabbing, carrying and the bow were not compared" },
             Unknown { area: "serverwarp", what: "the lab's 178 reached the game server, but the warp text it used was not recorded; split on commas only, as the 5.x and 6.x builds" },
             Unknown { area: "props", what: "own and other prop sets are 3.153's; no 4.x prop parser was read (the lab saw X2/Y2, 78 and 79)" },
             Unknown { area: "ui", what: "chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7" },
@@ -1141,7 +1144,11 @@ pub const CHAIN: &[Step] = &[
             // The binary's constant send ids plus 11 and 38 (lab), with the ids both
             // 3.153 and 6.03r7 send taken as sent. 162 answers 108, which 5.00r7
             // does not handle. The lobby, list and chat are 4.x's.
-            pli: IdDelta::plus_minus(&[47, 159], &[162]),
+            pli: IdDelta::plus_minus(&[159], &[162]),
+            // Not recorded for 5.00r7; the 4.x value is not carried over.
+            showimg: Some(None),
+            // The 4.x login line; the 4.x after-login messages are not carried over.
+            lobby: Some(Some(LOBBY_500)),
             ..Delta::NONE
         },
         source: "binary (unpacked engine DLL) and lab (lab-v5-2026-10-30): PLO set of 100 ids, send ids from the send wrappers, login id 5 with G3D22067 and the win,<3 md5> list in the plain zlib frame, then 37 in its own gen-5 frame; Login mode until 178",
@@ -1434,9 +1441,19 @@ fn lobby_text(l: &Option<Lobby>) -> String {
     match l {
         None => "none".into(),
         Some(l) => format!(
-            "first server {:?}, nothing drawn until 178, login line ends {}",
+            "first server {:?}, nothing drawn until 178, login line ends {}{}",
             l.first_server,
-            String::from_utf8_lossy(&l.login_tail())
+            String::from_utf8_lossy(&l.login_tail()),
+            match l.after_login {
+                Some(a) => format!(
+                    "; after the login {} (first session also {}), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS {} and code page {}",
+                    a.after_language.join(", "),
+                    a.first_session_files.join(", "),
+                    a.os_props.0,
+                    a.os_props.1
+                ),
+                None => String::new(),
+            }
         ),
     }
 }
