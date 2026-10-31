@@ -280,6 +280,13 @@ impl ClientVersion {
     /// row is read from a real binary (not [`super::Basis::Inferred`]), and
     /// it is the one row picked for its release:
     ///
+    /// - 1.28 beta 2, 1.3 test and 1.31 (`GSERV013`, `GSERV014`,
+    ///   `GSERV016`): read from their binaries and run in the lab, where
+    ///   Seihai sent each real client's login line and props byte for byte
+    ///   (`documentation/login-burst.md`). 1.21 (`GSERV007`) is in gs2lib
+    ///   too but is not listed: its archive holds only an InstallShield
+    ///   setup, so it was never run and its login props are borrowed from
+    ///   1.28 beta 2.
     /// - 1.39, 1.41, 2.05, 2.17, 2.22 and 2.31 for the 1.x and 2.x line.
     /// - 3.04 (gs2lib `3.041`) for 3.x. 3.153's `G3D28015` is not in stock
     ///   gs2lib.
@@ -290,13 +297,14 @@ impl ClientVersion {
     ///   stock gs2lib.
     /// - 6.03r7 Windows (`6.037`). The Linux twin stays under "All versions".
     ///
-    /// Everything else (1.21 to 1.38, 1.42, 2.00 to 2.04, the inferred 2.1x,
+    /// Everything else (1.21, 1.32 to 1.38, 1.42, 2.00 to 2.04, the inferred 2.1x,
     /// 2.3, 6.015 and 6.034 rows, and the offline-only builds) is listed
     /// only under "All versions". Sources: Graal_analysis
     /// `client-internals/version-id-map.md`, `protocol/file-transfer.md`
     /// and `server-notes/public-allowed-versions.md`.
     pub fn reborn_versions() -> &'static [ClientVersion] {
         &[
+            Self::V128B2, Self::V13T, Self::V131,
             Self::V139, Self::V141, Self::V205, Self::V217, Self::V222, Self::V231,
             Self::V304, Self::V404R2, Self::V420R8,
             Self::V500R7, Self::V512, Self::V531R4, Self::V603R7,
@@ -405,7 +413,7 @@ mod tests {
         let labels: Vec<&str> = ClientVersion::reborn_versions().iter().map(|v| v.label()).collect();
         assert_eq!(
             labels,
-            ["1.39", "1.41", "2.05", "2.17", "2.22", "2.31", "3.04", "4.04r2", "4.20r8", "5.00r7", "5.12", "5.31r4", "6.03r7"]
+            ["1.28 beta 2", "1.3 test", "1.31", "1.39", "1.41", "2.05", "2.17", "2.22", "2.31", "3.04", "4.04r2", "4.20r8", "5.00r7", "5.12", "5.31r4", "6.03r7"]
         );
     }
 
