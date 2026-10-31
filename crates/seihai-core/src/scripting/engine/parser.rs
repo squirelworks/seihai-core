@@ -150,12 +150,30 @@ impl<'a> Parser<'a> {
     }
 
     /// Skip to the end of the current statement: past the next `;`, or up
-    /// to a `}` or the end of input.
+    /// to the enclosing block's `}` or the end of input. A `{` met on the
+    /// way opens a block that is skipped whole, and the statement ends with
+    /// it: `*if (timeout) { ... }` (a block "commented out" with a `*`, as
+    /// 2gta's scripts have it) does nothing, and a bad `*bad{x;}` inside an
+    /// `if` does not close the `if`. Cases from pyReborn's (MIT)
+    /// `test_gs1_parser_recovery.py`, taken from scripts 2gta serves.
     fn recover(&mut self) {
+        let mut depth = 0usize;
         loop {
             match self.peek().tok.clone() {
-                Tok::Eof | Tok::Op("}") => return,
-                Tok::Op(";") => {
+                Tok::Eof => return,
+                Tok::Op("}") if depth == 0 => return,
+                Tok::Op("}") => {
+                    self.next();
+                    depth -= 1;
+                    if depth == 0 {
+                        return;
+                    }
+                }
+                Tok::Op("{") => {
+                    self.next();
+                    depth += 1;
+                }
+                Tok::Op(";") if depth == 0 => {
                     self.next();
                     return;
                 }
@@ -376,7 +394,7 @@ impl<'a> Parser<'a> {
     /// command, an assignment, a call, or something unknown.
     fn name_stmt(&mut self, w: String, line: u32, start: usize) -> Option<Stmt> {
         let nxt = self.peek().tok.clone();
-        let assigns = matches!(nxt, Tok::Op("=" | "+=" | "-=" | "*=" | "/=" | "++" | "--" | "["));
+        let assigns = matches!(nxt, Tok::Op("=" | ":=" | "+=" | "-=" | "*=" | "/=" | "++" | "--" | "["));
         let paren = matches!(nxt, Tok::Op("("));
         // `name(...)` calls the script's own function of that name, even
         // one named like a command (`move();`, `hurt();` in baddy scripts).
@@ -521,7 +539,7 @@ impl<'a> Parser<'a> {
 
     fn assign_tail(&mut self, target: VarRef) -> Stmt {
         let op = match self.peek().tok.clone() {
-            Tok::Op("=") => AssignOp::Set,
+            Tok::Op("=" | ":=") => AssignOp::Set,
             Tok::Op("+=") => AssignOp::Add,
             Tok::Op("-=") => AssignOp::Sub,
             Tok::Op("*=") => AssignOp::Mul,
@@ -1109,5 +1127,46 @@ mod tests {
             "(if created (block (cmd setimg \"door.png\") (cmd setshape 1 32 32)))\n\
              (if playertouchsme (block (if (! client.keyfound) (block (cmd say2 \"The door is locked.\")) (block (cmd hide) (cmd setlevel2 \"house.nw\" 32 60)))))\n"
         );
+    }
+}
+/// GS1 parser-recovery cases from pyReborn's `test_gs1_parser_recovery.py`
+/// (MIT), taken from scripts 2gta serves.
+#[cfg(test)]
+mod twogta_recovery {
+    use super::*;
+
+    fn g(src: &str) -> String {
+        parse(src, Era::V21).to_string()
+    }
+
+    /// A block "commented out" with a `*` does nothing; before, its body ran
+    /// at the top level.
+    #[test]
+    fn a_star_block_is_skipped_whole() {
+        let src = "*if(playerenters||timeout){\ntimereverywhere;\nshowimg 300,light2.png,x-2.8,y-1.6;\ntimeout = 0.05;\n}\nthis.after = 1;";
+        assert_eq!(g(src), "(block)\n(= this.after 1)\n");
+    }
+
+    /// A bad statement with a block inside an `if` does not close the `if`.
+    #[test]
+    fn a_bad_block_inside_an_if_keeps_the_if() {
+        assert_eq!(g("if (created) { *bad{x;} this.a = 1; }\nthis.b = 2;"), "(if created (block (block) (= this.a 1)))\n(= this.b 2)\n");
+    }
+
+    #[test]
+    fn colon_equals_assigns() {
+        let s = parse("this.a := 3; this.b := this.a + 1;", Era::V21);
+        assert!(s.diagnostics.is_empty(), "{:?}", s.diagnostics);
+        assert_eq!(s.to_string(), "(= this.a 3)\n(= this.b (+ this.a 1))\n");
+    }
+
+    #[test]
+    fn a_stray_top_level_brace_is_skipped() {
+        assert_eq!(g("this.x=1;\n}\nthis.y=2;"), "(= this.x 1)\n(= this.y 2)\n");
+    }
+
+    #[test]
+    fn a_junk_character_loses_only_its_statement() {
+        assert!(g("this.a=1;\nboxy = {1\\0,10};\nthis.b=2;").ends_with("(= this.b 2)\n"));
     }
 }

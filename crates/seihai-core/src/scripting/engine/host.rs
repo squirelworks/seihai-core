@@ -77,6 +77,8 @@ impl SessionScripts {
             }
         }
         self.world.core.level = level_name.to_string();
+        // A new level's view follows the player until a script moves it.
+        session.view_focus = None;
         // A weapon's images belong to the level the player was on.
         session.player_images.clear();
         let resumed = session.gmap.is_some() && self.world.unpark_level(level_name);
@@ -137,6 +139,8 @@ impl SessionScripts {
         // The board as it is now: cuts, lifts and the server's board
         // changes all show in `board[]` reads.
         self.world.core.board = s.current_level.as_ref().map(|l| l.tile_ids());
+        // 2.05: "keydown(index) is always false when the player is paused".
+        self.world.core.keys_down = if s.paused { 0 } else { s.keys_down };
         let p = &mut self.world.core.player;
         let (ox, oy) = gmap_origin(s);
         p.x = s.player_x as f64 + ox;
@@ -239,6 +243,36 @@ impl SessionScripts {
         if let Some(o) = id.and_then(|id| self.world.obj_mut(id)) {
             o.x = f64::from(x);
             o.y = f64::from(y);
+        }
+    }
+
+    /// Give each level NPC without a `setshape` the size of its picture:
+    /// the image part it shows, else the whole image, whose size in pixels
+    /// `image_size` knows once the image is loaded. That rectangle is what
+    /// `playertouchsme` tests. Before, every such NPC was 2 by 2 tiles, so
+    /// 2gta's wide `tulepathcheck.png` exit at the top of
+    /// `onlinestartlocal.nw` (an NPC at 29,0 that runs `setlevel2` on
+    /// touch) could not be touched from y 0, where the feet are at 2.75.
+    pub fn size_npcs(&mut self, session: &OfflineSession, image_size: impl Fn(&str) -> Option<(u32, u32)>) {
+        let Some(level) = session.current_level.as_ref() else { return };
+        for id in self.world.ids() {
+            let Some(o) = self.world.obj_mut(id) else { continue };
+            if o.kind != ObjKind::Npc {
+                continue;
+            }
+            let Some(n) = level.npcs.get(o.tag) else { continue };
+            if n.shape.is_some() {
+                continue;
+            }
+            let size = match n.image_part {
+                Some((_, _, w, h)) => Some((w.max(0) as u32, h.max(0) as u32)),
+                None if !n.image.is_empty() => image_size(&n.image),
+                None => None,
+            };
+            if let Some((w, h)) = size.filter(|&(w, h)| w > 0 && h > 0) {
+                o.w_px = f64::from(w);
+                o.h_px = f64::from(h);
+            }
         }
     }
 
@@ -676,6 +710,13 @@ impl SessionScripts {
                         s.script_hide_ms = ms;
                     }
                 }
+                // `setfocus x,y` and `resetfocus` (2.1+ only; the engine
+                // drops them for 2.05): where the view is centred.
+                Effect::Command { ref name, ref args, .. } if name == "setfocus" => {
+                    let num = |i: usize| args.get(i).map_or(0.0, |v| v.num()) as f32;
+                    s.view_focus = Some((num(0), num(1)));
+                }
+                Effect::Command { ref name, .. } if name == "resetfocus" => s.view_focus = None,
                 // `showstats bits`: which parts of the status bar show.
                 Effect::Command { ref name, ref args, .. } if name == "showstats" => {
                     let bits = args.first().map_or(0.0, |v| v.num());

@@ -31,7 +31,8 @@ pub struct Spanned {
 
 // `=<`, `=>` and `<>` are in the 2.05 client's comparison table beside
 // `<=`, `>=` and `!=`. `.` is the field after an index (`npcs[i].x`).
-const OPS2: &[&str] = &["==", "!=", "<=", ">=", "=<", "=>", "<>", "&&", "||", "+=", "-=", "*=", "/=", "++", "--"];
+// `:=` is a plain assignment (2gta's "Space Storm" weapon is written with it).
+const OPS2: &[&str] = &["==", "!=", "<=", ">=", "=<", "=>", "<>", "&&", "||", "+=", "-=", "*=", "/=", "++", "--", ":="];
 const OPS1: &[&str] = &[
     "+", "-", "*", "/", "%", "^", "=", "<", ">", "!", "(", ")", "{", "}", "[", "]", ",", ";", "|", ":", "?", "@", ".",
 ];
