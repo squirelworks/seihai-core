@@ -72,7 +72,7 @@ If the new build lands between two existing ones, the step after it must be re-c
 
 - It does not say a value is true; it says what Seihai's row holds and how well it is backed. Rows marked inferred are the builds with no binary (2.1 to 2.16, 2.3).
 - The table lists changes in Seihai's profile fields only. Behaviour of a build that is not a profile field (payload layouts, timings) lives in `protocol.md` and the notes.
-- Found while building it (left as it was, so behaviour is unchanged): the 1.41 row carries the 2.05 death and combat rules, because it was built from the 2.05 template; 1.42 clears them. No 1.41 handler was traced. The TOML lists GLEVNW01 (`.nw`) as readable by 1.41 and 1.42, while the rows of 1.33 to 2.04 have `.graal` only.
+- Found while building it (left as it was, so behaviour is unchanged): the 1.41 row carries the 2.05 death and combat rules, because it was built from the 2.05 template; 1.42 clears them. No 1.41 handler was traced. (The rows of 1.33 to 2.04 also had `.graal` only, though the 1.41 and 1.42 binaries carry the GLEVNW01 loader; 1.41 and 1.42 now read `.nw`.)
 
 ## The table
 
@@ -178,6 +178,7 @@ Generated; do not edit between the markers.
 - props: **own-player props**: +35 BODYIMG, +36 RATING (35 -> 37 ids)
 - props: **other-player props**: +35 BODYIMG, +36 RATING (23 -> 25 ids)
 - props: **npc_max**: 34 -> 35
+- levels: **nw**: no -> yes
 - life: **death**: none -> 2.05 rules (name-group test)
 - life: **combat**: 1.39 rules (one swing step a tick, the rest 2.05) -> 2.05 rules
 - ui: **server_list**: direct (www.graalonline.com:14900) -> one list
@@ -186,8 +187,8 @@ Generated; do not edit between the markers.
 - unknown (listserver): original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured
 - unknown (listserver): the real 1.41 rev 1 sent nothing to the lab listserver, which spoke first (shape S, 2026-10-30); whether the public service speaks first to a silent client is not known, so after 3 s with no reply Seihai sends shape B (id 0 `newmain`, then id 1 with the account), which 14923 answered on 2026-10-25
 - unknown (life): death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)
-- unknown (levels): the version-profile TOML lists GLEVNW01 (.nw) as readable by 1.41 and 1.42 and drops it at 2.00; the rows of 1.33 to 2.04 have .graal only
-- source: binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126
+- unknown (levels): the .nw loader was found by a string and function scan of the binary; no .nw level was loaded in a real 1.41
+- source: binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126, .nw (GLEVNW01) loader
 
 #### 1.42 (`GNW08011`, binary, linked 2001-01-10)
 
@@ -208,6 +209,7 @@ Generated; do not edit between the markers.
 #### 2.00 (`GNW24011`, binary, linked 2001-02-01)
 
 - protocol: **plo (server ids handled)**: +154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
+- levels: **nw**: yes -> no
 - life: **death**: none -> 2.05 rules (name-group test)
 - life: **combat**: none -> 2.00 rules (raw sword power, fewer packet gates)
 - ui: **gs1_commands**: 134 -> 142
@@ -216,7 +218,7 @@ Generated; do not edit between the markers.
 - unknown (life): death read in the 2.00 r0 decompile; 2.00 r1 to 2.04 checked by their constants only (timer cap, input gate, dead bit, respawn AP steps). No real 2.00 death was captured yet
 - unknown (listserver): Seihai now sends the real 2.00 frame (shape A, captured in the lab: id 0 `newmain` only, no account). That frame has not been run on the public service. The 2026-10-25 matrix used Seihai's older classic login (shape B), which 14923 answered with a plain zlib id-0 list (4 rows) while 14922 stayed silent; the port is assumed for shape A until a run. A real 2.00's reply was not captured
 - unknown (token): the token is not in gs2lib, so a stock GServer-v2 does not know it
-- source: binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)
+- source: binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, .nw loader dropped, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)
 
 #### 2.01 (`GNW23021`, binary, linked 2001-03-08)
 

@@ -1380,8 +1380,12 @@ mod tests {
         assert!(d.protocol.plo.contains(166) && !c.protocol.plo.contains(166));
         assert!(d.props.own.contains(42) && !c.props.own.contains(42));
         assert_eq!((a.token, b.token, c.token, d.token), ("GNW15041", "GNW20041", "GNW06051", "GNW24061"));
-        // 2.05 is the first build with .nw levels and the server name in the title.
-        assert!(!d.levels.nw && p(ClientVersion::V205).levels.nw);
+        // .nw levels: 1.41 and 1.42 have the loader, 2.00 to 2.04 drop it,
+        // 2.05 brings it back. 2.05 is also the first with the server name in
+        // the title.
+        assert!(p(ClientVersion::V141).levels.nw && p(ClientVersion::V142).levels.nw);
+        assert!(!p(ClientVersion::V200).levels.nw && !a.levels.nw && !d.levels.nw);
+        assert!(p(ClientVersion::V205).levels.nw);
         assert_eq!(b.window_title(Some("X")), "Graal 2.02 rev2");
         assert_eq!(by_label("2.02 rev2").unwrap().version, ClientVersion::V202R2);
     }
