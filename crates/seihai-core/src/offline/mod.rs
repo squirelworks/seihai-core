@@ -384,6 +384,19 @@ pub struct OfflineSession {
     /// known. Edge links to the level next door on it keep the player's
     /// offset across the seam (see [`edge_link_arrival`]).
     pub big_map: Option<crate::gmap::Gmap>,
+    /// The big-map levels around the player's, drawn past the edges (see
+    /// [`crate::gmap::BigMapView`]).
+    pub big_map_view: crate::gmap::BigMapView,
+    /// Online: the name of the server's level the player is in (the main
+    /// loop keeps it). A level drawn from the server's board has no file,
+    /// so edge links ask this one which level they leave.
+    pub online_level: Option<String>,
+    /// After an edge link on a big map: where the player stood before it,
+    /// in the next level's tiles, until [`Self::arrive`] takes it.
+    seam_from: Option<(f32, f32)>,
+    /// The draw-only glide that hides the jump an edge link makes (see
+    /// [`SeamGlide`]).
+    pub seam_glide: Option<SeamGlide>,
     /// False from an arrival until the player has moved: a link cannot
     /// fire on the spot the player was put on.
     armed: bool,
@@ -528,6 +541,35 @@ pub fn name_group(level: &str) -> String {
     }
 }
 
+/// How long the view takes to catch up with a big-map edge link's jump.
+pub const SEAM_GLIDE_MS: u32 = 200;
+
+/// The view's glide over a big-map edge link. The edge link lands the
+/// player where the real client does: on the east edge, feet on tile 63 of
+/// one level put the player at x -0.5 of the next, two tiles further on
+/// than the seam (see [`edge_link_arrival`]). The position and what goes to
+/// the server stay as they are; only the drawing starts from where the
+/// player stood and catches up over [`SEAM_GLIDE_MS`], so the crossing
+/// shows no jump.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SeamGlide {
+    /// The draw offset at the start, in tiles (old place minus new).
+    pub from: (f32, f32),
+    pub left_ms: u32,
+}
+
+impl SeamGlide {
+    /// The draw offset now, in tiles: `from`, shrinking to nothing.
+    pub fn offset(&self) -> (f32, f32) {
+        let k = self.left_ms as f32 / SEAM_GLIDE_MS as f32;
+        (self.from.0 * k, self.from.1 * k)
+    }
+}
+
+/// The largest jump (tiles, each axis) a glide hides: more is a warp the
+/// server made somewhere else, drawn at once.
+const SEAM_GLIDE_MAX: f32 = 4.0;
+
 /// Where an edge link to the big-map neighbour on that side puts the
 /// player, or `None` for any other link. The 2.05 client: a link one tile
 /// wide on the west edge (x 0), east edge (x 63), north edge (y 0) or south
@@ -662,6 +704,10 @@ impl OfflineSession {
             warp_pending: None,
             gmap: None,
             big_map: None,
+            big_map_view: crate::gmap::BigMapView::default(),
+            online_level: None,
+            seam_from: None,
+            seam_glide: None,
             armed: true,
             arrival_tile: None,
             swim_sent: false,
@@ -1083,6 +1129,10 @@ impl OfflineSession {
 
     /// Load a .nw level from disk.
     pub fn load_level<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), String> {
+        // On a big map the level being left is drawn beside the next one.
+        if let Some(old) = self.loaded_file.clone().filter(|_| self.gmap.is_none()) {
+            self.keep_level_for_big_map(&old);
+        }
         self.loaded_file = path.as_ref().file_name().map(|n| n.to_string_lossy().into_owned());
         let level = Level::load(path)?;
         self.current_level = Some(level);
@@ -1790,6 +1840,7 @@ impl OfflineSession {
         if self.warp_pending.is_some() || !self.armed {
             return false;
         }
+        self.seam_from = None;
         let Some(level) = &self.current_level else {
             return false;
         };
@@ -1804,16 +1855,69 @@ impl OfflineSession {
             }
             self.arrival_tile = None;
         }
-        let here = self.loaded_file.as_deref().unwrap_or("");
+        let here = self.online_level.as_deref().or(self.loaded_file.as_deref()).unwrap_or("");
         let big_map = self.big_map.as_ref();
         let (x, y) = (self.player_x, self.player_y);
+        let mut seam = None;
         self.pending_link = level.links.iter().find(|l| hit(l)).map(|link| {
-            let (nx, ny) = big_map
-                .and_then(|m| edge_link_arrival(m, here, link, x, y))
-                .unwrap_or((link.new_x.unwrap_or(x + link.x_offset), link.new_y.unwrap_or(y + link.y_offset)));
+            let edge = big_map.and_then(|m| edge_link_arrival(m, here, link, x, y));
+            if let Some((nx, ny)) = edge {
+                // Which edge: the arrival is about a level away on that axis.
+                let (dx, dy) = (((x - nx) / 64.0).round(), ((y - ny) / 64.0).round());
+                seam = Some((x - 64.0 * dx, y - 64.0 * dy));
+            }
+            let (nx, ny) = edge.unwrap_or((link.new_x.unwrap_or(x + link.x_offset), link.new_y.unwrap_or(y + link.y_offset)));
             (link.dest.clone(), nx, ny)
         });
+        self.seam_from = seam;
         self.pending_link.is_some()
+    }
+
+    /// The draw offset of the player and the view, in tiles: a glide over a
+    /// big-map edge link, else none.
+    pub fn view_glide(&self) -> (f32, f32) {
+        self.seam_glide.map_or((0.0, 0.0), |g| g.offset())
+    }
+
+    /// Run the glide on by `dt_ms`. True while it is still moving (the view
+    /// needs drawing again).
+    pub fn tick_seam_glide(&mut self, dt_ms: u64) -> bool {
+        let Some(g) = self.seam_glide.as_mut() else { return false };
+        g.left_ms = g.left_ms.saturating_sub(dt_ms.min(u64::from(u32::MAX)) as u32);
+        if g.left_ms == 0 {
+            self.seam_glide = None;
+        }
+        true
+    }
+
+    /// Before the current level is replaced: on a big map, keep it to draw
+    /// beside the next one (the player is leaving `name` across an edge,
+    /// or by any other warp; a level not next door is dropped at the next
+    /// [`Self::sync_big_map`]).
+    pub fn keep_level_for_big_map(&mut self, name: &str) {
+        let key = crate::gmap::level_key(name);
+        let on_grid = self.big_map.as_ref().is_some_and(|m| m.names.iter().any(|n| !n.is_empty() && crate::gmap::level_key(n) == key));
+        if let (true, Some(level)) = (on_grid, self.current_level.as_ref()) {
+            // Chests opened on this visit stay open on the far side.
+            let mut level = level.clone();
+            for c in level.chests.iter_mut() {
+                c.opened |= self.opened_chests.contains(&(c.x, c.y));
+            }
+            self.big_map_view.keep(name, level);
+        }
+    }
+
+    /// Bring the big-map neighbours up to date for the player's level
+    /// `here` (see [`crate::gmap::BigMapView::sync`]). Off a gmap only: a
+    /// gmap draws its own neighbours. True when the view changed.
+    pub fn sync_big_map(&mut self, here: Option<&str>, load: &mut dyn FnMut(&str) -> Option<Level>) -> bool {
+        let map = self.big_map.as_ref().filter(|_| self.gmap.is_none());
+        self.big_map_view.sync(map, here, load)
+    }
+
+    /// The big-map level drawn `(dx, dy)` levels away from the player's.
+    pub fn big_map_neighbour(&self, dx: i32, dy: i32) -> Option<&Level> {
+        self.big_map_view.at(self.big_map.as_ref()?, dx, dy)
     }
 
     /// The player is put at `(x, y)` in a level that is now loaded: the
@@ -1823,6 +1927,12 @@ impl OfflineSession {
     pub fn arrive(&mut self, x: f32, y: f32) -> bool {
         self.player_x = x;
         self.player_y = y;
+        // Across a big-map edge: the drawing glides from the old place.
+        self.seam_glide = self.seam_from.take().and_then(|(fx, fy)| {
+            let from = (fx - x, fy - y);
+            let near = from.0.abs() <= SEAM_GLIDE_MAX && from.1.abs() <= SEAM_GLIDE_MAX;
+            (near && from != (0.0, 0.0)).then_some(SeamGlide { from, left_ms: SEAM_GLIDE_MS })
+        });
         self.warp_pending = None;
         self.pending_link = None;
         self.armed = false;
@@ -1844,6 +1954,7 @@ impl OfflineSession {
     /// Give up a pending warp (the server refused or never answered).
     pub fn cancel_warp(&mut self) {
         self.warp_pending = None;
+        self.seam_from = None;
     }
 
     /// Recompute `in_water` and `sitting` from the feet.
@@ -3601,6 +3712,78 @@ mod tests {
         let mut asked = std::collections::HashSet::new();
         assert_eq!(map.big_map_ahead("mid", 60.0, 60.0, &mut asked), ["e.nw", "s.nw", "se.nw"]);
         assert!(map.big_map_ahead("MID", 61.0, 61.0, &mut asked).is_empty());
+    }
+
+    /// Online the edge link waits for the server: the glide starts at the
+    /// server's arrival, from where the player stood, and only when the
+    /// server put the player next to the seam. Other warps do not glide.
+    #[test]
+    fn an_edge_link_glides_only_when_it_lands_by_the_seam() {
+        let mut lvl = level(|_, _| OPEN);
+        lvl.links.push(link("e.nw", 63, 0, 1, 64, Some(0.0), None));
+        let walk_to_link = |s: &mut OfflineSession| {
+            s.player_dir = DIR_EAST;
+            s.player_x = 61.5;
+            s.player_y = 20.0;
+            assert!(s.check_links());
+            let (dest, x, y) = s.pending_link.take().unwrap();
+            s.begin_warp(&dest);
+            (x, y)
+        };
+        let mut s = session_at(lvl.clone(), 30.0, 20.0);
+        s.loaded_file = Some("mid.nw".into());
+        s.big_map = Some(big3());
+        let (x, y) = walk_to_link(&mut s);
+        assert_eq!((x, y), (-0.5, 20.0));
+        // Ticks while the warp is pending keep it.
+        assert!(!s.check_links());
+        s.arrive(x, y);
+        assert_eq!(s.view_glide(), (-2.0, 0.0), "drawn at x -2.5: where 61.5 is, seen from e.nw");
+        // The server put the player somewhere else: drawn there at once.
+        let mut s = session_at(lvl.clone(), 30.0, 20.0);
+        s.loaded_file = Some("mid.nw".into());
+        s.big_map = Some(big3());
+        walk_to_link(&mut s);
+        s.arrive(30.0, 30.0);
+        assert_eq!(s.view_glide(), (0.0, 0.0));
+        // A refused warp forgets it.
+        let mut s = session_at(lvl.clone(), 30.0, 20.0);
+        s.loaded_file = Some("mid.nw".into());
+        s.big_map = Some(big3());
+        let (x, y) = walk_to_link(&mut s);
+        s.cancel_warp();
+        s.arrive(x, y);
+        assert_eq!(s.view_glide(), (0.0, 0.0));
+        // No big map: no glide either.
+        let mut s = session_at(lvl, 30.0, 20.0);
+        s.loaded_file = Some("mid.nw".into());
+        let (x, y) = walk_to_link(&mut s);
+        s.arrive(x, y);
+        assert_eq!(s.view_glide(), (0.0, 0.0));
+    }
+
+    /// Leaving a big-map level keeps it to draw beside the next one, with
+    /// the chests opened on this visit open.
+    #[test]
+    fn the_level_left_on_a_big_map_is_kept_with_its_opened_chests() {
+        let mut lvl = level(|_, _| OPEN);
+        lvl.chests.push(crate::assets::Chest { x: 5, y: 5, item: "greenrupee".into(), sign_index: -1, opened: false });
+        let mut s = session_at(lvl, 30.0, 20.0);
+        s.big_map = Some(big3());
+        s.opened_chests.insert((5, 5));
+        s.keep_level_for_big_map("house.nw");
+        assert!(!s.big_map_view.has("house.nw"), "not on the grid");
+        s.keep_level_for_big_map("MID");
+        assert!(s.big_map_view.has("mid.nw"));
+        s.current_level = Some(level(|_, _| OPEN));
+        let mut none = |_: &str| None;
+        s.sync_big_map(Some("e.nw"), &mut none);
+        let west = s.big_map_neighbour(-1, 0).expect("mid.nw west of e.nw");
+        assert!(west.chests[0].opened);
+        // On a gmap the gmap draws its neighbours: the big-map view is off.
+        s.enter_gmap("g.gmap".into(), big3(), (0, 0));
+        assert!(s.sync_big_map(Some("e.nw"), &mut none));
+        assert!(s.big_map_neighbour(-1, 0).is_none());
     }
 
     #[test]

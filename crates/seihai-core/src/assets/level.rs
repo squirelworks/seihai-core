@@ -976,14 +976,19 @@ impl Level {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, String> {
         let path = path.as_ref();
         let data = fs::read(path).map_err(|e| e.to_string())?;
+        Self::from_bytes(&data).map_err(|e| format!("{e} in {}", path.display()))
+    }
+
+    /// Read a .nw or .graal file's bytes (a download kept in memory, say).
+    pub fn from_bytes(data: &[u8]) -> Result<Self, String> {
         if data.len() >= 8 && &data[0..8] == b"GLEVNW01" {
-            let text = String::from_utf8_lossy(&data);
+            let text = String::from_utf8_lossy(data);
             return Self::parse(&text);
         }
         if data.len() >= 8 && (data[0..8].starts_with(b"GR-V1") || data[0..8].starts_with(b"Z3-V1")) {
-            return Self::parse_binary(&data);
+            return Self::parse_binary(data);
         }
-        Err(format!("unrecognised level header in {}", path.display()))
+        Err("unrecognised level header".into())
     }
 
     /// Parse a binary .graal (GR-V1) bitstream into a Level.

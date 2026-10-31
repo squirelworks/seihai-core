@@ -150,6 +150,123 @@ impl GmapWorld {
     }
 }
 
+/// The big-map levels drawn around the player's level, so a big map reads
+/// as one world: the neighbours' tiles past each edge, and the level the
+/// player left kept on its side after a crossing. Drawing only: the
+/// level change still goes to the server as an edge link, and nothing here
+/// sends a message (`documentation/bigmap-neighbours.md`).
+#[derive(Debug, Default)]
+pub struct BigMapView {
+    /// The player's level the view was built around (as [`level_key`]
+    /// gives it) and its cell on the grid.
+    here: Option<(String, (i32, i32))>,
+    /// Loaded neighbour levels by [`level_key`].
+    levels: HashMap<String, Level>,
+    /// Names the loader had nothing for since the last [`Self::retry`].
+    tried: HashSet<String>,
+}
+
+/// A big-map level name as a key: lower case, `.nw` added to a bare name
+/// (the same file name [`Gmap::big_map_ahead`] asks for).
+pub fn level_key(name: &str) -> String {
+    let n = name.trim().to_ascii_lowercase();
+    if n.contains('.') {
+        n
+    } else {
+        format!("{n}.nw")
+    }
+}
+
+impl BigMapView {
+    /// Keep `level` (the one the player is leaving) under `name`, to be
+    /// drawn beside the next level instead of loaded again.
+    pub fn keep(&mut self, name: &str, level: Level) {
+        self.levels.insert(level_key(name), level);
+    }
+
+    /// Ask the loader again for the levels it had nothing for (a file came in).
+    pub fn retry(&mut self) {
+        self.tried.clear();
+    }
+
+    /// The level drawn `(dx, dy)` levels away from the player's.
+    pub fn at<'a>(&'a self, map: &Gmap, dx: i32, dy: i32) -> Option<&'a Level> {
+        let (_, (cx, cy)) = self.here.as_ref()?;
+        let n = map.level_at(cx + dx, cy + dy)?;
+        self.levels.get(&level_key(n))
+    }
+
+    /// Whether a level of this name is loaded here.
+    pub fn has(&self, name: &str) -> bool {
+        self.levels.contains_key(&level_key(name))
+    }
+
+    /// Bring the view up to date for the player in `here` on `map`: forget
+    /// the levels no longer next door, and load the missing neighbours (up
+    /// to eight) through `load`, each name tried once until [`Self::retry`].
+    /// Off the grid, or with no map, the view is empty. Returns true when
+    /// a level came or went (the view changed).
+    pub fn sync(&mut self, map: Option<&Gmap>, here: Option<&str>, load: &mut dyn FnMut(&str) -> Option<Level>) -> bool {
+        // The grid may name a level with or without `.nw`.
+        let cell_of = |m: &Gmap, h: &str| {
+            let k = level_key(h);
+            let i = m.names.iter().position(|n| !n.is_empty() && level_key(n) == k)?;
+            Some(((i % m.width) as i32, (i / m.width) as i32))
+        };
+        let cell = map.zip(here).and_then(|(m, h)| Some((m, h, cell_of(m, h)?)));
+        let Some((map, here, cell)) = cell else {
+            let changed = !self.levels.is_empty();
+            *self = Self::default();
+            return changed;
+        };
+        let key = level_key(here);
+        let mut changed = false;
+        let around: Vec<String> = map.neighbours(cell).into_iter().filter_map(|(x, y)| map.level_at(x, y)).map(level_key).collect();
+        if self.here.as_ref().map(|(k, _)| k) != Some(&key) {
+            self.here = Some((key, cell));
+            self.tried.clear();
+            let before = self.levels.len();
+            self.levels.retain(|k, _| around.contains(k));
+            changed |= self.levels.len() != before;
+        }
+        for name in around {
+            if self.levels.contains_key(&name) || !self.tried.insert(name.clone()) {
+                continue;
+            }
+            if let Some(l) = load(&name) {
+                self.levels.insert(name, l);
+                changed = true;
+            }
+        }
+        changed
+    }
+}
+
+/// How far from a big-map edge (tiles, across and down) the level next
+/// door is asked for, for a view `view_w` by `view_h` tiles: once the edge
+/// can come into view (half the view, plus the body's offset and a step's
+/// margin), and never closer than [`BIGMAP_NEAR_EDGE`]. Asked earlier, its
+/// file is in by the time its tiles would be drawn past the edge, so the
+/// edge never shows black.
+pub fn big_map_ahead_distance(view_w: u32, view_h: u32) -> (f32, f32) {
+    let d = |v: u32| (v as f32 / 2.0 + 4.0).max(BIGMAP_NEAR_EDGE);
+    (d(view_w), d(view_h))
+}
+
+/// How long the last frame may stay up while a big-map level's tiles are
+/// on the way (see [`hold_frame_for_board`]).
+pub const BOARD_HOLD: std::time::Duration = std::time::Duration::from_millis(1000);
+
+/// Whether to keep showing the last frame instead of drawing a new one:
+/// online on a big map, the server named the new level (`waited` ago) and
+/// its tiles have not come yet. Drawing then would show a black board for
+/// a frame or more at every edge crossing. After [`BOARD_HOLD`] the frame is
+/// drawn whatever is there, so a level that never comes does not freeze
+/// the window.
+pub fn hold_frame_for_board(big_map: bool, level_loaded: bool, waited: Option<std::time::Duration>) -> bool {
+    big_map && !level_loaded && waited.is_some_and(|w| w < BOARD_HOLD)
+}
+
 /// How close (in tiles) to a big-map level's edge the player gets before the
 /// level on that side is asked for. Seihai's choice: the real clients do not
 /// ask for big-map neighbours ahead.
@@ -297,11 +414,17 @@ impl Gmap {
     /// across the edge finds the level already here (laundry list P7).
     /// Nothing when `here` is not on the grid.
     pub fn neighbours_near_edge(&self, here: &str, x: f32, y: f32) -> Vec<&str> {
+        self.neighbours_within(here, x, y, (BIGMAP_NEAR_EDGE, BIGMAP_NEAR_EDGE))
+    }
+
+    /// [`Self::neighbours_near_edge`] with the distance per axis: `near.0`
+    /// tiles from the west and east edges, `near.1` from the north and
+    /// south ones.
+    pub fn neighbours_within(&self, here: &str, x: f32, y: f32, near: (f32, f32)) -> Vec<&str> {
         // The middle of the player's body, as the edge links test it.
         let (fx, fy) = (x + 1.5, y + 2.0);
-        let near = BIGMAP_NEAR_EDGE;
-        let dx = if fx < near { -1 } else if fx >= 64.0 - near { 1 } else { 0 };
-        let dy = if fy < near { -1 } else if fy >= 64.0 - near { 1 } else { 0 };
+        let dx = if fx < near.0 { -1 } else if fx >= 64.0 - near.0 { 1 } else { 0 };
+        let dy = if fy < near.1 { -1 } else if fy >= 64.0 - near.1 { 1 } else { 0 };
         let mut v = Vec::new();
         for (ox, oy) in [(dx, 0), (0, dy), (dx, dy)] {
             if (ox, oy) == (0, 0) {
@@ -324,7 +447,14 @@ impl Gmap {
     /// edge itself, so the level is asked for before the link is walked
     /// (laundry item 9, `documentation/bigmap-neighbours.md`).
     pub fn big_map_ahead(&self, here: &str, x: f32, y: f32, asked: &mut HashSet<String>) -> Vec<String> {
-        self.neighbours_near_edge(here, x, y)
+        self.big_map_ahead_within(here, x, y, (BIGMAP_NEAR_EDGE, BIGMAP_NEAR_EDGE), asked)
+    }
+
+    /// [`Self::big_map_ahead`] with the distance per axis. The main loop
+    /// passes [`big_map_ahead_distance`] for its view, so the level next
+    /// door is asked for by the time its edge comes into view.
+    pub fn big_map_ahead_within(&self, here: &str, x: f32, y: f32, near: (f32, f32), asked: &mut HashSet<String>) -> Vec<String> {
+        self.neighbours_within(here, x, y, near)
             .into_iter()
             .filter(|n| asked.insert(format!("near:{}", n.to_ascii_lowercase())))
             .map(|n| if n.contains('.') { n.to_string() } else { format!("{n}.nw") })
@@ -674,6 +804,70 @@ pub fn sync_world(
 
 #[cfg(test)]
 mod tests {
+    /// The big-map view loads the eight levels around the player's (bare
+    /// grid names get `.nw`), keeps the one left behind, drops the ones no
+    /// longer next door, and asks the loader for a missing name once until
+    /// a retry.
+    #[test]
+    fn the_big_map_view_follows_the_player() {
+        use super::{BigMapView, Level};
+        let g = super::Gmap::parse_grid("\"a\",\"b\",\"c\",\"d\"\n\"e\",\"f\",\"g\",\"h\"\n").unwrap();
+        let asked = std::cell::RefCell::new(Vec::new());
+        let mut have = vec!["a.nw", "c.nw", "e.nw", "g.nw"];
+        let mut v = BigMapView::default();
+        let mut load = |n: &str| {
+            asked.borrow_mut().push(n.to_string());
+            have.contains(&n).then(|| Level::from_board(&[1u16; 4096]))
+        };
+        assert!(v.sync(Some(&g), Some("B.nw"), &mut load));
+        assert_eq!(*asked.borrow(), ["a.nw", "e.nw", "f.nw", "c.nw", "g.nw"], "columns first, as `neighbours`");
+        assert!(v.at(&g, -1, 0).is_some() && v.at(&g, 1, 1).is_some() && v.at(&g, 0, 1).is_none());
+        // Nothing new: nothing asked.
+        assert!(!v.sync(Some(&g), Some("b"), &mut load));
+        assert_eq!(asked.borrow().len(), 5);
+        // A file came: the missing one is asked again.
+        v.retry();
+        have.push("f.nw");
+        let mut load = |n: &str| have.contains(&n).then(|| Level::from_board(&[1u16; 4096]));
+        assert!(v.sync(Some(&g), Some("b"), &mut load));
+        assert!(v.at(&g, 0, 1).is_some());
+        // East to c: b is kept (handed over), a and e are dropped.
+        v.keep("b", Level::from_board(&[2u16; 4096]));
+        let mut load = |_: &str| None;
+        assert!(v.sync(Some(&g), Some("c.nw"), &mut load));
+        assert!(v.at(&g, -1, 0).is_some_and(|l| l.layer0_board()[0] == 2));
+        assert!(!v.has("a") && !v.has("e.nw") && v.has("g") && v.has("f"));
+        // Off the grid: empty.
+        assert!(v.sync(Some(&g), Some("house.nw"), &mut load));
+        assert!(v.at(&g, 0, 0).is_none() && !v.has("b"));
+    }
+
+    /// With a wide view the level next door is asked for as its edge can
+    /// come into view, not at 10 tiles.
+    #[test]
+    fn the_ahead_distance_follows_the_view() {
+        let g = super::Gmap::parse_grid("\"w\",\"mid\",\"e\"\n").unwrap();
+        let near = super::big_map_ahead_distance(40, 30);
+        assert_eq!(near, (24.0, 19.0));
+        assert_eq!(super::big_map_ahead_distance(8, 8), (10.0, 10.0), "never under 10");
+        let mut asked = std::collections::HashSet::new();
+        // Body middle at 41.5: 22.5 tiles from the east edge.
+        assert_eq!(g.big_map_ahead_within("mid", 40.0, 30.0, near, &mut asked), ["e.nw"]);
+        assert!(g.big_map_ahead("mid", 40.0, 30.0, &mut std::collections::HashSet::new()).is_empty(), "the old 10 tiles");
+    }
+
+    #[test]
+    fn the_last_frame_waits_for_a_big_map_board_but_not_forever() {
+        use super::hold_frame_for_board as hold;
+        use std::time::Duration;
+        let ms = |n| Some(Duration::from_millis(n));
+        assert!(hold(true, false, ms(10)));
+        assert!(!hold(true, true, ms(10)), "the tiles are in");
+        assert!(!hold(false, false, ms(10)), "no big map: as before");
+        assert!(!hold(true, false, None), "not waiting");
+        assert!(!hold(true, false, ms(1000)), "given up");
+    }
+
     #[test]
     fn big_map_neighbours_are_asked_for_near_an_edge() {
         let g = super::Gmap::parse_grid("\"nw.nw\",\"n.nw\",\"ne.nw\"\n\"w.nw\",\"mid.nw\",\"e.nw\"\n\"sw.nw\",\"\",\"se.nw\"\n").unwrap();
