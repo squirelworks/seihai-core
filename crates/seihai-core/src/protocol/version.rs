@@ -238,6 +238,13 @@ impl ClientVersion {
         super::profile::by_label(label).map(|p| p.version)
     }
 
+    /// The version to run for a launcher label: a profile's own, or the
+    /// [`OfflineBuild::plays_as`](super::offline_builds::OfflineBuild) of an
+    /// offline-only build (which is never played online).
+    pub fn from_label_or_offline(label: &str) -> Option<ClientVersion> {
+        Self::from_label(label).or_else(|| super::offline_builds::by_label(label).map(|b| b.plays_as))
+    }
+
     /// Main versions shown by default.
     pub fn main_versions() -> &'static [ClientVersion] {
         &[Self::V139, Self::V205, Self::V217, Self::V222, Self::V231]

@@ -16,6 +16,7 @@ pub mod layouts;
 pub mod levelcache;
 pub mod lobby;
 pub mod npcprops;
+pub mod offline_builds;
 mod list;
 pub mod flagset;
 pub mod login;
