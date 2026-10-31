@@ -416,7 +416,8 @@ impl<'a> Run<'a> {
             "playermaxhp" => p.max_hp,
             "tokenscount" => self.core.tokens.len() as f64,
             "paramscount" => self.obj.params.len() as f64,
-            "weaponscount" => 0.0,
+            "weaponscount" => p.weapons.len() as f64,
+            "selectedweapon" => p.selected_weapon.unwrap_or(0) as f64,
             _ => 0.0,
         })
     }
@@ -443,6 +444,20 @@ impl<'a> Run<'a> {
                 self.core.effects.push(Effect::SetPos { obj: id, x: self.obj.x, y: n });
             }
             "timeout" => self.set_timeout(n),
+            "selectedweapon" => {
+                let p = &mut self.core.player;
+                let len = p.weapons.len();
+                if n < 0.0 || n.floor() as usize >= len {
+                    return;
+                }
+                // The client's own select: the first weapon from `i` on,
+                // wrapping, that is not hidden; `i` itself if all are.
+                let i = n.floor() as usize;
+                let pick = (0..len).map(|k| (i + k) % len).find(|&j| !p.weapons[j].0.is_empty() && !p.weapons[j].0.starts_with('-')).unwrap_or(i);
+                p.selected_weapon = Some(pick);
+                p.weapon = p.weapons[pick].0.clone();
+                self.core.effects.push(Effect::SetPlayerVar { name: name.to_string(), value: pick as f64 });
+            }
             _ => {
                 let p = &mut self.core.player;
                 match name {
@@ -772,6 +787,13 @@ impl<'a> Run<'a> {
                 ('n', None) => Some(self.core.player.nick.clone()),
                 ('a', None) => Some(self.core.player.account.clone()),
                 ('w', None) => Some(self.core.player.weapon.clone()),
+                // `#w(i)` and `#W(i)`: name and image of weapon `i` of the
+                // whole list (2.04).
+                ('w' | 'W', Some(x)) if era >= Era::V204 => {
+                    let i = self.expand(x, depth + 1).trim().parse::<f64>().unwrap_or(-1.0);
+                    let w = (i >= 0.0).then(|| self.core.player.weapons.get(i as usize)).flatten();
+                    Some(w.map(|(n, img)| if code == 'w' { n.clone() } else { img.clone() }).unwrap_or_default())
+                }
                 ('L', None) | ('F', None) => Some(self.core.level.clone()),
                 ('v', Some(x)) => match parse_expr(x, era) {
                     Some(e) => Some(self.eval(&e).text()),

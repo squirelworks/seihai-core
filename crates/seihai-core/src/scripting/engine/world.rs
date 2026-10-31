@@ -125,6 +125,14 @@ pub struct PlayerView {
     pub chat: String,
     /// The selected weapon's name (`#w`).
     pub weapon: String,
+    /// The whole weapon list the client holds, in its order, hidden (`-`)
+    /// weapons included: `(name, image)`. `#w(i)`, `#W(i)`, `weaponscount`,
+    /// `selectedweapon` and `callweapon i` index it. Empty when the host
+    /// keeps no list (offline), and then `callweapon i` counts the world's
+    /// weapon objects instead.
+    pub weapons: Vec<(String, String)>,
+    /// Index of the selected weapon in `weapons` (`selectedweapon`).
+    pub selected_weapon: Option<usize>,
     /// Names of the status flags that are true (`playerswimming`, ...).
     pub status: BTreeSet<String>,
 }
@@ -147,6 +155,8 @@ impl Default for PlayerView {
             account: String::new(),
             chat: String::new(),
             weapon: String::new(),
+            weapons: Vec::new(),
+            selected_weapon: None,
             status: BTreeSet::new(),
         }
     }
@@ -602,6 +612,15 @@ impl ScriptWorld {
                 }
                 Target::Id(i) => Some(i),
                 Target::Npc(n) => self.ids().into_iter().filter(|&i| self.obj(i).is_some_and(|o| o.kind == ObjKind::Npc)).nth(n),
+                // `callweapon i` indexes the client's whole weapon list, as
+                // `selectedweapon` does; offline there is no list.
+                Target::Weapon(n) if !self.core.player.weapons.is_empty() => match self.core.player.weapons.get(n) {
+                    Some((name, _)) => {
+                        let name = name.clone();
+                        self.ids().into_iter().find(|&i| self.obj(i).is_some_and(|o| o.kind == ObjKind::Weapon && o.name == name))
+                    }
+                    None => None,
+                },
                 Target::Weapon(n) => self.ids().into_iter().filter(|&i| self.obj(i).is_some_and(|o| o.kind == ObjKind::Weapon)).nth(n),
             };
             match id {
