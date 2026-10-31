@@ -4,10 +4,11 @@
 //! Graal's `.mng` files (lamps, glares, emoticons, a few heads and bodies)
 //! are made by Graal's own `gif2mng`, and every client from 1.34 to 2.22
 //! reads them with its own `TMNGAnimation` unit, not with a real MNG
-//! library. That unit is the model here, read from the 2.22 client
-//! (`Graal_222.exe`, the loader at 0x58A3E4, the step at 0x58ACEC, the
-//! frame draw at 0x58AE60, the tick at 0x585083) and from `gif2mng.exe`,
-//! which carries the same loader. It differs from the MNG standard:
+//! library. That unit is the model here, read from the 2.22 client (the
+//! routine that loads the file, the one that moves to the next frame, the
+//! one that draws a frame into the picture, and the game-tick handler that
+//! counts frames down) and from `gif2mng.exe`, which carries the same
+//! loader. It differs from the MNG standard:
 //!
 //! * **Chunks.** Names are compared in upper case. Only `MHDR`, `FRAM`,
 //!   `TERM`, `IHDR`, `PLTE`, `tRNS`, `IDAT`, `IEND` and `MEND` are read;
