@@ -155,6 +155,11 @@ pub struct OfflineSession {
     pub tiletypes: Option<TileTypes>,
     /// The cut and lift tables of `arrays.dat`, if one was loaded.
     pub object_tables: Option<ObjectTables>,
+    /// The tile and object tables of the built-in tutorial sheet, used while
+    /// the level is a tutorial level (`assets::tutorial`). `None`: no swap.
+    pub tutorial_tables: Option<(TileTypes, Option<ObjectTables>)>,
+    /// The player's own tables, kept here while a tutorial level is up.
+    stashed_tables: Option<(Option<TileTypes>, Option<ObjectTables>)>,
     /// What the player is carrying after a lift: the object's tiles.
     pub carried: Option<Carried>,
     /// Objects in flight, break effects playing, and thrown things that stay
@@ -559,6 +564,8 @@ impl OfflineSession {
             current_level: None,
             tiletypes: None,
             object_tables: None,
+            tutorial_tables: None,
+            stashed_tables: None,
             carried: None,
             thrown: Vec::new(),
             leaps: Vec::new(),
@@ -1079,6 +1086,7 @@ impl OfflineSession {
         self.loaded_file = path.as_ref().file_name().map(|n| n.to_string_lossy().into_owned());
         let level = Level::load(path)?;
         self.current_level = Some(level);
+        self.swap_tutorial_tables();
         self.opened_chests.clear();
         self.reading = None;
         self.no_pk = false;
@@ -1088,21 +1096,60 @@ impl OfflineSession {
         Ok(())
     }
 
+    /// True while the tutorial's own tables are in use (the level is a
+    /// tutorial level and [`Self::tutorial_tables`] is set). The client draws
+    /// the tutorial sheet for as long as this holds.
+    pub fn tutorial_tables_active(&self) -> bool {
+        self.stashed_tables.is_some()
+    }
+
+    /// Put the tutorial's tables in place on entering a tutorial level, and
+    /// the player's own back on leaving one.
+    fn swap_tutorial_tables(&mut self) {
+        let want = self.tutorial_tables.is_some()
+            && self.loaded_file.as_deref().is_some_and(crate::assets::tutorial::is_tutorial_level);
+        if want && self.stashed_tables.is_none() {
+            let (types, obj) = self.tutorial_tables.clone().expect("checked above");
+            self.stashed_tables = Some((self.tiletypes.replace(types), std::mem::replace(&mut self.object_tables, obj)));
+            self.refresh_water();
+        } else if !want {
+            if let Some((types, obj)) = self.stashed_tables.take() {
+                self.tiletypes = types;
+                self.object_tables = obj;
+                self.refresh_water();
+            }
+        }
+    }
+
     /// Load the 4096-byte collision table from a text tiledefs file.
     pub fn load_tiletypes<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), String> {
-        self.tiletypes = Some(TileTypes::load(path)?);
+        let types = TileTypes::load(path)?;
+        self.put_own_tables_back();
+        self.tiletypes = Some(types);
         self.refresh_water();
+        self.swap_tutorial_tables();
         Ok(())
+    }
+
+    /// Undo the tutorial swap (the player's tables are about to change).
+    fn put_own_tables_back(&mut self) {
+        if let Some((types, obj)) = self.stashed_tables.take() {
+            self.tiletypes = types;
+            self.object_tables = obj;
+        }
     }
 
     /// Load type-0 collision from `arrays.dat` (first array = nowall list).
     /// Tiles in the list get type 0 (passable); everything else gets type 22.
     pub fn load_tiletypes_arrays<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), String> {
         let path = path.as_ref();
-        self.tiletypes = Some(TileTypes::load_arrays(path)?);
+        let types = TileTypes::load_arrays(path)?;
+        self.put_own_tables_back();
+        self.tiletypes = Some(types);
         // The same file holds the cut and lift tables.
         self.object_tables = std::fs::read(path).ok().and_then(|d| ObjectTables::parse(&d));
         self.refresh_water();
+        self.swap_tutorial_tables();
         Ok(())
     }
 

@@ -46,6 +46,11 @@ pub const FILES: &[(&str, &[u8])] = &[
     ("heads/head0.png", include_bytes!("../../../../assets/default/heads/head0.png")),
     ("levels/new1.nw", include_bytes!("../../../../assets/default/levels/new1.nw")),
     ("levels/new2.nw", include_bytes!("../../../../assets/default/levels/new2.nw")),
+    ("levels/seihai_tutorial1.nw", include_bytes!("../../../../assets/default/levels/seihai_tutorial1.nw")),
+    ("levels/seihai_tutorial2.nw", include_bytes!("../../../../assets/default/levels/seihai_tutorial2.nw")),
+    ("levels/seihai_tutorial3.nw", include_bytes!("../../../../assets/default/levels/seihai_tutorial3.nw")),
+    ("levels/seihai_tutorial4.nw", include_bytes!("../../../../assets/default/levels/seihai_tutorial4.nw")),
+    ("levels/seihai_tutorial_house.nw", include_bytes!("../../../../assets/default/levels/seihai_tutorial_house.nw")),
     ("levels/tiledefs/tiledefsOffline.txt", include_bytes!("../../../../assets/default/levels/tiledefs/tiledefsOffline.txt")),
     ("pics1.png", include_bytes!("../../../../assets/default/pics1.png")),
     ("shields/shield1.gif", include_bytes!("../../../../assets/default/shields/shield1.gif")),
@@ -59,6 +64,8 @@ pub const FILES: &[(&str, &[u8])] = &[
     ("swords/sword1.gif", include_bytes!("../../../../assets/default/swords/sword1.gif")),
     ("swords/sword1.png", include_bytes!("../../../../assets/default/swords/sword1.png")),
     ("tiledefs.txt", include_bytes!("../../../../assets/default/tiledefs.txt")),
+    ("tutorial/arrays.dat", include_bytes!("../../../../assets/default/tutorial/arrays.dat")),
+    ("tutorial/pics1.png", include_bytes!("../../../../assets/default/tutorial/pics1.png")),
 ];
 
 /// An identifier of the whole set: CRC-32 over each name and its bytes.
@@ -178,8 +185,9 @@ mod tests {
         for (n, d) in FILES {
             assert_eq!(&fs::read(root.join(n)).unwrap(), d, "{n}");
         }
-        // 128 KB since the sheet holds art for all 4096 tile ids of the Graal layout.
-        assert!(total_size() < 128 * 1024, "the set stays small: {} bytes", total_size());
+        // 128 KB since the sheet holds art for all 4096 tile ids of the Graal
+        // layout; 256 KB since the tutorial (its sheet, tables and levels).
+        assert!(total_size() < 256 * 1024, "the set stays small: {} bytes", total_size());
     }
 
     #[test]
