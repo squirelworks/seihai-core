@@ -265,9 +265,47 @@ impl ClientVersion {
         Self::from_label(label).or_else(|| super::offline_builds::by_label(label).map(|b| b.plays_as))
     }
 
-    /// Main versions shown by default.
+    /// The five versions tested most from Mae. `--check-assets` with no
+    /// `--version` checks these. Every one is also in [`Self::reborn_versions`].
     pub fn main_versions() -> &'static [ClientVersion] {
         &[Self::V139, Self::V205, Self::V217, Self::V222, Self::V231]
+    }
+
+    /// The versions the launcher lists by default: the major releases that
+    /// Graal Reborn's GServer-v2 knows by name, oldest first.
+    ///
+    /// A version is here when its token is in stock gs2lib's
+    /// `clientVersions[]` table (GServer-v2 gives an unknown token
+    /// `CLVER_UNKNOWN`, which no `allowedversions.txt` range admits), its
+    /// row is read from a real binary (not [`super::Basis::Inferred`]), and
+    /// it is the one row picked for its release:
+    ///
+    /// - 1.39, 1.41, 2.05, 2.17, 2.22 and 2.31 for the 1.x and 2.x line.
+    /// - 3.04 (gs2lib `3.041`) for 3.x. 3.153's `G3D28015` is not in stock
+    ///   gs2lib.
+    /// - 4.04r2 (`4.042`) and 4.20r8 (`4.208`). 4.20r6's `G3D27076` is not
+    ///   in stock gs2lib.
+    /// - 5.00r7 (`5.07`), 5.12, and 5.31r4 for `G3D26090` (gs2lib `5.31x`,
+    ///   shared with 5.30r3 and 6.00r2). 5.24r4's `G3D15010` is not in
+    ///   stock gs2lib.
+    /// - 6.03r7 Windows (`6.037`). The Linux twin stays under "All versions".
+    ///
+    /// Everything else (1.21 to 1.38, 1.42, 2.00 to 2.04, the inferred 2.1x,
+    /// 2.3, 6.015 and 6.034 rows, and the offline-only builds) is listed
+    /// only under "All versions". Sources: Graal_analysis
+    /// `client-internals/version-id-map.md`, `protocol/file-transfer.md`
+    /// and `server-notes/public-allowed-versions.md`.
+    pub fn reborn_versions() -> &'static [ClientVersion] {
+        &[
+            Self::V139, Self::V141, Self::V205, Self::V217, Self::V222, Self::V231,
+            Self::V304, Self::V404R2, Self::V420R8,
+            Self::V500R7, Self::V512, Self::V531R4, Self::V603R7,
+        ]
+    }
+
+    /// Whether the launcher lists this version without "All versions".
+    pub fn listed_by_default(self) -> bool {
+        Self::reborn_versions().contains(&self)
     }
 
     /// All versions with a profile, oldest first.
@@ -316,6 +354,59 @@ mod tests {
         ] {
             assert_eq!(v.token().len(), 8);
         }
+    }
+
+    /// Stock gs2lib's `clientVersions[]` tokens that Seihai has rows for
+    /// (Graal_analysis `client-internals/version-id-map.md`,
+    /// `protocol/file-transfer.md`, `version-profiles/lab-v4`).
+    const GS2LIB_TOKENS: &[&str] = &[
+        "GSERV007", "GSERV013", "GSERV014", "GSERV016", "GNW07080", "GNW13110", "GNW03081",
+        "GNW31101", "GNW01012", "GNW23012", "GNW30042", "GNW19052", "GNW12102", "GNW22122",
+        "GNW03014", "GNW14015", "GNW28015", "G3D03014", "G3D17026", "G3D20126", "G3D22067",
+        "G3D14097", "G3D26090", "G3D3007A", "G3D2505C", "G3D0311C", "G3D0511C",
+    ];
+
+    /// Every default-listed version is one Reborn's gs2lib knows, is read
+    /// from a binary, and is the only listed row for its token.
+    #[test]
+    fn reborn_versions_are_known_to_gs2lib_and_binary_backed() {
+        let listed = ClientVersion::reborn_versions();
+        let mut tokens = std::collections::HashSet::new();
+        for &v in listed {
+            assert!(GS2LIB_TOKENS.contains(&v.token()), "{}: {} not in gs2lib", v.label(), v.token());
+            assert_eq!(v.profile().basis, crate::protocol::Basis::Binary, "{} is inferred", v.label());
+            assert!(tokens.insert(v.token()), "{}: token {} listed twice", v.label(), v.token());
+        }
+    }
+
+    /// The default list keeps the all-versions order (oldest first) and
+    /// still has the five versions tested from Mae.
+    #[test]
+    fn reborn_versions_are_ordered_and_keep_the_main_five() {
+        let all = ClientVersion::all_versions();
+        let pos: Vec<usize> = ClientVersion::reborn_versions()
+            .iter()
+            .map(|v| all.iter().position(|a| a == v).expect("in all_versions"))
+            .collect();
+        assert!(pos.windows(2).all(|w| w[0] < w[1]), "{pos:?}");
+        for v in ClientVersion::main_versions() {
+            assert!(v.listed_by_default(), "{}", v.label());
+        }
+    }
+
+    /// Builds Reborn does not know, inferred rows, and platform twins stay
+    /// behind "All versions"; one per major line is listed.
+    #[test]
+    fn minor_builds_stay_behind_all_versions() {
+        use ClientVersion::*;
+        for v in [V121, V132, V138, V142, V200, V204, V210, V216, V230, V3153, V420R6, V524R4, V530R3, V600R2, V6015, V6034, V603R7Linux] {
+            assert!(!v.listed_by_default(), "{}", v.label());
+        }
+        let labels: Vec<&str> = ClientVersion::reborn_versions().iter().map(|v| v.label()).collect();
+        assert_eq!(
+            labels,
+            ["1.39", "1.41", "2.05", "2.17", "2.22", "2.31", "3.04", "4.04r2", "4.20r8", "5.00r7", "5.12", "5.31r4", "6.03r7"]
+        );
     }
 
     #[test]
