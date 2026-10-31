@@ -84,15 +84,42 @@ pub fn position_message_precise(x: f32, y: f32, sprite: u8) -> Vec<u8> {
     m
 }
 
+/// The walk props for `version`: SPRITE, X2 and Y2
+/// ([`position_message_precise`]) when its profile uses the precise
+/// positions, X, Y and SPRITE ([`position_message_sprite`]) otherwise. The
+/// real 2.31 walks with X2/Y2 only (cloud lab, 2026-10-31,
+/// `documentation/lab-231-walk.md`), as the 4.x to 6.x builds do.
+pub fn walk_message_for(version: ClientVersion, x: f32, y: f32, sprite: u8) -> Vec<u8> {
+    if version.profile().props.precise_pos {
+        position_message_precise(x, y, sprite)
+    } else {
+        position_message_sprite(x, y, sprite)
+    }
+}
+
+/// Whether `version` sends only `client.` flags to the server. A GS1
+/// probe weapon (`setstring gr.probe,1`, `setstring client.probe,2`, `set
+/// probeflag` on `playerenters`) got only `client.probe=2` from the real
+/// 2.31 (cloud lab, 2026-10-31, `documentation/lab-231-walk.md`) and the real 4.04r2 (lab, 2026-10-31,
+/// `documentation/v4-profiles.md`), and the real 2.31 sent no `gr.x`/`gr.y`
+/// with the `-gr_movement` weapon. The real 2.22 sends every flag
+/// (`documentation/gr-flags.md`). 2.3 has no binary and takes 2.31's
+/// values; the 3.x builds were not probed and keep every flag.
+pub fn sends_client_flags_only(version: ClientVersion) -> bool {
+    matches!(version, ClientVersion::V230 | ClientVersion::V231) || version.profile().protocol.lobby.is_some()
+}
+
 /// Extra messages that go in the same frame right after 46 on a level
 /// entry. A real 2.31 client sends 46 and then its props (the cell prop
 /// and the position) in one frame when it started the move itself: lab,
 /// 2026-10-24, every level link, cached or not, and every gmap crossing. After
 /// a server-side warp the props follow only if the position changed, which
-/// Seihai does not track, so 46 goes out alone then.
-pub fn enter_level_extras(own_link: bool, at: &PlayerUpdate) -> Vec<Vec<u8>> {
+/// Seihai does not track, so 46 goes out alone then. The position is X2/Y2
+/// for a precise-position build: the real 2.31 sent `ENTERLEVEL` and
+/// `PLAYERPROPS X2=61 Y2=33` in its warp frame (lan-231c, 2026-10-31).
+pub fn enter_level_extras(version: ClientVersion, own_link: bool, at: &PlayerUpdate) -> Vec<Vec<u8>> {
     if own_link {
-        vec![position_message(at.x, at.y, at.dir)]
+        vec![walk_message_for(version, at.x, at.y, at.dir % 4)]
     } else {
         Vec::new()
     }
@@ -427,7 +454,7 @@ pub fn link_request_frame(
     let with_enter_level = cached.is_some() && version.sends_enter_level();
     if with_enter_level {
         messages.push(enter_level_message());
-        messages.push(position_message(x, y, dir));
+        messages.push(walk_message_for(version, x, y, dir % 4));
     }
     LinkFrame { messages, with_tamper, with_enter_level }
 }
@@ -788,10 +815,11 @@ pub struct Connection {
     /// only when they change).
     last_walk: Option<Vec<u8>>,
     /// Walk updates carry X2/Y2 ([`position_message_precise`]) instead of
-    /// X/Y: set at login for the Login-lobby builds.
+    /// X/Y: set at login for the builds with precise positions (2.3, 2.31,
+    /// 3.153 and the Login-lobby builds; see [`walk_message_for`]).
     precise_walk: bool,
     /// Only `client.` flags go to the server: set at login for the
-    /// Login-lobby builds ([`Self::queue_flag`]).
+    /// Login-lobby builds and 2.3/2.31 ([`sends_client_flags_only`], [`Self::queue_flag`]).
     client_flags_only: bool,
     /// Set once the reader runs ([`Self::spawn_reader`]): the reader's
     /// thread owns the socket from then on, and frames to send go to it.
@@ -890,8 +918,8 @@ impl Connection {
         let frame = if self.zlib_best { write_zlib_frame_best(&line)? } else { write_zlib_frame(&line)? };
         self.send_raw(&frame)?;
         self.pli = Some(version.profile().protocol.pli);
-        self.precise_walk = version.profile().protocol.lobby.is_some();
-        self.client_flags_only = self.precise_walk;
+        self.precise_walk = version.profile().props.precise_pos;
+        self.client_flags_only = sends_client_flags_only(version);
         self.take_flags();
         match version.encryption() {
             EncryptionGen::Gen3 => self.gen3 = gen3,
@@ -1175,7 +1203,8 @@ impl Connection {
     pub fn queue_flag(&mut self, name: &str, value: Option<&str>) {
         // The real 4.04r2 runs a GS1 weapon's `setstring gr.x,..`,
         // `setstring client.probe,2` and `set probeflag`, and sends only
-        // `client.probe=2` (lab, 2026-10-31, `documentation/v4-profiles.md`).
+        // `client.probe=2` (lab, 2026-10-31, `documentation/v4-profiles.md`);
+        // the real 2.31 does the same (cloud lab, 2026-10-31).
         if self.client_flags_only && !name.starts_with("client.") {
             return;
         }
@@ -1395,7 +1424,7 @@ impl Connection {
     }
 
     /// The walk props for this login: X/Y/SPRITE, or SPRITE/X2/Y2 for a
-    /// Login-lobby build.
+    /// precise-position build.
     fn walk_message(&self, x: f32, y: f32, sprite: u8) -> Vec<u8> {
         if self.precise_walk {
             position_message_precise(x, y, sprite)
@@ -1668,12 +1697,35 @@ mod tests {
     }
 
     #[test]
+    fn walk_matches_the_real_231() {
+        // Real 2.31 in the cloud lab (2026-10-31): the first step right from
+        // x 30 is `GANI walk, SPRITE 3, X2 30.5`, then X2 only, never X/Y.
+        // Seihai sends SPRITE, X2 and Y2 together for 2.31 now; the
+        // classic X/Y stays for 2.22 and 3.04, which have no X2/Y2.
+        for (v, precise) in [(ClientVersion::V222, false), (ClientVersion::V230, true), (ClientVersion::V231, true), (ClientVersion::V304, false), (ClientVersion::V3153, true)] {
+            assert_eq!(walk_message_for(v, 30.5, 30.0, 3)[1], if precise { 17 } else { 15 } + 0x20, "{}", v.label());
+        }
+        let (mut conn, mut srv) = pair();
+        conn.login_versioned(ClientVersion::V231, 5, "acct", "pw").unwrap();
+        let _ = read_frame(&mut srv);
+        assert!(conn.precise_walk && conn.client_flags_only);
+        conn.queue_flag("gr.x", Some("30"));
+        conn.queue_flag("probeflag", None);
+        conn.queue_flag("client.probe", Some("2"));
+        assert_eq!(conn.take_flags(), vec![b"\x32client.probe=2\n".to_vec()]);
+        assert_eq!(conn.walk_message(30.5, 30.0, 3), position_message_precise(30.5, 30.0, 3));
+        // X2 30.5 tiles is 976 = GSHORT `n'p`, as in the 4.04r2 test.
+        assert_eq!(&position_message_precise(30.5, 0.0, 3)[3..6], &[78 + 0x20, b'\'', b'p']);
+    }
+
+    #[test]
     fn lobby_builds_walk_with_x2_y2_and_send_client_flags_only() {
         for (v, precise) in [(ClientVersion::V222, false), (ClientVersion::V404R2, true), (ClientVersion::V420R8, true)] {
             let (mut conn, mut srv) = pair();
             conn.login_versioned(v, 5, "acct", "pw").unwrap();
             let _ = read_frame(&mut srv);
             assert_eq!(conn.precise_walk, precise, "{}", v.label());
+            assert_eq!(conn.client_flags_only, precise, "{}", v.label());
             assert_eq!(conn.walk_message(30.0, 30.5, 2)[1], if precise { 17 } else { 15 } + 0x20, "{}", v.label());
             conn.queue_flag("gr.x", Some("30"));
             conn.queue_flag("probeflag", None);
@@ -3041,7 +3093,8 @@ mod tests {
     #[test]
     fn link_frame_by_profile_cached_and_not() {
         let t = 1_781_284_436u32;
-        let props = position_message(10.0, 20.0, 2);
+        // 2.31 has the precise positions: its props here are X2/Y2.
+        let props = position_message_precise(10.0, 20.0, 2);
         let cached_msg = levelwarpmod_message(t, 10.0, 20.0, "lv_c.nw");
 
         // 2.31: uncached = 0 alone; cached = 30, 46, props. No tamper check.
@@ -3111,7 +3164,7 @@ mod tests {
         let body = gen5_body(&mut srv, &mut g);
         assert_eq!(
             body,
-            [levelwarpmod_message(t, 10.0, 20.0, "lv_c.nw"), ENTER.to_vec(), position_message(10.0, 20.0, 2)].concat()
+            [levelwarpmod_message(t, 10.0, 20.0, "lv_c.nw"), ENTER.to_vec(), position_message_precise(10.0, 20.0, 2)].concat()
         );
         // The server's answer names the level: no 46 is owed.
         assert!(!el.note_level("lv_c.nw") && !el.is_pending());
@@ -3128,8 +3181,9 @@ mod tests {
     #[test]
     fn enter_level_ordering_after_the_servers_answer() {
         let at = PlayerUpdate { x: 10.5, y: 3.0, dir: 2 };
-        assert_eq!(enter_level_extras(true, &at), vec![position_message(10.5, 3.0, 2)]);
-        assert!(enter_level_extras(false, &at).is_empty());
+        assert_eq!(enter_level_extras(ClientVersion::V231, true, &at), vec![position_message_precise(10.5, 3.0, 2)]);
+        assert_eq!(enter_level_extras(ClientVersion::V222, true, &at), vec![position_message(10.5, 3.0, 2)]);
+        assert!(enter_level_extras(ClientVersion::V231, false, &at).is_empty());
 
         let (mut conn, mut srv) = pair();
         conn.login_versioned(ClientVersion::V231, 0x23, "ab", "cd").unwrap();
@@ -3144,15 +3198,15 @@ mod tests {
         // Own link to b: 46 + props, one frame, 46 first.
         assert!(el.note_level("b.nw"));
         assert!(el.is_pending());
-        assert!(el.send_pending(&mut conn, &enter_level_extras(true, &at)).unwrap());
+        assert!(el.send_pending(&mut conn, &enter_level_extras(ClientVersion::V231, true, &at)).unwrap());
         let body = gen5_body(&mut srv, &mut g);
-        assert_eq!(body, [&ENTER[..], &position_message(10.5, 3.0, 2)[..]].concat());
+        assert_eq!(body, [&ENTER[..], &position_message_precise(10.5, 3.0, 2)[..]].concat());
         // Owed once: a second flush sends nothing.
         assert!(!el.is_pending());
         assert!(!el.send_pending(&mut conn, &[]).unwrap());
         // Server warp to a: 46 alone.
         assert!(el.note_level("a.nw"));
-        assert!(el.send_pending(&mut conn, &enter_level_extras(false, &at)).unwrap());
+        assert!(el.send_pending(&mut conn, &enter_level_extras(ClientVersion::V231, false, &at)).unwrap());
         assert_eq!(gen5_body(&mut srv, &mut g), ENTER);
         assert_eq!(el.sent, 2);
     }
