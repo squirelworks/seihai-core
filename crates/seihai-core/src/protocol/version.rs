@@ -111,6 +111,12 @@ pub enum ClientVersion {
     V531R4,
     /// Graal 6.00 rev 2 (`G3D26090`), Windows. Gen 5.
     V600R2,
+    /// Graal 6.015 (`G3D3007A`), Windows: the token 6.00r7 and 6.01r5 send.
+    /// Gen 5. No binary; inferred from Linux 6.01r1.
+    V6015,
+    /// Graal 6.034 (`G3D2505C`), Windows: the token 6.03r4 sends. Gen 5. No
+    /// binary; inferred from 6.03r7.
+    V6034,
     /// Graal 6.03 rev 7 (`G3D0311C`), Windows. Gen 5.
     V603R7,
 }
@@ -260,7 +266,7 @@ impl ClientVersion {
             Self::V212, Self::V213, Self::V214, Self::V215, Self::V216, Self::V217, Self::V222,
             Self::V230, Self::V231, Self::V304, Self::V3153,
             Self::V404R2, Self::V420R6, Self::V420R8,
-            Self::V500R7, Self::V512, Self::V524R4, Self::V530R3, Self::V531R4, Self::V600R2, Self::V603R7,
+            Self::V500R7, Self::V512, Self::V524R4, Self::V530R3, Self::V531R4, Self::V600R2, Self::V6015, Self::V6034, Self::V603R7,
         ]
     }
 }

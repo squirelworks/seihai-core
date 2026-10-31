@@ -1242,18 +1242,69 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "framing", what: "the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1" },
         ],
     },
+    // 6.015 and 6.034 have no binary. Their tokens are in GServer-v2's
+    // allowedversions.txt (G3D3007A for 6.00r7 and 6.01r5, G3D2505C for
+    // 6.03r4) and stock gs2lib knows both (CLVER_6_015, CLVER_6_034). Their id
+    // sets are the Linux reads of the same release lines (v5v6/6x-findings.md,
+    // graal-decompile/v6x/FINDINGS.md); everything else is carried from 6.00r2.
+    Step {
+        version: ClientVersion::V6015,
+        label: "6.015",
+        token: "G3D3007A",
+        date: "",
+        basis: Basis::Inferred,
+        delta: Delta {
+            // Linux 6.01r1 (2011-09-18): 6.00r2's set without 175 and 184 (91 ids).
+            plo: IdDelta::plus_minus(&[], &[175, 184]),
+            // 6.00r2's send set is already Linux 6.01r1's, so no change.
+            lobby: Some(Some(LOBBY_512)),
+            ..Delta::NONE
+        },
+        source: "GServer-v2's allowedversions.txt (G3D3007A for 6.0.0.7 and 6.0.1.5) and stock gs2lib (CLVER_6_015); PLO and PLI from Linux 6.01r1 (91 PLO ids: 6.00r2's without 175 and 184); the rest as 6.00r2",
+        unknown: &[
+            Unknown { area: "binary", what: "no 6.00r7 or 6.01r5 binary; every value of this step is inferred" },
+            Unknown { area: "token", what: "G3D3007A comes from GServer-v2's allowedversions.txt and gs2lib only; no 6.00r7 or 6.01r5 login was captured" },
+            Unknown { area: "plo", what: "Linux 6.01r1's set; whether 6.00r7 (the earlier of the two builds) already drops 175 and 184 is not known" },
+            Unknown { area: "pli", what: "Linux 6.01r1's set (6.03r7's without 160), as for 6.00r2" },
+            Unknown { area: "login", what: "the 5.12 to 6.03r7 login line (win, three machine fields, the quoted Windows version) is taken; no capture with this token" },
+            Unknown { area: "framing", what: "the 0xFFFF long frame length is read in Linux 6.01r1 and taken" },
+            Unknown { area: "ui", what: "Tempus Sans ITC 24 is carried from 6.00r2; Login-mode tile drawing before the warp is not known" },
+            Unknown { area: "date", what: "link date not known" },
+        ],
+    },
+    Step {
+        version: ClientVersion::V6034,
+        label: "6.034",
+        token: "G3D2505C",
+        date: "",
+        basis: Basis::Inferred,
+        delta: Delta {
+            // 6.03r7's sets (Linux 6.03r7, the same 6.03 release): 111 in, and 160 sent.
+            plo: IdDelta::plus(&[111]),
+            pli: IdDelta::plus(&[160]),
+            lobby: Some(Some(LOBBY_512)),
+            ..Delta::NONE
+        },
+        source: "GServer-v2's allowedversions.txt (G3D2505C for 6.0.3.4) and stock gs2lib (CLVER_6_034); PLO and PLI from Linux 6.03r7 (92 PLO ids, 60 send ids); the rest as 6.015",
+        unknown: &[
+            Unknown { area: "binary", what: "no 6.03r4 binary; every value of this step is inferred" },
+            Unknown { area: "token", what: "G3D2505C comes from GServer-v2's allowedversions.txt and gs2lib only; no 6.03r4 login was captured" },
+            Unknown { area: "plo", what: "6.03r7's set; 111 (creationtime.dat) is in 6.03r7 and not in 6.01r1, and whether 6.03r4 already has it is not known" },
+            Unknown { area: "pli", what: "6.03r7's set; whether 6.03r4 already sends 160 (RC folder delete) is not known" },
+            Unknown { area: "login", what: "the 5.12 to 6.03r7 login line (win, three machine fields, the quoted Windows version) is taken; no capture with this token" },
+            Unknown { area: "ui", what: "Tempus Sans ITC 24 is carried; whether 6.03r4 draws tiles before the warp (6.03r7 does not) is not known" },
+            Unknown { area: "date", what: "link date not known" },
+        ],
+    },
     Step {
         version: ClientVersion::V603R7,
         label: "6.03r7",
         token: "G3D0311C",
         date: "2012-11-16",
         basis: Basis::Binary,
-        delta: Delta {
-            plo: IdDelta::plus_minus(&[111], &[175, 184]),
-            pli: IdDelta::plus(&[160]),
-            ..Delta::NONE
-        },
-        source: "unpacked from Themida and lab: 92 PLO ids (175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date",
+        // 6.015 and 6.034 before it already carry 6.03r7's id sets.
+        delta: Delta::NONE,
+        source: "unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date",
         unknown: &[
             Unknown { area: "token", what: "the Linux 6.03r7 sends G3D0511C; this row is the Windows build" },
         ],
