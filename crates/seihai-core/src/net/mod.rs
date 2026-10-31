@@ -661,6 +661,10 @@ fn socket_thread(
         // Every whole frame: a u16 length (6.x: or `FF FF` and a u32),
         // then that many bytes.
         while let Some((head, len)) = frame_len.header(&inbuf) {
+            if len > FrameLen::MAX_LONG {
+                let e = io::Error::new(io::ErrorKind::InvalidData, format!("gen-5 frame length {len} is over {}", FrameLen::MAX_LONG));
+                return fail(&frames, e);
+            }
             if inbuf.len() < head + len {
                 break;
             }

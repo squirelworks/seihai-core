@@ -44,6 +44,11 @@ pub enum FrameLen {
 }
 
 impl FrameLen {
+    /// The longest long frame Seihai takes. The 6.x client sets no limit of
+    /// its own; this is Seihai's, so that a bad `u32` length can't make it
+    /// buffer gigabytes.
+    pub const MAX_LONG: usize = 64 << 20;
+
     /// The header length and the frame length from the start of `buf`, or
     /// `None` until enough bytes are in.
     pub fn header(self, buf: &[u8]) -> Option<(usize, usize)> {
@@ -208,6 +213,12 @@ fn read_frame_inner<R: std::io::Read>(
         r.read_exact(&mut len_buf[2..])?;
     }
     let (_, total) = len.header(&len_buf).expect("six bytes are enough");
+    if total > FrameLen::MAX_LONG {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("gen-5 frame length {total} is over {}", FrameLen::MAX_LONG),
+        ));
+    }
     if total == 0 {
         return Ok(Vec::new());
     }
@@ -378,6 +389,10 @@ mod tests {
         assert_eq!(FrameLen::Short.header(&framed), Some((2, 0xFFFF)));
         assert_eq!(FrameLen::Long.header(&[0x12, 0x34]), Some((2, 0x1234)));
         assert_eq!(FrameLen::Long.header(&[0x12]), None);
+
+        let mut huge = vec![0xFF, 0xFF];
+        huge.extend(u32::MAX.to_be_bytes());
+        assert!(read_frame_len(&mut huge.as_slice(), &mut Gen5::new(9), FrameLen::Long).is_err());
     }
 
     #[test]
