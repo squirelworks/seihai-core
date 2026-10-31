@@ -2583,7 +2583,7 @@ mod tests {
 
     const ENTER: [u8; 3] = [46 + 0x20, 1 + 0x20, b'\n'];
 
-    /// The send sets of 2.3, 2.31, 3.153 and the 5.x/6.x builds have 46; no
+    /// The send sets of 2.3, 2.31, 3.153 and the 4.x to 6.x builds have 46; no
     /// other profile does.
     #[test]
     fn enter_level_follows_the_profile_send_set() {
@@ -2596,7 +2596,7 @@ mod tests {
             .filter(|p| p.version.sends_enter_level())
             .map(|p| p.label)
             .collect();
-        assert_eq!(with, ["2.3", "2.31", "3.153", "5.00r7", "5.12", "5.24r4", "5.30r3", "5.31r4", "6.00r2", "6.03r7"]);
+        assert_eq!(with, ["2.3", "2.31", "3.153", "4.04r2", "4.20r6", "4.20r8", "5.00r7", "5.12", "5.24r4", "5.30r3", "5.31r4", "6.00r2", "6.03r7"]);
     }
 
     /// 46 goes first in the frame, then the props message that follows it.

@@ -435,15 +435,49 @@ Generated; do not edit between the markers.
 - unknown (3d): the 3D mode (Torque GameConnection, Graal3D protocol 19, on UDP listed port + 1) is not modelled here; seihai-ato::torque has its profile
 - source: binary (Mac OS X PPC Mach-O), not run: OSTYPE mac; PLO 67, 74, 82, 104, 131-134, 187 and MOVE2 (189) in, 44 out; RC file browser, script upload and text request ids; X2/Y2/Z2; UDP off in the shipped prefs
 
-#### 5.00r7 (`G3D22067`, binary, linked 2007-07)
+#### 4.04r2 (`G3D17026`, binary, linked 2006-03-03)
 
 - protocol: **listserver**: listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame inferred, not captured) -> none
-- protocol: **plo (server ids handled)**: +105 UPDATEPACKAGESIZE, +106 UPDATEPACKAGEDONE, +107 BOARDLAYER, +140 NPCWEAPONSCRIPT, +170 GHOSTMODE, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +190 SERVERLISTCONNECTED, +191 SHOOT2, +193 UNKNOWN193, +194 CLEARWEAPONS, +195 LOADGANI, +197 LOADSCRIPT; -100 RAWDATA (88 -> 100 ids)
-- protocol: **pli (client ids sent)**: +44 PROCESSLIST, +47 VERIFYWANTSEND, +79 RC_CHAT, +92 RC_FILEBROWSER_DOWN, +130 REQUESTUPDATEBOARD, +159 UPDATEPACKAGEREQUESTFILE, +161 UPDATECLASS; -40 SHOOT, -43 MUTEPLAYER (54 -> 59 ids)
+- protocol: **plo (server ids handled)**: +105 UPDATEPACKAGESIZE, +106 UPDATEPACKAGEDONE, +170 GHOSTMODE, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +190 SERVERLISTCONNECTED, +191 SHOOT2, +193 UNKNOWN193, +194 CLEARWEAPONS, +195 LOADGANI (88 -> 98 ids)
+- protocol: **pli (client ids sent)**: +44 PROCESSLIST, +79 RC_CHAT, +92 RC_FILEBROWSER_DOWN, +130 REQUESTUPDATEBOARD, +161 UPDATECLASS; -40 SHOOT, -43 MUTEPLAYER (54 -> 57 ids)
 - protocol: **login frame**: head and default-weapon files, props without head or colours with OS mac and code page 1250, status icons -> none
 - protocol: **login lobby**: none -> first server "Login", nothing drawn until 178, login line ends win,"","",""
 - ui: **server_list**: 3 tabs -> direct (loginserver.graalonline.com:14900)
 - ui: **chat_text**: ChatText { face: TempusSans, height: 24 } -> ChatText { face: Arial, height: 24 }
+- unknown (pli): the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34 and 38 seen in the lab)
+- unknown (login): Seihai sends the three machine fields as an empty quoted string, as for 5.00r7; the real client sends three MD5s
+- unknown (login): the base-file requests after the language (basepackage.gupd, bigmap.txt) are not sent
+- unknown (serverwarp): the lab's 178 reached the game server, but the warp text it used was not recorded; split on commas only, as the 5.x and 6.x builds
+- unknown (props): own and other prop sets are 3.153's; no 4.x prop parser was read (the lab saw X2/Y2, 78 and 79)
+- unknown (ui): chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
+- unknown (3d): Graal3DEngine.dll (Torque protocol 19, UDP on listed port + 1) is not modelled; seihai-ato::torque has its profile
+- source: binary (stock engine DLL unpacked from the Thinstall installer) and one live lab run (live-behaviour-404): 98 PLO ids, login id 5 with G3D17026 and win,<3 md5> in the plain zlib frame, then 37; Login mode while the server name starts with login, until 178
+
+#### 4.20r6 (`G3D27076`, binary, linked 2006-09)
+
+- protocol: **plo (server ids handled)**: +107 BOARDLAYER, +108 UNKNOWN108; -41 STARTMESSAGE (98 -> 99 ids)
+- protocol: **pli (client ids sent)**: +162 RC_UNKNOWN162 (57 -> 58 ids)
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends mac,"","",""
+- unknown (plo): the note gives the set as 4.20r8's without 41 and 196 (99 ids) but counts 97; the binary was not re-read, the listed set is kept. 41 may be handled outside the switch
+- unknown (pli): the Mac send ids were not read; 4.20r8's set is taken
+- unknown (login): the fourth field is empty in the binary; Seihai sends it, like the other two, as an empty quoted string
+- unknown (live): never run (PowerPC)
+- unknown (3d): Torque protocol 21 is not modelled here; seihai-ato::torque has its profile
+- source: binary (Mac OS X PPC, not run): 4.20r8's PLO set without 41 and 196, login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty>
+
+#### 4.20r8 (`G3D20126`, binary, linked 2007-01)
+
+- protocol: **plo (server ids handled)**: +41 STARTMESSAGE, +196 (99 -> 101 ids)
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends mac,"","","" -> first server "Login", nothing drawn until 178, login line ends win,"","",""
+- unknown (pli): provisional: some sends pass the id in a register, so the set is a floor; 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's
+- unknown (binary): only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
+- unknown (plo): 196 (same layout as 193) is read and dropped by the client; Seihai drops it too
+- source: binary (a third-party packet-logger copy of the engine DLL, linked January 2007; its signature check is patched out): 101 PLO ids (41 and 196 in against the Mac 4.20r6), send ids from the connection code, login id 5 with G3D20126 and win,<3 md5>
+
+#### 5.00r7 (`G3D22067`, binary, linked 2007-07)
+
+- protocol: **plo (server ids handled)**: +140 NPCWEAPONSCRIPT, +197 LOADSCRIPT; -100 RAWDATA, -108 UNKNOWN108, -196 (101 -> 100 ids)
+- protocol: **pli (client ids sent)**: +47 VERIFYWANTSEND, +159 UPDATEPACKAGEREQUESTFILE; -162 RC_UNKNOWN162 (58 -> 59 ids)
 - unknown (pli): only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
 - unknown (login): Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); whether a server accepts all three empty is not known
 - unknown (login): the base-file requests after the language (47 or 23 basepackage.gupd) are not sent

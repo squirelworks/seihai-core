@@ -430,7 +430,7 @@ fn layout_report_follows_the_chain_and_marks_versions_without_a_layout() {
     let t = Tables::builtin();
     let rep = layout_report(&t, Dir::S2C, 49);
     assert_eq!(rep.name, "PLAYERWARP2");
-    // The 3.x, 5.x and 6.x builds handle 49, but their field layouts are not
+    // The 3.x to 6.x builds handle 49, but their field layouts are not
     // written up yet.
     let last = rep.runs.last().unwrap();
     assert_eq!((last.from, last.to), ("3.04", "6.03r7"));

@@ -27,7 +27,7 @@ use super::profile::{
     ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, TAMPER_217, TAMPER_222,
     TAMPER_230, TAMPER_231,
 };
-use super::lobby::{Lobby, LOBBY_500, LOBBY_512};
+use super::lobby::{Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_512};
 use super::login::{LoginInfo, LOGIN_217, LOGIN_222, LOGIN_231, LOGIN_304, LOGIN_3153};
 use super::showimg::ShowImgInfo;
 use super::tampercheck::TamperInfo;
@@ -1041,9 +1041,88 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "3d", what: "the 3D mode (Torque GameConnection, Graal3D protocol 19, on UDP listed port + 1) is not modelled here; seihai-ato::torque has its profile" },
         ],
     },
+    // The 4.x builds (Graal_analysis `protocol/v4x-clients.md`,
+    // `client-internals/live-behaviour-404.md`, `version-profiles/4.04-4.20.toml`).
+    // The first Login-lobby builds: no listserver protocol, a game server
+    // named `Login` first, and a server warp (178) before anything but the
+    // level is drawn. Their 3D plug-in (Torque protocol 19 in 4.04r2, 21 in
+    // 4.20r6) is not modelled; they play on the flat path in seihai-mae.
+    Step {
+        version: ClientVersion::V404R2,
+        label: "4.04r2",
+        token: "G3D17026",
+        date: "2006-03-03",
+        basis: Basis::Binary,
+        delta: Delta {
+            // Against 3.153: update packages (105, 106), ghost mode (170), the
+            // window list (182, 183), onServerListerConnect (190), SHOOT2 (191),
+            // the cache check (193), script list clear (194) and server ganis (195).
+            plo: IdDelta::plus(&[105, 106, 170, 182, 183, 190, 191, 193, 194, 195]),
+            // The send ids read in the 4.x engine, with the ids 3.153 and 5.00r7
+            // both send taken as sent; 40 and 43 are in neither 4.x nor 5.00r7.
+            pli: IdDelta::plus_minus(&[44, 79, 92, 130, 161], &[40, 43]),
+            // No listserver: the game server named `Login` serves the list.
+            listserver: Some(None),
+            login: Some(None),
+            lobby: Some(Some(LOBBY_404)),
+            server_list: Some(ServerList::Direct { default: "loginserver.graalonline.com:14900" }),
+            chat_text: Some(ChatText { face: ChatFace::Arial, height: 24 }),
+            ..Delta::NONE
+        },
+        source: "binary (stock engine DLL unpacked from the Thinstall installer) and one live lab run (live-behaviour-404): 98 PLO ids, login id 5 with G3D17026 and win,<3 md5> in the plain zlib frame, then 37; Login mode while the server name starts with login, until 178",
+        unknown: &[
+            Unknown { area: "pli", what: "the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34 and 38 seen in the lab)" },
+            Unknown { area: "login", what: "Seihai sends the three machine fields as an empty quoted string, as for 5.00r7; the real client sends three MD5s" },
+            Unknown { area: "login", what: "the base-file requests after the language (basepackage.gupd, bigmap.txt) are not sent" },
+            Unknown { area: "serverwarp", what: "the lab's 178 reached the game server, but the warp text it used was not recorded; split on commas only, as the 5.x and 6.x builds" },
+            Unknown { area: "props", what: "own and other prop sets are 3.153's; no 4.x prop parser was read (the lab saw X2/Y2, 78 and 79)" },
+            Unknown { area: "ui", what: "chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7" },
+            Unknown { area: "3d", what: "Graal3DEngine.dll (Torque protocol 19, UDP on listed port + 1) is not modelled; seihai-ato::torque has its profile" },
+        ],
+    },
+    Step {
+        version: ClientVersion::V420R6,
+        label: "4.20r6",
+        token: "G3D27076",
+        date: "2006-09",
+        basis: Basis::Binary,
+        delta: Delta {
+            // Layered board change (107) and 108 in; 41 has no case in this build.
+            plo: IdDelta::plus_minus(&[107, 108], &[41]),
+            pli: IdDelta::plus(&[162]),
+            lobby: Some(Some(LOBBY_420_MAC)),
+            ..Delta::NONE
+        },
+        source: "binary (Mac OS X PPC, not run): 4.20r8's PLO set without 41 and 196, login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty>",
+        unknown: &[
+            Unknown { area: "plo", what: "the note gives the set as 4.20r8's without 41 and 196 (99 ids) but counts 97; the binary was not re-read, the listed set is kept. 41 may be handled outside the switch" },
+            Unknown { area: "pli", what: "the Mac send ids were not read; 4.20r8's set is taken" },
+            Unknown { area: "login", what: "the fourth field is empty in the binary; Seihai sends it, like the other two, as an empty quoted string" },
+            Unknown { area: "live", what: "never run (PowerPC)" },
+            Unknown { area: "3d", what: "Torque protocol 21 is not modelled here; seihai-ato::torque has its profile" },
+        ],
+    },
+    Step {
+        version: ClientVersion::V420R8,
+        label: "4.20r8",
+        token: "G3D20126",
+        date: "2007-01",
+        basis: Basis::Binary,
+        delta: Delta {
+            plo: IdDelta::plus(&[41, 196]),
+            lobby: Some(Some(LOBBY_404)),
+            ..Delta::NONE
+        },
+        source: "binary (a third-party packet-logger copy of the engine DLL, linked January 2007; its signature check is patched out): 101 PLO ids (41 and 196 in against the Mac 4.20r6), send ids from the connection code, login id 5 with G3D20126 and win,<3 md5>",
+        unknown: &[
+            Unknown { area: "pli", what: "provisional: some sends pass the id in a register, so the set is a floor; 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's" },
+            Unknown { area: "binary", what: "only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive" },
+            Unknown { area: "plo", what: "196 (same layout as 193) is read and dropped by the client; Seihai drops it too" },
+        ],
+    },
     // The 5.x and 6.x Windows builds (Graal_analysis `protocol/v5x-clients.md`,
     // `v6x-clients.md`, `v5v6-windows-unpacked.md`, `v5v6-lab-play.md`,
-    // `version-profiles/5.00-6.03.toml`). They follow 3.153 in the chain, but
+    // `version-profiles/5.00-6.03.toml`). They follow 4.20r8 in the chain, but
     // their 3D mode is not modelled and they play on the flat path: no
     // listserver protocol, a game server named `Login` first, and a server
     // warp (178) before anything but the level is drawn. 6.036 has no binary
@@ -1055,17 +1134,12 @@ pub const CHAIN: &[Step] = &[
         date: "2007-07",
         basis: Basis::Binary,
         delta: Delta {
-            // Against 3.153: 100 out; 105-107, 140, 170, 182, 183, 190, 191, 193-195 and 197 in.
-            plo: IdDelta::plus_minus(&[105, 106, 107, 140, 170, 182, 183, 190, 191, 193, 194, 195, 197], &[100]),
+            // Against 4.20r8: 100, 108 and 196 out; 140 and 197 in.
+            plo: IdDelta::plus_minus(&[140, 197], &[100, 108, 196]),
             // The binary's constant send ids plus 11 and 38 (lab), with the ids both
-            // 3.153 and 6.03r7 send taken as sent; 40 and 43 are in neither 5.00r7 nor 6.03r7.
-            pli: IdDelta::plus_minus(&[44, 47, 79, 92, 130, 159, 161], &[40, 43]),
-            // No listserver: the game server named `Login` serves the list as scripted GUI.
-            listserver: Some(None),
-            login: Some(None),
-            lobby: Some(Some(LOBBY_500)),
-            server_list: Some(ServerList::Direct { default: "loginserver.graalonline.com:14900" }),
-            chat_text: Some(ChatText { face: ChatFace::Arial, height: 24 }),
+            // 3.153 and 6.03r7 send taken as sent. 162 answers 108, which 5.00r7
+            // does not handle. The lobby, list and chat are 4.x's.
+            pli: IdDelta::plus_minus(&[47, 159], &[162]),
             ..Delta::NONE
         },
         source: "binary (unpacked engine DLL) and lab (lab-v5-2026-10-30): PLO set of 100 ids, send ids from the send wrappers, login id 5 with G3D22067 and the win,<3 md5> list in the plain zlib frame, then 37 in its own gen-5 frame; Login mode until 178",

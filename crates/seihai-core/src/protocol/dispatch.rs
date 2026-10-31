@@ -601,7 +601,7 @@ pub struct SessionState {
     /// `PLO_SERVERWARP` (178), decoded: name, host and port. The last one
     /// received; the client takes it with `take()` and reconnects.
     pub server_warp: Option<ServerWarp>,
-    /// The build is a 5.x/6.x lobby build, which splits 178 on commas only.
+    /// The build is a 4.x to 6.x lobby build, which splits 178 on commas only.
     pub lobby_warp_fields: bool,
     /// `PLO_UNKNOWN181` (181): the last player and toggle.
     pub player_toggle: Option<(u16, bool)>,

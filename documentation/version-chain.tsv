@@ -256,46 +256,71 @@ step	label	token	basis	kind	area	field	detail
 32	3.153	G3D28015	binary	unknown	login	-	OSTYPE mac is from the binary; the code page (1250), the files in the first frame (bigmap.txt, minimap.txt) and the head and default-weapon checks are 3.04's
 32	3.153	G3D28015	binary	unknown	3d	-	the 3D mode (Torque GameConnection, Graal3D protocol 19, on UDP listed port + 1) is not modelled here; seihai-ato::torque has its profile
 32	3.153	G3D28015	binary	source	-	-	binary (Mac OS X PPC Mach-O), not run: OSTYPE mac; PLO 67, 74, 82, 104, 131-134, 187 and MOVE2 (189) in, 44 out; RC file browser, script upload and text request ids; X2/Y2/Z2; UDP off in the shipped prefs
-33	5.00r7	G3D22067	binary	changed	protocol	listserver	listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame inferred, not captured) -> none
-33	5.00r7	G3D22067	binary	changed	protocol	plo (server ids handled)	+105 UPDATEPACKAGESIZE, +106 UPDATEPACKAGEDONE, +107 BOARDLAYER, +140 NPCWEAPONSCRIPT, +170 GHOSTMODE, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +190 SERVERLISTCONNECTED, +191 SHOOT2, +193 UNKNOWN193, +194 CLEARWEAPONS, +195 LOADGANI, +197 LOADSCRIPT; -100 RAWDATA (88 -> 100 ids)
-33	5.00r7	G3D22067	binary	changed	protocol	pli (client ids sent)	+44 PROCESSLIST, +47 VERIFYWANTSEND, +79 RC_CHAT, +92 RC_FILEBROWSER_DOWN, +130 REQUESTUPDATEBOARD, +159 UPDATEPACKAGEREQUESTFILE, +161 UPDATECLASS; -40 SHOOT, -43 MUTEPLAYER (54 -> 59 ids)
-33	5.00r7	G3D22067	binary	changed	protocol	login frame	head and default-weapon files, props without head or colours with OS mac and code page 1250, status icons -> none
-33	5.00r7	G3D22067	binary	changed	protocol	login lobby	none -> first server "Login", nothing drawn until 178, login line ends win,"","",""
-33	5.00r7	G3D22067	binary	changed	ui	server_list	3 tabs -> direct (loginserver.graalonline.com:14900)
-33	5.00r7	G3D22067	binary	changed	ui	chat_text	ChatText { face: TempusSans, height: 24 } -> ChatText { face: Arial, height: 24 }
-33	5.00r7	G3D22067	binary	unknown	pli	-	only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
-33	5.00r7	G3D22067	binary	unknown	login	-	Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); whether a server accepts all three empty is not known
-33	5.00r7	G3D22067	binary	unknown	login	-	the base-file requests after the language (47 or 23 basepackage.gupd) are not sent
-33	5.00r7	G3D22067	binary	unknown	props	-	own and other prop sets are 3.153's; no 5.x parser was read
-33	5.00r7	G3D22067	binary	unknown	ui	-	chat is a bold sans serif in the lab; its cell height is not known, 24 is kept
-33	5.00r7	G3D22067	binary	unknown	3d	-	the Torque 3D mode (Graal3DEngine.dll, protocol 24) is not modelled
-33	5.00r7	G3D22067	binary	source	-	-	binary (unpacked engine DLL) and lab (lab-v5-2026-10-30): PLO set of 100 ids, send ids from the send wrappers, login id 5 with G3D22067 and the win,<3 md5> list in the plain zlib frame, then 37 in its own gen-5 frame; Login mode until 178
-34	5.12	G3D14097	binary	changed	protocol	login lobby	first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
-34	5.12	G3D14097	binary	changed	protocol	gen5_round_down	no -> yes
-34	5.12	G3D14097	binary	unknown	pli	-	not read; 5.00r7's set is kept
-34	5.12	G3D14097	binary	unknown	framing	-	a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
-34	5.12	G3D14097	binary	source	-	-	unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed
-35	5.24r4	G3D15010	binary	changed	protocol	plo (server ids handled)	+109 UNKNOWN109, +198 SERVEROPTIONS; -75 PROFILE, -132 UNKNOWN132, -133 UNKNOWN133, -171 BIGMAP, -193 UNKNOWN193 (100 -> 97 ids)
-35	5.24r4	G3D15010	binary	changed	protocol	gen5_round_down	yes -> no
-35	5.24r4	G3D15010	binary	unknown	pli	-	not read; 5.00r7's set is kept
-35	5.24r4	G3D15010	binary	unknown	files	-	stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md
-35	5.24r4	G3D15010	binary	unknown	plo	-	109 (probably a file redirect) and 198 (one GINT5) are in the set but not decoded
-35	5.24r4	G3D15010	binary	source	-	-	unpacked from MoleBox and lab: 97 PLO ids (75, 132, 133, 171 and 193 out, 109 and 198 in), one MSVC exe, short bodies sent uncompressed as 2.22, font=Arial
-36	5.30r3	G3D26090	binary	changed	protocol	plo (server ids handled)	-41 STARTMESSAGE, -181 UNKNOWN181 (97 -> 95 ids)
-36	5.30r3	G3D26090	binary	unknown	pli	-	not read; 5.00r7's set is kept
-36	5.30r3	G3D26090	binary	source	-	-	unpacked from Themida and lab (clock set back): 95 PLO ids (41 and 181 out), bundles no files
-37	5.31r4	G3D26090	binary	same	-	-	no change against the step before
-37	5.31r4	G3D26090	binary	unknown	pli	-	not read; 5.00r7's set is kept
-37	5.31r4	G3D26090	binary	unknown	ui	-	before the warp it draws no tiles (5.24 and 5.30r3 do); Seihai draws them for every lobby build
-37	5.31r4	G3D26090	binary	source	-	-	unpacked from Themida and lab (clock set back): same PLO set and token as 5.30r3; draws no tiles before the warp
-38	6.00r2	G3D26090	binary	changed	protocol	plo (server ids handled)	-165 MOVE, -169 UPGRADEURL (95 -> 93 ids)
-38	6.00r2	G3D26090	binary	changed	protocol	pli (client ids sent)	+45 PROCESSRUNNING, +48 SHOOT2, +162 RC_UNKNOWN162; -21 PUTNPC, -80 PROFILEGET, -81 PROFILESET (59 -> 59 ids)
-38	6.00r2	G3D26090	binary	changed	protocol	gen5_long_frames	no -> yes
-38	6.00r2	G3D26090	binary	changed	ui	chat_text	ChatText { face: Arial, height: 24 } -> ChatText { face: TempusSans, height: 24 }
-38	6.00r2	G3D26090	binary	unknown	pli	-	not read; Linux 6.01r1's set (6.03r7's without 160) is taken
-38	6.00r2	G3D26090	binary	unknown	framing	-	the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
-38	6.00r2	G3D26090	binary	source	-	-	unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24, 6.x long frame lengths
-39	6.03r7	G3D0311C	binary	changed	protocol	plo (server ids handled)	+111 SETNETCOOKIE; -175 SHOOT, -184 TAKESCREENSHOT (93 -> 92 ids)
-39	6.03r7	G3D0311C	binary	changed	protocol	pli (client ids sent)	+160 RC_FOLDERDELETE (59 -> 60 ids)
-39	6.03r7	G3D0311C	binary	unknown	token	-	the Linux 6.03r7 sends G3D0511C; this row is the Windows build
-39	6.03r7	G3D0311C	binary	source	-	-	unpacked from Themida and lab: 92 PLO ids (175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date
+33	4.04r2	G3D17026	binary	changed	protocol	listserver	listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame inferred, not captured) -> none
+33	4.04r2	G3D17026	binary	changed	protocol	plo (server ids handled)	+105 UPDATEPACKAGESIZE, +106 UPDATEPACKAGEDONE, +170 GHOSTMODE, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +190 SERVERLISTCONNECTED, +191 SHOOT2, +193 UNKNOWN193, +194 CLEARWEAPONS, +195 LOADGANI (88 -> 98 ids)
+33	4.04r2	G3D17026	binary	changed	protocol	pli (client ids sent)	+44 PROCESSLIST, +79 RC_CHAT, +92 RC_FILEBROWSER_DOWN, +130 REQUESTUPDATEBOARD, +161 UPDATECLASS; -40 SHOOT, -43 MUTEPLAYER (54 -> 57 ids)
+33	4.04r2	G3D17026	binary	changed	protocol	login frame	head and default-weapon files, props without head or colours with OS mac and code page 1250, status icons -> none
+33	4.04r2	G3D17026	binary	changed	protocol	login lobby	none -> first server "Login", nothing drawn until 178, login line ends win,"","",""
+33	4.04r2	G3D17026	binary	changed	ui	server_list	3 tabs -> direct (loginserver.graalonline.com:14900)
+33	4.04r2	G3D17026	binary	changed	ui	chat_text	ChatText { face: TempusSans, height: 24 } -> ChatText { face: Arial, height: 24 }
+33	4.04r2	G3D17026	binary	unknown	pli	-	the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34 and 38 seen in the lab)
+33	4.04r2	G3D17026	binary	unknown	login	-	Seihai sends the three machine fields as an empty quoted string, as for 5.00r7; the real client sends three MD5s
+33	4.04r2	G3D17026	binary	unknown	login	-	the base-file requests after the language (basepackage.gupd, bigmap.txt) are not sent
+33	4.04r2	G3D17026	binary	unknown	serverwarp	-	the lab's 178 reached the game server, but the warp text it used was not recorded; split on commas only, as the 5.x and 6.x builds
+33	4.04r2	G3D17026	binary	unknown	props	-	own and other prop sets are 3.153's; no 4.x prop parser was read (the lab saw X2/Y2, 78 and 79)
+33	4.04r2	G3D17026	binary	unknown	ui	-	chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
+33	4.04r2	G3D17026	binary	unknown	3d	-	Graal3DEngine.dll (Torque protocol 19, UDP on listed port + 1) is not modelled; seihai-ato::torque has its profile
+33	4.04r2	G3D17026	binary	source	-	-	binary (stock engine DLL unpacked from the Thinstall installer) and one live lab run (live-behaviour-404): 98 PLO ids, login id 5 with G3D17026 and win,<3 md5> in the plain zlib frame, then 37; Login mode while the server name starts with login, until 178
+34	4.20r6	G3D27076	binary	changed	protocol	plo (server ids handled)	+107 BOARDLAYER, +108 UNKNOWN108; -41 STARTMESSAGE (98 -> 99 ids)
+34	4.20r6	G3D27076	binary	changed	protocol	pli (client ids sent)	+162 RC_UNKNOWN162 (57 -> 58 ids)
+34	4.20r6	G3D27076	binary	changed	protocol	login lobby	first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends mac,"","",""
+34	4.20r6	G3D27076	binary	unknown	plo	-	the note gives the set as 4.20r8's without 41 and 196 (99 ids) but counts 97; the binary was not re-read, the listed set is kept. 41 may be handled outside the switch
+34	4.20r6	G3D27076	binary	unknown	pli	-	the Mac send ids were not read; 4.20r8's set is taken
+34	4.20r6	G3D27076	binary	unknown	login	-	the fourth field is empty in the binary; Seihai sends it, like the other two, as an empty quoted string
+34	4.20r6	G3D27076	binary	unknown	live	-	never run (PowerPC)
+34	4.20r6	G3D27076	binary	unknown	3d	-	Torque protocol 21 is not modelled here; seihai-ato::torque has its profile
+34	4.20r6	G3D27076	binary	source	-	-	binary (Mac OS X PPC, not run): 4.20r8's PLO set without 41 and 196, login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty>
+35	4.20r8	G3D20126	binary	changed	protocol	plo (server ids handled)	+41 STARTMESSAGE, +196 (99 -> 101 ids)
+35	4.20r8	G3D20126	binary	changed	protocol	login lobby	first server "Login", nothing drawn until 178, login line ends mac,"","","" -> first server "Login", nothing drawn until 178, login line ends win,"","",""
+35	4.20r8	G3D20126	binary	unknown	pli	-	provisional: some sends pass the id in a register, so the set is a floor; 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's
+35	4.20r8	G3D20126	binary	unknown	binary	-	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
+35	4.20r8	G3D20126	binary	unknown	plo	-	196 (same layout as 193) is read and dropped by the client; Seihai drops it too
+35	4.20r8	G3D20126	binary	source	-	-	binary (a third-party packet-logger copy of the engine DLL, linked January 2007; its signature check is patched out): 101 PLO ids (41 and 196 in against the Mac 4.20r6), send ids from the connection code, login id 5 with G3D20126 and win,<3 md5>
+36	5.00r7	G3D22067	binary	changed	protocol	plo (server ids handled)	+140 NPCWEAPONSCRIPT, +197 LOADSCRIPT; -100 RAWDATA, -108 UNKNOWN108, -196 (101 -> 100 ids)
+36	5.00r7	G3D22067	binary	changed	protocol	pli (client ids sent)	+47 VERIFYWANTSEND, +159 UPDATEPACKAGEREQUESTFILE; -162 RC_UNKNOWN162 (58 -> 59 ids)
+36	5.00r7	G3D22067	binary	unknown	pli	-	only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
+36	5.00r7	G3D22067	binary	unknown	login	-	Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); whether a server accepts all three empty is not known
+36	5.00r7	G3D22067	binary	unknown	login	-	the base-file requests after the language (47 or 23 basepackage.gupd) are not sent
+36	5.00r7	G3D22067	binary	unknown	props	-	own and other prop sets are 3.153's; no 5.x parser was read
+36	5.00r7	G3D22067	binary	unknown	ui	-	chat is a bold sans serif in the lab; its cell height is not known, 24 is kept
+36	5.00r7	G3D22067	binary	unknown	3d	-	the Torque 3D mode (Graal3DEngine.dll, protocol 24) is not modelled
+36	5.00r7	G3D22067	binary	source	-	-	binary (unpacked engine DLL) and lab (lab-v5-2026-10-30): PLO set of 100 ids, send ids from the send wrappers, login id 5 with G3D22067 and the win,<3 md5> list in the plain zlib frame, then 37 in its own gen-5 frame; Login mode until 178
+37	5.12	G3D14097	binary	changed	protocol	login lobby	first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
+37	5.12	G3D14097	binary	changed	protocol	gen5_round_down	no -> yes
+37	5.12	G3D14097	binary	unknown	pli	-	not read; 5.00r7's set is kept
+37	5.12	G3D14097	binary	unknown	framing	-	a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
+37	5.12	G3D14097	binary	source	-	-	unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed
+38	5.24r4	G3D15010	binary	changed	protocol	plo (server ids handled)	+109 UNKNOWN109, +198 SERVEROPTIONS; -75 PROFILE, -132 UNKNOWN132, -133 UNKNOWN133, -171 BIGMAP, -193 UNKNOWN193 (100 -> 97 ids)
+38	5.24r4	G3D15010	binary	changed	protocol	gen5_round_down	yes -> no
+38	5.24r4	G3D15010	binary	unknown	pli	-	not read; 5.00r7's set is kept
+38	5.24r4	G3D15010	binary	unknown	files	-	stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md
+38	5.24r4	G3D15010	binary	unknown	plo	-	109 (probably a file redirect) and 198 (one GINT5) are in the set but not decoded
+38	5.24r4	G3D15010	binary	source	-	-	unpacked from MoleBox and lab: 97 PLO ids (75, 132, 133, 171 and 193 out, 109 and 198 in), one MSVC exe, short bodies sent uncompressed as 2.22, font=Arial
+39	5.30r3	G3D26090	binary	changed	protocol	plo (server ids handled)	-41 STARTMESSAGE, -181 UNKNOWN181 (97 -> 95 ids)
+39	5.30r3	G3D26090	binary	unknown	pli	-	not read; 5.00r7's set is kept
+39	5.30r3	G3D26090	binary	source	-	-	unpacked from Themida and lab (clock set back): 95 PLO ids (41 and 181 out), bundles no files
+40	5.31r4	G3D26090	binary	same	-	-	no change against the step before
+40	5.31r4	G3D26090	binary	unknown	pli	-	not read; 5.00r7's set is kept
+40	5.31r4	G3D26090	binary	unknown	ui	-	before the warp it draws no tiles (5.24 and 5.30r3 do); Seihai draws them for every lobby build
+40	5.31r4	G3D26090	binary	source	-	-	unpacked from Themida and lab (clock set back): same PLO set and token as 5.30r3; draws no tiles before the warp
+41	6.00r2	G3D26090	binary	changed	protocol	plo (server ids handled)	-165 MOVE, -169 UPGRADEURL (95 -> 93 ids)
+41	6.00r2	G3D26090	binary	changed	protocol	pli (client ids sent)	+45 PROCESSRUNNING, +48 SHOOT2, +162 RC_UNKNOWN162; -21 PUTNPC, -80 PROFILEGET, -81 PROFILESET (59 -> 59 ids)
+41	6.00r2	G3D26090	binary	changed	protocol	gen5_long_frames	no -> yes
+41	6.00r2	G3D26090	binary	changed	ui	chat_text	ChatText { face: Arial, height: 24 } -> ChatText { face: TempusSans, height: 24 }
+41	6.00r2	G3D26090	binary	unknown	pli	-	not read; Linux 6.01r1's set (6.03r7's without 160) is taken
+41	6.00r2	G3D26090	binary	unknown	framing	-	the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
+41	6.00r2	G3D26090	binary	source	-	-	unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24, 6.x long frame lengths
+42	6.03r7	G3D0311C	binary	changed	protocol	plo (server ids handled)	+111 SETNETCOOKIE; -175 SHOOT, -184 TAKESCREENSHOT (93 -> 92 ids)
+42	6.03r7	G3D0311C	binary	changed	protocol	pli (client ids sent)	+160 RC_FOLDERDELETE (59 -> 60 ids)
+42	6.03r7	G3D0311C	binary	unknown	token	-	the Linux 6.03r7 sends G3D0511C; this row is the Windows build
+42	6.03r7	G3D0311C	binary	source	-	-	unpacked from Themida and lab: 92 PLO ids (175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date

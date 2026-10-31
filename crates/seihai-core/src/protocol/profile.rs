@@ -340,7 +340,7 @@ pub struct Protocol {
     /// checks, process list, login props); `Some` only for the builds
     /// observed doing it (2.17, 2.22 and 2.31). See [`super::login`].
     pub login: Option<LoginInfo>,
-    /// The 5.x/6.x Login lobby: the first server is named `Login`, the
+    /// The 4.x to 6.x Login lobby: the first server is named `Login`, the
     /// login line ends with the machine-field comma list, and nothing but
     /// the level is drawn until a `PLO_SERVERWARP` (178). See
     /// [`super::lobby`]. `None` for every build before 5.00.
@@ -1001,7 +1001,7 @@ mod tests {
         plo: IdSet,
         pli: IdSet,
         pli_lower_bound: bool,
-        /// `None` (`-`) where the TOML has no parser reading (the 5.x/6.x rows).
+        /// `None` (`-`) where the TOML has no parser reading (the 4.x to 6.x rows).
         own_max: Option<u8>,
         npc_max: Option<u8>,
         other: Option<IdSet>,
@@ -1209,7 +1209,7 @@ mod tests {
         let mut lobby = 0;
         for p in PROFILES {
             match p.protocol.listserver {
-                // The 5.x/6.x builds have no listserver protocol: their list is
+                // The 4.x, 5.x and 6.x builds have no listserver protocol: their list is
                 // scripted GUI on the `Login` game server.
                 None if p.protocol.lobby.is_some() => lobby += 1,
                 None => {
@@ -1240,7 +1240,7 @@ mod tests {
             }
         }
         assert_eq!(seen, classic.len() + gen5.len());
-        assert_eq!(lobby, 7);
+        assert_eq!(lobby, 10);
         assert_eq!(seen + 12 + lobby, PROFILES.len());
     }
 
