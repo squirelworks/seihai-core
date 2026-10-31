@@ -87,6 +87,64 @@ pub const HURT_POSE_139_TICKS: usize = 10;
 /// (lab, 2026-10-30 run 2 and lan-200i).
 pub const HURT_POSE_TICKS: usize = 31;
 
+/// The player animations a build without GANIs (1.33 to 1.39) has built
+/// into its executable, by the names of the stock files that later wrote
+/// them out. NewMain 1.41.1, the first GANI client, plays them from files,
+/// and its `idle`, `walk`, `sword`, `push`, `pull`, `carry` and `swim` show
+/// the same sheet cells as 1.39 does on screen (Graal_analysis
+/// `player-mannerisms-live.md`, "Other builds"). There is no `lift`: 1.39
+/// goes straight to the carry pose. `hidden` / `hiddenstill` are not
+/// played either, since 1.39 keeps the carry poses while hidden.
+pub const BUILTIN_ANIMS: [&str; 14] =
+    ["idle", "walk", "swim", "sword", "spin", "push", "grab", "pull", "carrystill", "carry", "hurt", "sit", "sleep", "dead"];
+
+/// The sprite step S (prop 17 is `dir + 4 * S`) of walk frames 0 to 7: the
+/// 2.05 step table, and what a real 1.39 sends while it walks (lab capture
+/// `item-drops/b4_139.txt`: facing down, S 4, 2 then 5, 3, 1 at 100 ms
+/// intervals, one walk frame every 50 ms). Its inverse picks the frame to
+/// draw for another player's S.
+pub const WALK_S: [u8; 8] = [4, 5, 4, 3, 2, 1, 2, 3];
+
+/// Ticks each push frame shows in 1.39: about 2 (video, ±1), where the
+/// stock `push.gani` holds 4.
+pub const PUSH_FRAME_139_TICKS: u32 = 2;
+
+/// Fit a stock GANI standing in for a built-in 1.39 animation (`name`, as
+/// in [`BUILTIN_ANIMS`]) to what 1.39 shows:
+///
+/// * the push frames last [`PUSH_FRAME_139_TICKS`], not 4;
+/// * the hurt pose lasts [`HURT_POSE_139_TICKS`], not 31, then the normal
+///   pose comes back (and the blink starts, `Blink::AfterHurtPose`);
+/// * the sound cues are the ones 1.39 has: the footsteps are `steps.wav`
+///   (the GANI sets name `steps2.wav`), and a cue for a sound 1.39 does not
+///   name (`lift.wav` on the hurt pose) is dropped.
+pub fn fit_builtin_139(name: &str, gani: &mut Gani) {
+    let stem = name.trim().to_ascii_lowercase();
+    let stem = stem.strip_suffix(".gani").unwrap_or(&stem);
+    match stem {
+        "push" => gani.frames.iter_mut().for_each(|f| f.wait = PUSH_FRAME_139_TICKS - 1),
+        "hurt" if !gani.looped => {
+            let n = gani.frames.len().max(1);
+            // Spread the 1.39 length over the file's steps.
+            let each = (HURT_POSE_139_TICKS / n).max(1) as u32;
+            gani.frames.iter_mut().for_each(|f| f.wait = each - 1);
+        }
+        _ => {}
+    }
+    for f in &mut gani.frames {
+        for s in &mut f.sounds {
+            if s.file.eq_ignore_ascii_case("steps2.wav") {
+                s.file = "steps.wav".into();
+            }
+        }
+        f.sounds.retain(|s| {
+            let lower = s.file.to_ascii_lowercase();
+            let stem = lower.strip_suffix(".wav").unwrap_or(&lower);
+            crate::assets::coverage::SOUNDS_139.contains(&stem)
+        });
+    }
+}
+
 /// The loaded pose animations.
 #[derive(Debug, Clone, Default)]
 pub struct PoseGanis {

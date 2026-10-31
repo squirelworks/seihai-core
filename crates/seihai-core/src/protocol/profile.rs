@@ -657,6 +657,15 @@ pub const COMBAT_205: CombatRules = CombatRules {
     packet_victim_gates: true,
 };
 
+/// 1.39: the swing, its sprites and hurt mode as far as they were seen in
+/// the real client; the rest is the 2.05 template (no 1.39 hit handler was
+/// traced). One swing step per 50 ms tick: the lab capture of a real 1.39
+/// (Graal_analysis live trace `item-drops/b4_139.txt`) sends S 6, 8, 10 at
+/// 100 ms intervals and then the idle sprite, and the video read gives a
+/// 5-tick swing that cuts the bush; the 40-tick hurt lock-out is the
+/// video's too (`player-mannerisms-live.md`, "Cross-version table").
+pub const COMBAT_139: CombatRules = CombatRules { swing_step_ticks: 1, ..COMBAT_205 };
+
 /// 2.01 and 2.02: as 2.05, but the sword power is stored without the offset
 /// and limit. (Their kick test and the no-kill flag on the player, not the
 /// level, change nothing Seihai checks.)

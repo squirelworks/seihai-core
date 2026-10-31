@@ -320,9 +320,33 @@ impl AssetResolver {
         if !self.profile.ui.ganis {
             return None;
         }
+        self.gani_in_layers(name, |_| true)
+    }
+
+    /// The animation a player pose or a character NPC is drawn with. A
+    /// build with GANIs finds it as [`AssetResolver::gani`]. A build without
+    /// them (1.33 to 1.39) has its player animations built into the
+    /// executable, and the first GANI files (NewMain 1.41) are those
+    /// tables written out, so the same stock files stand in for them: only
+    /// the names in [`crate::pose::BUILTIN_ANIMS`], and only from the
+    /// user's asset folder or Seihai's built-in set, never from what a
+    /// server sent (the cache), since such a build downloads no GANIs.
+    pub fn pose_gani(&self, name: &str) -> Option<PathBuf> {
+        if self.profile.ui.ganis {
+            return self.gani(name);
+        }
+        let stem = name.trim().to_ascii_lowercase();
+        let stem = stem.strip_suffix(".gani").unwrap_or(&stem);
+        if !crate::pose::BUILTIN_ANIMS.contains(&stem) {
+            return None;
+        }
+        self.gani_in_layers(name, |l| l != Layer::Cache)
+    }
+
+    fn gani_in_layers(&self, name: &str, keep: impl Fn(Layer) -> bool) -> Option<PathBuf> {
         let rel = clean_name(name)?;
         let file = if has_ext(&rel) { rel } else { format!("{rel}.gani") };
-        for (_, r) in self.roots(false) {
+        for (_, r) in self.roots(false).into_iter().filter(|(l, _)| keep(*l)) {
             let dirs = [
                 r.gani_dir(),
                 r.root.join(DOWNLOADS).join("ganis"),
@@ -783,6 +807,34 @@ mod tests {
         assert_eq!(new.gani("idle.gani"), Some(d.join("gani/idle.gani")));
         assert_eq!(new.gani("../walk.gani"), None);
         let _ = fs::remove_dir_all(&d);
+    }
+
+    /// A build without GANIs still draws its built-in player animations
+    /// from the stock files of the user's folder, but never from the cache
+    /// and never for a name that is not one of its built-in poses.
+    #[test]
+    fn builds_without_ganis_take_their_built_in_poses_from_local_files() {
+        let d = tmp("pose-gani");
+        let cache = tmp("pose-gani-cache");
+        touch(&d, "levels/ganis/walk.gani");
+        touch(&d, "levels/ganis/sword.gani");
+        touch(&d, "levels/ganis/lift.gani");
+        touch(&d, "levels/ganis/mywalk.gani");
+        touch(&cache, "levels/ganis/sword.gani");
+        touch(&cache, "levels/ganis/push.gani");
+        let r = AssetResolver::new(AssetRoot::new(&d), ClientVersion::V139.profile()).with_cache(Some(cache.clone()));
+        assert_eq!(r.gani("walk.gani"), None, "no GANI files as such");
+        assert_eq!(r.pose_gani("walk.gani"), Some(d.join("levels/ganis/walk.gani")));
+        assert_eq!(r.pose_gani("walk"), Some(d.join("levels/ganis/walk.gani")));
+        assert_eq!(r.pose_gani("sword.gani"), Some(d.join("levels/ganis/sword.gani")), "the user's copy, not the server's");
+        assert_eq!(r.pose_gani("push.gani"), None, "a server's file is never read");
+        assert_eq!(r.pose_gani("lift.gani"), None, "1.39 has no lift pose");
+        assert_eq!(r.pose_gani("mywalk.gani"), None, "a server's own animation is not built in");
+        // A GANI build reads them as GANIs, cache first.
+        let n = AssetResolver::new(AssetRoot::new(&d), ClientVersion::V222.profile()).with_cache(Some(cache.clone()));
+        assert_eq!(n.pose_gani("sword.gani"), Some(cache.join("levels/ganis/sword.gani")));
+        let _ = fs::remove_dir_all(&d);
+        let _ = fs::remove_dir_all(&cache);
     }
 
     #[test]

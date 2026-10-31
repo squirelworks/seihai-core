@@ -11,7 +11,7 @@ pub(crate) mod resolve;
 mod root;
 mod tiledefs;
 mod zelda;
-mod coverage;
+pub(crate) mod coverage;
 
 pub use objects::{ObjectSet, Stamp};
 pub use coverage::{check_folder, expected_files, format_report, Finding, Need, NeedKind, Status};

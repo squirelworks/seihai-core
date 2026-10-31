@@ -24,7 +24,7 @@
 use super::profile::{
     Basis, BuiltIn, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, Levels, ListKind, Listserver, LoginShape, PortStatus, Props, Protocol, ServerList, ShapeBasis, Ui,
     BUILT_IN_14921, BUILT_IN_14922,
-    ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222,
+    ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_139, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222,
     TAMPER_230, TAMPER_231,
 };
 use super::lobby::{Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_603_LINUX};
@@ -554,10 +554,13 @@ pub const CHAIN: &[Step] = &[
             chat_recall: Some(true),
             chat_text: Some(ChatText { face: ChatFace::Helvetica, height: 24 }),
             gs1_commands: Some(111),
+            combat: Some(Some(COMBAT_139)),
             ..Delta::NONE
         },
-        source: "binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111",
-        unknown: &[],
+        source: "binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111; sword swing S 6 to 10 one per tick and the 40-tick hurt lock-out (lab capture and video)",
+        unknown: &[
+            Unknown { area: "life", what: "combat: the swing steps and hurt lock-out were seen live; the reach, the hit judgement and the hurt sprite come from the 2.05 template, no 1.39 hit handler was traced; 1.33 to 1.38 keep no combat row" },
+        ],
     },
     // 1.41 is the first gen 3 build. Its row was built on the 2.05 template,
     // so everything not listed here is the 2.05 value; that includes the
@@ -1540,6 +1543,7 @@ fn combat_text(c: &Option<super::profile::CombatRules>) -> String {
     match c {
         None => "none".into(),
         Some(c) if *c == COMBAT_205 => "2.05 rules".into(),
+        Some(c) if *c == COMBAT_139 => "1.39 rules (one swing step a tick, the rest 2.05)".into(),
         Some(c) if *c == COMBAT_201 => "2.01 rules (raw sword power)".into(),
         Some(c) if *c == COMBAT_200 => "2.00 rules (raw sword power, fewer packet gates)".into(),
         Some(_) => "custom".into(),
@@ -1755,6 +1759,7 @@ mod tests {
     /// 2.00 to 2.04 then got combat rows read in their own binaries, and
     /// every combat row two more fields (`sword_power_store`,
     /// `packet_victim_gates`; Graal_analysis `client-internals/combat-200-204.md`).
+    /// 1.39 then got the combat row its lab capture and video show.
     #[test]
     fn chain_equals_the_hand_written_rows() {
         let mut seen = 0;

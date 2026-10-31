@@ -219,6 +219,9 @@ pub struct OfflineSession {
     /// The swing lasts the sword GANI (see `CombatState::set_swing_ticks`):
     /// set for 2.22, the build that was checked.
     pub gani_swing: bool,
+    /// The walk frame goes out in the SPRITE prop (17) as S 1 to 5: a
+    /// build without GANIs (1.39 lab capture). Set from the profile.
+    pub walk_sprite: bool,
     /// Optional walk animation.
     pub walk_gani: Option<GaniPlayer>,
     /// Optional swim animation, shown instead of the walk one while the
@@ -577,6 +580,7 @@ impl OfflineSession {
             player_dir: DIR_SOUTH,
             in_water: false,
             gani_swing: false,
+            walk_sprite: false,
             walk_gani: None,
             swim_gani: None,
             swim_ticks: 0,
@@ -5006,6 +5010,28 @@ mod tests {
         s.tick_bombs(50);
         let events = s.tick_life(50);
         assert!(events.contains(&LifeEvent::Died { attacker: Some(7) }), "{events:?}");
+    }
+
+    /// One blast hurts once: the hit starts hurt mode, which keeps the
+    /// later ticks of the same blast off. 1.39 on hastur lost three half
+    /// hearts to its own bomb while it had no combat row (no hurt mode).
+    #[test]
+    fn a_139_player_is_hurt_once_by_one_blast() {
+        let mut s = bombed();
+        s.combat = crate::combat::CombatState::new(crate::protocol::ClientVersion::V139.combat_rules());
+        s.receive_explosion(&explosion(false), None);
+        for _ in 0..10 {
+            s.tick_bombs(50);
+        }
+        assert_eq!(s.hearts_half(), 5);
+        // Without a combat row nothing keeps the blast off.
+        let mut s = bombed();
+        s.combat = crate::combat::CombatState::new(None);
+        s.receive_explosion(&explosion(false), None);
+        for _ in 0..10 {
+            s.tick_bombs(50);
+        }
+        assert!(s.hearts_half() < 5, "{}", s.hearts_half());
     }
 
     #[test]
