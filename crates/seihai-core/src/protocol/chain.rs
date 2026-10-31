@@ -1088,15 +1088,16 @@ pub const CHAIN: &[Step] = &[
         basis: Basis::Binary,
         delta: Delta {
             // Layered board change (107) and 108 in; 41 has no case in this build.
+            // Re-read 2026-10-31: the switch has 97 cases (0-195 without 41) and
+            // 100 and 108 are taken before it, as in 4.20r8, so 99 ids.
             plo: IdDelta::plus_minus(&[107, 108], &[41]),
             pli: IdDelta::plus(&[162]),
             lobby: Some(Some(LOBBY_420_MAC)),
             ..Delta::NONE
         },
-        source: "binary (Mac OS X PPC, not run): 4.20r8's PLO set without 41 and 196, login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty>",
+        source: "binary (Mac OS X PPC, not run): 4.20r8's PLO set without 41 and 196 (a 97-case switch plus 100 and 108 before it; 108 subtype 0 answers with 162), login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty>",
         unknown: &[
-            Unknown { area: "plo", what: "the note gives the set as 4.20r8's without 41 and 196 (99 ids) but counts 97; the binary was not re-read, the listed set is kept. 41 may be handled outside the switch" },
-            Unknown { area: "pli", what: "the Mac send ids were not read; 4.20r8's set is taken" },
+            Unknown { area: "pli", what: "only 162 (the answer to 108) was confirmed in the Mac binary; the rest of 4.20r8's set is taken" },
             Unknown { area: "login", what: "the fourth field is empty in the binary; Seihai sends it, like the other two, as an empty quoted string" },
             Unknown { area: "live", what: "never run (PowerPC)" },
             Unknown { area: "3d", what: "Torque protocol 21 is not modelled here; seihai-ato::torque has its profile" },

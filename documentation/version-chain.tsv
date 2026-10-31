@@ -274,12 +274,11 @@ step	label	token	basis	kind	area	field	detail
 34	4.20r6	G3D27076	binary	changed	protocol	plo (server ids handled)	+107 BOARDLAYER, +108 UNKNOWN108; -41 STARTMESSAGE (98 -> 99 ids)
 34	4.20r6	G3D27076	binary	changed	protocol	pli (client ids sent)	+162 RC_UNKNOWN162 (57 -> 58 ids)
 34	4.20r6	G3D27076	binary	changed	protocol	login lobby	first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends mac,"","",""
-34	4.20r6	G3D27076	binary	unknown	plo	-	the note gives the set as 4.20r8's without 41 and 196 (99 ids) but counts 97; the binary was not re-read, the listed set is kept. 41 may be handled outside the switch
-34	4.20r6	G3D27076	binary	unknown	pli	-	the Mac send ids were not read; 4.20r8's set is taken
+34	4.20r6	G3D27076	binary	unknown	pli	-	only 162 (the answer to 108) was confirmed in the Mac binary; the rest of 4.20r8's set is taken
 34	4.20r6	G3D27076	binary	unknown	login	-	the fourth field is empty in the binary; Seihai sends it, like the other two, as an empty quoted string
 34	4.20r6	G3D27076	binary	unknown	live	-	never run (PowerPC)
 34	4.20r6	G3D27076	binary	unknown	3d	-	Torque protocol 21 is not modelled here; seihai-ato::torque has its profile
-34	4.20r6	G3D27076	binary	source	-	-	binary (Mac OS X PPC, not run): 4.20r8's PLO set without 41 and 196, login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty>
+34	4.20r6	G3D27076	binary	source	-	-	binary (Mac OS X PPC, not run): 4.20r8's PLO set without 41 and 196 (a 97-case switch plus 100 and 108 before it; 108 subtype 0 answers with 162), login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty>
 35	4.20r8	G3D20126	binary	changed	protocol	plo (server ids handled)	+41 STARTMESSAGE, +196 (99 -> 101 ids)
 35	4.20r8	G3D20126	binary	changed	protocol	login lobby	first server "Login", nothing drawn until 178, login line ends mac,"","","" -> first server "Login", nothing drawn until 178, login line ends win,"","",""
 35	4.20r8	G3D20126	binary	unknown	pli	-	provisional: some sends pass the id in a register, so the set is a floor; 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's
