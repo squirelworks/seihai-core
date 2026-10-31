@@ -100,6 +100,9 @@ pub enum ItemEvent {
     /// The player rolled this item (1.x): the server hears of it from 1.38
     /// on (`PLI_ITEMADD`).
     Rolled { item: u8, x: f32, y: f32 },
+    /// The player laid this item (S held and A, then A): the server hears
+    /// of it from 1.38 on, for floor items only.
+    Laid { item: u8, x: f32, y: f32 },
     /// The player walked over it.
     Taken { item: u8, x: f32, y: f32 },
     /// Its time ran out.
@@ -188,7 +191,13 @@ fn item_message(id: u8, item: u8, x: f32, y: f32) -> Vec<u8> {
     vec![id + 0x20, half(x), half(y), item + 0x20, b'\n']
 }
 
-/// The roll told to the server (1.38 to 1.41): `PLI_ITEMADD` (12).
+/// Whether `item` lies on the floor as a pickup ([`FLOOR_ITEMS`]): only
+/// these are told to the server when added or taken (2.05).
+pub fn is_floor_item(item: u8) -> bool {
+    FLOOR_ITEMS.get(usize::from(item)).copied().unwrap_or(false)
+}
+
+/// The roll or a lay told to the server: `PLI_ITEMADD` (12).
 pub fn item_add_message(item: u8, x: f32, y: f32) -> Vec<u8> {
     item_message(12, item, x, y)
 }

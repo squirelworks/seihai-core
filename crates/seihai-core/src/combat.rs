@@ -678,6 +678,11 @@ impl CombatState {
         true
     }
 
+    /// Whether the spin attack is allowed (STATUS bit 0x40).
+    pub fn has_spin(&self) -> bool {
+        self.has_spin
+    }
+
     /// The server's STATUS has the has-spin bit (0x40), or not.
     pub fn set_has_spin(&mut self, on: bool) {
         self.has_spin = on;

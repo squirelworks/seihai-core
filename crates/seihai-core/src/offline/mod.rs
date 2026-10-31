@@ -15,10 +15,13 @@ use std::collections::{HashMap, HashSet};
 mod baddies;
 mod drops;
 mod hide;
+mod laying;
 mod pause;
 mod pushpull;
 mod servernpcs;
+pub use drops::ITEM_NAMES;
 pub use hide::{HIDDEN_STATUS, HIDE_KINDS, LIFT_CARRIED_TICK};
+pub use laying::{lay_held_centre, LayCost, LAY_OFFSET, LAY_ORDER};
 pub use pause::{focus_pauses, name_label, pause_message_bits, server_status_base, PAUSED_STATUS};
 pub use pushpull::{NpcMoved, Grab, Jump, PushPull, Trigger};
 pub use servernpcs::{block_flags, Linked, ServerNpcSync, NPC_SEND_INTERVAL};
@@ -254,8 +257,11 @@ pub struct OfflineSession {
     /// The 1.x drop roll's `Random`.
     pub(crate) item_rng: crate::items::DelphiRandom,
     pub(crate) item_ms: u64,
-    /// Rolls, pickups and timeouts for [`Self::take_item_messages`].
+    /// Rolls, lays, pickups and timeouts for [`Self::take_item_messages`].
     pub(crate) item_events: Vec<crate::items::ItemEvent>,
+    /// The lay mode (S held and A): the item picked to put down (see
+    /// `offline/laying.rs`).
+    pub laying: Option<u8>,
     /// The sword, hurt and sit animations (see [`crate::pose`]).
     pub poses: crate::pose::PoseGanis,
     /// GANIs for animated NPCs, by lower-case name (see [`crate::npcart`]).
@@ -576,6 +582,7 @@ impl OfflineSession {
             item_rng: crate::items::DelphiRandom::from_clock(),
             item_ms: 0,
             item_events: Vec::new(),
+            laying: None,
             poses: crate::pose::PoseGanis::default(),
             sitting: false,
             sleeping: false,
@@ -1152,6 +1159,7 @@ impl OfflineSession {
         self.arrow_ms = 0;
         // The items on the floor belong to the level.
         self.floor_items.clear();
+        self.laying = None;
     }
 
     /// Whether a thrown object's wall probe at `(fx, fy)` ends its flight:
