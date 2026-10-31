@@ -27,7 +27,7 @@ use super::profile::{
     ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222,
     TAMPER_230, TAMPER_231,
 };
-use super::lobby::{Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512};
+use super::lobby::{Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_603_LINUX};
 use super::login::{LoginInfo, LOGIN_217, LOGIN_222, LOGIN_231, LOGIN_304, LOGIN_3153};
 use super::showimg::ShowImgInfo;
 use super::tampercheck::TamperInfo;
@@ -1255,7 +1255,27 @@ pub const CHAIN: &[Step] = &[
         },
         source: "unpacked from Themida and lab: 92 PLO ids (175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date",
         unknown: &[
-            Unknown { area: "token", what: "the Linux 6.03r7 sends G3D0511C; this row is the Windows build" },
+            Unknown { area: "token", what: "the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)" },
+        ],
+    },
+    // The Linux x64 6.03r7 (Graal_analysis `protocol/v6x-clients.md`). It is
+    // the build the Windows 6.03r7's send ids and long frame length were read
+    // from, so only the token and the login list differ.
+    Step {
+        version: ClientVersion::V603R7Linux,
+        label: "6.03r7 Linux",
+        token: "G3D0511C",
+        date: "2012-11-11",
+        basis: Basis::Binary,
+        delta: Delta {
+            lobby: Some(Some(LOBBY_603_LINUX)),
+            ..Delta::NONE
+        },
+        source: "binary (Linux x64 ELF, not packed): token stored as the scrambled string g3d0511c, login list linux plus four machine ids (eth0 MAC md5, /etc inode md5, empty, kernel string); PLO and PLI sets are the ones the Windows row took from it; gs2lib names the token 6.037 (Linux)",
+        unknown: &[
+            Unknown { area: "login", what: "the four machine ids are sent as empty quoted strings; the real kernel string field was not captured, and whether it is quoted is not known" },
+            Unknown { area: "lab", what: "the Linux client was not run; the Windows 6.03r7 lab run (2026-10-31) stands in for it" },
+            Unknown { area: "files", what: "Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for" },
         ],
     },
 ];

@@ -371,6 +371,10 @@ mod tests {
         assert!(b.starts_with(b"%kG3D14097%guest(7Y3bdzjfwin,"), "{b:?}");
         assert!(b.ends_with(b",\"6.2 9200 \""), "{b:?}");
         assert!(line(ClientVersion::V603R7, 0x79).starts_with(b"%\x99G3D0311C%guest(7Y3bdzjfwin,"));
+        // The Linux 6.03r7: its own token, `linux` and four empty machine ids.
+        let l = line(ClientVersion::V603R7Linux, 0x79);
+        assert!(l.starts_with(b"%\x99G3D0511C%guest(7Y3bdzjflinux,"), "{l:?}");
+        assert!(l.ends_with(b"linux,\"\",\"\",\"\",\"\""), "{l:?}");
         // Builds before 5.00 end at the password.
         assert!(line(ClientVersion::V3153, 1).ends_with(b"(7Y3bdzjf"));
     }

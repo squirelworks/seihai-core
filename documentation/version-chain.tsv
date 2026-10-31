@@ -325,5 +325,10 @@ step	label	token	basis	kind	area	field	detail
 41	6.00r2	G3D26090	binary	source	-	-	unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24, 6.x long frame lengths
 42	6.03r7	G3D0311C	binary	changed	protocol	plo (server ids handled)	+111 SETNETCOOKIE; -175 SHOOT, -184 TAKESCREENSHOT (93 -> 92 ids)
 42	6.03r7	G3D0311C	binary	changed	protocol	pli (client ids sent)	+160 RC_FOLDERDELETE (59 -> 60 ids)
-42	6.03r7	G3D0311C	binary	unknown	token	-	the Linux 6.03r7 sends G3D0511C; this row is the Windows build
+42	6.03r7	G3D0311C	binary	unknown	token	-	the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)
 42	6.03r7	G3D0311C	binary	source	-	-	unpacked from Themida and lab: 92 PLO ids (175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date
+43	6.03r7 Linux	G3D0511C	binary	changed	protocol	login lobby	first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends linux,"","","",""
+43	6.03r7 Linux	G3D0511C	binary	unknown	login	-	the four machine ids are sent as empty quoted strings; the real kernel string field was not captured, and whether it is quoted is not known
+43	6.03r7 Linux	G3D0511C	binary	unknown	lab	-	the Linux client was not run; the Windows 6.03r7 lab run (2026-10-31) stands in for it
+43	6.03r7 Linux	G3D0511C	binary	unknown	files	-	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for
+43	6.03r7 Linux	G3D0511C	binary	source	-	-	binary (Linux x64 ELF, not packed): token stored as the scrambled string g3d0511c, login list linux plus four machine ids (eth0 MAC md5, /etc inode md5, empty, kernel string); PLO and PLI sets are the ones the Windows row took from it; gs2lib names the token 6.037 (Linux)
