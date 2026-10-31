@@ -244,12 +244,49 @@ pub struct ServerNpcSync {
     known: HashMap<u32, Known>,
     /// Time since the last send round ([`ServerNpcSync::tick`]).
     since: Duration,
+    /// The level `known` belongs to (lower case), once
+    /// [`ServerNpcSync::switch_level`] named one.
+    level: Option<String>,
+    /// Gmap levels left while still loaded: what the server has for their
+    /// NPCs, until the player walks back in.
+    parked: HashMap<String, HashMap<u32, Known>>,
 }
 
 impl ServerNpcSync {
     /// Forget everything (a new level).
     pub fn clear(&mut self) {
         self.known.clear();
+        self.parked.clear();
+        self.level = None;
+    }
+
+    /// The player is now in `here`. On a gmap (`on_gmap`) the level left
+    /// is parked with what the server has for its NPCs, and a parked `here`
+    /// comes back: true then, and the caller must not replay the server's
+    /// stored records into it (they are older than what was sent since,
+    /// lab 2026-10-30: replaying them resent GANI and BODY on every
+    /// crossing back). Off a gmap everything is forgotten.
+    pub fn switch_level(&mut self, here: Option<&str>, on_gmap: bool) -> bool {
+        let left = self.level.take();
+        let known = std::mem::take(&mut self.known);
+        if !on_gmap {
+            self.parked.clear();
+        } else if let Some(l) = left {
+            self.parked.insert(l, known);
+        }
+        let here = here.map(str::to_ascii_lowercase);
+        let back = match (&here, on_gmap) {
+            (Some(h), true) => self.parked.remove(h),
+            _ => None,
+        };
+        self.level = here;
+        match back {
+            Some(k) => {
+                self.known = k;
+                true
+            }
+            None => false,
+        }
     }
 
     /// The server sent `p` for `id`: those are now the values it has.
@@ -456,6 +493,26 @@ mod tests {
         let n = &s.current_level.as_ref().unwrap().npcs[0];
         assert!(n.pullable && !n.pushable && !n.blocks);
         assert_eq!(block_flags(n, 0x40), 0x40 | 5);
+    }
+
+    /// A gmap level left and walked back into keeps what the server has:
+    /// nothing goes out again. Off the gmap the same level starts afresh.
+    #[test]
+    fn walking_back_into_a_gmap_level_sends_nothing_again() {
+        let mut s = session("GLEVNW01\n");
+        s.take_server_npc(301, &record("a.png", 30.0, 25.0));
+        let mut sync = ServerNpcSync::default();
+        assert!(!sync.switch_level(Some("a.nw"), true));
+        let n = s.current_level.as_ref().unwrap().npcs[0].clone();
+        sync.heard(301, &record("a.png", 30.0, 25.0), &n);
+        let level = s.current_level.clone().unwrap();
+        assert!(!sync.changes(&level).is_empty(), "the first VISFLAGS");
+        assert!(sync.changes(&level).is_empty());
+        assert!(!sync.switch_level(Some("b.nw"), true));
+        assert!(sync.switch_level(Some("A.nw"), true), "parked, back");
+        assert!(sync.changes(&level).is_empty(), "nothing again");
+        assert!(!sync.switch_level(Some("house.nw"), false), "a plain warp off the gmap");
+        assert!(!sync.switch_level(Some("a.nw"), true), "off the gmap forgot it");
     }
 
     #[test]
