@@ -62,10 +62,13 @@ impl OfflineSession {
     }
 }
 
-/// The server's STATUS for our own player, without the paused bit: pause
-/// is ours to set (P or the focus), never taken from the account.
+/// The server's STATUS for our own player, without the paused and dead
+/// bits: pause is ours to set (P or the focus) and death ours to report
+/// (`life.rs`), never taken from the account. An account saved dead keeps
+/// STATUS 29 with full hearts (lab, 2026-10-31); keeping its dead bit made
+/// every pause message show the player dead.
 pub fn server_status_base(status: u8) -> u8 {
-    status & !PAUSED_STATUS
+    status & !(PAUSED_STATUS | crate::life::STATUS_DEAD)
 }
 
 /// Whether losing the window focus pauses the player in this build: not in
@@ -175,6 +178,7 @@ mod tests {
         // STATUS 21 from the lab accounts' template.
         assert_eq!(server_status_base(21), 0x14);
         assert_eq!(server_status_base(0x02), 0x02);
+        assert_eq!(server_status_base(29), 0x14);
     }
 
     #[test]
