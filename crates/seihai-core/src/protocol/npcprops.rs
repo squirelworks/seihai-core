@@ -3,10 +3,11 @@
 //! Both ways the payload is `GINT3 id`, then props as `GCHAR prop id` and
 //! a value. The prop ids and value shapes are GServer-v2's (`TNPC.h`); the
 //! 2.05 behaviour was checked in the lab (`documentation/ledges-push-pull.md`).
-//! Image, script, position, the two flag bytes, the message and the
-//! character props are kept; the other
-//! props of the pre-2.2 table are skipped by their length, and reading stops
-//! at a prop whose length is not known.
+//! Image, script, position, the two flag bytes, the message, the
+//! character props (GANI attributes 1 to 30) and the NPC's level
+//! (`CURLEVEL`) are kept; the other props up to 76 are skipped by their
+//! length, and reading stops at a prop whose length is not known (43, 48,
+//! and anything past 76; GServer-v2 never sends 43 or 48).
 
 use super::dispatch::{latin1, read_gint3, read_gshort, script_text};
 
@@ -33,6 +34,18 @@ pub const NPCPROP_NICKNAME: u8 = 20;
 pub const NPCPROP_HEAD: u8 = 22;
 pub const NPCPROP_BODY: u8 = 35;
 pub const NPCPROP_GATTRIB1: u8 = 36;
+/// GANI attributes 6 to 9 (44 to 47) and 10 to 30 (53 to 73), as 1 to 5:
+/// `GCHAR` length and the text.
+pub const NPCPROP_GATTRIB6: u8 = 44;
+pub const NPCPROP_GATTRIB10: u8 = 53;
+/// `NPCPROP_CURLEVEL` (52): `GCHAR` length and the level the NPC is on.
+pub const NPCPROP_CURLEVEL: u8 = 52;
+/// `NPCPROP_X2` (75) and `NPCPROP_Y2` (76): `GSHORT` pixels, doubled, the
+/// low bit the sign (2.3 and later).
+pub const NPCPROP_X2: u8 = 75;
+pub const NPCPROP_Y2: u8 = 76;
+/// GANI attributes the NPC record holds (`#P1` to `#P30`).
+pub const NPC_GATTRIBS: usize = 30;
 /// The image a character NPC reports.
 pub const CHARACTER_IMAGE: &str = "#c#";
 /// The colours of a character NPC whose script set none (2.05, lab).
@@ -82,7 +95,10 @@ pub struct NpcProps {
     pub nickname: Option<String>,
     pub head: Option<Head>,
     pub body: Option<String>,
-    pub attrs: [Option<String>; 5],
+    /// GANI attributes 1 to 30.
+    pub attrs: [Option<String>; NPC_GATTRIBS],
+    /// The level the server says the NPC is on (`CURLEVEL`).
+    pub level: Option<String>,
 }
 
 impl NpcProps {
@@ -102,6 +118,7 @@ impl NpcProps {
         self.nickname = o.nickname.or(self.nickname.take());
         self.head = o.head.or(self.head.take());
         self.body = o.body.or(self.body.take());
+        self.level = o.level.or(self.level.take());
         for (a, b) in self.attrs.iter_mut().zip(o.attrs) {
             if b.is_some() {
                 *a = b;
@@ -180,6 +197,29 @@ pub fn parse_npc_props(b: &[u8], bow_prop12: bool) -> Option<(u32, NpcProps)> {
                 let (s, n) = text(i)?;
                 p.attrs[prop - 36] = Some(s);
                 i += n;
+            }
+            44..=47 | 53..=73 => {
+                let (s, n) = text(i)?;
+                p.attrs[if prop < 53 { prop - 44 + 5 } else { prop - 53 + 9 }] = Some(s);
+                i += n;
+            }
+            52 => {
+                let (s, n) = text(i)?;
+                p.level = Some(s);
+                i += n;
+            }
+            // Scripter, name, type: `GCHAR` length and the text.
+            49..=51 => i += text(i)?.1,
+            // Class list: `GSHORT` length and the text.
+            74 => i += 2 + read_gshort(b.get(i..)?)? as usize,
+            75 | 76 => {
+                let v = Some(super::props::decode_pos_precise(read_gshort(b.get(i..)?)?));
+                if prop == 75 {
+                    p.x = v;
+                } else {
+                    p.y = v;
+                }
+                i += 2;
             }
             12 if !bow_prop12 => {
                 let (s, n) = text(i)?;
@@ -340,7 +380,7 @@ mod tests {
 
     #[test]
     fn an_unknown_prop_ends_the_record_and_a_short_one_is_dropped() {
-        let p = [gc(0), gc(0), gc(1), gc(2), gc(8), gc(70), gc(1), gc(3), gc(9)];
+        let p = [gc(0), gc(0), gc(1), gc(2), gc(8), gc(77), gc(1), gc(3), gc(9)];
         assert_eq!(parse_npc_props(&p, true).unwrap().1.x, Some(4.0));
         assert_eq!(parse_npc_props(&p[..2], true), None);
         assert_eq!(parse_npc_props(&[gc(0), gc(0), gc(1), gc(0), gc(9), b'a'], true), None);
@@ -401,6 +441,54 @@ mod tests {
         let p = [gc(0), gc(0), gc(1), gc(15), gc(4), b't', b'i', b'c', b'k', gc(13), gc(81)];
         let (_, p) = parse_npc_props(&p, true).unwrap();
         assert_eq!((p.message.as_deref(), p.vis_flags), (Some("tick"), Some(81)));
+    }
+
+    /// The order GServer-v2 sends a moved NPC in: GANI attributes 1 to 30
+    /// (6 to 30 past prop 43), the saves, the gmap level, then X2 and Y2.
+    /// The reader used to stop at prop 44 and drop the rest.
+    #[test]
+    fn props_past_43_are_read_and_keep_the_reader_in_step() {
+        let mut p = vec![gc(0), gc(0), gc(9)];
+        let attr = |p: &mut Vec<u8>, prop: usize, t: &[u8]| {
+            p.extend([gc(prop), gc(t.len())]);
+            p.extend_from_slice(t);
+        };
+        attr(&mut p, 36, b"a1.png");
+        attr(&mut p, 44, b"a6.png");
+        attr(&mut p, 47, b"a9.png");
+        attr(&mut p, 53, b"a10.png");
+        attr(&mut p, 73, b"a30.png");
+        attr(&mut p, 49, b"someone");
+        attr(&mut p, 50, b"door");
+        attr(&mut p, 51, b"LOCALN");
+        attr(&mut p, 52, b"onlinestartlocal.nw");
+        // Class list: GSHORT length.
+        p.extend([gc(74), gc(0), gc(3)]);
+        p.extend_from_slice(b"a,b");
+        p.extend([gc(23), gc(7), gc(41), gc(1), gc(42), gc(0)]);
+        // X2 = 30.5 tiles = 488 px, Y2 = -2 tiles = -32 px.
+        let x2 = 488u16 << 1;
+        let y2 = (32u16 << 1) | 1;
+        p.extend([gc(75), gc((x2 >> 7) as usize), gc((x2 & 0x7F) as usize)]);
+        p.extend([gc(76), gc((y2 >> 7) as usize), gc((y2 & 0x7F) as usize)]);
+        p.extend([gc(15), gc(2)]);
+        p.extend_from_slice(b"hi");
+        let (id, n) = parse_npc_props(&p, false).unwrap();
+        assert_eq!(id, 9);
+        let a = |i: usize| n.attrs[i - 1].as_deref();
+        assert_eq!((a(1), a(6), a(9), a(10), a(30), a(7)), (Some("a1.png"), Some("a6.png"), Some("a9.png"), Some("a10.png"), Some("a30.png"), None));
+        assert_eq!(n.level.as_deref(), Some("onlinestartlocal.nw"));
+        assert_eq!((n.x, n.y), (Some(30.5), Some(-2.0)));
+        assert_eq!(n.message.as_deref(), Some("hi"));
+    }
+
+    #[test]
+    fn props_43_48_and_past_76_still_end_the_record() {
+        for prop in [43, 48, 77] {
+            let p = vec![gc(0), gc(0), gc(9), gc(prop), gc(1), gc(15), gc(1), b'x'];
+            let (_, n) = parse_npc_props(&p, false).unwrap();
+            assert_eq!(n.message, None, "prop {prop}");
+        }
     }
 
     #[test]
