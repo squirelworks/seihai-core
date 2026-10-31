@@ -575,7 +575,12 @@ pub const CHAIN: &[Step] = &[
             encryption: Some(EncryptionGen::Gen3),
             // 14923 is the port the patched surviving copy carries, and the classic-login port.
             // Seihai's classic login got a list there on 2026-10-25 (matrix run).
-            listserver: Some(Some(Listserver::new(ListKind::Legacy, PortStatus::Confirmed, Some(BuiltIn { host: "listserver.graal.in", port: 14923 }), None))),
+            // Shape S: the real 1.41 rev 1 sends nothing and waits for the
+            // list (lab, 2026-10-30).
+            listserver: Some(Some(
+                Listserver::new(ListKind::Legacy, PortStatus::Confirmed, Some(BuiltIn { host: "listserver.graal.in", port: 14923 }), None)
+                    .shape(LoginShape::Silent, ShapeBasis::Captured),
+            )),
             pli: IdDelta::plus_minus(&[], &[31]),
             own_props: IdDelta::plus(&[35, 36]),
             other_props: IdDelta::plus(&[35, 36]),
@@ -594,7 +599,7 @@ pub const CHAIN: &[Step] = &[
         unknown: &[
             Unknown { area: "drops", what: "the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced" },
             Unknown { area: "listserver", what: "original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured" },
-            Unknown { area: "listserver", what: "login frame inferred, not captured, and no evidence for its shape: Seihai keeps shape B (id 0 `newmain`, then id 1 with the account), what it sent before the lab captures; whether a real 1.41 sends the account to the listserver is unknown" },
+            Unknown { area: "listserver", what: "the real 1.41 rev 1 sent nothing to the lab listserver, which spoke first (shape S, 2026-10-30); whether the public service speaks first to a silent client is not known, so after 3 s with no reply Seihai sends shape B (id 0 `newmain`, then id 1 with the account), which 14923 answered on 2026-10-25" },
             Unknown { area: "life", what: "death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)" },
             Unknown { area: "levels", what: "the .nw loader was found by a string and function scan of the binary; no .nw level was loaded in a real 1.41" },
         ],
@@ -609,7 +614,8 @@ pub const CHAIN: &[Step] = &[
             // Classic login: 14923 (matrix run, 2026-10-25). The build itself carries
             // www.graalonline.com:14921 (dead).
             listserver: Some(Some(
-                Listserver::new(ListKind::Legacy, PortStatus::Assumed, Some(BUILT_IN_14921), None).shape(LoginShape::NewmainOnly, ShapeBasis::Inferred),
+                // Captured: the real NewMain 26 sent id 0 `newmain` only (lab, 2026-10-30).
+                Listserver::new(ListKind::Legacy, PortStatus::Assumed, Some(BUILT_IN_14921), None).shape(LoginShape::NewmainOnly, ShapeBasis::Captured),
             )),
             plo: IdDelta::plus(&[42, 44, 45, 150, 151, 153]),
             pli: IdDelta::plus(&[34]),
@@ -625,7 +631,7 @@ pub const CHAIN: &[Step] = &[
         source: "binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)",
         unknown: &[
             Unknown { area: "listserver", what: "built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured" },
-            Unknown { area: "listserver", what: "login frame inferred, not captured: Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; a real 1.42 frame was never captured, and no run on the public service has used shape A, so the port is assumed" },
+            Unknown { area: "listserver", what: "the real NewMain 26 sent shape A (id 0 `newmain` only) to the lab listserver (2026-10-30), which Seihai sends; no run on the public service has used shape A, so the port is assumed" },
         ],
     },
     Step {

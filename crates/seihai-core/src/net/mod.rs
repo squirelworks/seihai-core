@@ -1051,7 +1051,10 @@ impl Connection {
     ///   password. Replies are gen-5 frames keyed with the same key.
     /// - D (3.04): C's two messages in one plain zlib frame, at the default
     ///   level (`78 9C`) as the real 3.04 sent it. Replies as for C.
-    /// - B (2.17 and the builds with no capture from 1.41 and 2.1 to 2.16):
+    /// - S (the real 1.41 rev 1): nothing; the listserver sends the list
+    ///   first. [`Self::fetch_server_list`] sends shape B when nothing comes
+    ///   within [`crate::protocol::SILENT_LIST_WAIT`].
+    /// - B (2.17 and the builds with no capture from 2.1 to 2.16):
     ///   one plain zlib frame with id 0 `newmain` and id 1. There is no
     ///   cipher on this link.
     /// - A (the real 2.00 and 2.05, and 1.42 and 2.01 to 2.04 as a best
@@ -1069,6 +1072,10 @@ impl Connection {
         password: &str,
     ) -> io::Result<()> {
         let shape = version.listserver().shape;
+        if shape == LoginShape::Silent {
+            // The real 1.41 sends nothing; the listserver speaks first.
+            return Ok(());
+        }
         if shape == LoginShape::NewmainOnly {
             self.send_raw(&write_zlib_frame_best(b" newmain\n")?)?;
             return self.stream.flush();
@@ -1091,11 +1098,20 @@ impl Connection {
             self.send_raw(&write_zlib_frame_best(&hs)?)?;
             self.send_messages(&[serverlist])
         } else {
-            let mut body = b" newmain\n".to_vec();
-            body.extend_from_slice(&serverlist);
-            self.send_raw(&write_zlib_frame_best(&body)?)?;
-            self.stream.flush()
+            self.send_classic_list_login(account, password)
         }
+    }
+
+    /// Shape B: one plain zlib frame (`78 DA`) with id 0 `newmain` and id 1
+    /// (account, password).
+    fn send_classic_list_login(&mut self, account: &str, password: &str) -> io::Result<()> {
+        let mut body = b" newmain\n".to_vec();
+        body.push(1 + 0x20);
+        write_gstring(&mut body, account)?;
+        write_gstring(&mut body, password)?;
+        body.push(b'\n');
+        self.send_raw(&write_zlib_frame_best(&body)?)?;
+        self.stream.flush()
     }
 
     /// Log in to a listserver and collect its reply.
@@ -1117,6 +1133,22 @@ impl Connection {
         let version = version.list_version();
         let mut conn = Self::connect(addr)?;
         conn.login_listserver(version, random_key(), account, password)?;
+        // Shape S (1.41): wait for the listserver to speak; if it does not,
+        // log in with shape B, which a listserver that waits for a request
+        // answers. The real 1.41 has no such fallback.
+        let mut first: Option<Vec<u8>> = None;
+        if version.listserver().shape == LoginShape::Silent {
+            conn.stream.set_read_timeout(Some(crate::protocol::SILENT_LIST_WAIT))?;
+            match conn.read_list_body() {
+                Ok(b) => first = Some(b),
+                Err(e) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => {
+                    eprintln!("listserver: nothing within {:?} of a silent 1.41 login; sending the classic login", crate::protocol::SILENT_LIST_WAIT);
+                    conn.send_classic_list_login(account, password)?;
+                }
+                Err(e) => return Err(list_read_error(e)),
+            }
+            conn.stream.set_read_timeout(Some(Duration::from_secs(5)))?;
+        }
         let mut reply = ListReply::default();
         let mut tail_deadline: Option<Instant> = None;
         for _ in 0..5 {
@@ -1127,7 +1159,11 @@ impl Connection {
                 }
                 let _ = conn.stream.set_read_timeout(Some(left));
             }
-            let body = match conn.read_list_body() {
+            let read = match first.take() {
+                Some(b) => Ok(b),
+                None => conn.read_list_body(),
+            };
+            let body = match read {
                 Ok(b) => b,
                 // Past the server list (or the status), a timeout, close or
                 // bad frame just ends the reply.
@@ -2276,10 +2312,10 @@ mod tests {
     }
 
     /// Shape B, the real 2.17.1: one plain zlib frame, id 0 then id 1, 78 DA.
-    /// The builds with no capture (1.41 and 2.1 to 2.16) keep it.
+    /// The builds with no capture (2.1 to 2.16) keep it.
     #[test]
     fn shape_b_listserver_login() {
-        for v in [ClientVersion::V141, ClientVersion::V210, ClientVersion::V216, ClientVersion::V217] {
+        for v in [ClientVersion::V210, ClientVersion::V216, ClientVersion::V217] {
             assert_eq!(v.listserver().shape, LoginShape::NewmainAccount, "{}", v.label());
             let (mut conn, mut srv) = pair();
             conn.login_listserver(v, 0x66, "ab", "cd").unwrap();
@@ -2669,6 +2705,65 @@ mod tests {
         let (mut srv, _) = listener.accept().unwrap();
         let login = read_frame(&mut srv);
         (srv, login)
+    }
+
+    /// Shape S, the real 1.41 rev 1: the login sends nothing at all.
+    #[test]
+    fn shape_s_listserver_login_sends_nothing() {
+        assert_eq!(ClientVersion::V141.listserver().shape, LoginShape::Silent);
+        let (mut conn, mut srv) = pair();
+        conn.login_listserver(ClientVersion::V141, 0x66, "ab", "cd").unwrap();
+        drop(conn);
+        let mut rest = Vec::new();
+        srv.read_to_end(&mut rest).unwrap();
+        assert!(rest.is_empty(), "1.41 sends nothing to the listserver");
+    }
+
+    /// 1.41 against a listserver that speaks first (the lab's): the list
+    /// comes with nothing sent, and nothing is sent after it.
+    #[test]
+    fn fetch_server_list_141_listserver_speaks_first() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        let (done_tx, done_rx) = mpsc::channel::<()>();
+        let server = std::thread::spawn(move || {
+            let (mut srv, _) = listener.accept().unwrap();
+            send_plain(&mut srv, &svrlist_body());
+            send_plain(&mut srv, &tail_body());
+            let _ = done_rx.recv();
+            srv.set_read_timeout(Some(Duration::from_millis(200))).unwrap();
+            let mut b = [0u8; 1];
+            assert!(srv.read(&mut b).map_or(true, |n| n == 0), "1.41 sent something");
+        });
+        let t = Instant::now();
+        let reply = Connection::fetch_server_list(&addr, ClientVersion::V141, "ab", "cd").unwrap();
+        assert!(t.elapsed() < Duration::from_secs(2));
+        assert_eq!(reply.servers.len(), 1);
+        done_tx.send(()).unwrap();
+        server.join().unwrap();
+    }
+
+    /// 1.41 against a listserver that waits for a request: after
+    /// `SILENT_LIST_WAIT` Seihai sends shape B and gets the list.
+    #[test]
+    fn fetch_server_list_141_falls_back_to_shape_b() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        let (done_tx, done_rx) = mpsc::channel::<()>();
+        let server = std::thread::spawn(move || {
+            let (mut srv, login) = accept_plain_listserver(&listener);
+            assert_eq!(login, b" newmain\n!\"ab\"cd\n");
+            send_plain(&mut srv, &svrlist_body());
+            send_plain(&mut srv, &tail_body());
+            let _ = done_rx.recv();
+        });
+        let t = Instant::now();
+        let reply = Connection::fetch_server_list(&addr, ClientVersion::V141, "ab", "cd").unwrap();
+        let took = t.elapsed();
+        assert!(took >= crate::protocol::SILENT_LIST_WAIT && took < crate::protocol::SILENT_LIST_WAIT + Duration::from_secs(2), "{took:?}");
+        assert_eq!(reply.servers.len(), 1);
+        done_tx.send(()).unwrap();
+        server.join().unwrap();
     }
 
     /// 2.17 lab flow: the login is one plain frame with id 0 and id 1, the
