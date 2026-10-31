@@ -4999,6 +4999,28 @@ mod tests {
         assert!(events.contains(&LifeEvent::Died { attacker: Some(7) }), "{events:?}");
     }
 
+    /// One blast hurts once: the hit starts hurt mode, which keeps the
+    /// later ticks of the same blast off. 1.39 on hastur lost three half
+    /// hearts to its own bomb while it had no combat row (no hurt mode).
+    #[test]
+    fn a_139_player_is_hurt_once_by_one_blast() {
+        let mut s = bombed();
+        s.combat = crate::combat::CombatState::new(crate::protocol::ClientVersion::V139.combat_rules());
+        s.receive_explosion(&explosion(false), None);
+        for _ in 0..10 {
+            s.tick_bombs(50);
+        }
+        assert_eq!(s.hearts_half(), 5);
+        // Without a combat row nothing keeps the blast off.
+        let mut s = bombed();
+        s.combat = crate::combat::CombatState::new(None);
+        s.receive_explosion(&explosion(false), None);
+        for _ in 0..10 {
+            s.tick_bombs(50);
+        }
+        assert!(s.hearts_half() < 5, "{}", s.hearts_half());
+    }
+
     #[test]
     fn on_a_no_player_killing_level_an_owned_piece_does_not_hurt() {
         let mut s = bombed();
