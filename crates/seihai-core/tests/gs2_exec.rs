@@ -61,15 +61,15 @@ fn calls_fixture_runs_a_function_with_parameters_and_a_return_value() {
 }
 
 #[test]
-fn control_fixture_runs_loops_and_switch_and_logs_what_it_skips() {
+fn control_fixture_runs_loops_and_switch() {
     let mut m = machine("control.gs2bc");
     let mut h = host();
     m.call_event("onTimeout", &[], &mut h);
     // n = 1 + 3 + 4 = 8, counted down to 1 by the while loop: case 1.
     assert_eq!(h.effects, [Effect::Say2 { text: "one".into() }]);
-    assert!(h.log.iter().any(|l| l.contains("OP_IN_RANGE") && l.contains("Stage D")), "{:?}", h.log);
-    // `setTimer` is the machine's own now (Stage D, timers).
-    assert!(!h.log.iter().any(|l| l.contains("setTimer")), "{:?}", h.log);
+    // `in |a, b|` and `setTimer` are the machine's own now (Stage D), so
+    // nothing is skipped.
+    assert!(h.log.is_empty(), "{:?}", h.log);
     assert_eq!(m.timeout(), 0.1);
 }
 
@@ -170,4 +170,47 @@ fn lists_fixture_builds_changes_and_walks_lists() {
 fn missing_events_are_reported() {
     let mut m = machine("shared.gs2bc");
     assert_eq!(m.call_event("onPlayerEnters", &[], &mut host()), Outcome::NoSuchEvent);
+}
+
+#[test]
+fn rest_fixture_runs_the_maths_ranges_types_and_with() {
+    let mut m = machine("rest.gs2bc");
+    let mut h = host();
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    let n = |v: f64| Val::Num(v);
+    let v = |name: &str| m.var(Root::This, name).cloned().unwrap_or_else(|| panic!("{name} not set"));
+    assert_eq!(v("e"), n(1.0));
+    // gs2-parser pushes log(2, 8) as 8 then 2, and the client takes the
+    // lower one as the base: log base 8 of 2.
+    assert!((v("l").num() - 1.0 / 3.0).abs() < 1e-12);
+    assert!((v("ga").num() - std::f64::consts::FRAC_PI_4).abs() < 1e-12);
+    assert_eq!((v("gd"), v("vx"), v("vy")), (n(1.0), n(1.0), n(1.0)));
+    assert_eq!((v("sh"), v("sr")), (n(16.0), n(64.0)));
+    assert_eq!((v("inr"), v("outr")), (n(1.0), n(0.0)));
+    // gs2-parser pushes the value under the list; the client wants the
+    // list under the value, so this finds nothing.
+    assert_eq!(v("ixn"), n(0.0));
+    assert_eq!((v("tl"), v("tn")), (n(3.0), n(0.0)));
+    assert_eq!(m.list(Root::This, "arr").map(<[_]>::len), Some(3));
+    assert_eq!(v("an"), n(3.0));
+    // `with (player)`: `x` and `this.inw` land on the player; the null
+    // `with` block is skipped.
+    assert_eq!((m.var(Root::Player, "x"), m.var(Root::Player, "inw")), (Some(&n(12.0)), Some(&n(1.0))));
+    assert_eq!((v("px"), h.x), (n(12.0), 30.0));
+    assert_eq!(m.var(Root::This, "never"), None);
+    assert!(h.log.is_empty(), "{:?}", h.log);
+}
+
+#[test]
+fn shared_commands_match_in_any_case_and_under_this() {
+    use seihai_core::scripting::gs2::exec::Host;
+    let mut h = host();
+    assert!(h.command("this.hideImg", &[Val::Num(2.0)]).is_some());
+    assert!(h.command("Say2", &[Val::from("hi")]).is_some());
+    // GS2 has its own lists; the GS1 string-list commands are not there.
+    assert!(h.command("setstring", &[Val::from("a"), Val::from("b")]).is_none());
+    assert_eq!(
+        h.effects,
+        [Effect::Command { obj: 7, name: "hideimg".into(), args: vec![Val::Num(2.0)] }, Effect::Say2 { text: "hi".into() }]
+    );
 }

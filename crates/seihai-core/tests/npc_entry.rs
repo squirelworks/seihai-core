@@ -1,4 +1,4 @@
-//! What 2.22 sends for a server NPC on the first entry of a level: the props
+//! What 2.22 and 2.31 send for a server NPC on the first entry of a level: the props
 //! its `created` set that the server's copy lacks, under the 2.05 rule
 //! (`documentation/gmap-order.md`, "NPC props on entry for 2.22").
 //!
@@ -29,13 +29,14 @@ const SERVER_CLOTHES_NPC: &str = "20224f2020212861696620286372656174656429207ba7
 const REAL_WARP_NPC: &str = "20225020232363232c2469646c652d312f38546f20746865206d696e6920706c61796572776f726c6421368d68656164322e706e674328626f64792e706e67";
 const REAL_CLOTHES_NPC: &str = "20224f20232363232c2469646c652d312f39546f756368206d6520666f72206e657720636c6f746865732133222e203221368d68656164342e706e674329626f6479322e706e67";
 
-#[test]
-fn on_2_22_the_first_entry_reports_what_created_set() {
+/// The first round of NPC props on entering testworld as `version`.
+fn first_round(version: ClientVersion, settle_first: bool) -> (Vec<Vec<u8>>, Vec<Vec<u8>>) {
     let mut s = OfflineSession::new();
     s.current_level = Some(seihai_core::assets::Level::from_board(&vec![0u16; 4096]));
-    let mut sc = SessionScripts::new(ClientVersion::V222);
+    let mut sc = SessionScripts::new(version);
     sc.load_level(&mut s, "testworld.nw");
     let mut sync = ServerNpcSync::default();
+    sync.settle_first = settle_first;
     for record in [SERVER_WARP_NPC, SERVER_CLOTHES_NPC] {
         let (id, p) = parse_npc_props(&hex(record), false).expect("the server's record parses");
         let Linked::Added(i) = s.take_server_npc(id, &p) else { panic!("{id} not added") };
@@ -43,8 +44,24 @@ fn on_2_22_the_first_entry_reports_what_created_set() {
         sync.heard(id, &p, &s.current_level.as_ref().unwrap().npcs[i]);
     }
     sc.tick(&mut s, 16);
-    let sent = sync.changes(s.current_level.as_ref().unwrap());
+    let first = sync.changes(s.current_level.as_ref().unwrap());
+    let second = sync.changes(s.current_level.as_ref().unwrap());
+    (first, second)
+}
+
+#[test]
+fn on_2_22_the_first_entry_reports_what_created_set() {
+    let (sent, again) = first_round(ClientVersion::V222, false);
     let want: Vec<Vec<u8>> = [REAL_WARP_NPC, REAL_CLOTHES_NPC].iter().map(|h| [&[3 + 0x20][..], &hex(h), b"\n"].concat()).collect();
     assert_eq!(sent, want);
-    assert!(sync.changes(s.current_level.as_ref().unwrap()).is_empty(), "nothing twice");
+    assert!(again.is_empty(), "nothing twice");
+}
+
+/// The real 2.31 on the same entry, with the same two server records
+/// (Mirae, 2026-10-31, `lan-231c`): no `PLI_NPCPROPS` at all. Its first frame
+/// after the level held only `TAMPERCHECK` and `PLAYERPROPS`.
+#[test]
+fn on_2_31_the_first_entry_reports_nothing() {
+    let (sent, again) = first_round(ClientVersion::V231, true);
+    assert!(sent.is_empty() && again.is_empty(), "{sent:?} {again:?}");
 }

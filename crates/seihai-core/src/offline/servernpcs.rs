@@ -20,7 +20,7 @@
 //! server NPC's image and position *is* that NPC and takes its id; a server
 //! NPC with no such twin is added to the level.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use super::OfflineSession;
@@ -250,6 +250,15 @@ pub struct ServerNpcSync {
     /// Gmap levels left while still loaded: what the server has for their
     /// NPCs, until the player walks back in.
     parked: HashMap<String, HashMap<u32, Known>>,
+    /// The first round after linking an NPC sends nothing: what its script
+    /// set then counts as what the server has. Real 2.31 sent no
+    /// `PLI_NPCPROPS` on a link into testworld, where the server's copy of
+    /// both NPCs lacked the looks and message their `created` set (Mirae,
+    /// 2026-10-31, `lan-231c`); real 2.22 sent them on the same entry
+    /// (`lan-222g`). Off (the 2.05 rule, 2.22) by default.
+    pub settle_first: bool,
+    /// Linked NPCs that have not had their first round yet.
+    fresh: HashSet<u32>,
 }
 
 impl ServerNpcSync {
@@ -258,6 +267,7 @@ impl ServerNpcSync {
         self.known.clear();
         self.parked.clear();
         self.level = None;
+        self.fresh.clear();
     }
 
     /// The player is now in `here`. On a gmap (`on_gmap`) the level left
@@ -291,6 +301,9 @@ impl ServerNpcSync {
 
     /// The server sent `p` for `id`: those are now the values it has.
     pub fn heard(&mut self, id: u32, p: &NpcProps, n: &Npc) {
+        if !self.known.contains_key(&id) {
+            self.fresh.insert(id);
+        }
         let k = self.known.entry(id).or_insert_with(|| Known {
             x: half_tiles(n.x),
             y: half_tiles(n.y),
@@ -439,6 +452,9 @@ impl ServerNpcSync {
             }
             // The 2.05 client sends props in id order.
             props.sort_by_key(|(p, _)| *p);
+            if self.fresh.remove(&id) && self.settle_first {
+                continue;
+            }
             if !props.is_empty() {
                 out.push(npc_props_message(id, &props));
             }
@@ -537,6 +553,24 @@ mod tests {
         s.take_server_npc(1001, &moved);
         sync.heard(1001, &moved, &s.current_level.as_ref().unwrap().npcs[0]);
         assert!(sync.changes(s.current_level.as_ref().unwrap()).is_empty());
+    }
+
+    /// 2.31: the first round after linking only learns what the script set;
+    /// later changes still go out.
+    #[test]
+    fn on_2_31_the_first_round_after_linking_sends_nothing() {
+        let mut s = session("GLEVNW01\n");
+        let p = record("labblock.gif", 30.0, 25.0);
+        s.take_server_npc(1001, &p);
+        let mut sync = ServerNpcSync { settle_first: true, ..ServerNpcSync::default() };
+        sync.heard(1001, &p, &s.current_level.as_ref().unwrap().npcs[0]);
+        // The script made it a character: no VISFLAGS, IMAGE, GANI or BODY.
+        s.current_level.as_mut().unwrap().npcs[0].ani = Some("idle".into());
+        assert!(sync.changes(s.current_level.as_ref().unwrap()).is_empty());
+        assert!(sync.changes(s.current_level.as_ref().unwrap()).is_empty());
+        // A push later still goes out (Y, 48 half tiles).
+        s.current_level.as_mut().unwrap().npcs[0].y = 24.0;
+        assert_eq!(sync.changes(s.current_level.as_ref().unwrap()), vec![b"# '\x89#P\n".to_vec()]);
     }
 
     #[test]
