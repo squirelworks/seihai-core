@@ -390,6 +390,13 @@ pub struct SessionState {
     pub server_npcs: std::collections::BTreeMap<u32, (Option<String>, NpcProps)>,
     /// `PLO_NPCPROPS` updates in arrival order, taken by the game loop.
     pub npc_changes: Vec<(u32, NpcProps)>,
+    /// `PLO_NPCBYTECODE` (131): the compiled GS2 script of a server NPC, as
+    /// sent (see `documentation/gs2-receive.md`). Only builds that handle
+    /// 131 (3.153) fill it. Nothing here runs it.
+    pub npc_bytecode: std::collections::BTreeMap<u32, Vec<u8>>,
+    /// 131 records for an NPC no `PLO_NPCPROPS` has named yet. The 3.153
+    /// client drops these; so does Seihai.
+    pub npc_bytecode_dropped: usize,
     /// `PLO_ITEMADD` (22) and `PLO_ITEMDEL` (23) in arrival order, drained
     /// by the game loop onto the floor (see [`crate::items`]).
     pub items: Vec<ServerItem>,
@@ -756,6 +763,16 @@ impl SessionState {
                     if level.as_deref().zip(here.as_deref()).is_none_or(|(a, b)| a.eq_ignore_ascii_case(b)) {
                         self.npc_changes.push((id, p));
                     }
+                }
+            }
+            131 => {
+                // PLO_NPCBYTECODE, behind PLO_RAWDATA: GINT3 npc id, then
+                // the GS2 bytecode file (ending in the compiler's `\n`).
+                match read_gint3(&msg.payload) {
+                    Some(id) if id > 0 && self.server_npcs.contains_key(&(id as u32)) => {
+                        self.npc_bytecode.insert(id as u32, msg.payload[3..].to_vec());
+                    }
+                    _ => self.npc_bytecode_dropped += 1,
                 }
             }
             14 => {
@@ -3446,5 +3463,35 @@ mod tests {
             assert_eq!(e.kind(), std::io::ErrorKind::Unsupported);
             assert!(sess.warp_pending.is_none());
         }
+    }
+
+    /// `PLO_NPCBYTECODE` (131) as GServer-v2's `TLevel::getNpcsPacket`
+    /// sends it: `PLO_RAWDATA` with the length, then id 131, GINT3 npc id
+    /// and the bytecode, whose last byte is the compiler's `\n`.
+    fn npc_bytecode(id: u32, code: &[u8]) -> Vec<u8> {
+        let mut m = vec![131 + 0x20, gc((id >> 14) as u8 & 0x7F), gc((id >> 7) as u8 & 0x7F), gc(id as u8 & 0x7F)];
+        m.extend_from_slice(code);
+        let n = m.len();
+        let mut out = vec![100 + 0x20, gc((n >> 14) as u8 & 0x7F), gc((n >> 7) as u8 & 0x7F), gc(n as u8 & 0x7F), b'\n'];
+        out.extend(m);
+        out
+    }
+
+    #[test]
+    fn npc_bytecode_is_kept_for_a_known_npc_on_3153_only() {
+        use crate::protocol::npcprops::{npc_props_message, PropValue, NPCPROP_X};
+        // Any bytes: the dispatcher keeps them as sent, `\n` and all.
+        let code = b"\0\0\0\x01\0\0\0\x04\0\0\0\0\n\x8a\n";
+        let body = [msg(6, b"lab3x.nw"), npc_props_message(5, &[(NPCPROP_X, PropValue::Byte(60))]), npc_bytecode(5, code), npc_bytecode(9, code)].concat();
+        let mut st = SessionState::for_version(ClientVersion::V3153);
+        st.apply_body(&body);
+        assert_eq!(st.npc_bytecode.get(&5).map(Vec::as_slice), Some(&code[..]));
+        // NPC 9 was never named: the client drops it.
+        assert_eq!((st.npc_bytecode.len(), st.npc_bytecode_dropped), (1, 1));
+        // 3.04 has no 131.
+        let mut st = SessionState::for_version(ClientVersion::V304);
+        st.apply_body(&body);
+        assert!(st.npc_bytecode.is_empty());
+        assert_eq!(st.ignored.get(&131), Some(&2));
     }
 }
