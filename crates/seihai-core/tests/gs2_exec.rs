@@ -144,6 +144,29 @@ fn strings_fixture_runs_the_string_built_ins() {
 }
 
 #[test]
+fn lists_fixture_builds_changes_and_walks_lists() {
+    use seihai_core::scripting::gs2::lists::Value;
+    let mut m = machine("lists.gs2bc");
+    let mut h = host();
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    let n = |v: f64| Val::Num(v);
+    let v = |name: &str| m.var(Root::This, name).cloned().unwrap_or_else(|| panic!("{name} not set"));
+    assert_eq!((v("n"), v("first")), (n(3.0), n(10.0)));
+    // {10, "two", 30}, a[1] = 20, add 40, insert 5 at 0, delete 1,
+    // remove 30, replace 0 with 7.
+    let joined: Vec<Val> = m.list(Root::This, "joined").expect("a list").iter().map(Value::val).collect();
+    assert_eq!(joined, [n(7.0), n(20.0), n(40.0)]);
+    assert_eq!((v("idx"), v("has")), (n(2.0), n(1.0)));
+    assert_eq!((v("tn"), v("t2")), (n(3.0), Val::from("c")));
+    let ps: Vec<Val> = m.list(Root::This, "ps").expect("a list").iter().map(Value::val).collect();
+    assert_eq!(ps, [n(1.0), n(3.0)]);
+    assert_eq!(v("sum"), n(67.0));
+    assert_eq!((v("g"), v("gn")), (n(9.0), n(2.0)));
+    assert_eq!(v("left"), n(0.0));
+    assert!(h.log.is_empty(), "{:?}", h.log);
+}
+
+#[test]
 fn missing_events_are_reported() {
     let mut m = machine("shared.gs2bc");
     assert_eq!(m.call_event("onPlayerEnters", &[], &mut host()), Outcome::NoSuchEvent);

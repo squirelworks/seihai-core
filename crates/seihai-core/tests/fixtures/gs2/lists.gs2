@@ -1,0 +1,29 @@
+// Lists: literals, a[i], a[i] =, size, add, insert, delete, remove,
+// replace, clear, index, tokenize, positions, in, for-each,
+// new[n][m] and a[i, j].
+function onCreated() {
+  temp.a = {10, "two", 30};
+  this.n = temp.a.size();
+  this.first = temp.a[0];
+  temp.a[1] = 20;
+  temp.a.add(40);
+  temp.a.insert(0, 5);
+  temp.a.delete(1);
+  temp.a.remove(30);
+  temp.a.replace(0, 7);
+  this.joined = temp.a;
+  this.idx = temp.a.index(40);
+  this.has = 40 in temp.a;
+  temp.t = "a b,c".tokenize();
+  this.tn = temp.t.size();
+  this.t2 = temp.t[2];
+  this.ps = "abab".positions("b");
+  this.sum = 0;
+  for (temp.v : temp.a) this.sum += temp.v;
+  temp.g = new[2][3];
+  temp.g[1, 2] = 9;
+  this.g = temp.g[1, 2];
+  this.gn = temp.g.size();
+  temp.a.clear();
+  this.left = temp.a.size();
+}
