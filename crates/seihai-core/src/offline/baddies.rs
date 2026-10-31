@@ -242,6 +242,11 @@ impl OfflineSession {
         self.sound_events.extend(sounds);
         self.baddy_sends.extend(sends);
         for s in shots {
+            // Online the leader sends each shot as PLI_ARROWADD, as the real
+            // 2.22 does (`lan-222d`: `87 79 20 8b 21`, an arrow facing north).
+            if role.online && role.leader {
+                self.baddy_sends.push(crate::arrows::arrow_add_message(s.x as f32, s.y as f32, s.dir, false, s.sprite, s.kind));
+            }
             let mut a = crate::arrows::Arrow::new(s.x as f32, s.y as f32, s.dir);
             a.sprite = s.sprite;
             a.kind = s.kind;
@@ -380,5 +385,14 @@ mod tests {
             let step = (w[1].2 - w[0].2).abs().max((w[1].3 - w[0].3).abs());
             assert!((0.2..=0.5).contains(&step), "step {step}");
         }
+    }
+
+    /// A baddy's arrow as the 2.22 leader sends it (`lan-222d` +88201 ms).
+    #[test]
+    fn a_shot_is_sent_as_the_2_22_leader_sends_it() {
+        let m = crate::arrows::arrow_add_message(51.5, 44.5, 0, false, b::ARROW_SPRITE, 0);
+        assert_eq!(m, [9 + 32, 0x87, 0x79, 0x20, 0x8b, 0x21, b'\n']);
+        let m = crate::arrows::arrow_add_message(70.0, 55.5, 3, false, b::ARROW_SPRITE + 3, 0);
+        assert_eq!(&m[3..6], [0x23, 0x8e, 0x21]);
     }
 }
