@@ -323,12 +323,31 @@ step	label	token	basis	kind	area	field	detail
 41	6.00r2	G3D26090	binary	unknown	pli	-	not read; Linux 6.01r1's set (6.03r7's without 160) is taken
 41	6.00r2	G3D26090	binary	unknown	framing	-	the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
 41	6.00r2	G3D26090	binary	source	-	-	unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24, 6.x long frame lengths
-42	6.03r7	G3D0311C	binary	changed	protocol	plo (server ids handled)	+111 SETNETCOOKIE; -175 SHOOT, -184 TAKESCREENSHOT (93 -> 92 ids)
-42	6.03r7	G3D0311C	binary	changed	protocol	pli (client ids sent)	+160 RC_FOLDERDELETE (59 -> 60 ids)
-42	6.03r7	G3D0311C	binary	unknown	token	-	the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)
-42	6.03r7	G3D0311C	binary	source	-	-	unpacked from Themida and lab: 92 PLO ids (175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date
-43	6.03r7 Linux	G3D0511C	binary	changed	protocol	login lobby	first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends linux,"","","",""
-43	6.03r7 Linux	G3D0511C	binary	unknown	login	-	the four machine ids are sent as empty quoted strings; the real kernel string field was not captured, and whether it is quoted is not known
-43	6.03r7 Linux	G3D0511C	binary	unknown	lab	-	the Linux client was not run; the Windows 6.03r7 lab run (2026-10-31) stands in for it
-43	6.03r7 Linux	G3D0511C	binary	unknown	files	-	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for
-43	6.03r7 Linux	G3D0511C	binary	source	-	-	binary (Linux x64 ELF, not packed): token stored as the scrambled string g3d0511c, login list linux plus four machine ids (eth0 MAC md5, /etc inode md5, empty, kernel string); PLO and PLI sets are the ones the Windows row took from it; gs2lib names the token 6.037 (Linux)
+42	6.015	G3D3007A	inferred	changed	protocol	plo (server ids handled)	-175 SHOOT, -184 TAKESCREENSHOT (93 -> 91 ids)
+42	6.015	G3D3007A	inferred	unknown	binary	-	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
+42	6.015	G3D3007A	inferred	unknown	token	-	G3D3007A comes from GServer-v2's allowedversions.txt and gs2lib only; no 6.00r7 or 6.01r5 login was captured
+42	6.015	G3D3007A	inferred	unknown	plo	-	Linux 6.01r1's set; whether 6.00r7 (the earlier of the two builds) already drops 175 and 184 is not known
+42	6.015	G3D3007A	inferred	unknown	pli	-	Linux 6.01r1's set (6.03r7's without 160), as for 6.00r2
+42	6.015	G3D3007A	inferred	unknown	login	-	the 5.12 to 6.03r7 login line (win, three machine fields, the quoted Windows version) is taken; no capture with this token
+42	6.015	G3D3007A	inferred	unknown	framing	-	the 0xFFFF long frame length is read in Linux 6.01r1 and taken
+42	6.015	G3D3007A	inferred	unknown	ui	-	Tempus Sans ITC 24 is carried from 6.00r2; Login-mode tile drawing before the warp is not known
+42	6.015	G3D3007A	inferred	unknown	date	-	link date not known
+42	6.015	G3D3007A	inferred	source	-	-	GServer-v2's allowedversions.txt (G3D3007A for 6.0.0.7 and 6.0.1.5) and stock gs2lib (CLVER_6_015); PLO and PLI from Linux 6.01r1 (91 PLO ids: 6.00r2's without 175 and 184); the rest as 6.00r2
+43	6.034	G3D2505C	inferred	changed	protocol	plo (server ids handled)	+111 SETNETCOOKIE (91 -> 92 ids)
+43	6.034	G3D2505C	inferred	changed	protocol	pli (client ids sent)	+160 RC_FOLDERDELETE (59 -> 60 ids)
+43	6.034	G3D2505C	inferred	unknown	binary	-	no 6.03r4 binary; every value of this step is inferred
+43	6.034	G3D2505C	inferred	unknown	token	-	G3D2505C comes from GServer-v2's allowedversions.txt and gs2lib only; no 6.03r4 login was captured
+43	6.034	G3D2505C	inferred	unknown	plo	-	6.03r7's set; 111 (creationtime.dat) is in 6.03r7 and not in 6.01r1, and whether 6.03r4 already has it is not known
+43	6.034	G3D2505C	inferred	unknown	pli	-	6.03r7's set; whether 6.03r4 already sends 160 (RC folder delete) is not known
+43	6.034	G3D2505C	inferred	unknown	login	-	the 5.12 to 6.03r7 login line (win, three machine fields, the quoted Windows version) is taken; no capture with this token
+43	6.034	G3D2505C	inferred	unknown	ui	-	Tempus Sans ITC 24 is carried; whether 6.03r4 draws tiles before the warp (6.03r7 does not) is not known
+43	6.034	G3D2505C	inferred	unknown	date	-	link date not known
+43	6.034	G3D2505C	inferred	source	-	-	GServer-v2's allowedversions.txt (G3D2505C for 6.0.3.4) and stock gs2lib (CLVER_6_034); PLO and PLI from Linux 6.03r7 (92 PLO ids, 60 send ids); the rest as 6.015
+44	6.03r7	G3D0311C	binary	same	-	-	no change against the step before
+44	6.03r7	G3D0311C	binary	unknown	token	-	the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)
+44	6.03r7	G3D0311C	binary	source	-	-	unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date
+45	6.03r7 Linux	G3D0511C	binary	changed	protocol	login lobby	first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends linux,"","","",""
+45	6.03r7 Linux	G3D0511C	binary	unknown	login	-	the four machine ids are sent as empty quoted strings; the real kernel string field was not captured, and whether it is quoted is not known
+45	6.03r7 Linux	G3D0511C	binary	unknown	lab	-	the Linux client was not run; the Windows 6.03r7 lab run (2026-10-31) stands in for it
+45	6.03r7 Linux	G3D0511C	binary	unknown	files	-	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for
+45	6.03r7 Linux	G3D0511C	binary	source	-	-	binary (Linux x64 ELF, not packed): token stored as the scrambled string g3d0511c, login list linux plus four machine ids (eth0 MAC md5, /etc inode md5, empty, kernel string); PLO and PLI sets are the ones the Windows row took from it; gs2lib names the token 6.037 (Linux)

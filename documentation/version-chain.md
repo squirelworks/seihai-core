@@ -529,12 +529,37 @@ Generated; do not edit between the markers.
 - unknown (framing): the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
 - source: unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24, 6.x long frame lengths
 
+#### 6.015 (`G3D3007A`, inferred)
+
+- protocol: **plo (server ids handled)**: -175 SHOOT, -184 TAKESCREENSHOT (93 -> 91 ids)
+- unknown (binary): no 6.00r7 or 6.01r5 binary; every value of this step is inferred
+- unknown (token): G3D3007A comes from GServer-v2's allowedversions.txt and gs2lib only; no 6.00r7 or 6.01r5 login was captured
+- unknown (plo): Linux 6.01r1's set; whether 6.00r7 (the earlier of the two builds) already drops 175 and 184 is not known
+- unknown (pli): Linux 6.01r1's set (6.03r7's without 160), as for 6.00r2
+- unknown (login): the 5.12 to 6.03r7 login line (win, three machine fields, the quoted Windows version) is taken; no capture with this token
+- unknown (framing): the 0xFFFF long frame length is read in Linux 6.01r1 and taken
+- unknown (ui): Tempus Sans ITC 24 is carried from 6.00r2; Login-mode tile drawing before the warp is not known
+- unknown (date): link date not known
+- source: GServer-v2's allowedversions.txt (G3D3007A for 6.0.0.7 and 6.0.1.5) and stock gs2lib (CLVER_6_015); PLO and PLI from Linux 6.01r1 (91 PLO ids: 6.00r2's without 175 and 184); the rest as 6.00r2
+
+#### 6.034 (`G3D2505C`, inferred)
+
+- protocol: **plo (server ids handled)**: +111 SETNETCOOKIE (91 -> 92 ids)
+- protocol: **pli (client ids sent)**: +160 RC_FOLDERDELETE (59 -> 60 ids)
+- unknown (binary): no 6.03r4 binary; every value of this step is inferred
+- unknown (token): G3D2505C comes from GServer-v2's allowedversions.txt and gs2lib only; no 6.03r4 login was captured
+- unknown (plo): 6.03r7's set; 111 (creationtime.dat) is in 6.03r7 and not in 6.01r1, and whether 6.03r4 already has it is not known
+- unknown (pli): 6.03r7's set; whether 6.03r4 already sends 160 (RC folder delete) is not known
+- unknown (login): the 5.12 to 6.03r7 login line (win, three machine fields, the quoted Windows version) is taken; no capture with this token
+- unknown (ui): Tempus Sans ITC 24 is carried; whether 6.03r4 draws tiles before the warp (6.03r7 does not) is not known
+- unknown (date): link date not known
+- source: GServer-v2's allowedversions.txt (G3D2505C for 6.0.3.4) and stock gs2lib (CLVER_6_034); PLO and PLI from Linux 6.03r7 (92 PLO ids, 60 send ids); the rest as 6.015
+
 #### 6.03r7 (`G3D0311C`, binary, linked 2012-11-16)
 
-- protocol: **plo (server ids handled)**: +111 SETNETCOOKIE; -175 SHOOT, -184 TAKESCREENSHOT (93 -> 92 ids)
-- protocol: **pli (client ids sent)**: +160 RC_FOLDERDELETE (59 -> 60 ids)
+- no change against the step before
 - unknown (token): the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)
-- source: unpacked from Themida and lab: 92 PLO ids (175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date
+- source: unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date
 
 #### 6.03r7 Linux (`G3D0511C`, binary, linked 2012-11-11)
 
