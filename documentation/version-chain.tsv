@@ -298,7 +298,7 @@ step	label	token	basis	kind	area	field	detail
 37	5.12	G3D14097	binary	changed	protocol	login lobby	first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 37	5.12	G3D14097	binary	changed	protocol	gen5_round_down	no -> yes
 37	5.12	G3D14097	binary	unknown	pli	-	not read; 5.00r7's set is kept
-37	5.12	G3D14097	binary	unknown	framing	-	a server must step as 5.12 does; GServer-v2 rounds up, so Seihai pads its zlib bodies to a multiple of 4, where both counts agree
+37	5.12	G3D14097	binary	unknown	framing	-	a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
 37	5.12	G3D14097	binary	source	-	-	unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed
 38	5.24r4	G3D15010	binary	changed	protocol	plo (server ids handled)	+109 UNKNOWN109, +198 SERVEROPTIONS; -75 PROFILE, -132 UNKNOWN132, -133 UNKNOWN133, -171 BIGMAP, -193 UNKNOWN193 (100 -> 97 ids)
 38	5.24r4	G3D15010	binary	changed	protocol	gen5_round_down	yes -> no

@@ -33,7 +33,7 @@ pub use dispatch::{
     latin1, read_gint3, read_gshort, script_text, split_messages, sword_power_from_wire, ChatKind, ChatLine, IncomingFile, LevelObject, Message, OtherLooks, OtherPlayer, ServerItem, SessionState, Splitter,
 };
 pub use extras::MapSpec;
-pub use frame::{read_zlib_frame, write_zlib_frame, write_zlib_frame_best, zlib_compress, zlib_compress_best, zlib_compress_len4, zlib_decompress};
+pub use frame::{read_zlib_frame, write_zlib_frame, write_zlib_frame_best, zlib_compress, zlib_compress_best, zlib_decompress};
 pub use gen3::Gen3;
 pub use gen5::{choose_comp, read_frame, read_frame_len, read_frame_or_plain, write_frame, FrameLen, Gen5, Gen5Comp};
 pub use list::{parse_list_reply, parse_svrlist, ListReply, ServerEntry};

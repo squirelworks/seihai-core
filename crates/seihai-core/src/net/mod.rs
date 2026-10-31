@@ -14,7 +14,7 @@ pub use udp::{
 
 use crate::protocol::{
     bz2_compress, choose_comp, encode_pos_classic, encode_pos_precise, read_zlib_frame, write_frame, write_gstring,
-    write_login, write_zlib_frame, write_zlib_frame_best, zlib_compress, zlib_compress_len4, ClientVersion, EncryptionGen, FrameLen, Gen3, Gen5, LoginShape, TamperSender,
+    write_login, write_zlib_frame, write_zlib_frame_best, zlib_compress, ClientVersion, EncryptionGen, FrameLen, Gen3, Gen5, LoginShape, TamperSender,
     Gen5Comp, IdSet, LevelRequest, ListReply, LoginRequest, PlayerUpdate, SessionState,
 };
 use crate::offline::OfflineSession;
@@ -1206,9 +1206,6 @@ impl Connection {
             };
             let compressed = match comp {
                 Gen5Comp::Bz2 => bz2_compress(&body)?,
-                // Keeps 5.12's cipher in step on a server that counts the
-                // groups rounded up (see `zlib_compress_len4`).
-                Gen5Comp::Zlib if g5.is_round_down() => zlib_compress_len4(&body)?,
                 Gen5Comp::Zlib => zlib_compress(&body)?,
                 Gen5Comp::None => body,
             };
@@ -2105,31 +2102,6 @@ mod tests {
         conn.send_post_login(ClientVersion::V524R4, "English").unwrap();
         assert!(read_frame(&mut srv).starts_with(b"%kG3D15010%guest(7Y3bdzjfwin,"));
         assert_eq!(gen5_body(&mut srv, &mut Gen5::new(0x4B)), b"EEnglish\n");
-    }
-
-    /// 5.12 sends every body zlib-compressed. A short one used to leave
-    /// GServer-v2's cipher (groups rounded up) a step ahead of 5.12's
-    /// (rounded down), so the server could read nothing after it: links
-    /// went unanswered (stress test, 2026-10-31). Every body now decodes the
-    /// same with either count, frame after frame.
-    #[test]
-    fn v512_short_bodies_keep_both_cipher_counts_in_step() {
-        let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V512, 0x4B, "guest", "pw").unwrap();
-        let _ = read_frame(&mut srv);
-        let msgs: Vec<Vec<u8>> = (0..24).map(|n| format!("{}{}\n", (b'!' + n % 40) as char, "x".repeat(n as usize)).into_bytes()).collect();
-        let (mut down, mut up) = (Gen5::new(0x4B).round_down(), Gen5::new(0x4B));
-        for m in &msgs {
-            conn.send_messages(std::slice::from_ref(m)).unwrap();
-            let raw = read_raw(&mut srv);
-            assert_eq!(raw[0], Gen5Comp::Zlib as u8);
-            assert_eq!((raw.len() - 1) % 4, 0, "body length {}", raw.len() - 1);
-            let (mut a, mut b) = (raw[1..].to_vec(), raw[1..].to_vec());
-            down.xor_body(&mut a, Gen5Comp::Zlib);
-            up.xor_body(&mut b, Gen5Comp::Zlib);
-            assert_eq!(zlib_decompress(&a).unwrap(), *m);
-            assert_eq!(zlib_decompress(&b).unwrap(), *m);
-        }
     }
 
     /// 1.39 has no `PLI_TRIGGERACTION` (38): a push try sends nothing and is
