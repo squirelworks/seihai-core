@@ -472,4 +472,30 @@ mod tests {
         }
         assert_eq!(sent, [vec![16 + 32, 0x21, 0x28, 0x60, 0x21, b'\n'], vec![15 + 32, 0x21, 0x24, 0x21, 0x20, 0x25, 0x23, b'\n']]);
     }
+
+    /// The leader gets the follower's hit as PLO_BADDYHURT `21 28 60 21`
+    /// (`lan-222hurt`): the baddy takes it, is knocked east, away from the
+    /// hitter at dx -3.5, and the next think sends the new state.
+    #[test]
+    fn the_leader_applies_a_relayed_hit() {
+        let mut s = OfflineSession::new();
+        s.current_level = Some(Level::parse("GLEVNW01\n").unwrap());
+        s.baddy_role = BaddyRole { online: true, leader: true };
+        (s.player_x, s.player_y) = (10.0, 10.0);
+        s.receive_baddy_props(&[0x21, 0x21, 0x7c, 0x22, 0x7c, 0x23, 0x20, 0x24, 0x22, 0x2d, b'b', b'a', b'd', b'd', b'y', b'g', b'r', b'a', b'y', b'.', b'p', b'n', b'g', 0x25, 0x20, 0x26, 0x20, 0x27, 0x2a]);
+        s.tick_baddies(100, &[]);
+        s.take_baddy_sends();
+        s.receive_baddy_hurt(&[0x21, 0x28, 0x60, 0x21]);
+        let mut sent = Vec::new();
+        for _ in 0..2 {
+            s.tick_baddies(50, &[]);
+            sent.extend(s.take_baddy_sends());
+        }
+        assert_eq!(sent.len(), 1, "{sent:?}");
+        let m = &sent[0];
+        // Power 1 with the empty image, mode 3, counter 7, moved east 2 tiles.
+        assert!(m.windows(3).any(|w| w == [0x24, 0x21, 0x20]), "{m:?}");
+        assert!(m.windows(2).any(|w| w == [0x25, 0x23]) && m.windows(2).any(|w| w == [0x26, 0x27]), "{m:?}");
+        assert!(m.windows(2).any(|w| w == [0x21, 0x7c + 4]), "{m:?}");
+    }
 }
