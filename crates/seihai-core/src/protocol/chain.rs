@@ -114,6 +114,7 @@ pub struct Delta {
     pub login: Option<Option<LoginInfo>>,
     pub lobby: Option<Option<Lobby>>,
     pub gen5_round_down: Option<bool>,
+    pub gen5_long_frames: Option<bool>,
     pub udp: Option<bool>,
     pub udp_off_by_default: Option<bool>,
     // Props.
@@ -173,6 +174,7 @@ impl Delta {
         login: None,
         lobby: None,
         gen5_round_down: None,
+        gen5_long_frames: None,
         udp: None,
         udp_off_by_default: None,
         own_props: IdDelta::NONE,
@@ -269,6 +271,7 @@ pub const fn apply(prev: VersionProfile, s: &Step) -> VersionProfile {
     p.protocol.login = pick(p.protocol.login, d.login);
     p.protocol.lobby = pick(p.protocol.lobby, d.lobby);
     p.protocol.gen5_round_down = pick(p.protocol.gen5_round_down, d.gen5_round_down);
+    p.protocol.gen5_long_frames = pick(p.protocol.gen5_long_frames, d.gen5_long_frames);
     p.protocol.udp = pick(p.protocol.udp, d.udp);
     p.protocol.udp_off_by_default = pick(p.protocol.udp_off_by_default, d.udp_off_by_default);
 
@@ -338,6 +341,7 @@ pub const ORIGIN: VersionProfile = VersionProfile {
         login: None,
         lobby: None,
         gen5_round_down: false,
+        gen5_long_frames: false,
         // No direct data packages before 1.28 beta 2.
         udp: false,
         udp_off_by_default: false,
@@ -1146,12 +1150,13 @@ pub const CHAIN: &[Step] = &[
             // Linux 6.01r1's set (three months later; 6.00r2 is behind Themida).
             pli: IdDelta::plus_minus(&[45, 48, 162], &[21, 80, 81]),
             chat_text: Some(ChatText { face: ChatFace::TempusSans, height: 24 }),
+            gen5_long_frames: Some(true),
             ..Delta::NONE
         },
-        source: "unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24",
+        source: "unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24, 6.x long frame lengths",
         unknown: &[
             Unknown { area: "pli", what: "not read; Linux 6.01r1's set (6.03r7's without 160) is taken" },
-            Unknown { area: "framing", what: "the 0xFFFF long-frame form of 6.x is not handled" },
+            Unknown { area: "framing", what: "the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1" },
         ],
     },
     Step {
@@ -1165,11 +1170,9 @@ pub const CHAIN: &[Step] = &[
             pli: IdDelta::plus(&[160]),
             ..Delta::NONE
         },
-        source: "unpacked from Themida and lab: 92 PLO ids (175 and 184 out, 111 in), equal to Linux 6.03r7; send ids from Linux 6.03r7 (same release); no expiry date",
+        source: "unpacked from Themida and lab: 92 PLO ids (175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date",
         unknown: &[
             Unknown { area: "token", what: "the Linux 6.03r7 sends G3D0511C; this row is the Windows build" },
-            Unknown { area: "plo", what: "111 (writes creationtime.dat) is in the set but not decoded" },
-            Unknown { area: "framing", what: "the 0xFFFF long-frame form of 6.x is not handled" },
         ],
     },
 ];
@@ -1406,6 +1409,7 @@ pub fn diff(a: &VersionProfile, b: &VersionProfile) -> Vec<Change> {
     value_change(&mut o, "protocol", "login frame", &pa.login, &pb.login, login_text);
     value_change(&mut o, "protocol", "login lobby", &pa.lobby, &pb.lobby, lobby_text);
     value_change(&mut o, "protocol", "gen5_round_down", &pa.gen5_round_down, &pb.gen5_round_down, yes_no);
+    value_change(&mut o, "protocol", "gen5_long_frames", &pa.gen5_long_frames, &pb.gen5_long_frames, yes_no);
     value_change(&mut o, "protocol", "udp", &pa.udp, &pb.udp, yes_no);
     value_change(&mut o, "protocol", "udp_off_by_default", &pa.udp_off_by_default, &pb.udp_off_by_default, yes_no);
     let (ra, rb) = (&a.props, &b.props);

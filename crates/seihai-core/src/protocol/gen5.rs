@@ -14,6 +14,12 @@
 //! A partial last group is XORed byte by byte and still steps the iterator.
 //! A body shorter than the cap steps fewer times.
 //! Login frame is plain zlib with no compression byte and no XOR.
+//!
+//! 6.x adds a long length: a frame of 0xFFFF bytes or more has `FF FF`
+//! where the length goes, then the length as a `u32be` (Graal_analysis
+//! `protocol/v6x-clients.md`; the 6.03 receive loop reads it the same way).
+//! Only builds with [`FrameLen::Long`] read it; for the others `FF FF` is an
+//! ordinary length.
 
 use super::gen3::{GEN3_MUL, GEN3_SEED};
 
@@ -26,6 +32,33 @@ pub enum Gen5Comp {
     Zlib = 0x04,
     /// bz2 (`0x06`).
     Bz2 = 0x06,
+}
+
+/// How a build reads a frame's length.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameLen {
+    /// `u16be` only (2.22 to 5.x).
+    Short,
+    /// `u16be`, or `FF FF` + `u32be` for 0xFFFF bytes or more (6.x).
+    Long,
+}
+
+impl FrameLen {
+    /// The longest long frame Seihai takes. The 6.x client sets no limit of
+    /// its own; this is Seihai's, so that a bad `u32` length can't make it
+    /// buffer gigabytes.
+    pub const MAX_LONG: usize = 64 << 20;
+
+    /// The header length and the frame length from the start of `buf`, or
+    /// `None` until enough bytes are in.
+    pub fn header(self, buf: &[u8]) -> Option<(usize, usize)> {
+        let short = u16::from_be_bytes([*buf.first()?, *buf.get(1)?]);
+        if short != 0xFFFF || self == FrameLen::Short {
+            return Some((2, short as usize));
+        }
+        let long = buf.get(2..6)?;
+        Some((6, u32::from_be_bytes([long[0], long[1], long[2], long[3]]) as usize))
+    }
 }
 
 /// Gen-5 partial-XOR state.
@@ -143,7 +176,16 @@ pub fn read_frame<R: std::io::Read>(
     r: &mut R,
     cipher: &mut Gen5,
 ) -> std::io::Result<Vec<u8>> {
-    read_frame_inner(r, cipher, false)
+    read_frame_inner(r, cipher, false, FrameLen::Short)
+}
+
+/// As [`read_frame`], with the length read as `len` says.
+pub fn read_frame_len<R: std::io::Read>(
+    r: &mut R,
+    cipher: &mut Gen5,
+    len: FrameLen,
+) -> std::io::Result<Vec<u8>> {
+    read_frame_inner(r, cipher, false, len)
 }
 
 /// As [`read_frame`], but a frame whose first byte is the zlib header
@@ -156,17 +198,27 @@ pub fn read_frame_or_plain<R: std::io::Read>(
     r: &mut R,
     cipher: &mut Gen5,
 ) -> std::io::Result<Vec<u8>> {
-    read_frame_inner(r, cipher, true)
+    read_frame_inner(r, cipher, true, FrameLen::Short)
 }
 
 fn read_frame_inner<R: std::io::Read>(
     r: &mut R,
     cipher: &mut Gen5,
     allow_plain: bool,
+    len: FrameLen,
 ) -> std::io::Result<Vec<u8>> {
-    let mut len_buf = [0u8; 2];
-    r.read_exact(&mut len_buf)?;
-    let total = u16::from_be_bytes(len_buf) as usize;
+    let mut len_buf = [0u8; 6];
+    r.read_exact(&mut len_buf[..2])?;
+    if len.header(&len_buf[..2]).is_none() {
+        r.read_exact(&mut len_buf[2..])?;
+    }
+    let (_, total) = len.header(&len_buf).expect("six bytes are enough");
+    if total > FrameLen::MAX_LONG {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("gen-5 frame length {total} is over {}", FrameLen::MAX_LONG),
+        ));
+    }
     if total == 0 {
         return Ok(Vec::new());
     }
@@ -316,6 +368,31 @@ mod tests {
         let framed = [0u8, 2, 0x09, 0x00];
         let mut g = Gen5::new(1);
         assert!(read_frame(&mut &framed[..], &mut g).is_err());
+    }
+
+    /// A 6.x long frame: `FF FF`, the `u32be` length, then the frame. A
+    /// 2.22 to 5.x build reads the same `FF FF` as a plain length.
+    #[test]
+    fn long_frame_length() {
+        let body = vec![b'a'; 0x10000];
+        let mut framed = vec![0xFF, 0xFF];
+        framed.extend(((body.len() + 1) as u32).to_be_bytes());
+        framed.push(0x02);
+        framed.extend(&body);
+        let mut enc = framed.clone();
+        Gen5::new(9).xor_body(&mut enc[7..], Gen5Comp::None);
+        let got = read_frame_len(&mut enc.as_slice(), &mut Gen5::new(9), FrameLen::Long).unwrap();
+        assert_eq!(got, body);
+
+        assert_eq!(FrameLen::Long.header(&framed[..5]), None);
+        assert_eq!(FrameLen::Long.header(&framed), Some((6, 0x10001)));
+        assert_eq!(FrameLen::Short.header(&framed), Some((2, 0xFFFF)));
+        assert_eq!(FrameLen::Long.header(&[0x12, 0x34]), Some((2, 0x1234)));
+        assert_eq!(FrameLen::Long.header(&[0x12]), None);
+
+        let mut huge = vec![0xFF, 0xFF];
+        huge.extend(u32::MAX.to_be_bytes());
+        assert!(read_frame_len(&mut huge.as_slice(), &mut Gen5::new(9), FrameLen::Long).is_err());
     }
 
     #[test]

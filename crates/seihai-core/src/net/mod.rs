@@ -13,7 +13,7 @@ pub use udp::{
 
 use crate::protocol::{
     bz2_compress, choose_comp, encode_pos_classic, read_zlib_frame, write_frame, write_gstring,
-    write_login, write_zlib_frame, write_zlib_frame_best, zlib_compress, ClientVersion, EncryptionGen, Gen3, Gen5, LoginShape, TamperSender,
+    write_login, write_zlib_frame, write_zlib_frame_best, zlib_compress, ClientVersion, EncryptionGen, FrameLen, Gen3, Gen5, LoginShape, TamperSender,
     Gen5Comp, IdSet, LevelRequest, ListReply, LoginRequest, PlayerUpdate, SessionState,
 };
 use crate::offline::OfflineSession;
@@ -616,6 +616,7 @@ pub fn login_gserver_with(
 fn socket_thread(
     mut stream: TcpStream,
     mut cipher: Option<Gen5>,
+    frame_len: FrameLen,
     out: Receiver<Vec<u8>>,
     frames: mpsc::Sender<(Instant, io::Result<Vec<u8>>)>,
 ) {
@@ -657,18 +658,22 @@ fn socket_thread(
             Err(e) => return fail(&frames, e),
         }
         let at = Instant::now();
-        // Every whole frame: a u16 length, then that many bytes.
-        while inbuf.len() >= 2 {
-            let len = u16::from_be_bytes([inbuf[0], inbuf[1]]) as usize;
-            if inbuf.len() < 2 + len {
+        // Every whole frame: a u16 length (6.x: or `FF FF` and a u32),
+        // then that many bytes.
+        while let Some((head, len)) = frame_len.header(&inbuf) {
+            if len > FrameLen::MAX_LONG {
+                let e = io::Error::new(io::ErrorKind::InvalidData, format!("gen-5 frame length {len} is over {}", FrameLen::MAX_LONG));
+                return fail(&frames, e);
+            }
+            if inbuf.len() < head + len {
                 break;
             }
-            let mut raw: &[u8] = &inbuf[..2 + len];
+            let mut raw: &[u8] = &inbuf[..head + len];
             let frame = match cipher.as_mut() {
-                Some(g) => crate::protocol::read_frame(&mut raw, g),
+                Some(g) => crate::protocol::read_frame_len(&mut raw, g, frame_len),
                 None => read_zlib_frame(&mut raw),
             };
-            inbuf.drain(..2 + len);
+            inbuf.drain(..head + len);
             let stop = frame.is_err();
             if frames.send((at, frame)).is_err() || stop {
                 return;
@@ -743,6 +748,8 @@ pub struct Connection {
     /// Gen-5 XOR state for server→client frames. Each direction has its
     /// own iterator, both seeded at login.
     gen5_in: Option<Gen5>,
+    /// How server frames give their length: 6.x builds read a long length.
+    frame_len: FrameLen,
     /// Client→server ids the logged-in version can send, set by
     /// [`Self::login_versioned`]. Others are refused.
     pli: Option<IdSet>,
@@ -791,7 +798,7 @@ impl Connection {
         let addrs: Vec<SocketAddr> = addr.to_socket_addrs()?.collect();
         let stream = connect_any(&addrs, CONNECT_TIMEOUT)?;
         stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-        Ok(Self { stream, gen3: None, gen5: None, gen5_in: None, pli: None, zlib_best: false, flags_out: Vec::new(), flags_since: None, files_out: Vec::new(), files_since: None, last_walk: None, io_thread: None })
+        Ok(Self { stream, gen3: None, gen5: None, gen5_in: None, frame_len: FrameLen::Short, pli: None, zlib_best: false, flags_out: Vec::new(), flags_since: None, files_out: Vec::new(), files_since: None, last_walk: None, io_thread: None })
     }
 
     /// Close the connection in both directions. A reader thread from
@@ -866,6 +873,7 @@ impl Connection {
             EncryptionGen::Gen3 => self.gen3 = gen3,
             EncryptionGen::Gen5 => {
                 let g = if version.profile().protocol.gen5_round_down { Gen5::new(key).round_down() } else { Gen5::new(key) };
+                self.frame_len = if version.profile().protocol.gen5_long_frames { FrameLen::Long } else { FrameLen::Short };
                 self.gen5 = Some(g.clone());
                 self.gen5_in = Some(g);
             }
@@ -985,7 +993,7 @@ impl Connection {
     /// framing after a gen-5 login, plain zlib otherwise.
     pub fn read_body(&mut self) -> io::Result<Vec<u8>> {
         match self.gen5_in.as_mut() {
-            Some(g) => crate::protocol::read_frame(&mut self.stream, g),
+            Some(g) => crate::protocol::read_frame_len(&mut self.stream, g, self.frame_len),
             None => read_zlib_frame(&mut self.stream),
         }
     }
@@ -1246,11 +1254,12 @@ impl Connection {
         stream.set_read_timeout(None)?;
         stream.set_nonblocking(true)?;
         let cipher = self.gen5_in.take();
+        let frame_len = self.frame_len;
         let (tx, rx) = mpsc::channel();
         let (out_tx, out_rx) = mpsc::channel::<Vec<u8>>();
         let handle = std::thread::Builder::new()
             .name("seihai-net".into())
-            .spawn(move || socket_thread(stream, cipher, out_rx, tx))?;
+            .spawn(move || socket_thread(stream, cipher, frame_len, out_rx, tx))?;
         self.io_thread = Some(IoThread { out: out_tx, thread: handle.thread().clone() });
         Ok(rx)
     }
@@ -1802,6 +1811,41 @@ mod tests {
         conn.send_post_login(ClientVersion::V524R4, "English").unwrap();
         assert!(read_frame(&mut srv).starts_with(b"%kG3D15010%guest(7Y3bdzjfwin,"));
         assert_eq!(gen5_body(&mut srv, &mut Gen5::new(0x4B)), b"EEnglish\n");
+    }
+
+    /// A 6.x build reads a server frame of 0xFFFF bytes or more as `FF FF`
+    /// and a `u32be` length, on the reader thread and in `read_body`; 5.31r4
+    /// has no such form.
+    #[test]
+    fn six_x_reads_long_frames() {
+        let body = [b"8".as_slice(), &vec![b'a'; 0x10000], b"\n"].concat();
+        let long = |key: u8| {
+            let mut enc = body.clone();
+            Gen5::new(key).xor_body(&mut enc, Gen5Comp::None);
+            [&[0xFF, 0xFF][..], &((enc.len() + 1) as u32).to_be_bytes(), &[Gen5Comp::None as u8], &enc].concat()
+        };
+        assert_eq!(ClientVersion::V603R7.profile().protocol.gen5_long_frames, true);
+        assert_eq!(ClientVersion::V600R2.profile().protocol.gen5_long_frames, true);
+        assert_eq!(ClientVersion::V531R4.profile().protocol.gen5_long_frames, false);
+
+        let (mut conn, mut srv) = pair();
+        conn.login_versioned(ClientVersion::V603R7, 0x19, "guest", "7Y3bdzjf").unwrap();
+        srv.write_all(&long(0x19)).unwrap();
+        assert_eq!(conn.read_body().unwrap(), body);
+
+        let (mut conn, mut srv) = pair();
+        conn.login_versioned(ClientVersion::V600R2, 0x19, "guest", "7Y3bdzjf").unwrap();
+        let rx = conn.spawn_reader_timed().unwrap();
+        srv.write_all(&long(0x19)).unwrap();
+        let (_, got) = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(got.unwrap(), body);
+
+        // 5.31r4 takes `FF FF` as the length itself: the next byte is not a
+        // compression type.
+        let (mut conn, mut srv) = pair();
+        conn.login_versioned(ClientVersion::V531R4, 0x19, "guest", "7Y3bdzjf").unwrap();
+        srv.write_all(&long(0x19)).unwrap();
+        assert!(conn.read_body().is_err());
     }
 
     /// GServer's view of a 2.22 login: the first frame is plain zlib and
