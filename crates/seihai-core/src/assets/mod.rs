@@ -10,6 +10,7 @@ mod png;
 pub(crate) mod resolve;
 mod root;
 mod tiledefs;
+pub mod tutorial;
 mod zelda;
 pub(crate) mod coverage;
 
