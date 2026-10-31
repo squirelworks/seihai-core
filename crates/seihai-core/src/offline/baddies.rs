@@ -302,6 +302,8 @@ mod tests {
         let mut s = OfflineSession::new();
         s.current_level = Some(Level::parse(&format!("GLEVNW01\nBADDY {baddy}\n\n\n\nBADDYEND\n")).unwrap());
         s.level_serial += 1;
+        // A fixed seed: the walk turns are random.
+        s.item_rng = crate::items::DelphiRandom::new(1);
         let profile = ClientVersion::V205.profile();
         s.life.set_rules(profile.life.death);
         s.combat.set_rules(profile.life.combat);
