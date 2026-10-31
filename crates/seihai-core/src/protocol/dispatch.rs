@@ -871,9 +871,22 @@ impl SessionState {
                 self.disconnect_message = Some(text);
             }
             102 => {
-                // PLO_FILE, always behind PLO_RAWDATA.
-                let parsed = parse_file_packet(&msg.payload, self.file_has_modtime)
-                    .or_else(|| parse_file_packet(&msg.payload, !self.file_has_modtime));
+                // PLO_FILE, always behind PLO_RAWDATA. GServer picks the
+                // layout from its own token table, not from the build: a
+                // stock gs2lib has no `G3D15010` and sends 5.24 the 2.05
+                // layout. A file that reads only in the other layout means
+                // that is the server's layout for this connection, so the
+                // next file is read that way first.
+                let parsed = match parse_file_packet(&msg.payload, self.file_has_modtime) {
+                    Some(p) => Some(p),
+                    None => {
+                        let other = parse_file_packet(&msg.payload, !self.file_has_modtime);
+                        if other.is_some() {
+                            self.file_has_modtime = !self.file_has_modtime;
+                        }
+                        other
+                    }
+                };
                 if let Some((name, data, mod_time)) = parsed {
                     self.file_requests.push(format!("FILE:{name}"));
                     if let Some(t) = mod_time.filter(|&t| t != 0) {
@@ -2057,6 +2070,59 @@ mod tests {
         let mut st = SessionState::default();
         st.apply_body(&body);
         assert_eq!(st.incoming_files, vec![(name.to_string(), b"GLEVNW01\n".to_vec())]);
+    }
+
+    /// The first 120 bytes of a `PLO_FILE` payload (after the id) that the
+    /// lab server sent 5.24r4 (`G3D15010`) with the patched gs2lib: GINT5
+    /// modtime, `state.png`, then the PNG. Lab proxy log 2026-10-30b,
+    /// connection c6.
+    const STATE_PNG_524: &[u8] = b"&w1vH)state.png\x89PNG\x0d\x0a\x1a\x0a\x00\x00\x00\x0dIHDR\x00\x00\x00\xe0\x00\x00\x00\x91\x08\x03\x00\x00\x00\xed\x8dD\xb7\x00\x00\x00+tEXtCreation Time\x00Fr 16 Feb 2007 21:35:32 +0100w\xe7\xf6\xf9\x00\x00\x00\x07tIME\x07\xd7\x02\x10\x14#)\x0e\x02";
+
+    fn raw_file(payload: &[u8]) -> Vec<u8> {
+        let n = 1 + payload.len();
+        let mut out = vec![100 + 0x20, ((n >> 14) & 0x7F) as u8 + 0x20, ((n >> 7) & 0x7F) as u8 + 0x20, (n & 0x7F) as u8 + 0x20, b'\n'];
+        out.push(102 + 0x20);
+        out.extend_from_slice(payload);
+        out
+    }
+
+    #[test]
+    fn file_524_capture_reads_with_its_modtime() {
+        let mut st = SessionState::default();
+        st.file_has_modtime = true;
+        st.apply_body(&raw_file(STATE_PNG_524));
+        assert_eq!(st.incoming_files.len(), 1);
+        assert_eq!(st.incoming_files[0].0, "state.png");
+        assert!(st.incoming_files[0].1.starts_with(b"\x89PNG"));
+        assert_eq!(st.incoming_mod_times.get("state.png"), Some(&1_793_354_536));
+        assert!(st.file_has_modtime);
+    }
+
+    #[test]
+    fn stock_gs2lib_layout_is_not_read_as_a_png_name() {
+        // A stock gs2lib has no `G3D15010`, so GServer sends 5.24 the 2.05
+        // layout: the same reply without the GINT5 (TPlayer::sendFile).
+        let old = &STATE_PNG_524[5..];
+        // The 5.24 client reads 5 bytes as the modtime and the 6th as the
+        // name length, so its name is `.png` + PNG data: "Couldn't open
+        // …png‰PNG… for writing" in the lab.
+        let len = (old[5] - 0x20) as usize;
+        assert!(old[6..6 + len].starts_with(b".png\x89PNG"));
+        assert_eq!(parse_file_packet(old, true), None);
+
+        let mut st = SessionState::default();
+        st.file_has_modtime = true;
+        st.apply_body(&raw_file(old));
+        assert_eq!(st.incoming_files.len(), 1);
+        assert_eq!(st.incoming_files[0].0, "state.png");
+        assert!(st.incoming_files[0].1.starts_with(b"\x89PNG"));
+        assert!(st.incoming_mod_times.is_empty());
+        // The rest of the connection is read in the server's layout.
+        assert!(!st.file_has_modtime);
+        let mut gani = vec![b' ' + 9];
+        gani.extend_from_slice(b"idle.ganiGANI0001\r\n");
+        st.apply_body(&raw_file(&gani));
+        assert_eq!(st.incoming_files[1], ("idle.gani".to_string(), b"GANI0001\r\n".to_vec()));
     }
 
     #[test]
