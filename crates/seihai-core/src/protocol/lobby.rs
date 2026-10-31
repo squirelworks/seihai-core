@@ -35,11 +35,17 @@ pub struct Lobby {
     /// What the build sends after its login and once the server's login
     /// burst is in ([`LobbyLogin`]). `None`: not recorded (5.x and 6.x).
     pub after_login: Option<LobbyLogin>,
+    /// The build draws the board's tiles while it is in Login mode (before
+    /// its first server warp). 5.31r4 and 6.03r7 draw none then, only the
+    /// chests and image NPCs; 5.24r4 and 5.30r3, run in the same lab, draw
+    /// them (Graal_analysis `protocol/v5v6-lab-play.md`, "Tiles in 5.31r4
+    /// and 6.03r7"). After the warp every build draws the full level.
+    pub login_tiles: bool,
 }
 
 /// 4.04r2, 4.20r8 and 5.00r7: four fields (`win` and three MD5s, read in
 /// the 4.x engines; `win,<md5>,"",<md5>` in the 5.00r7 lab capture).
-pub const LOBBY_404: Lobby = Lobby { first_server: "Login", platform: "win", os_version: None, after_login: Some(LOBBY_LOGIN_4X) };
+pub const LOBBY_404: Lobby = Lobby { first_server: "Login", platform: "win", os_version: None, after_login: Some(LOBBY_LOGIN_4X), login_tiles: true };
 /// The Mac 4.20r6: `mac`, a hash of the Ethernet MAC, a hash of
 /// `stat("/etc")` and an empty fourth field (read in the binary; the lab run
 /// on Mac OS X 10.4 sent `mac,"",<32 hex>,""`). Its after-login messages are
@@ -52,13 +58,16 @@ pub const LOBBY_420_MAC: Lobby = Lobby { platform: "mac", after_login: Some(Lobb
 pub const LOBBY_500: Lobby = Lobby { after_login: None, ..LOBBY_404 };
 /// 5.12 to 6.03r7: the quoted Windows version as a fifth field.
 pub const LOBBY_512: Lobby = Lobby { os_version: Some("\"6.2 9200 \""), ..LOBBY_500 };
+/// 5.31r4 and 6.03r7: 5.12's login, and no tiles in Login mode (lab
+/// screenshots, Graal_analysis `protocol/v5v6-lab-play.md`).
+pub const LOBBY_531: Lobby = Lobby { login_tiles: false, ..LOBBY_512 };
 
 /// The Linux 6.03r7: `linux`, then four machine ids (MD5 hex of the `eth0`
 /// MAC, MD5 hex of the inode of `/etc`, an empty field, and the kernel
 /// release and version), read in the binary (Graal_analysis
 /// `protocol/v6x-clients.md`), never captured. Seihai sends all four as
 /// `""`, as it does the Windows hashes; the kernel string is not invented.
-pub const LOBBY_603_LINUX: Lobby = Lobby { platform: "linux", os_version: Some(EMPTY_MACHINE_FIELD), ..LOBBY_512 };
+pub const LOBBY_603_LINUX: Lobby = Lobby { platform: "linux", os_version: Some(EMPTY_MACHINE_FIELD), ..LOBBY_531 };
 
 /// The machine field Seihai sends for each of the three hashes.
 pub const EMPTY_MACHINE_FIELD: &str = "\"\"";
@@ -370,9 +379,22 @@ mod tests {
 
     /// 6.03r7 on GServer-RS and 6.00r2 on hastur, picked from the server
     /// list: they are game servers, not a Login lobby, so the player shows.
+    /// 5.31r4 and 6.03r7 (and the Linux 6.03r7, the same release) draw no
+    /// tiles before the warp; every other lobby build does.
+    #[test]
+    fn login_tiles_follow_the_lab() {
+        use crate::protocol::ClientVersion::*;
+        for v in [V531R4, V603R7, V603R7Linux] {
+            assert!(!v.profile().protocol.lobby.unwrap().login_tiles, "{}", v.label());
+        }
+        for v in [V404R2, V420R6, V420R8, V500R7, V512, V524R4, V530R3, V600R2, V6015, V6034] {
+            assert!(v.profile().protocol.lobby.unwrap().login_tiles, "{}", v.label());
+        }
+    }
+
     #[test]
     fn a_picked_game_server_is_not_login_mode() {
-        for lobby in [LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_603_LINUX] {
+        for lobby in [LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_531, LOBBY_603_LINUX] {
             for name in ["GServer-RS", "Zelda-A-Link-to-the-Past"] {
                 let first = first_server_name(&lobby, Some(name));
                 assert_eq!(first, name);

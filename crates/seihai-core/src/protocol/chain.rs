@@ -27,7 +27,7 @@ use super::profile::{
     ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_139, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222,
     TAMPER_230, TAMPER_231,
 };
-use super::lobby::{Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_603_LINUX};
+use super::lobby::{Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_531, LOBBY_603_LINUX};
 use super::login::{LoginInfo, LOGIN_217, LOGIN_222, LOGIN_231, LOGIN_304, LOGIN_3153};
 use super::showimg::ShowImgInfo;
 use super::tampercheck::TamperInfo;
@@ -1222,11 +1222,13 @@ pub const CHAIN: &[Step] = &[
         token: "G3D26090",
         date: "2011-01-05",
         basis: Basis::Binary,
-        delta: Delta::NONE,
+        // No tiles before the warp (lab screenshots; 5.24r4 and 5.30r3 in the
+        // same lab draw them).
+        delta: Delta { lobby: Some(Some(LOBBY_531)), ..Delta::NONE },
         source: "unpacked from Themida and lab (clock set back): same PLO set and token as 5.30r3; draws no tiles before the warp",
         unknown: &[
             Unknown { area: "pli", what: "not read; 5.00r7's set is kept" },
-            Unknown { area: "ui", what: "before the warp it draws no tiles (5.24 and 5.30r3 do); Seihai draws them for every lobby build" },
+            Unknown { area: "ui", what: "why it draws no tiles before the warp was not traced in the binary; the lab shows it, and the warp alone brings the tiles back" },
         ],
     },
     Step {
@@ -1241,12 +1243,16 @@ pub const CHAIN: &[Step] = &[
             pli: IdDelta::plus_minus(&[45, 48, 162], &[21, 80, 81]),
             chat_text: Some(ChatText { face: ChatFace::TempusSans, height: 24 }),
             gen5_long_frames: Some(true),
+            // Back to 5.12's lobby, which draws tiles in Login mode: 6.00r2
+            // was not checked for it, so it keeps what Seihai did before.
+            lobby: Some(Some(LOBBY_512)),
             ..Delta::NONE
         },
         source: "unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24, 6.x long frame lengths",
         unknown: &[
             Unknown { area: "pli", what: "not read; Linux 6.01r1's set (6.03r7's without 160) is taken" },
             Unknown { area: "framing", what: "the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1" },
+            Unknown { area: "ui", what: "whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them" },
         ],
     },
     // 6.015 and 6.034 have no binary. Their tokens are in GServer-v2's
@@ -1309,9 +1315,10 @@ pub const CHAIN: &[Step] = &[
         token: "G3D0311C",
         date: "2012-11-16",
         basis: Basis::Binary,
-        // 6.015 and 6.034 before it already carry 6.03r7's id sets.
-        delta: Delta::NONE,
-        source: "unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date",
+        // 6.015 and 6.034 before it already carry 6.03r7's id sets. No tiles
+        // before the warp (lab screenshots, as 5.31r4).
+        delta: Delta { lobby: Some(Some(LOBBY_531)), ..Delta::NONE },
+        source: "unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date; draws no tiles before the warp",
         unknown: &[
             Unknown { area: "token", what: "the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)" },
         ],
