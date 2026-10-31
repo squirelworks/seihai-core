@@ -1115,3 +1115,79 @@ fn a_flag_set_to_its_value_again_is_not_sent() {
     let sets: Vec<_> = w.take_effects().into_iter().filter(|e| matches!(e, Effect::SetFlag { .. })).collect();
     assert_eq!(sets.len(), 1);
 }
+
+// ---- the whole weapon list: selectedweapon, #w(i), weaponscount ----
+
+/// The client's list: a built-in weapon with no script, a hidden system
+/// weapon, then two server weapons, as 2gta sends them.
+fn weapon_list_world() -> ScriptWorld {
+    let mut w = ScriptWorld::new(Era::V21);
+    w.add(ObjSpec::weapon("-System3", "", "if (playerchats) { callweapon selectedweapon,weaponfired; }"));
+    w.add(ObjSpec::weapon("Bomb Bag", "bombbag.png", "if (weaponfired) { message bag #v(selectedweapon); }"));
+    w.add(ObjSpec::weapon("Lamp", "lamp.png", "if (weaponfired) { message lamp; }"));
+    let p = &mut w.core.player;
+    p.weapons = ["Bow", "-System3", "Bomb Bag", "Lamp"].iter().map(|n| (n.to_string(), format!("{n}.png"))).collect();
+    p.selected_weapon = Some(2);
+    p.weapon = "Bomb Bag".into();
+    w
+}
+
+#[test]
+fn callweapon_selectedweapon_indexes_the_whole_list() {
+    let mut w = weapon_list_world();
+    // Index 2 counts Bow and the hidden -System3: it is Bomb Bag, not the
+    // world's third weapon object (Lamp).
+    w.fire(0, "playerchats", &[]);
+    assert_eq!(messages(&mut w), vec!["bag 2"]);
+}
+
+#[test]
+fn a_call_to_a_weapon_with_no_script_does_nothing() {
+    let mut w = weapon_list_world();
+    w.core.player.selected_weapon = Some(0);
+    w.fire(0, "playerchats", &[]);
+    assert!(messages(&mut w).is_empty());
+}
+
+#[test]
+fn weapon_names_images_and_count_read_the_whole_list() {
+    let mut w = weapon_list_world();
+    let id = w.add(ObjSpec::npc("a.png", 0.0, 0.0, "if (created) { message #v(weaponscount) #w(1) #W(3) #w(9).; }"));
+    w.fire(id, "created", &[]);
+    assert_eq!(messages(&mut w), vec!["4 -System3 Lamp.png ."]);
+}
+
+#[test]
+fn setting_selectedweapon_selects_and_skips_hidden_weapons() {
+    let mut w = weapon_list_world();
+    let id = w.add(ObjSpec::npc("a.png", 0.0, 0.0, "if (created) { selectedweapon = 1; message #w; }\nif (timeout) { selectedweapon = 7; }"));
+    w.fire(id, "created", &[]);
+    // -System3 is hidden, so the client's select moves on to Bomb Bag.
+    assert_eq!(w.core.player.selected_weapon, Some(2));
+    let fx = w.take_effects();
+    assert!(fx.contains(&Effect::SetPlayerVar { name: "selectedweapon".into(), value: 2.0 }), "{fx:?}");
+    assert!(fx.contains(&Effect::Message { obj: id, text: "Bomb Bag".into() }), "{fx:?}");
+    // Past the end of the list: nothing changes.
+    w.fire(id, "timeout", &[]);
+    assert_eq!(w.core.player.selected_weapon, Some(2));
+    assert!(w.take_effects().is_empty());
+}
+
+#[test]
+fn selectedweapon_is_a_plain_variable_before_2_04() {
+    let mut w = ScriptWorld::new(Era::V203);
+    w.core.player.weapons = vec![("Bow".into(), String::new()), ("Bomb".into(), String::new())];
+    let id = w.add(ObjSpec::npc("a.png", 0.0, 0.0, "if (created) { selectedweapon = 1; message #v(selectedweapon); }"));
+    w.fire(id, "created", &[]);
+    assert_eq!(w.core.player.selected_weapon, None);
+    assert_eq!(messages(&mut w), vec!["1"]);
+}
+
+#[test]
+fn offline_callweapon_still_counts_weapon_objects() {
+    let mut w = ScriptWorld::new(Era::V21);
+    let a = w.add(ObjSpec::weapon("A", "", "if (created) { callweapon 1,weaponfired; }"));
+    w.add(ObjSpec::weapon("B", "", "if (weaponfired) { message b; }"));
+    w.fire(a, "created", &[]);
+    assert_eq!(messages(&mut w), vec!["b"]);
+}

@@ -498,6 +498,7 @@ impl SessionScripts {
                     "playerdarts" => s.darts = value as i32,
                     "playerswordpower" => s.sword_power = value.clamp(0.0, 255.0) as u8,
                     "playershieldpower" => s.shield_power = value.clamp(0.0, 255.0) as u8,
+                    "selectedweapon" => s.weapon_select = Some(value as usize),
                     "playerhearts" | "playerhp" => {
                         s.player_health = (value * 2.0 / s.max_hearts.max(1) as f64 * 100.0).round().clamp(0.0, 100.0) as i32;
                     }
@@ -1389,5 +1390,14 @@ mod tests {
         sc.apply(&mut s);
         let ev = s.take_sound_events();
         assert_eq!(ev, vec![crate::sound::SoundEvent { file: "arrow.wav".into(), x: 8.5, y: 11.0 }]);
+    }
+
+    #[test]
+    fn a_script_setting_selectedweapon_asks_the_front_end_to_select() {
+        let mut s = session("GLEVNW01\n");
+        let mut sc = SessionScripts::new(ClientVersion::V222);
+        sc.world.core.player.weapons = vec![("Bow".into(), String::new()), ("-System3".into(), String::new()), ("Lamp".into(), String::new())];
+        sc.sync_weapons(&mut s, &[WeaponScript { name: "-System3", image: "", script: "if (created) { selectedweapon = 1; }" }]);
+        assert_eq!(s.weapon_select, Some(2));
     }
 }

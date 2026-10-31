@@ -422,6 +422,9 @@ pub static BUILTIN_VARS: &[(&str, Era, bool)] = &[
     ("tokenscount", V202, false),
     ("paramscount", V203, false),
     ("weaponscount", V204, false),
+    // The selected weapon's index in the whole list; a script can set it
+    // (2.04 `newfeatures2001.txt`).
+    ("selectedweapon", V204, true),
     // GS2-style names, used by scripts on servers that run NPCs (GServer GS2
     // reference); `chat` is the object's bubble text, like `message`.
     ("chat", V21, true),

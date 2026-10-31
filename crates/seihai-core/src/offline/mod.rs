@@ -325,6 +325,9 @@ pub struct OfflineSession {
     pub props: HashMap<String, String>,
     /// Weapons the player holds (`toweapons`).
     pub weapons: Vec<String>,
+    /// A script set `selectedweapon`: the index in the client's whole
+    /// weapon list to select. The front end takes it.
+    pub weapon_select: Option<usize>,
     /// Pending link destination if the player walked into a LINK area.
     pub pending_link: Option<(String, f32, f32)>,
     /// Rupees (gralats).
@@ -630,6 +633,7 @@ impl OfflineSession {
             strings: HashMap::new(),
             props: HashMap::new(),
             weapons: Vec::new(),
+            weapon_select: None,
             pending_link: None,
             rupees: 0,
             bombs: 10,
