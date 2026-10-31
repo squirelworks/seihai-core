@@ -576,6 +576,35 @@ pub fn start_online_link(
     Ok(Some(LinkStart { frame, arrival: Some((x, y)), cached_mod_time: cached }))
 }
 
+/// Where a secure login ([`crate::protocol::seclogin`]) gets the server
+/// key it trusts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PinSource {
+    /// Exactly this key (`--server-key`).
+    Key([u8; 32]),
+    /// The pin file: trust a server's key on the first visit, refuse a
+    /// changed one after.
+    File(std::path::PathBuf),
+}
+
+/// A secure login's settings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecureLogin {
+    pub pin: PinSource,
+}
+
+impl SecureLogin {
+    /// Pins from the settings folder's `known_servers.txt`.
+    pub fn trust_on_first_use() -> Self {
+        Self { pin: PinSource::File(crate::protocol::seclogin::pin_path()) }
+    }
+
+    /// Only `key`.
+    pub fn pinned(key: [u8; 32]) -> Self {
+        Self { pin: PinSource::Key(key) }
+    }
+}
+
 /// A game-server session as [`login_gserver`] sets it up.
 pub struct GserverSession {
     pub conn: Connection,
@@ -640,8 +669,30 @@ pub fn login_gserver_with(
     first_session: bool,
     check: impl Fn(&str) -> Vec<u8>,
 ) -> Result<GserverSession, LoginFailure> {
+    login_gserver_secure(addr, version, key, account, password, send_tampercheck, first_session, check, None)
+}
+
+/// As [`login_gserver_with`]; with `secure`, the login goes through the
+/// Seihai secure login ([`crate::protocol::seclogin`], token `SEI00001`)
+/// and the session then runs as `version`.
+#[allow(clippy::too_many_arguments)]
+pub fn login_gserver_secure(
+    addr: &str,
+    version: ClientVersion,
+    key: u8,
+    account: &str,
+    password: &str,
+    send_tampercheck: bool,
+    first_session: bool,
+    check: impl Fn(&str) -> Vec<u8>,
+    secure: Option<&SecureLogin>,
+) -> Result<GserverSession, LoginFailure> {
     let mut conn =
         Connection::connect(addr).map_err(|error| LoginFailure { connect: true, error })?;
+    let login_with = |conn: &mut Connection, then: &[Vec<u8>]| match secure {
+        Some(s) => conn.login_secure_with(version, key, account, password, then, addr, s),
+        None => conn.login_versioned_with(version, key, account, password, then),
+    };
     let login = version.profile().protocol.login;
     let first_files = login.map_or(&[][..], |l| l.first_frame_files);
     let bundle = login.is_some_and(|l| l.bundle_login) || !first_files.is_empty();
@@ -650,7 +701,7 @@ pub fn login_gserver_with(
     let tamper_unavailable = send_tampercheck && tamper.is_none();
     let after_login = version.profile().protocol.lobby.and_then(|l| l.after_login);
     if !bundle {
-        conn.login_versioned(version, key, account, password)
+        login_with(&mut conn, &[])
             .map_err(|error| LoginFailure { connect: false, error })?;
         let mut msgs = conn.post_login_messages(version, "English", tamper.as_ref());
         // The real 4.04r2 and 4.20r8 ask their base files in the frame of
@@ -669,7 +720,7 @@ pub fn login_gserver_with(
         // The real 3.04: login line, language and the file checks in one plain frame.
         let mut then = conn.post_login_messages(version, "English", tamper.as_ref());
         then.extend(first_files.iter().map(|n| check(n)));
-        conn.login_versioned_with(version, key, account, password, &then)
+        login_with(&mut conn, &then)
             .map_err(|error| LoginFailure { connect: false, error })?;
     }
     let mut enter_level = EnterLevelSender::for_version(version);
@@ -1010,6 +1061,88 @@ impl Connection {
         let mut line = Vec::new();
         write_login(&mut line, version, key, account, password)?;
         line.push(b'\n');
+        self.send_login_frame(version, key, line, then)
+    }
+
+    /// As [`Self::login_versioned_with`], through the Seihai secure login
+    /// ([`crate::protocol::seclogin`], token `SEI00001`): the account and
+    /// password go sealed, to a server whose key `secure` trusts. `server`
+    /// names the server in the pin file (`host:port` as given). After the
+    /// handshake the session is `version`'s, as after its classic login.
+    pub fn login_secure_with(
+        &mut self,
+        version: ClientVersion,
+        key: u8,
+        account: &str,
+        password: &str,
+        then: &[Vec<u8>],
+        server: &str,
+        secure: &SecureLogin,
+    ) -> io::Result<()> {
+        let mut classic = Vec::new();
+        write_login(&mut classic, version, key, account, password)?;
+        let prefix_len = if version.encryption() == EncryptionGen::Gen2 { 1 } else { 2 };
+        let (prefix, rest) = classic.split_at(prefix_len);
+        let tail = &rest[8..];
+        let sealed = self.secure_handshake(prefix, version.token(), b"", tail, server, secure)?;
+        let mut line = sealed;
+        line.push(b'\n');
+        self.send_login_frame(version, key, line, then)
+    }
+
+    /// C1, S1 and the pin check of the secure login; returns the C2 line
+    /// (no line feed) that seals `tail`.
+    fn secure_handshake(&mut self, prefix: &[u8], inner: &str, suffix: &[u8], tail: &[u8], server: &str, secure: &SecureLogin) -> io::Result<Vec<u8>> {
+        use crate::protocol::seclogin::{self, ClientHandshake, PinCheck};
+        let bad = |e: seclogin::Error| io::Error::new(io::ErrorKind::InvalidData, e.to_string());
+        let hs = ClientHandshake::new(prefix, inner, suffix).map_err(bad)?;
+        let mut c1 = hs.hello().to_vec();
+        c1.push(b'\n');
+        self.send_raw(&write_zlib_frame_best(&c1)?)?;
+        self.stream.flush()?;
+        let body = read_zlib_frame(&mut self.stream).map_err(|e| match e.kind() {
+            io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut => io::Error::new(io::ErrorKind::TimedOut, "the server did not answer the secure login within 5 s (it may not support SEI00001)"),
+            _ => e,
+        })?;
+        let s1 = body.split(|&b| b == b'\n').next().unwrap_or_default();
+        if !s1.starts_with(seclogin::TOKEN.as_bytes()) {
+            let text = s1.get(1..).map(crate::protocol::latin1).unwrap_or_default();
+            return Err(io::Error::new(io::ErrorKind::PermissionDenied, format!("the server refused the secure login: {text}")));
+        }
+        let verified = hs.finish(s1).map_err(bad)?;
+        let fp = seclogin::fingerprint(&verified.server_key);
+        match &secure.pin {
+            PinSource::Key(k) if *k == verified.server_key => {}
+            PinSource::Key(k) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    format!("server key {fp} is not the given key {}; not sending the password", seclogin::fingerprint(k)),
+                ))
+            }
+            PinSource::File(path) => match seclogin::Pins::load(path)?.check(server, &verified.server_key) {
+                PinCheck::Matches => {}
+                PinCheck::Unknown => {
+                    seclogin::Pins::append(path, server, &verified.server_key)?;
+                    eprintln!("secure login: first visit to {server}; trusting its key {fp} (saved to {})", path.display());
+                }
+                PinCheck::Mismatch { pinned } => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::PermissionDenied,
+                        format!(
+                            "server key for {server} CHANGED: was {}, now {fp}; not sending the password. If the server's admin changed the key on purpose, remove its line from {}",
+                            seclogin::fingerprint(&pinned),
+                            path.display()
+                        ),
+                    ))
+                }
+            },
+        }
+        verified.sealer.seal(tail).map_err(bad)
+    }
+
+    /// Send a login frame whose first line (with its line feed) is `line`,
+    /// then `then`, and set the session up for `version` and `key`.
+    fn send_login_frame(&mut self, version: ClientVersion, key: u8, mut line: Vec<u8>, then: &[Vec<u8>]) -> io::Result<()> {
         let mut gen3 = (version.encryption() == EncryptionGen::Gen3).then(|| Gen3::new(key));
         for m in then {
             if let Err(why) = check_wire_message(m) {
@@ -1071,12 +1204,27 @@ impl Connection {
         account: &str,
         password: &str,
     ) -> io::Result<()> {
+        self.login_listserver_secure(version, key, account, password, None)
+    }
+
+    /// As [`Self::login_listserver`]; with `secure` (the server's name in
+    /// the pin file and the trust source), through the Seihai secure login:
+    /// id 7 carries `SEI00001` and the profile's list token, and id 1 goes
+    /// sealed. Only the gen-5 shapes (C, D) have a secure form.
+    pub fn login_listserver_secure(
+        &mut self,
+        version: ClientVersion,
+        key: u8,
+        account: &str,
+        password: &str,
+        secure: Option<(&str, &SecureLogin)>,
+    ) -> io::Result<()> {
         let shape = version.listserver().shape;
-        if shape == LoginShape::Silent {
+        if shape == LoginShape::Silent && secure.is_none() {
             // The real 1.41 sends nothing; the listserver speaks first.
             return Ok(());
         }
-        if shape == LoginShape::NewmainOnly {
+        if shape == LoginShape::NewmainOnly && secure.is_none() {
             self.send_raw(&write_zlib_frame_best(b" newmain\n")?)?;
             return self.stream.flush();
         }
@@ -1084,6 +1232,19 @@ impl Connection {
         write_gstring(&mut serverlist, account)?;
         write_gstring(&mut serverlist, password)?;
         serverlist.push(b'\n');
+        if let Some((server, secure)) = secure {
+            if !matches!(shape, LoginShape::Gen5 | LoginShape::Gen5OneFrame) {
+                return Err(io::Error::new(io::ErrorKind::Unsupported, "the secure list login needs a 2.22 or later profile"));
+            }
+            let prefix = [7 + 0x20, (key & 0x7F) + 0x20];
+            let sealed = self.secure_handshake(&prefix, version.listserver_token(), b"newmain", &serverlist[1..serverlist.len() - 1], server, secure)?;
+            let mut line = sealed;
+            line.push(b'\n');
+            self.send_raw(&write_zlib_frame_best(&line)?)?;
+            self.gen5 = Some(Gen5::new(key));
+            self.gen5_in = Some(Gen5::new(key));
+            return self.stream.flush();
+        }
         if matches!(shape, LoginShape::Gen5 | LoginShape::Gen5OneFrame) {
             let mut hs = vec![7 + 0x20, (key & 0x7F) + 0x20];
             hs.extend_from_slice(version.listserver_token().as_bytes());
@@ -1130,14 +1291,26 @@ impl Connection {
         account: &str,
         password: &str,
     ) -> io::Result<ListReply> {
+        Self::fetch_server_list_secure(addr, version, account, password, None)
+    }
+
+    /// As [`Self::fetch_server_list`]; with `secure`, through the Seihai
+    /// secure login ([`Self::login_listserver_secure`]).
+    pub fn fetch_server_list_secure(
+        addr: &str,
+        version: ClientVersion,
+        account: &str,
+        password: &str,
+        secure: Option<&SecureLogin>,
+    ) -> io::Result<ListReply> {
         let version = version.list_version();
         let mut conn = Self::connect(addr)?;
-        conn.login_listserver(version, random_key(), account, password)?;
+        conn.login_listserver_secure(version, random_key(), account, password, secure.map(|s| (addr, s)))?;
         // Shape S (1.41): wait for the listserver to speak; if it does not,
         // log in with shape B, which a listserver that waits for a request
         // answers. The real 1.41 has no such fallback.
         let mut first: Option<Vec<u8>> = None;
-        if version.listserver().shape == LoginShape::Silent {
+        if version.listserver().shape == LoginShape::Silent && secure.is_none() {
             conn.stream.set_read_timeout(Some(crate::protocol::SILENT_LIST_WAIT))?;
             match conn.read_list_body() {
                 Ok(b) => first = Some(b),
@@ -2238,6 +2411,128 @@ mod tests {
         )
         .unwrap();
         assert_eq!(body, b"EEnglish\n");
+    }
+
+    /// The secure login (`SEI00001`) as the server sees it: C1 names the
+    /// inner build and carries no account; C2 opens to the classic tail;
+    /// later frames are the inner build's, seeded as after a classic login.
+    fn secure_server(mut srv: TcpStream, id: crate::protocol::seclogin::ServerIdentity, prefix_len: usize) -> std::thread::JoinHandle<(Vec<u8>, Vec<u8>, TcpStream)> {
+        use crate::protocol::seclogin::ClientHello;
+        std::thread::spawn(move || {
+            let c1 = read_frame(&mut srv);
+            let hello = ClientHello::parse(&c1, prefix_len).unwrap().unwrap();
+            let (mut s1, opener) = hello.respond(&id).unwrap();
+            s1.push(b'\n');
+            srv.write_all(&write_zlib_frame(&s1).unwrap()).unwrap();
+            let c2 = read_frame(&mut srv);
+            let first = c2.split(|&b| b == b'\n').next().unwrap().to_vec();
+            let tail = opener.open(&first).unwrap();
+            (c1, [tail, c2[first.len()..].to_vec()].concat(), srv)
+        })
+    }
+
+    #[test]
+    fn secure_gserver_login_seals_the_account() {
+        use crate::protocol::seclogin::{encode_key, ServerIdentity};
+        let (mut conn, srv) = pair();
+        let id = ServerIdentity::generate();
+        let key = id.public_key();
+        let server = secure_server(srv, id, 2);
+        let secure = SecureLogin::pinned(key);
+        conn.login_secure_with(ClientVersion::V222, 0x2B, "ab", "cdpass", &[], "lab", &secure).unwrap();
+        conn.send_messages(&[b"EEnglish\n".to_vec()]).unwrap();
+        let (c1, opened, mut srv) = server.join().unwrap();
+        assert_eq!(&c1[..18], b"%KSEI00001GNW03014");
+        assert!(!c1.windows(6).any(|w| w == b"cdpass"));
+        assert_eq!(opened, b"\"ab&cdpass\n");
+        // The next frame is gen 5 from the seed, as after a classic login.
+        let raw = read_raw(&mut srv);
+        let mut g = Gen5::new(0x2B);
+        let body = crate::protocol::read_frame(&mut [&(raw.len() as u16).to_be_bytes()[..], &raw].concat().as_slice(), &mut g).unwrap();
+        assert_eq!(body, b"EEnglish\n");
+        let _ = encode_key;
+    }
+
+    #[test]
+    fn secure_login_refuses_a_key_that_is_not_the_pin() {
+        use crate::protocol::seclogin::ServerIdentity;
+        let (mut conn, srv) = pair();
+        let server = secure_server(srv, ServerIdentity::generate(), 2);
+        let secure = SecureLogin::pinned(ServerIdentity::generate().public_key());
+        let e = conn.login_secure_with(ClientVersion::V231, 0x11, "ab", "cdpass", &[], "lab", &secure).unwrap_err();
+        assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
+        drop(conn);
+        // The server never gets a C2.
+        assert!(server.join().is_err());
+    }
+
+    #[test]
+    fn secure_login_trusts_on_first_use_then_holds_the_pin() {
+        use crate::protocol::seclogin::ServerIdentity;
+        let path = std::env::temp_dir().join(format!("seihai-tofu-{}/known_servers.txt", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let secure = SecureLogin { pin: PinSource::File(path.clone()) };
+        let id = ServerIdentity::generate();
+        let seed = id.seed();
+        let (mut conn, srv) = pair();
+        let server = secure_server(srv, id, 2);
+        conn.login_secure_with(ClientVersion::V231, 0x11, "ab", "cd", &[], "lab:1", &secure).unwrap();
+        server.join().unwrap();
+        // Same key again: fine.
+        let (mut conn, srv) = pair();
+        let server = secure_server(srv, ServerIdentity::from_seed(&seed), 2);
+        conn.login_secure_with(ClientVersion::V231, 0x11, "ab", "cd", &[], "lab:1", &secure).unwrap();
+        server.join().unwrap();
+        // A new key for the same server: refused.
+        let (mut conn, srv) = pair();
+        let server = secure_server(srv, ServerIdentity::generate(), 2);
+        let e = conn.login_secure_with(ClientVersion::V231, 0x11, "ab", "cd", &[], "lab:1", &secure).unwrap_err();
+        assert!(e.to_string().contains("CHANGED"), "{e}");
+        drop(conn);
+        assert!(server.join().is_err());
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn secure_login_reports_a_server_that_does_not_know_it() {
+        let (mut conn, mut srv) = pair();
+        let t = std::thread::spawn(move || {
+            let _ = read_frame(&mut srv);
+            // PLO_DISCMESSAGE (16), as a classic server answers an unknown token.
+            srv.write_all(&write_zlib_frame(b"0Your client version is not allowed.\n").unwrap()).unwrap();
+        });
+        let secure = SecureLogin::pinned([0; 32]);
+        let e = conn.login_secure_with(ClientVersion::V231, 0x11, "ab", "cd", &[], "lab", &secure).unwrap_err();
+        assert!(e.to_string().contains("not allowed"), "{e}");
+        t.join().unwrap();
+    }
+
+    #[test]
+    fn secure_listserver_login_seals_id_1() {
+        use crate::protocol::seclogin::ServerIdentity;
+        let (mut conn, srv) = pair();
+        let id = ServerIdentity::generate();
+        let secure = SecureLogin::pinned(id.public_key());
+        let server = secure_server(srv, id, 2);
+        conn.login_listserver_secure(ClientVersion::V222, 0x66, "ab", "cd", Some(("lab", &secure))).unwrap();
+        let (c1, opened, mut srv) = server.join().unwrap();
+        assert_eq!(&c1[..18], b"'\x86SEI00001GNW30123");
+        assert!(c1.ends_with(b"newmain\n"));
+        assert_eq!(opened, b"\"ab\"cd\n");
+        // The reply is gen 5 from the seed.
+        let mut out = Gen5::new(0x66);
+        let z = zlib_compress(b"\"Lab listserver\n").unwrap();
+        srv.write_all(&write_frame(Gen5Comp::Zlib, &out.encode(z, Gen5Comp::Zlib))).unwrap();
+        let reply = parse_list_reply(&conn.read_body().unwrap());
+        assert_eq!(reply.status.as_deref(), Some("Lab listserver"));
+    }
+
+    #[test]
+    fn secure_list_login_needs_a_gen5_profile() {
+        let (mut conn, _srv) = pair();
+        let secure = SecureLogin::pinned([0; 32]);
+        let e = conn.login_listserver_secure(ClientVersion::V205, 0x66, "ab", "cd", Some(("lab", &secure))).unwrap_err();
+        assert_eq!(e.kind(), io::ErrorKind::Unsupported);
     }
 
     /// 2.22 listserver login: plain zlib id 7 handshake, then a gen-5
