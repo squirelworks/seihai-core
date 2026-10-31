@@ -2,11 +2,11 @@
 //! its `created` set that the server's copy lacks, under the 2.05 rule
 //! (`documentation/gmap-order.md`, "NPC props on entry for 2.22").
 //!
-//! Bytes: the Linux lab, 2026-10-31, `lo` capture of Seihai 2.22 (main
-//! `0613858`) entering `testworld.nw` by a link, on the lab GServer-v2. The
-//! server's record is its `PLO_NPCPROPS` for the warp NPC; the reply is the
-//! 63-byte `PLI_NPCPROPS` Seihai sent 46 ms later. The real 2.22 sent a
-//! 63-byte message for the same NPC on the same entry (Mirae, `lan-222g`).
+//! Bytes: the real 2.22 (`Graal_222.exe`) entering `testworld.nw` by a link
+//! on the Seihai LAN test server (Mirae, 2026-10-31, `lan-222g`). The server
+//! sent both NPC records in its level frame (f14); 115 ms later the client
+//! sent one `PLI_NPCPROPS` for each (f70). Seihai 2.22 before #261 sent the
+//! same two messages on the Linux lab's GServer-v2, apart from the ids.
 
 use seihai_core::offline::{Linked, OfflineSession, ServerNpcSync};
 use seihai_core::protocol::npcprops::parse_npc_props;
@@ -17,28 +17,34 @@ fn hex(s: &str) -> Vec<u8> {
     (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
 }
 
-/// The server's `PLO_NPCPROPS` payload for testworld's warp NPC: the script,
-/// the position and VISFLAGS, none of the looks or the message.
-const SERVER_WARP_NPC: &str = "2022512020212147696620286372656174656429207b2073686f776368617261637465723b207365746368617270726f702023332c68656164322e706e673b2073657463686172616e692069646c652c3b20646972203d20323b206d65737361676520546f20746865206d696e6920706c61796572776f726c64213b207da769662028706c61796572746f756368736d6529207365746c6576656c32206d696e6970772e676d61702c39322c39363b226823602d212f203120225132224bff6b29206c28206d2c81";
+/// The server's `PLO_NPCPROPS` payloads: script, position and VISFLAGS,
+/// none of the looks or the message the scripts set.
+const SERVER_WARP_NPC: &str = "2022502020212147696620286372656174656429207b2073686f776368617261637465723b207365746368617270726f702023332c68656164322e706e673b2073657463686172616e692069646c652c3b20646972203d20323b206d65737361676520546f20746865206d696e6920706c61796572776f726c64213b207da769662028706c61796572746f756368736d6529207365746c6576656c32206d696e6970772e676d61702c39322c39363b226823602d212f203120225032224bff6b29206c28206d2c81";
+const SERVER_CLOTHES_NPC: &str = "20224f2020212861696620286372656174656429207ba773686f776368617261637465723ba77365746368617270726f702023332c68656164342e706e673ba77365746368617270726f702023382c626f6479322e706e673ba77365746368617270726f70202343302c6f72616e67653ba77365746368617270726f70202343312c707572706c653ba77365746368617270726f70202343322c77686974653ba77365746368617270726f70202343332c626c61636b3ba77365746368617270726f70202343342c79656c6c6f773ba773657463686172616e692069646c652c3ba7646972203d20323ba76d65737361676520546f756368206d6520666f72206e657720636c6f74686573213ba77da769662028706c61796572746f756368736d6529207ba7746869732e6e203d2028746869732e6e202b203129202520343ba769662028746869732e6e203d3d203029207b20736574626f647920626f64792e706e673b2020736574686561642068656164302e706e673b20736574636f6174636f6c6f722077686974653b2020736574736c65657665636f6c6f72207265643b2020202073657473686f65636f6c6f7220626c75653b202073657462656c74636f6c6f7220626c61636b3b20736574736b696e636f6c6f72206f72616e67653b207da769662028746869732e6e203d3d203129207b20736574626f647920626f6479322e706e673b20736574686561642068656164312e706e673b20736574636f6174636f6c6f7220626c75653b202020736574736c65657665636f6c6f722079656c6c6f773b2073657473686f65636f6c6f722062726f776e3b2073657462656c74636f6c6f72207265643b202020736574736b696e636f6c6f72206f72616e67653b207da769662028746869732e6e203d3d203229207b20736574626f647920626f6479332e706e673b20736574686561642068656164322e706e673b20736574636f6174636f6c6f7220677265656e3b2020736574736c65657665636f6c6f7220626c61636b3b202073657473686f65636f6c6f72207265643b20202073657462656c74636f6c6f722077686974653b20736574736b696e636f6c6f722070696e6b3b207da769662028746869732e6e203d3d203329207b20736574626f647920626f64792e706e673b2020736574686561642068656164332e706e673b20736574636f6174636f6c6f7220707572706c653b20736574736c65657665636f6c6f722077686974653b202073657473686f65636f6c6f7220626c61636b3b2073657462656c74636f6c6f722079656c6c6f773b20736574736b696e636f6c6f722062726f776e3b207da76d657373616765204f757466697420237628746869732e6e202b203129206f6620343ba77da769662028706c61796572636861747320262620737472657175616c732823632c6f75746669742929207ba76d65737361676520596f752068617665206f757466697420237628746869732e6e202b2031293ba77d227823582d212f203120224f32224bff6b2b206c27206d2c81";
 
-/// The `PLI_NPCPROPS` payload after the message id: `#c#`, GANI `idle`,
-/// VISFLAGS 17, the message, HEAD `head2.png` and BODY `body.png`.
-const SENT_WARP_NPC: &str = "20225120232363232c2469646c652d312f38546f20746865206d696e6920706c61796572776f726c6421368d68656164322e706e674328626f64792e706e67";
+/// The real client's `PLI_NPCPROPS` payloads after the message id.
+/// Warp NPC: `#c#`, GANI `idle`, VISFLAGS 17, the message, HEAD `head2.png`,
+/// BODY `body.png`. Clothes NPC: the same with its colours, `head4.png` and
+/// `body2.png`.
+const REAL_WARP_NPC: &str = "20225020232363232c2469646c652d312f38546f20746865206d696e6920706c61796572776f726c6421368d68656164322e706e674328626f64792e706e67";
+const REAL_CLOTHES_NPC: &str = "20224f20232363232c2469646c652d312f39546f756368206d6520666f72206e657720636c6f746865732133222e203221368d68656164342e706e674329626f6479322e706e67";
 
 #[test]
 fn on_2_22_the_first_entry_reports_what_created_set() {
-    let (id, p) = parse_npc_props(&hex(SERVER_WARP_NPC), false).expect("the server's record parses");
     let mut s = OfflineSession::new();
     s.current_level = Some(seihai_core::assets::Level::from_board(&vec![0u16; 4096]));
     let mut sc = SessionScripts::new(ClientVersion::V222);
     sc.load_level(&mut s, "testworld.nw");
-    let Linked::Added(i) = s.take_server_npc(id, &p) else { panic!("{id} not added") };
-    sc.add_npc(&mut s, i);
     let mut sync = ServerNpcSync::default();
-    sync.heard(id, &p, &s.current_level.as_ref().unwrap().npcs[i]);
+    for record in [SERVER_WARP_NPC, SERVER_CLOTHES_NPC] {
+        let (id, p) = parse_npc_props(&hex(record), false).expect("the server's record parses");
+        let Linked::Added(i) = s.take_server_npc(id, &p) else { panic!("{id} not added") };
+        sc.add_npc(&mut s, i);
+        sync.heard(id, &p, &s.current_level.as_ref().unwrap().npcs[i]);
+    }
     sc.tick(&mut s, 16);
     let sent = sync.changes(s.current_level.as_ref().unwrap());
-    let want = [&[3 + 0x20][..], &hex(SENT_WARP_NPC), b"\n"].concat();
-    assert_eq!(sent, vec![want]);
+    let want: Vec<Vec<u8>> = [REAL_WARP_NPC, REAL_CLOTHES_NPC].iter().map(|h| [&[3 + 0x20][..], &hex(h), b"\n"].concat()).collect();
+    assert_eq!(sent, want);
     assert!(sync.changes(s.current_level.as_ref().unwrap()).is_empty(), "nothing twice");
 }
