@@ -14,6 +14,8 @@
 //! `cancelevents`) are the machine's own and run on [`Machine::tick`]
 //! (`documentation/gs2-commands.md`).
 
+use super::lists::{self, Value};
+use super::strings::{self, client_int};
 use super::{Op, Operand, Script};
 use crate::scripting::engine::vocab::{self, Exec};
 use crate::scripting::engine::world::ObjId;
@@ -60,6 +62,18 @@ enum Slot {
     Obj(Option<(Root, String)>),
     /// A variable not read yet: its root (`None` when unqualified) and name.
     Var(Option<Root>, String),
+    /// A list value (a literal, `new[n]`, `tokenize`, …).
+    List(Vec<Value>),
+}
+
+impl From<Value> for Slot {
+    fn from(v: Value) -> Slot {
+        match v {
+            Value::Val(Val::Num(n)) => Slot::Num(n),
+            Value::Val(Val::Str(s)) => Slot::Str(s),
+            Value::List(l) => Slot::List(l),
+        }
+    }
 }
 
 /// What the script needs from its owner.
@@ -96,7 +110,7 @@ struct Frame {
     ret: Option<usize>,
     /// Stack height where the return value goes (set by `OP_JMP`).
     base: usize,
-    locals: HashMap<String, Val>,
+    locals: HashMap<String, Value>,
 }
 
 /// A `scheduleevent` waiting for its frame.
@@ -111,7 +125,7 @@ struct Scheduled {
 /// A loaded script and its variables.
 pub struct Machine {
     script: Script,
-    vars: HashMap<(Root, String), Val>,
+    vars: HashMap<(Root, String), Value>,
     stack: Vec<Slot>,
     frames: Vec<Frame>,
     pc: usize,
@@ -165,7 +179,18 @@ impl Machine {
     /// A script variable (not a host property). `This` and `ThisO` share one
     /// set of variables, as they are the same object for a script's owner.
     pub fn var(&self, root: Root, name: &str) -> Option<&Val> {
-        self.vars.get(&(Self::store(root), name.to_string()))
+        match self.vars.get(&(Self::store(root), name.to_string()))? {
+            Value::Val(v) => Some(v),
+            Value::List(_) => None,
+        }
+    }
+
+    /// A script variable that holds a list.
+    pub fn list(&self, root: Root, name: &str) -> Option<&[Value]> {
+        match self.vars.get(&(Self::store(root), name.to_string()))? {
+            Value::List(l) => Some(l),
+            Value::Val(_) => None,
+        }
     }
 
     /// Runs the code outside any function from op 0 (the compiler jumps over
@@ -296,15 +321,19 @@ impl Machine {
     // --- variables -------------------------------------------------------
 
     fn read_var(&mut self, root: Option<Root>, name: &str, host: &mut dyn Host) -> Val {
+        self.read_value(root, name, host).val()
+    }
+
+    fn read_value(&mut self, root: Option<Root>, name: &str, host: &mut dyn Host) -> Value {
         match root {
             Some(Root::Temp) => match self.frames.last() {
                 Some(f) => f.locals.get(name).cloned().unwrap_or_default(),
                 None => self.vars.get(&(Root::Global, name.to_string())).cloned().unwrap_or_default(),
             },
-            Some(Root::This | Root::ThisO) if name.eq_ignore_ascii_case("timeout") => Val::Num(self.timeout()),
+            Some(Root::This | Root::ThisO) if name.eq_ignore_ascii_case("timeout") => Val::Num(self.timeout()).into(),
             Some(r) => {
                 if let Some(v) = host.get_prop(r, name) {
-                    return v;
+                    return v.into();
                 }
                 self.vars.get(&(Self::store(r), name.to_string())).cloned().unwrap_or_default()
             }
@@ -315,22 +344,22 @@ impl Machine {
                     return v.clone();
                 }
                 if name.eq_ignore_ascii_case("timeout") {
-                    return Val::Num(self.timeout());
+                    return Val::Num(self.timeout()).into();
                 }
                 if let Some(v) = host.get_prop(Root::This, name) {
-                    return v;
+                    return v.into();
                 }
                 for r in [Root::This, Root::Level, Root::Global] {
                     if let Some(v) = self.vars.get(&(r, name.to_string())) {
                         return v.clone();
                     }
                 }
-                Val::default()
+                Value::default()
             }
         }
     }
 
-    fn write_var(&mut self, root: Option<Root>, name: &str, value: Val, host: &mut dyn Host) {
+    fn write_var(&mut self, root: Option<Root>, name: &str, value: Value, host: &mut dyn Host) {
         let target = match root {
             Some(Root::Temp) => {
                 match self.frames.last_mut() {
@@ -348,7 +377,7 @@ impl Machine {
                 return;
             }
             Some(r) => {
-                if host.set_prop(r, name, &value) {
+                if host.set_prop(r, name, &value.val()) {
                     return;
                 }
                 Self::store(r)
@@ -362,7 +391,7 @@ impl Machine {
                     self.timeout = frames(value.num());
                     return;
                 }
-                if host.set_prop(Root::This, name, &value) {
+                if host.set_prop(Root::This, name, &value.val()) {
                     return;
                 }
                 [Root::This, Root::Level].into_iter().find(|r| self.vars.contains_key(&(*r, name.to_string()))).unwrap_or(Root::Global)
@@ -371,12 +400,53 @@ impl Machine {
         self.vars.insert((target, name.to_string()), value);
     }
 
+    /// A slot as a full value: a variable that holds a list stays a list.
+    fn value_full(&mut self, slot: Slot, host: &mut dyn Host) -> Value {
+        match slot {
+            Slot::Var(root, name) => self.read_value(root, &name, host),
+            // A variable the compiler converted to an object.
+            Slot::Obj(Some((root, path))) if !path.is_empty() => self.read_value(Some(root), &path, host),
+            Slot::List(l) => Value::List(l),
+            s => self.value(s, host).into(),
+        }
+    }
+
+    /// The variable a list opcode works on: `a` in `a.add(x)` (the
+    /// compiler converts it to an object first).
+    fn list_target(slot: &Slot) -> Option<(Option<Root>, String)> {
+        match slot {
+            Slot::Obj(Some((root, path))) if !path.is_empty() => Some((Some(*root), path.clone())),
+            Slot::Var(root, name) if !name.is_empty() => Some((*root, name.clone())),
+            _ => None,
+        }
+    }
+
+    /// The list in a slot. Anything that is not a list is an empty one.
+    fn list_of(&mut self, slot: &Slot, host: &mut dyn Host) -> Vec<Value> {
+        match self.value_full(slot.clone(), host) {
+            Value::List(l) => l,
+            Value::Val(_) => Vec::new(),
+        }
+    }
+
+    /// Changes the list in the variable a slot names, if it names one.
+    fn edit_list(&mut self, slot: &Slot, host: &mut dyn Host, f: impl FnOnce(&mut Vec<Value>)) {
+        let Some((root, name)) = Self::list_target(slot) else { return };
+        let mut l = match self.read_value(root, &name, host) {
+            Value::List(l) => l,
+            Value::Val(_) => Vec::new(),
+        };
+        f(&mut l);
+        self.write_var(root, &name, Value::List(l), host);
+    }
+
     fn value(&mut self, slot: Slot, host: &mut dyn Host) -> Val {
         match slot {
             Slot::Num(n) => Val::Num(n),
             Slot::Str(s) => Val::Str(s),
             Slot::Var(root, name) => self.read_var(root, &name, host),
             Slot::Obj(Some((_, path))) => Val::Str(path),
+            Slot::List(l) => Value::List(l).val(),
             Slot::Obj(None) | Slot::Marker => Val::Num(0.0),
         }
     }
@@ -479,15 +549,15 @@ impl Machine {
                         self.stack.clear();
                         return Outcome::Done;
                     };
-                    let v = self.pop_val(host).unwrap_or_default();
+                    let v = match self.pop() {
+                        Some(s) => self.value_full(s, host),
+                        None => Value::default(),
+                    };
                     self.stack.truncate(frame.base);
                     match frame.ret {
                         Some(pc) => {
                             self.pc = pc;
-                            self.stack.push(match v {
-                                Val::Num(n) => Slot::Num(n),
-                                Val::Str(s) => Slot::Str(s),
-                            });
+                            self.stack.push(v.into());
                         }
                         None => {
                             self.running = false;
@@ -573,7 +643,7 @@ impl Machine {
                 }
                 Op::Assign => {
                     let (Some(value), Some(target)) = (self.pop(), self.pop()) else { return fault(self, host) };
-                    let value = self.value(value, host);
+                    let value = self.value_full(value, host);
                     if let Slot::Var(root, name) = target {
                         if !name.is_empty() {
                             self.write_var(root, &name, value, host);
@@ -585,7 +655,7 @@ impl Machine {
                     let d = if ins.op == Op::Inc { 1.0 } else { -1.0 };
                     if let Slot::Var(root, name) = &top {
                         let n = self.read_var(*root, name, host).num() + d;
-                        self.write_var(*root, name, Val::Num(n), host);
+                        self.write_var(*root, name, Val::Num(n).into(), host);
                     } else if let Slot::Num(n) = top {
                         *self.stack.last_mut().unwrap() = Slot::Num(n + d);
                     }
@@ -594,7 +664,7 @@ impl Machine {
                 // Arithmetic on numbers; the compiler converts the operands.
                 Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Mod | Op::Pow | Op::BitOr | Op::BitAnd | Op::BitXor | Op::Min | Op::Max => {
                     let (Some(b), Some(a)) = (self.pop_num(host), self.pop_num(host)) else { return fault(self, host) };
-                    let (ia, ib) = (a as i32, b as i32);
+                    let (ia, ib) = (client_int(a), client_int(b));
                     self.push(Slot::Num(match ins.op {
                         Op::Add => a + b,
                         Op::Sub => a - b,
@@ -622,8 +692,8 @@ impl Machine {
                     self.push(Slot::Num(match ins.op {
                         Op::Not => (a == 0.0) as i32 as f64,
                         Op::UnarySub => -a,
-                        Op::BitInvert => !(a as i32) as f64,
-                        Op::Int => a.trunc(),
+                        Op::BitInvert => !client_int(a) as f64,
+                        Op::Int => client_int(a) as f64,
                         Op::Abs => a.abs(),
                         Op::Sin => a.sin(),
                         Op::Cos => a.cos(),
@@ -646,6 +716,226 @@ impl Machine {
                 Op::Join => {
                     let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else { return fault(self, host) };
                     self.push(Slot::Str(a.text() + &b.text()));
+                }
+
+
+                // Strings (Stage D). The compiler converts the object to a
+                // string first.
+                Op::Char | Op::ObjTrim | Op::ObjLength => {
+                    let Some(v) = self.pop_val(host) else { return fault(self, host) };
+                    self.push(match ins.op {
+                        Op::Char => Slot::Str(strings::char_of(v.num())),
+                        Op::ObjTrim => Slot::Str(strings::trim(&v.text())),
+                        _ => Slot::Num(v.text().chars().count() as f64),
+                    });
+                }
+                Op::ObjPos | Op::ObjCharAt | Op::ObjStarts | Op::ObjEnds => {
+                    let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else { return fault(self, host) };
+                    let (s, t) = (a.text(), b.text());
+                    self.push(match ins.op {
+                        Op::ObjPos => Slot::Num(strings::pos(&s, &t) as f64),
+                        Op::ObjCharAt => Slot::Str(strings::charat(&s, b.num())),
+                        Op::ObjStarts => Slot::Num(s.starts_with(t.as_str()) as i32 as f64),
+                        _ => Slot::Num(s.ends_with(t.as_str()) as i32 as f64),
+                    });
+                }
+                // Always the string, the start and the length.
+                Op::ObjSubstr => {
+                    let (Some(len), Some(start), Some(s)) = (self.pop_num(host), self.pop_num(host), self.pop_val(host)) else {
+                        return fault(self, host);
+                    };
+                    self.push(Slot::Str(strings::substring(&s.text(), start, len)));
+                }
+                // `_(s)`: the client leaves the value as it is.
+                Op::Translate => {
+                    if self.stack.is_empty() {
+                        return fault(self, host);
+                    }
+                }
+                // The pattern is on top, its arguments below it back to the
+                // marker, the first nearest; all of it becomes the result.
+                Op::Format => {
+                    let Some(m) = self.last_marker() else { return fault(self, host) };
+                    let mut vals = Vec::new();
+                    while self.stack.len() > m + 1 {
+                        let s = self.pop().unwrap();
+                        vals.push(self.value(s, host));
+                    }
+                    self.stack.truncate(m);
+                    let text = match vals.split_first() {
+                        Some((fmt, args)) => strings::format(&fmt.text(), args),
+                        None => String::new(),
+                    };
+                    self.push(Slot::Str(text));
+                }
+
+                // Lists (Stage D). A list operand is the variable the
+                // compiler converted to an object, or a list value.
+                Op::ArrayEnd => {
+                    let Some(m) = self.last_marker() else { return fault(self, host) };
+                    let mut l = Vec::new();
+                    while self.stack.len() > m + 1 {
+                        let s = self.pop().unwrap();
+                        l.push(self.value_full(s, host));
+                    }
+                    self.stack.truncate(m);
+                    self.push(Slot::List(l));
+                }
+                Op::ArrayNew => {
+                    let Some(n) = self.pop_num(host) else { return fault(self, host) };
+                    self.push(Slot::List(lists::zeros(client_int(n))));
+                }
+                Op::ArrayNewMultidim => {
+                    let Some(n) = self.pop_num(host) else { return fault(self, host) };
+                    if let Some(Slot::List(l)) = self.stack.last_mut() {
+                        fill_leaves(l, client_int(n));
+                    }
+                }
+                Op::ObjSize => {
+                    let Some(o) = self.pop() else { return fault(self, host) };
+                    let n = match self.value_full(o, host) {
+                        Value::List(l) => l.len() as f64,
+                        Value::Val(_) => 0.0,
+                    };
+                    self.push(Slot::Num(n));
+                }
+                Op::Array | Op::ArrayMultidim => {
+                    let j = if ins.op == Op::ArrayMultidim { self.pop_num(host) } else { Some(0.0) };
+                    let (Some(j), Some(i), Some(o)) = (j, self.pop_num(host), self.pop()) else { return fault(self, host) };
+                    let mut v = self.value_full(o, host);
+                    let path = if ins.op == Op::ArrayMultidim { vec![i, j] } else { vec![i] };
+                    for k in path {
+                        v = match v {
+                            Value::List(l) => usize::try_from(client_int(k)).ok().and_then(|k| l.into_iter().nth(k)).unwrap_or_default(),
+                            // A string variable indexed gives the string.
+                            other => other,
+                        };
+                    }
+                    self.push(v.into());
+                }
+                Op::ArrayAssign | Op::ArrayMultidimAssign => {
+                    let Some(v) = self.pop() else { return fault(self, host) };
+                    let v = self.value_full(v, host);
+                    let j = if ins.op == Op::ArrayMultidimAssign { self.pop_num(host) } else { Some(-1.0) };
+                    let (Some(j), Some(i), Some(o)) = (j, self.pop_num(host), self.pop()) else { return fault(self, host) };
+                    let (i, j) = (client_int(i), client_int(j));
+                    self.edit_list(&o, host, |l| {
+                        let Some(e) = usize::try_from(i).ok().and_then(|i| l.get_mut(i)) else { return };
+                        if ins.op == Op::ArrayAssign {
+                            *e = v;
+                        } else if let (Value::List(inner), Ok(j)) = (e, usize::try_from(j)) {
+                            if let Some(e) = inner.get_mut(j) {
+                                *e = v;
+                            }
+                        }
+                    });
+                }
+                Op::ObjAddString | Op::ObjRemoveString => {
+                    let (Some(v), Some(o)) = (self.pop(), self.pop()) else { return fault(self, host) };
+                    let v = self.value_full(v, host);
+                    let add = ins.op == Op::ObjAddString;
+                    self.edit_list(&o, host, |l| {
+                        if add {
+                            l.push(v);
+                        } else if let Some(k) = l.iter().position(|e| e.same(&v, compare)) {
+                            l.remove(k);
+                        }
+                    });
+                }
+                Op::ObjDeleteString => {
+                    let (Some(i), Some(o)) = (self.pop_num(host), self.pop()) else { return fault(self, host) };
+                    let i = client_int(i);
+                    self.edit_list(&o, host, |l| {
+                        if let Some(i) = usize::try_from(i).ok().filter(|&i| i < l.len()) {
+                            l.remove(i);
+                        }
+                    });
+                }
+                // The index is on top, the value under it.
+                Op::ObjReplaceString | Op::ObjInsertString => {
+                    let (Some(i), Some(v), Some(o)) = (self.pop_num(host), self.pop(), self.pop()) else { return fault(self, host) };
+                    let v = self.value_full(v, host);
+                    let i = client_int(i);
+                    let replace = ins.op == Op::ObjReplaceString;
+                    self.edit_list(&o, host, |l| {
+                        let at = usize::try_from(i).ok().filter(|&i| i < l.len());
+                        match (replace, at) {
+                            (true, Some(i)) => l[i] = v,
+                            // Out of range, `replace` adds at the end.
+                            (true, None) => l.push(v),
+                            (false, _) => {
+                                let i = i.clamp(0, l.len() as i32) as usize;
+                                l.insert(i, v);
+                            }
+                        }
+                    });
+                }
+                Op::ObjClear => {
+                    let Some(o) = self.pop() else { return fault(self, host) };
+                    self.edit_list(&o, host, |l| l.clear());
+                }
+                // The length on top, then the start, then the list.
+                Op::ObjSubarray => {
+                    let (Some(n), Some(start), Some(o)) = (self.pop_num(host), self.pop_num(host), self.pop()) else {
+                        return fault(self, host);
+                    };
+                    let l = self.list_of(&o, host);
+                    self.push(Slot::List(lists::subarray(&l, client_int(start), client_int(n))));
+                }
+                Op::ObjIndex => {
+                    let (Some(v), Some(o)) = (self.pop(), self.pop()) else { return fault(self, host) };
+                    let v = self.value_full(v, host);
+                    let l = self.list_of(&o, host);
+                    let k = l.iter().position(|e| e.same(&v, compare)).map_or(-1.0, |k| k as f64);
+                    self.push(Slot::Num(k));
+                }
+                // `x in list`; a list `x` is in when each of its elements is.
+                Op::InObj => {
+                    let (Some(o), Some(v)) = (self.pop(), self.pop()) else { return fault(self, host) };
+                    let v = self.value_full(v, host);
+                    let l = self.list_of(&o, host);
+                    let has = |x: &Value| l.iter().any(|e| e.same(x, compare));
+                    let yes = match &v {
+                        Value::List(xs) if !xs.is_empty() => xs.iter().all(has),
+                        x => has(x),
+                    };
+                    self.push(Slot::Num(yes as i32 as f64));
+                }
+                Op::ObjTokenize | Op::ObjPositions => {
+                    let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else { return fault(self, host) };
+                    self.push(if ins.op == Op::ObjPositions {
+                        Slot::List(lists::positions(&a.text(), &b.text()))
+                    } else {
+                        let t = lists::tokenize(&a.text(), &b.text());
+                        // No tokens gives no list at all.
+                        if t.is_empty() {
+                            Slot::Obj(None)
+                        } else {
+                            Slot::List(t.into_iter().map(|s| Value::Val(Val::Str(s))).collect())
+                        }
+                    });
+                }
+                // The loop variable, the list and the index stay on the
+                // stack; past the end the loop jumps out and leaves them
+                // (the compiler pops only the index).
+                Op::ForEach => {
+                    let n = self.stack.len();
+                    if n < 3 {
+                        return fault(self, host);
+                    }
+                    let i = match &self.stack[n - 1] {
+                        Slot::Num(i) => client_int(*i),
+                        _ => -1,
+                    };
+                    let (target, o) = (self.stack[n - 3].clone(), self.stack[n - 2].clone());
+                    let l = self.list_of(&o, host);
+                    match (usize::try_from(i).ok().and_then(|i| l.get(i)), target) {
+                        (Some(e), Slot::Var(root, name)) if !name.is_empty() => {
+                            let e = e.clone();
+                            self.write_var(root, &name, e, host);
+                        }
+                        _ => self.pc = int.unwrap_or(0).max(0) as usize,
+                    }
                 }
 
                 Op::Unknown(n) => host.log(format!("gs2: unknown opcode {n} at op {at}, skipped")),
@@ -722,7 +1012,7 @@ impl Machine {
         let arg_slots: Vec<Slot> = self.stack[outer + 1..inner].iter().rev().cloned().collect();
         let mut args = Vec::new();
         for s in arg_slots {
-            args.push(self.value(s, host));
+            args.push(self.value_full(s, host));
         }
         self.stack.truncate(outer);
         if let Some(f) = self.frames.last_mut() {
@@ -731,6 +1021,16 @@ impl Machine {
                     f.locals.insert(n, args.get(i).cloned().unwrap_or_default());
                 }
             }
+        }
+    }
+}
+
+/// `new[n][m]`: every element that is not a list becomes `m` zeros.
+fn fill_leaves(l: &mut [Value], m: i32) {
+    for e in l {
+        match e {
+            Value::List(inner) => fill_leaves(inner, m),
+            _ => *e = Value::List(lists::zeros(m)),
         }
     }
 }

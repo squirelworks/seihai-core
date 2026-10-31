@@ -1,0 +1,22 @@
+// String built-ins: format, char, trim, length, pos, charat, substring,
+// starts, ends and the _() translation cast.
+function onCreated() {
+  temp.s = "  Hello, Graal  ";
+  this.trimmed = temp.s.trim();
+  this.len = this.trimmed.length();
+  this.at = this.trimmed.pos("Graal");
+  this.none = this.trimmed.pos("zzz");
+  this.c = this.trimmed.charat(1);
+  this.out = this.trimmed.charat(99);
+  this.sub = this.trimmed.substring(7, 3);
+  this.clip = this.trimmed.substring(-4, 100);
+  this.st = this.trimmed.starts("Hell");
+  this.en = this.trimmed.ends("al");
+  this.no = this.trimmed.ends("Hell");
+  this.ch = char(65);
+  this.tr = _("as is");
+  this.f1 = format("%d|%5d|%-5d|%+d|%.3d", 42, 7, 7, 3, 5);
+  this.f2 = format("%s|%6s|%.2s|%%|%f", "ab", "cd", "efgh", 1.5);
+  this.f3 = format("%d and %s", 9.7);
+  this.f4 = format("plain");
+}
