@@ -163,10 +163,12 @@ Generated; do not edit between the markers.
 - protocol: **pli (client ids sent)**: +80 PROFILEGET, +81 PROFILESET (33 -> 35 ids)
 - props: **own-player props**: +34 ACCOUNTNAME (34 -> 35 ids)
 - props: **other-player props**: +33 ADDITFLAGS (22 -> 23 ids)
+- life: **combat**: none -> 1.39 rules (one swing step a tick, the rest 2.05)
 - ui: **chat_recall**: no -> yes
 - ui: **chat_text**: ChatText { face: Dialog, height: 28 } -> ChatText { face: Helvetica, height: 24 }
 - ui: **gs1_commands**: 109 -> 111
-- source: binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111
+- unknown (life): combat: the swing steps and hurt lock-out were seen live; the reach, the hit judgement and the hurt sprite come from the 2.05 template, no 1.39 hit handler was traced; 1.33 to 1.38 keep no combat row
+- source: binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111; sword swing S 6 to 10 one per tick and the 40-tick hurt lock-out (lab capture and video)
 
 #### 1.41 (`GNW13110`, binary)
 
@@ -177,7 +179,7 @@ Generated; do not edit between the markers.
 - props: **other-player props**: +35 BODYIMG, +36 RATING (23 -> 25 ids)
 - props: **npc_max**: 34 -> 35
 - life: **death**: none -> 2.05 rules (name-group test)
-- life: **combat**: none -> 2.05 rules
+- life: **combat**: 1.39 rules (one swing step a tick, the rest 2.05) -> 2.05 rules
 - ui: **server_list**: direct (www.graalonline.com:14900) -> one list
 - ui: **gs1_commands**: 111 -> 126
 - unknown (drops): the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced

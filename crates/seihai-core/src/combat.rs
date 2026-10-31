@@ -1129,6 +1129,13 @@ impl OfflineSession {
             if let Some(ps) = self.pushpull_sprite_s_stepped(!gani_client) {
                 return (self.player_dir % 4) + 4 * ps;
             }
+            // A build without GANIs sends its walk frame as S (1.39 lab
+            // capture); a GANI build sends the name `walk` instead.
+            if !gani_client && self.walk_sprite && self.walking && !self.in_water {
+                if let Some(f) = self.walk_frame() {
+                    return (self.player_dir % 4) + 4 * crate::pose::WALK_S[f % 8];
+                }
+            }
         }
         s
     }
@@ -1457,7 +1464,7 @@ mod tests {
         assert_eq!(big[big.len() - 2], 0x20 + 2);
         assert_eq!(hurtplayer_message(v, (20.0, 20.0), &target(40.0, 20.0), (0.0, 0.0), 2), Err(Reject::TooFar));
         assert_eq!(hurtplayer_message(v, (20.0, 20.0), &target(21.0, 20.0), (0.0, 0.0), 0), Err(Reject::NoDamage));
-        for old in [ClientVersion::V133, ClientVersion::V139, ClientVersion::V142] {
+        for old in [ClientVersion::V133, ClientVersion::V138, ClientVersion::V142] {
             assert_eq!(hurtplayer_message(old, (20.0, 20.0), &target(21.0, 20.0), (0.0, 0.0), 2), Err(Reject::NotInBuild), "{old:?}");
         }
     }
@@ -1474,9 +1481,12 @@ mod tests {
                 assert!(c.reach_min_half <= c.reach_max_half, "{}", p.label);
             }
         }
-        for v in [ClientVersion::V133, ClientVersion::V139, ClientVersion::V142] {
+        for v in [ClientVersion::V133, ClientVersion::V138, ClientVersion::V142] {
             assert!(v.combat_rules().is_none(), "{}", v.label());
         }
+        // 1.39 swings one step a tick (lab capture), the rest from 2.05.
+        assert_eq!(ClientVersion::V139.combat_rules(), Some(crate::protocol::COMBAT_139));
+        assert_eq!(crate::protocol::COMBAT_139.swing_step_ticks, 1);
         // Read in each binary (Graal_analysis `client-internals/combat-200-204.md`).
         assert_eq!(ClientVersion::V200.combat_rules(), Some(COMBAT_200));
         for v in [ClientVersion::V201, ClientVersion::V202, ClientVersion::V202R2] {
@@ -2077,7 +2087,7 @@ mod tests {
         assert!(matches!(st.hits[0], IncomingHit::Hurt(h) if h.attacker == 12 && h.half == 2));
         assert!(matches!(st.hits[1], IncomingHit::Objects(h) if h.attacker == 12 && h.x == 20.0));
         // A build without the rules decodes nothing and counts the ids as unhandled.
-        for v in [ClientVersion::V133, ClientVersion::V139, ClientVersion::V142] {
+        for v in [ClientVersion::V133, ClientVersion::V138, ClientVersion::V142] {
             let mut st = SessionState::for_version(v);
             st.apply_body(&m40(12));
             st.apply_body(&m46);

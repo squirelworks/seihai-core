@@ -219,6 +219,9 @@ pub struct OfflineSession {
     /// The swing lasts the sword GANI (see `CombatState::set_swing_ticks`):
     /// set for 2.22, the build that was checked.
     pub gani_swing: bool,
+    /// The walk frame goes out in the SPRITE prop (17) as S 1 to 5: a
+    /// build without GANIs (1.39 lab capture). Set from the profile.
+    pub walk_sprite: bool,
     /// Optional walk animation.
     pub walk_gani: Option<GaniPlayer>,
     /// Optional swim animation, shown instead of the walk one while the
@@ -567,6 +570,7 @@ impl OfflineSession {
             player_dir: DIR_SOUTH,
             in_water: false,
             gani_swing: false,
+            walk_sprite: false,
             walk_gani: None,
             swim_gani: None,
             swim_ticks: 0,

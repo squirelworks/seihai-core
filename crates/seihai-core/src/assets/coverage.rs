@@ -73,7 +73,7 @@ impl Finding {
 }
 
 /// Sound effects named in the 1.39 binary (`early-clients.md`).
-const SOUNDS_139: [&str; 24] = [
+pub(crate) const SOUNDS_139: [&str; 24] = [
     "arrow", "arrowon", "axe", "bomb", "chest", "compudead", "crush", "dead", "extra", "fire", "frog", "goal", "item",
     "item2", "jump", "nextpage", "put", "sign", "steps", "stonemove", "sword", "swordon", "thunder", "water",
 ];
