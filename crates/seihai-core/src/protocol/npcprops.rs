@@ -5,9 +5,12 @@
 //! 2.05 behaviour was checked in the lab (`documentation/ledges-push-pull.md`).
 //! Image, script, position, the two flag bytes, the message, the
 //! character props (GANI attributes 1 to 30) and the NPC's level
-//! (`CURLEVEL`) are kept; the other props up to 76 are skipped by their
-//! length, and reading stops at a prop whose length is not known (43, 48,
-//! and anything past 76; GServer-v2 never sends 43 or 48).
+//! (`CURLEVEL`) are kept; the other props up to 77 are skipped by their
+//! length, and reading stops at a prop whose length is not known (48, and
+//! anything past 77). GServer-v2 beta4 sends 43 (one byte) before the GANI
+//! attributes 6 to 30 and 77 (a `GSHORT`, Z2) after X2/Y2 on every NPC to a
+//! 2.22 or 2.31 session (cloud lab, 2026-10-31,
+//! `documentation/npc-props-lab.md`).
 
 use super::dispatch::{latin1, read_gint3, read_gshort, script_text};
 
@@ -208,6 +211,11 @@ pub fn parse_npc_props(b: &[u8], bow_prop12: bool) -> Option<(u32, NpcProps)> {
                 p.level = Some(s);
                 i += n;
             }
+            // One byte, `ff` on every record seen (beta4, lab 2026-10-31).
+            // Reading used to stop here, before GANI attribute 6.
+            43 => i += 1,
+            // Z2 (`zprecise`): a `GSHORT`, after X2/Y2.
+            77 => i += 2,
             // Scripter, name, type: `GCHAR` length and the text.
             49..=51 => i += text(i)?.1,
             // Class list: `GSHORT` length and the text.
@@ -380,7 +388,7 @@ mod tests {
 
     #[test]
     fn an_unknown_prop_ends_the_record_and_a_short_one_is_dropped() {
-        let p = [gc(0), gc(0), gc(1), gc(2), gc(8), gc(77), gc(1), gc(3), gc(9)];
+        let p = [gc(0), gc(0), gc(1), gc(2), gc(8), gc(78), gc(1), gc(3), gc(9)];
         assert_eq!(parse_npc_props(&p, true).unwrap().1.x, Some(4.0));
         assert_eq!(parse_npc_props(&p[..2], true), None);
         assert_eq!(parse_npc_props(&[gc(0), gc(0), gc(1), gc(0), gc(9), b'a'], true), None);
@@ -483,12 +491,29 @@ mod tests {
     }
 
     #[test]
-    fn props_43_48_and_past_76_still_end_the_record() {
-        for prop in [43, 48, 77] {
+    fn prop_48_and_past_77_still_end_the_record() {
+        for prop in [48, 78] {
             let p = vec![gc(0), gc(0), gc(9), gc(prop), gc(1), gc(15), gc(1), b'x'];
             let (_, n) = parse_npc_props(&p, false).unwrap();
             assert_eq!(n.message, None, "prop {prop}");
         }
+    }
+
+    /// The real server's record, captured in the cloud lab (2026-10-31):
+    /// GServer-v2 beta4 sends a character NPC whose `#P6` the real 2.22
+    /// set to `six` to Seihai 2.22. Prop 43 (one byte) comes before 44 and
+    /// prop 77 (two bytes) after X2/Y2; the reader used to stop at 43 and
+    /// lose attribute 6.
+    #[test]
+    fn lab_beta4_record_keeps_attribute_6_past_prop_43() {
+        let hex = "20224c2023236323212179696620286372656174656429207ba773686f776368617261637465723ba77365746368617270726f702023332c68656164302e706e673ba77365746368617270726f70202350312c6f6e653ba77da769662028706c61796572656e7465727320262620737472657175616c732823612c6c61623232322929207ba77365746368617270726f70202350362c7369783ba77365746368617270726f7020235031302c74656e3ba77365746368617270726f7020235033302c7468697274793ba76d6573736167652070363d235036207033303d235033303ba77d225423542c2469646c652d312f2970363d207033303d303120224c322244236f6e654bff4c237369786b26606c26606d2c81";
+        let b: Vec<u8> = (0..hex.len()).step_by(2).map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap()).collect();
+        let (id, n) = parse_npc_props(&b, false).unwrap();
+        assert_eq!(id, 300);
+        assert_eq!(n.image.as_deref(), Some(CHARACTER_IMAGE));
+        assert_eq!(n.message.as_deref(), Some("p6= p30=0"));
+        assert_eq!((n.attrs[0].as_deref(), n.attrs[5].as_deref()), (Some("one"), Some("six")));
+        assert_eq!((n.x, n.y), (Some(26.0), Some(26.0)));
     }
 
     #[test]
