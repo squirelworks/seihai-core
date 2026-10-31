@@ -55,7 +55,7 @@ step	label	token	basis	kind	area	field	detail
 11	1.39	GNW07080	binary	unknown	life	-	combat: the swing steps and hurt lock-out were seen live; the reach, the hit judgement and the hurt sprite come from the 2.05 template, no 1.39 hit handler was traced; 1.33 to 1.38 keep no combat row
 11	1.39	GNW07080	binary	source	-	-	binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111; sword swing S 6 to 10 one per tick and the 40-tick hurt lock-out (lab capture and video)
 12	1.41	GNW13110	binary	changed	protocol	encryption	Gen2 -> Gen3
-12	1.41	GNW13110	binary	changed	protocol	listserver	none -> listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape B (login frame inferred, not captured; no evidence for this shape)
+12	1.41	GNW13110	binary	changed	protocol	listserver	none -> listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape S (login frame captured from a real client)
 12	1.41	GNW13110	binary	changed	protocol	pli (client ids sent)	-31 PACKETCOUNT (35 -> 34 ids)
 12	1.41	GNW13110	binary	changed	props	own-player props	+35 BODYIMG, +36 RATING (35 -> 37 ids)
 12	1.41	GNW13110	binary	changed	props	other-player props	+35 BODYIMG, +36 RATING (23 -> 25 ids)
@@ -66,11 +66,11 @@ step	label	token	basis	kind	area	field	detail
 12	1.41	GNW13110	binary	changed	ui	gs1_commands	111 -> 126
 12	1.41	GNW13110	binary	unknown	drops	-	the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced
 12	1.41	GNW13110	binary	unknown	listserver	-	original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured
-12	1.41	GNW13110	binary	unknown	listserver	-	login frame inferred, not captured, and no evidence for its shape: Seihai keeps shape B (id 0 `newmain`, then id 1 with the account), what it sent before the lab captures; whether a real 1.41 sends the account to the listserver is unknown
+12	1.41	GNW13110	binary	unknown	listserver	-	the real 1.41 rev 1 sent nothing to the lab listserver, which spoke first (shape S, 2026-10-30); whether the public service speaks first to a silent client is not known, so after 3 s with no reply Seihai sends shape B (id 0 `newmain`, then id 1 with the account), which 14923 answered on 2026-10-25
 12	1.41	GNW13110	binary	unknown	life	-	death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)
 12	1.41	GNW13110	binary	unknown	levels	-	the version-profile TOML lists GLEVNW01 (.nw) as readable by 1.41 and 1.42 and drops it at 2.00; the rows of 1.33 to 2.04 have .graal only
 12	1.41	GNW13110	binary	source	-	-	binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126
-13	1.42	GNW08011	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape B (login frame inferred, not captured; no evidence for this shape) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured)
+13	1.42	GNW08011	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape S (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
 13	1.42	GNW08011	binary	changed	protocol	plo (server ids handled)	+42 NEWWORLDTIME, +44 HASNPCSERVER, +45 FILEUPTODATE, +150 NPCDEL2, +151 HIDENPCS, +153 SAY2 (45 -> 51 ids)
 13	1.42	GNW08011	binary	changed	protocol	pli (client ids sent)	+34 UPDATEFILE (34 -> 35 ids)
 13	1.42	GNW08011	binary	changed	life	death	2.05 rules (name-group test) -> none
@@ -81,9 +81,8 @@ step	label	token	basis	kind	area	field	detail
 13	1.42	GNW08011	binary	changed	mannerisms	mannerisms	1.39 (blink after the hurt pose, hide keeps the carry poses, 4-tile knockback) -> NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses)
 13	1.42	GNW08011	binary	changed	drops	drops	client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE -> server drops (PLO_ITEMADD), pickups go through PLI_ITEMTAKE
 13	1.42	GNW08011	binary	unknown	listserver	-	built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured
-13	1.42	GNW08011	binary	unknown	listserver	-	login frame inferred, not captured: Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; a real 1.42 frame was never captured, and no run on the public service has used shape A, so the port is assumed
+13	1.42	GNW08011	binary	unknown	listserver	-	the real NewMain 26 sent shape A (id 0 `newmain` only) to the lab listserver (2026-10-30), which Seihai sends; no run on the public service has used shape A, so the port is assumed
 13	1.42	GNW08011	binary	source	-	-	binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)
-14	2.00	GNW24011	binary	changed	protocol	listserver	listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
 14	2.00	GNW24011	binary	changed	protocol	plo (server ids handled)	+154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
 14	2.00	GNW24011	binary	changed	life	death	none -> 2.05 rules (name-group test)
 14	2.00	GNW24011	binary	changed	life	combat	none -> 2.00 rules (raw sword power, fewer packet gates)
