@@ -87,6 +87,21 @@ pub fn is_login_mode(server_name: &str) -> bool {
     server_name.as_bytes().get(..5).is_some_and(|p| p.eq_ignore_ascii_case(b"login"))
 }
 
+/// The name a lobby build starts under. The real clients always reach the
+/// Login server first and only get a game server's name from its warp. A
+/// server Seihai picked from a server list (its name saved with the
+/// address) is that game server already, as if the Login server had warped
+/// there: it starts under that name, so the player, other players and the
+/// HUD are drawn. With no known name (an address typed straight in), it is
+/// taken to be the Login server. A picked name that itself starts with
+/// "login" still means Login mode.
+pub fn first_server_name(lobby: &Lobby, picked: Option<&str>) -> String {
+    match picked.map(str::trim).filter(|n| !n.is_empty()) {
+        Some(name) => name.to_string(),
+        None => lobby.first_server.to_string(),
+    }
+}
+
 /// Split a `PLO_SERVERWARP` (178) text the way the lobby builds read it:
 /// on commas only. The lab warp `0,Lab Server,127.0.0.1,14900` (unquoted)
 /// reached 127.0.0.1:14900 on 5.00r7, 5.12, 5.24r4, 5.31r4 and 6.03r7, and
@@ -351,6 +366,24 @@ mod tests {
         assert!(!is_login_mode("Lab Server"));
         assert!(!is_login_mode("Logi"));
         assert!(!is_login_mode(""));
+    }
+
+    /// 6.03r7 on GServer-RS and 6.00r2 on hastur, picked from the server
+    /// list: they are game servers, not a Login lobby, so the player shows.
+    #[test]
+    fn a_picked_game_server_is_not_login_mode() {
+        for lobby in [LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_603_LINUX] {
+            for name in ["GServer-RS", "Zelda-A-Link-to-the-Past"] {
+                let first = first_server_name(&lobby, Some(name));
+                assert_eq!(first, name);
+                assert!(!is_login_mode(&first));
+            }
+            // An address typed straight in: the Login server, as the real clients.
+            assert!(is_login_mode(&first_server_name(&lobby, None)));
+            assert!(is_login_mode(&first_server_name(&lobby, Some("  "))));
+            // A list entry that is a Login server stays in Login mode.
+            assert!(is_login_mode(&first_server_name(&lobby, Some("Login Server"))));
+        }
     }
 
     /// The bytes the lab proxy injected (`rules.py`, `WARP`).
