@@ -584,15 +584,19 @@ pub const CHAIN: &[Step] = &[
             combat: Some(Some(COMBAT_205)),
             server_list: Some(ServerList::Single),
             gs1_commands: Some(126),
+            // The GLEVNW01 loader is in the 1.41 rev 1 and NewMain 1.42
+            // binaries; 2.00 to 2.04 dropped it (Graal_analysis
+            // `client-internals/build-catalogue.md`).
+            nw: Some(true),
             ..Delta::NONE
         },
-        source: "binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126",
+        source: "binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126, .nw (GLEVNW01) loader",
         unknown: &[
             Unknown { area: "drops", what: "the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced" },
             Unknown { area: "listserver", what: "original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured" },
             Unknown { area: "listserver", what: "login frame inferred, not captured, and no evidence for its shape: Seihai keeps shape B (id 0 `newmain`, then id 1 with the account), what it sent before the lab captures; whether a real 1.41 sends the account to the listserver is unknown" },
             Unknown { area: "life", what: "death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)" },
-            Unknown { area: "levels", what: "the version-profile TOML lists GLEVNW01 (.nw) as readable by 1.41 and 1.42 and drops it at 2.00; the rows of 1.33 to 2.04 have .graal only" },
+            Unknown { area: "levels", what: "the .nw loader was found by a string and function scan of the binary; no .nw level was loaded in a real 1.41" },
         ],
     },
     Step {
@@ -640,9 +644,11 @@ pub const CHAIN: &[Step] = &[
             combat: Some(Some(COMBAT_200)),
             death: Some(Some(DEATH_205)),
             gs1_commands: Some(142),
+            // 2.00 to 2.04 hold no GLEVNW01 or GRMAP001 string; 2.05 brings .nw back.
+            nw: Some(false),
             ..Delta::NONE
         },
-        source: "binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)",
+        source: "binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, .nw loader dropped, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)",
         unknown: &[
             Unknown { area: "life", what: "combat read in 2.00 r0 only (Graal_analysis client-internals/combat-200-204.md); r1 to r3 assumed the same. Not run against a real client" },
             Unknown { area: "login", what: "props sent at login (verified for 2.05 only)" },
@@ -1759,7 +1765,9 @@ mod tests {
     /// 2.00 to 2.04 then got combat rows read in their own binaries, and
     /// every combat row two more fields (`sword_power_store`,
     /// `packet_victim_gates`; Graal_analysis `client-internals/combat-200-204.md`).
-    /// 1.39 then got the combat row its lab capture and video show.
+    /// 1.39 then got the combat row its lab capture and video show. 1.41
+    /// and 1.42 then got `.nw` levels (the GLEVNW01 loader is in both
+    /// binaries; Graal_analysis `client-internals/build-catalogue.md`).
     #[test]
     fn chain_equals_the_hand_written_rows() {
         let mut seen = 0;
