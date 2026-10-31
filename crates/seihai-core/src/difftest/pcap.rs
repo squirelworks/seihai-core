@@ -326,7 +326,7 @@ pub(crate) mod tests {
         // 3141. Keeping the first 89 left a hole and ended the stream.
         let pcap = synth_pcap(
             40002,
-            14801,
+            14802,
             &[
                 (1.0, true, 0x02, 99, b""),
                 (1.1, true, 0x18, 100, b"abc"),
