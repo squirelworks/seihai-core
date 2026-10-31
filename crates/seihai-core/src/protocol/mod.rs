@@ -14,6 +14,7 @@ mod gen3;
 mod gen5;
 pub mod layouts;
 pub mod levelcache;
+pub mod lobby;
 pub mod npcprops;
 mod list;
 pub mod flagset;
@@ -194,6 +195,11 @@ pub fn write_login<W: Write>(
     w.write_all(version.token().as_bytes())?;
     write_length_biased(w, account.as_bytes())?;
     write_length_biased(w, password.as_bytes())?;
+    // 5.00 on: the platform and machine-field list, with no length byte
+    // (see `lobby`).
+    if let Some(lobby) = version.profile().protocol.lobby {
+        w.write_all(&lobby.login_tail())?;
+    }
     Ok(())
 }
 
@@ -344,6 +350,28 @@ mod tests {
         assert_eq!(&buf[..2], &[0x20, 102 + 0x20]);
         assert_eq!(&buf[2..10], b"GNW03081");
         assert_eq!(&buf[10..], b"\"ab\"cd");
+    }
+
+    /// The 5.00r7 and 5.12 login lines as captured (lab, 2026-10-30), up to
+    /// the machine fields, which Seihai sends empty. 5.00r7 (key 119):
+    /// `%\x97G3D22067%guest(7Y3bdzjfwin,<md5>,"",<md5>`; 5.12 (key 0x4B):
+    /// `%kG3D14097%guest(7Y3bdzjfwin,<md5>,<md5>,<md5>,"6.2 9200 "`.
+    #[test]
+    fn lobby_login_lines_follow_the_captures() {
+        let line = |v, key| {
+            let mut buf = Vec::new();
+            write_login(&mut buf, v, key, "guest", "7Y3bdzjf").unwrap();
+            buf
+        };
+        let a = line(ClientVersion::V500R7, 119);
+        assert!(a.starts_with(b"%\x97G3D22067%guest(7Y3bdzjfwin,"), "{a:?}");
+        assert_eq!(&a[25..], b"win,\"\",\"\",\"\"");
+        let b = line(ClientVersion::V512, 0x4B);
+        assert!(b.starts_with(b"%kG3D14097%guest(7Y3bdzjfwin,"), "{b:?}");
+        assert!(b.ends_with(b",\"6.2 9200 \""), "{b:?}");
+        assert!(line(ClientVersion::V603R7, 0x79).starts_with(b"%\x99G3D0311C%guest(7Y3bdzjfwin,"));
+        // Builds before 5.00 end at the password.
+        assert!(line(ClientVersion::V3153, 1).ends_with(b"(7Y3bdzjf"));
     }
 
     #[test]

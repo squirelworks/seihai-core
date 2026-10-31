@@ -12,7 +12,7 @@ use super::extras::{
 use super::levelcache::{same_level, CachedLevel, LevelCache};
 use super::layouts::{
     parse_board_heights, parse_board_modify, parse_board_modify2, parse_flag, parse_npc_del2, parse_npc_id_rest,
-    parse_player_toggle, parse_player_warp2, parse_profile, parse_screenshot_name, parse_server_warp,
+    parse_player_toggle, parse_player_warp2, parse_profile, parse_screenshot_name, parse_server_warp, parse_server_warp_lobby,
     parse_shoot, parse_showimg_relay, BoardHeights, BoardModify2, PlayerWarp2, ProfileCard, ServerMode, ServerWarp,
 };
 use super::profile::{CombatRules, IdSet};
@@ -601,6 +601,8 @@ pub struct SessionState {
     /// `PLO_SERVERWARP` (178), decoded: name, host and port. The last one
     /// received; the client takes it with `take()` and reconnects.
     pub server_warp: Option<ServerWarp>,
+    /// The build is a 5.x/6.x lobby build, which splits 178 on commas only.
+    pub lobby_warp_fields: bool,
     /// `PLO_UNKNOWN181` (181): the last player and toggle.
     pub player_toggle: Option<(u16, bool)>,
     /// `PLO_HASPROCESSRUNNING` (183) requests. Never answered.
@@ -647,6 +649,7 @@ impl SessionState {
             own_prop_ids: Some(p.props.own),
             other_prop_ids: Some(p.props.other),
             combat: p.life.combat,
+            lobby_warp_fields: p.protocol.lobby.is_some(),
             showimg_records: {
                 let all = ClientVersion::all_versions();
                 let at = |v: ClientVersion| all.iter().position(|&x| x == v);
@@ -1110,7 +1113,8 @@ impl SessionState {
             176 => self.server_mode = Some(ServerMode::Kingdoms),
             177 => self.server_mode = Some(ServerMode::NewWorld),
             178 => {
-                if let Some(w) = parse_server_warp(&msg.payload) {
+                let w = if self.lobby_warp_fields { parse_server_warp_lobby(&msg.payload) } else { parse_server_warp(&msg.payload) };
+                if let Some(w) = w {
                     self.server_warp = Some(w);
                 }
             }
@@ -3009,6 +3013,28 @@ mod tests {
         assert_eq!((w.name.as_str(), w.host.as_str(), w.port.as_str()), ("labtwo", "127.0.0.2", "14803"));
         assert_eq!(w.address().as_deref(), Some("127.0.0.2:14803"));
         assert!(st.server_warp.is_none());
+    }
+
+    /// The warp the lab sent the 5.x and 6.x clients (`g5mitm.py`'s
+    /// `rules.py`: id 178 + `0,Lab Server,127.0.0.1,14900`, unquoted). The
+    /// real 5.00r7 reconnected to 127.0.0.1:14900 3 ms later and named the
+    /// server "Lab Server" (proxy log 2026-10-30b, connections c1 and c2).
+    /// Every lobby profile reads it so; 2.31's comma-text reader would split
+    /// the name at its space and find no port.
+    #[test]
+    fn lab_warp_bytes_for_the_lobby_builds() {
+        let frame = [&[178 + 0x20][..], b"0,Lab Server,127.0.0.1,14900", b"\n"].concat();
+        assert_eq!(frame[0], 0xD2);
+        for v in ClientVersion::all_versions().iter().copied().filter(|v| v.profile().protocol.lobby.is_some()) {
+            let mut st = SessionState::for_version(v);
+            st.apply_body(&frame);
+            let w = st.server_warp.take().unwrap_or_else(|| panic!("{}: no warp", v.label()));
+            assert_eq!(w.display_name(), "Lab Server", "{}", v.label());
+            assert_eq!(w.address().as_deref(), Some("127.0.0.1:14900"), "{}", v.label());
+        }
+        let mut st = SessionState::for_version(ClientVersion::V231);
+        st.apply_body(&frame);
+        assert_eq!(st.server_warp.and_then(|w| w.address()), None);
     }
 
     /// The signature rule is reported, not enforced.

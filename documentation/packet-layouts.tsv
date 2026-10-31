@@ -60,7 +60,7 @@ S>C	84	LARGEFILESIZE	1	size	gint5	2.31	2.31	known
 S>C	100	RAWDATA	1	length	gint3	-	-	known	byte count of the next raw packet
 S>C	102	FILE	2	name	gstring	-	-	known	
 S>C	102	FILE	3	data	raw	-	-	known	file bytes; viewer shows size and crc only
-S>C	102	FILE	1	modtime	gint5	2.1	3.153	known	only where the build's PLO_FILE carries a modtime
+S>C	102	FILE	1	modtime	gint5	2.1	-	known	only where the build's PLO_FILE carries a modtime
 S>C	150	NPCDEL2	1	level	gstring	2.17	2.31	known	
 S>C	150	NPCDEL2	2	npc	gint3	2.17	2.31	known	
 S>C	151	HIDENPCS	1	(none)	none	2.17	2.31	known	

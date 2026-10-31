@@ -865,8 +865,9 @@ impl Connection {
         match version.encryption() {
             EncryptionGen::Gen3 => self.gen3 = gen3,
             EncryptionGen::Gen5 => {
-                self.gen5 = Some(Gen5::new(key));
-                self.gen5_in = Some(Gen5::new(key));
+                let g = if version.profile().protocol.gen5_round_down { Gen5::new(key).round_down() } else { Gen5::new(key) };
+                self.gen5 = Some(g.clone());
+                self.gen5_in = Some(g);
             }
             _ => {}
         }
@@ -1018,7 +1019,11 @@ impl Connection {
             }
         }
         if let Some(g5) = self.gen5.as_mut() {
-            let comp = choose_comp(body.len());
+            // 5.12 sends even short bodies compressed.
+            let comp = match choose_comp(body.len()) {
+                Gen5Comp::None if g5.is_round_down() => Gen5Comp::Zlib,
+                c => c,
+            };
             let compressed = match comp {
                 Gen5Comp::Bz2 => bz2_compress(&body)?,
                 Gen5Comp::Zlib => zlib_compress(&body)?,
@@ -1774,6 +1779,31 @@ mod tests {
         (conn, srv)
     }
 
+    /// GServer's view of a 5.12 login: the plain zlib login line ends with
+    /// the machine-field list, and the language that follows goes out
+    /// zlib-compressed (5.12 compresses even short bodies) with 5.12's
+    /// round-down step count. 5.24r4 sends the same line with its own
+    /// token, the language raw and stepped as every other build.
+    #[test]
+    fn lobby_logins_on_the_wire() {
+        let (mut conn, mut srv) = pair();
+        conn.login_versioned(ClientVersion::V512, 0x4B, "guest", "7Y3bdzjf").unwrap();
+        conn.send_post_login(ClientVersion::V512, "English").unwrap();
+        assert_eq!(read_frame(&mut srv), b"%kG3D14097%guest(7Y3bdzjfwin,\"\",\"\",\"\",\"6.2 9200 \"\n");
+        let raw = read_raw(&mut srv);
+        assert_eq!(raw[0], Gen5Comp::Zlib as u8);
+        let mut body = raw[1..].to_vec();
+        let mut g = Gen5::new(0x4B).round_down();
+        g.xor_body(&mut body, Gen5Comp::Zlib);
+        assert_eq!(zlib_decompress(&body).unwrap(), b"EEnglish\n");
+
+        let (mut conn, mut srv) = pair();
+        conn.login_versioned(ClientVersion::V524R4, 0x4B, "guest", "7Y3bdzjf").unwrap();
+        conn.send_post_login(ClientVersion::V524R4, "English").unwrap();
+        assert!(read_frame(&mut srv).starts_with(b"%kG3D15010%guest(7Y3bdzjfwin,"));
+        assert_eq!(gen5_body(&mut srv, &mut Gen5::new(0x4B)), b"EEnglish\n");
+    }
+
     /// GServer's view of a 2.22 login: the first frame is plain zlib and
     /// is the login line itself (type 5, key, token), and the next frame
     /// is gen-5 with the iterator at the seed.
@@ -2509,7 +2539,8 @@ mod tests {
 
     const ENTER: [u8; 3] = [46 + 0x20, 1 + 0x20, b'\n'];
 
-    /// The send sets of 2.3, 2.31 and 3.153 have 46; no other profile does.
+    /// The send sets of 2.3, 2.31, 3.153 and the 5.x/6.x builds have 46; no
+    /// other profile does.
     #[test]
     fn enter_level_follows_the_profile_send_set() {
         assert_eq!(enter_level_message(), ENTER);
@@ -2521,7 +2552,7 @@ mod tests {
             .filter(|p| p.version.sends_enter_level())
             .map(|p| p.label)
             .collect();
-        assert_eq!(with, ["2.3", "2.31", "3.153"]);
+        assert_eq!(with, ["2.3", "2.31", "3.153", "5.00r7", "5.12", "5.24r4", "5.30r3", "5.31r4", "6.00r2", "6.03r7"]);
     }
 
     /// 46 goes first in the frame, then the props message that follows it.

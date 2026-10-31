@@ -89,6 +89,22 @@ pub enum ClientVersion {
     V304,
     /// Graal 3.153 (`G3D28015`), the Mac OS X build. Gen 5. The 3.x twin of 2.31.
     V3153,
+    /// Graal 5.00 rev 7 (`G3D22067`), Windows. Gen 5. Logs in to a game
+    /// server named `Login` and plays only after a server warp (178).
+    V500R7,
+    /// Graal 5.12 (`G3D14097`), Windows. Gen 5, with its own round-down
+    /// cipher step count on compressed frames.
+    V512,
+    /// Graal 5.24 rev 4 (`G3D15010`), Windows. Gen 5.
+    V524R4,
+    /// Graal 5.30 rev 3 (`G3D26090`), Windows. Gen 5.
+    V530R3,
+    /// Graal 5.31 rev 4 (`G3D26090`), Windows. Gen 5.
+    V531R4,
+    /// Graal 6.00 rev 2 (`G3D26090`), Windows. Gen 5.
+    V600R2,
+    /// Graal 6.03 rev 7 (`G3D0311C`), Windows. Gen 5.
+    V603R7,
 }
 
 impl ClientVersion {
@@ -228,6 +244,7 @@ impl ClientVersion {
             Self::V204, Self::V205, Self::V210,
             Self::V212, Self::V213, Self::V214, Self::V215, Self::V216, Self::V217, Self::V222,
             Self::V230, Self::V231, Self::V304, Self::V3153,
+            Self::V500R7, Self::V512, Self::V524R4, Self::V530R3, Self::V531R4, Self::V600R2, Self::V603R7,
         ]
     }
 }

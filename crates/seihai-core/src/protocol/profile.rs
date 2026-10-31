@@ -24,6 +24,7 @@
 //! values come from release notes and server source and should be checked
 //! when a build turns up.
 
+use super::lobby::Lobby;
 use super::login::LoginInfo;
 use super::showimg::ShowImgInfo;
 use std::time::Duration;
@@ -339,6 +340,17 @@ pub struct Protocol {
     /// checks, process list, login props); `Some` only for the builds
     /// observed doing it (2.17, 2.22 and 2.31). See [`super::login`].
     pub login: Option<LoginInfo>,
+    /// The 5.x/6.x Login lobby: the first server is named `Login`, the
+    /// login line ends with the machine-field comma list, and nothing but
+    /// the level is drawn until a `PLO_SERVERWARP` (178). See
+    /// [`super::lobby`]. `None` for every build before 5.00.
+    pub lobby: Option<Lobby>,
+    /// 5.12's gen-5 step count: on zlib and bz2 frames the iterator steps
+    /// once per whole 4-byte group (rounded down), and every frame the
+    /// client sends is compressed. Every other build rounds up. Read from
+    /// 5.12's frame decoder and needed by the lab proxy to talk to it
+    /// (Graal_analysis `protocol/v5v6-lab-play.md`, "5.12's cipher step count").
+    pub gen5_round_down: bool,
     /// Peer-to-peer UDP channel present.
     pub udp: bool,
     /// UDP off by default (`noudp=true` in the shipped config).
@@ -434,9 +446,12 @@ pub enum ChatFace {
     Dialog,
     /// `Helvetica` (1.39, 1.41). Windows maps it to Arial.
     Helvetica,
-    /// `Tempus Sans ITC` (2.00 to 2.31). The client installs `tempsitc.ttf`
-    /// from its own folder.
+    /// `Tempus Sans ITC` (2.00 to 2.31, 6.00r2 and 6.03r7). The client
+    /// installs `tempsitc.ttf` from its own folder.
     TempusSans,
+    /// `Arial` (5.24: `font=Arial` in its config; 5.00r7 and 5.12 drew a
+    /// bold sans serif in the lab).
+    Arial,
 }
 
 /// How a build draws chat text over a player: its font (bold, as every
@@ -982,8 +997,9 @@ mod tests {
         plo: IdSet,
         pli: IdSet,
         pli_lower_bound: bool,
-        own_max: u8,
-        npc_max: u8,
+        /// `None` (`-`) where the TOML has no parser reading (the 5.x/6.x rows).
+        own_max: Option<u8>,
+        npc_max: Option<u8>,
         other: Option<IdSet>,
         tampercheck: bool,
         list_port: Option<u16>,
@@ -1024,8 +1040,8 @@ mod tests {
                     plo: parse_ids(c[3]).unwrap(),
                     pli: parse_ids(c[4].trim_start_matches('>')).unwrap(),
                     pli_lower_bound: c[4].starts_with('>'),
-                    own_max: c[5].parse().unwrap(),
-                    npc_max: c[6].parse().unwrap(),
+                    own_max: (c[5] != "-").then(|| c[5].parse().unwrap()),
+                    npc_max: (c[6] != "-").then(|| c[6].parse().unwrap()),
                     other: parse_ids(c[7]),
                     tampercheck: c[8] == "1",
                     list_port: c[9].parse().ok(),
@@ -1067,7 +1083,7 @@ mod tests {
             } else {
                 check("pli", p.protocol.pli == t.pli);
             }
-            check("npc_max", p.props.npc_max == t.npc_max);
+            check("npc_max", t.npc_max.is_none_or(|n| p.props.npc_max == n));
             check("tampercheck", p.protocol.tampercheck == t.tampercheck);
             check("sends_language == pli has 37", p.protocol.sends_language == t.pli.contains(37));
             let ls = p.protocol.listserver;
@@ -1093,7 +1109,7 @@ mod tests {
             // 2.16: its TOML entry keeps the 2.15 prop limit but notes that
             // 54-74 arrive in 2.16; the row follows the note.
             if t.label != "2.16" {
-                check("own_max", p.props.own.iter().max() == Some(t.own_max));
+                check("own_max", t.own_max.is_none_or(|n| p.props.own.iter().max() == Some(n)));
                 if let Some(o) = t.other {
                     check("other props", p.props.other == o);
                 }
@@ -1186,8 +1202,12 @@ mod tests {
         ];
         let gen5 = ["2.22", "2.3", "2.31", "3.04", "3.153"];
         let mut seen = 0;
+        let mut lobby = 0;
         for p in PROFILES {
             match p.protocol.listserver {
+                // The 5.x/6.x builds have no listserver protocol: their list is
+                // scripted GUI on the `Login` game server.
+                None if p.protocol.lobby.is_some() => lobby += 1,
                 None => {
                     assert!(p.label.starts_with("1.2") || p.label.starts_with("1.3"), "{} has no listserver", p.label);
                     assert_eq!(p.version.listserver_port(), 14923, "{}", p.label);
@@ -1216,7 +1236,8 @@ mod tests {
             }
         }
         assert_eq!(seen, classic.len() + gen5.len());
-        assert_eq!(seen + 12, PROFILES.len());
+        assert_eq!(lobby, 7);
+        assert_eq!(seen + 12 + lobby, PROFILES.len());
     }
 
     /// The login shape per profile and where it comes from: real 2.00, 2.05,
