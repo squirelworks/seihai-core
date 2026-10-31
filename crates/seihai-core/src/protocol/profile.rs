@@ -1243,7 +1243,7 @@ mod tests {
             }
         }
         assert_eq!(seen, classic.len() + gen5.len());
-        assert_eq!(lobby, 10);
+        assert_eq!(lobby, 11);
         assert_eq!(seen + 12 + lobby, PROFILES.len());
     }
 
