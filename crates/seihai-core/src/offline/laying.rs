@@ -33,7 +33,8 @@
 //!
 //! Not modelled: a custom sword or shield image (2.05 lays it as a special
 //! item that carries the picture), the horse, and the `playerlaysitem`
-//! event. Not captured from a real client yet.
+//! event. The lay bytes were confirmed by a lab capture of the real 2.05 rev 2
+//! (`documentation/item-laying.md`).
 
 use super::OfflineSession;
 use crate::assets::TileKind;
