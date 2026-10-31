@@ -848,7 +848,7 @@ fn real_world_style_scripts() {
 /// Smoke test over a local corpus of real GS1 scripts (NUL-separated text
 /// in the file named by `SEIHAI_SCRIPT_CORPUS`). The corpus is not part of
 /// the repository, so this is ignored by default:
-/// `SEIHAI_SCRIPT_CORPUS=scripts.txt cargo test -p seihai corpus -- --ignored --nocapture`
+/// `SEIHAI_SCRIPT_CORPUS=scripts.txt cargo test -p seihai-core corpus -- --ignored --nocapture`
 #[test]
 #[ignore]
 fn corpus_parses_and_runs_without_panicking() {
