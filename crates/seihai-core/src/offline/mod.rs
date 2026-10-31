@@ -259,6 +259,9 @@ pub struct OfflineSession {
     pub(crate) item_ms: u64,
     /// Rolls, lays, pickups and timeouts for [`Self::take_item_messages`].
     pub(crate) item_events: Vec<crate::items::ItemEvent>,
+    /// The item shown above each chest just opened: its place (one tile
+    /// above the chest) and the item ticks left (see `offline/drops.rs`).
+    pub(crate) chest_shows: Vec<(f32, f32, i32)>,
     /// The lay mode (S held and A): the item picked to put down (see
     /// `offline/laying.rs`).
     pub laying: Option<u8>,
@@ -582,6 +585,7 @@ impl OfflineSession {
             item_rng: crate::items::DelphiRandom::from_clock(),
             item_ms: 0,
             item_events: Vec::new(),
+            chest_shows: Vec::new(),
             laying: None,
             poses: crate::pose::PoseGanis::default(),
             sitting: false,
@@ -943,6 +947,7 @@ impl OfflineSession {
                 .and_then(|i| level.signs.get(i))
                 .map(|s| s.text.clone());
             self.opened_chests.insert((c.x, c.y));
+            self.show_chest_item(c.x, c.y);
             let got = self.give_item(&c.item);
             self.reading = note;
             return Interaction::Chest { x: c.x, y: c.y, item: c.item, got };
@@ -1159,6 +1164,7 @@ impl OfflineSession {
         self.arrow_ms = 0;
         // The items on the floor belong to the level.
         self.floor_items.clear();
+        self.chest_shows.clear();
         self.laying = None;
     }
 
@@ -4920,6 +4926,28 @@ mod tests {
         s.add_server_item(crate::items::FloorItem::new(crate::items::BOMBS, 50.0, 50.0));
         ticks(&mut s, 165, true);
         assert!(s.floor_items.is_empty());
+        assert!(s.take_item_messages(true).is_empty());
+    }
+
+    #[test]
+    fn an_opened_chest_sends_itemdel_above_it_after_1_2_s() {
+        // Real 2.22 on GServer-RS: PLI_OPENCHEST, then 1.2 s later C>S 13
+        // one tile above the chest.
+        let mut s = drop_session(crate::protocol::DROPS_142);
+        s.current_level = Some(Level::parse("GLEVNW01\nCHEST 20 24 greenrupee -1\n").unwrap());
+        s.player_x = 19.5;
+        s.player_y = 25.0;
+        s.player_dir = DIR_NORTH;
+        assert!(matches!(s.interact(), Interaction::Chest { x: 20, y: 24, .. }));
+        ticks(&mut s, 23, true);
+        assert!(s.take_item_messages(true).is_empty());
+        ticks(&mut s, 1, true);
+        assert_eq!(s.take_item_messages(true), vec![crate::items::item_del_message(20.0, 23.0)]);
+        // A level change before the end sends nothing.
+        s.opened_chests.clear();
+        assert!(matches!(s.interact(), Interaction::Chest { .. }));
+        s.clear_throws();
+        ticks(&mut s, 30, true);
         assert!(s.take_item_messages(true).is_empty());
     }
 

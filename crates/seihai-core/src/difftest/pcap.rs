@@ -206,7 +206,18 @@ pub fn reassemble(packets: &[Packet]) -> Vec<TcpConn> {
             continue;
         }
         let off = rel_offset(half, p.seq);
-        half.segs.entry(off).or_insert((p.ts, p.payload.clone()));
+        // A retransmission can carry more than the first send (the sender
+        // adds the bytes queued since); keep the longest, with the first time.
+        match half.segs.entry(off) {
+            std::collections::btree_map::Entry::Vacant(e) => {
+                e.insert((p.ts, p.payload.clone()));
+            }
+            std::collections::btree_map::Entry::Occupied(mut e) => {
+                if p.payload.len() > e.get().1.len() {
+                    e.get_mut().1 = p.payload.clone();
+                }
+            }
+        }
     }
     let mut list: Vec<Acc> = conns.into_values().collect();
     list.sort_by_key(|a| a.order);
@@ -306,6 +317,26 @@ pub(crate) mod tests {
         assert_eq!(c.s2c.bytes, b"reply");
         assert!((c.c2s.ts_at(0) - 1.002).abs() < 1e-6);
         assert!((c.c2s.ts_at(8) - 1.004).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_longer_retransmission_fills_the_stream() {
+        // Seihai on GServer-RS (2026-10-31): 89 bytes at 3008, then a
+        // retransmission at 3008 with 133 (the next send joined on), then
+        // 3141. Keeping the first 89 left a hole and ended the stream.
+        let pcap = synth_pcap(
+            40002,
+            14802,
+            &[
+                (1.0, true, 0x02, 99, b""),
+                (1.1, true, 0x18, 100, b"abc"),
+                (1.2, true, 0x18, 100, b"abcdef"),
+                (1.3, true, 0x18, 106, b"ghi"),
+            ],
+        );
+        let c = &reassemble(&read_pcap(&pcap).unwrap())[0];
+        assert_eq!(c.c2s.bytes, b"abcdefghi");
+        assert!((c.c2s.ts_at(3) - 1.1).abs() < 1e-6, "the first send's time");
     }
 
     #[test]
