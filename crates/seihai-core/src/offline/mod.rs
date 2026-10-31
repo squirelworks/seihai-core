@@ -301,6 +301,13 @@ pub struct OfflineSession {
     /// layout, `documentation/hud.md`). `None` until a script sets it:
     /// everything shows.
     pub stats: Option<u16>,
+    /// `enablefeatures bits` (2.1+ vocabulary; the notes list it with
+    /// 2.15 to 2.17): the client keys that work. Bit 1 is the M map, 2 P,
+    /// 4 Q, 8 R, 0x10 S+A, 0x20 S+D, 0x40 Tab. `None` until a script sets
+    /// it: everything works. Seihai honours bit 1 only.
+    pub features: Option<u32>,
+    /// The M-map reading animation, while it runs (`pose::MapPose`).
+    pub map_pose: Option<crate::pose::MapPose>,
     /// `setfocus x,y` (2.1+): the level point, in tiles, the view is
     /// centred on instead of the player. `None` follows the player
     /// (`resetfocus`, and every new level).
@@ -630,6 +637,8 @@ impl OfflineSession {
             script_map: None,
             script_freeze_ms: 0,
             script_hide_ms: 0,
+            map_pose: None,
+            features: None,
             stats: None,
             view_focus: None,
             keys_down: 0,
@@ -842,6 +851,11 @@ impl OfflineSession {
     /// The player cannot act: dead and the timer not yet past the lock.
     pub fn controls_locked(&self) -> bool {
         self.life.input_locked()
+    }
+
+    /// The M key opens the map unless `enablefeatures` cleared bit 1.
+    pub fn map_key_enabled(&self) -> bool {
+        self.features.is_none_or(|f| f & 1 != 0)
     }
 
     /// The name of the player's level: on a gmap the level of the current
@@ -3044,6 +3058,36 @@ mod tests {
         s.refresh_water();
         assert!(s.sleeping && !s.sitting);
         assert_eq!(s.current_pose().map(|p| p.kind), Some(PoseKind::Sleep));
+    }
+
+    /// Reading the M map: maps1 by its waits, then maps2 looped; maps3
+    /// once after closing, then back to idle. Not while walking.
+    #[test]
+    fn the_map_reading_pose_runs_maps1_maps2_then_maps3() {
+        use crate::pose::PoseKind;
+        let g = |n: usize| crate::assets::Gani::parse(&format!("ANI\n{}ANIEND\n", "1 0 0\n1 0 0\n1 0 0\n1 0 0\n\n".repeat(n))).unwrap();
+        let mut s = OfflineSession::new();
+        s.set_pose_gani(PoseKind::Idle, g(1));
+        assert!(!s.start_map_reading(), "no maps1.gani: nothing");
+        s.set_pose_gani(PoseKind::Maps1, g(2));
+        s.set_pose_gani(PoseKind::Maps2, g(1));
+        s.set_pose_gani(PoseKind::Maps3, g(3));
+        s.walking = true;
+        assert!(!s.start_map_reading(), "not while walking");
+        s.walking = false;
+        assert!(s.start_map_reading());
+        assert_eq!(s.current_pose().map(|p| p.kind), Some(PoseKind::Maps1));
+        s.tick_map_pose(100);
+        assert_eq!(s.current_pose().map(|p| p.kind), Some(PoseKind::Maps2));
+        s.tick_map_pose(1000);
+        assert_eq!(s.current_pose().map(|p| p.kind), Some(PoseKind::Maps2), "maps2 loops");
+        s.stop_map_reading();
+        assert_eq!(s.current_pose().map(|p| p.kind), Some(PoseKind::Maps3));
+        s.tick_map_pose(100);
+        assert_eq!(s.current_pose().map(|p| p.kind), Some(PoseKind::Maps3));
+        s.tick_map_pose(100);
+        assert_eq!(s.current_pose().map(|p| p.kind), Some(PoseKind::Idle));
+        assert!(s.map_pose.is_none());
     }
 
     /// In bed, a step down snaps straight back; a step to the side gets out.

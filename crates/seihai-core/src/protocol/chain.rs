@@ -27,7 +27,7 @@ use super::profile::{
     ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_139, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222,
     TAMPER_230, TAMPER_231,
 };
-use super::lobby::{Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_603_LINUX};
+use super::lobby::{Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_531, LOBBY_603_LINUX};
 use super::login::{LoginInfo, LOGIN_217, LOGIN_222, LOGIN_231, LOGIN_304, LOGIN_3153};
 use super::showimg::ShowImgInfo;
 use super::tampercheck::TamperInfo;
@@ -575,7 +575,12 @@ pub const CHAIN: &[Step] = &[
             encryption: Some(EncryptionGen::Gen3),
             // 14923 is the port the patched surviving copy carries, and the classic-login port.
             // Seihai's classic login got a list there on 2026-10-25 (matrix run).
-            listserver: Some(Some(Listserver::new(ListKind::Legacy, PortStatus::Confirmed, Some(BuiltIn { host: "listserver.graal.in", port: 14923 }), None))),
+            // Shape S: the real 1.41 rev 1 sends nothing and waits for the
+            // list (lab, 2026-10-30).
+            listserver: Some(Some(
+                Listserver::new(ListKind::Legacy, PortStatus::Confirmed, Some(BuiltIn { host: "listserver.graal.in", port: 14923 }), None)
+                    .shape(LoginShape::Silent, ShapeBasis::Captured),
+            )),
             pli: IdDelta::plus_minus(&[], &[31]),
             own_props: IdDelta::plus(&[35, 36]),
             other_props: IdDelta::plus(&[35, 36]),
@@ -584,15 +589,19 @@ pub const CHAIN: &[Step] = &[
             combat: Some(Some(COMBAT_205)),
             server_list: Some(ServerList::Single),
             gs1_commands: Some(126),
+            // The GLEVNW01 loader is in the 1.41 rev 1 and NewMain 1.42
+            // binaries; 2.00 to 2.04 dropped it (Graal_analysis
+            // `client-internals/build-catalogue.md`).
+            nw: Some(true),
             ..Delta::NONE
         },
-        source: "binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126",
+        source: "binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126, .nw (GLEVNW01) loader",
         unknown: &[
             Unknown { area: "drops", what: "the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced" },
             Unknown { area: "listserver", what: "original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured" },
-            Unknown { area: "listserver", what: "login frame inferred, not captured, and no evidence for its shape: Seihai keeps shape B (id 0 `newmain`, then id 1 with the account), what it sent before the lab captures; whether a real 1.41 sends the account to the listserver is unknown" },
+            Unknown { area: "listserver", what: "the real 1.41 rev 1 sent nothing to the lab listserver, which spoke first (shape S, 2026-10-30); whether the public service speaks first to a silent client is not known, so after 3 s with no reply Seihai sends shape B (id 0 `newmain`, then id 1 with the account), which 14923 answered on 2026-10-25" },
             Unknown { area: "life", what: "death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)" },
-            Unknown { area: "levels", what: "the version-profile TOML lists GLEVNW01 (.nw) as readable by 1.41 and 1.42 and drops it at 2.00; the rows of 1.33 to 2.04 have .graal only" },
+            Unknown { area: "levels", what: "the .nw loader was found by a string and function scan of the binary; no .nw level was loaded in a real 1.41" },
         ],
     },
     Step {
@@ -605,7 +614,8 @@ pub const CHAIN: &[Step] = &[
             // Classic login: 14923 (matrix run, 2026-10-25). The build itself carries
             // www.graalonline.com:14921 (dead).
             listserver: Some(Some(
-                Listserver::new(ListKind::Legacy, PortStatus::Assumed, Some(BUILT_IN_14921), None).shape(LoginShape::NewmainOnly, ShapeBasis::Inferred),
+                // Captured: the real NewMain 26 sent id 0 `newmain` only (lab, 2026-10-30).
+                Listserver::new(ListKind::Legacy, PortStatus::Assumed, Some(BUILT_IN_14921), None).shape(LoginShape::NewmainOnly, ShapeBasis::Captured),
             )),
             plo: IdDelta::plus(&[42, 44, 45, 150, 151, 153]),
             pli: IdDelta::plus(&[34]),
@@ -621,7 +631,7 @@ pub const CHAIN: &[Step] = &[
         source: "binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)",
         unknown: &[
             Unknown { area: "listserver", what: "built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured" },
-            Unknown { area: "listserver", what: "login frame inferred, not captured: Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; a real 1.42 frame was never captured, and no run on the public service has used shape A, so the port is assumed" },
+            Unknown { area: "listserver", what: "the real NewMain 26 sent shape A (id 0 `newmain` only) to the lab listserver (2026-10-30), which Seihai sends; no run on the public service has used shape A, so the port is assumed" },
         ],
     },
     Step {
@@ -640,9 +650,11 @@ pub const CHAIN: &[Step] = &[
             combat: Some(Some(COMBAT_200)),
             death: Some(Some(DEATH_205)),
             gs1_commands: Some(142),
+            // 2.00 to 2.04 hold no GLEVNW01 or GRMAP001 string; 2.05 brings .nw back.
+            nw: Some(false),
             ..Delta::NONE
         },
-        source: "binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)",
+        source: "binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, .nw loader dropped, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)",
         unknown: &[
             Unknown { area: "life", what: "combat read in 2.00 r0 only (Graal_analysis client-internals/combat-200-204.md); r1 to r3 assumed the same. Not run against a real client" },
             Unknown { area: "login", what: "props sent at login (verified for 2.05 only)" },
@@ -1216,11 +1228,13 @@ pub const CHAIN: &[Step] = &[
         token: "G3D26090",
         date: "2011-01-05",
         basis: Basis::Binary,
-        delta: Delta::NONE,
+        // No tiles before the warp (lab screenshots; 5.24r4 and 5.30r3 in the
+        // same lab draw them).
+        delta: Delta { lobby: Some(Some(LOBBY_531)), ..Delta::NONE },
         source: "unpacked from Themida and lab (clock set back): same PLO set and token as 5.30r3; draws no tiles before the warp",
         unknown: &[
             Unknown { area: "pli", what: "not read; 5.00r7's set is kept" },
-            Unknown { area: "ui", what: "before the warp it draws no tiles (5.24 and 5.30r3 do); Seihai draws them for every lobby build" },
+            Unknown { area: "ui", what: "why it draws no tiles before the warp was not traced in the binary; the lab shows it, and the warp alone brings the tiles back" },
         ],
     },
     Step {
@@ -1235,12 +1249,16 @@ pub const CHAIN: &[Step] = &[
             pli: IdDelta::plus_minus(&[45, 48, 162], &[21, 80, 81]),
             chat_text: Some(ChatText { face: ChatFace::TempusSans, height: 24 }),
             gen5_long_frames: Some(true),
+            // Back to 5.12's lobby, which draws tiles in Login mode: 6.00r2
+            // was not checked for it, so it keeps what Seihai did before.
+            lobby: Some(Some(LOBBY_512)),
             ..Delta::NONE
         },
         source: "unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24, 6.x long frame lengths",
         unknown: &[
             Unknown { area: "pli", what: "not read; Linux 6.01r1's set (6.03r7's without 160) is taken" },
             Unknown { area: "framing", what: "the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1" },
+            Unknown { area: "ui", what: "whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them" },
         ],
     },
     // 6.015 and 6.034 have no binary. Their tokens are in GServer-v2's
@@ -1303,9 +1321,10 @@ pub const CHAIN: &[Step] = &[
         token: "G3D0311C",
         date: "2012-11-16",
         basis: Basis::Binary,
-        // 6.015 and 6.034 before it already carry 6.03r7's id sets.
-        delta: Delta::NONE,
-        source: "unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date",
+        // 6.015 and 6.034 before it already carry 6.03r7's id sets. No tiles
+        // before the warp (lab screenshots, as 5.31r4).
+        delta: Delta { lobby: Some(Some(LOBBY_531)), ..Delta::NONE },
+        source: "unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date; draws no tiles before the warp",
         unknown: &[
             Unknown { area: "token", what: "the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)" },
         ],
@@ -1759,7 +1778,9 @@ mod tests {
     /// 2.00 to 2.04 then got combat rows read in their own binaries, and
     /// every combat row two more fields (`sword_power_store`,
     /// `packet_victim_gates`; Graal_analysis `client-internals/combat-200-204.md`).
-    /// 1.39 then got the combat row its lab capture and video show.
+    /// 1.39 then got the combat row its lab capture and video show. 1.41
+    /// and 1.42 then got `.nw` levels (the GLEVNW01 loader is in both
+    /// binaries; Graal_analysis `client-internals/build-catalogue.md`).
     #[test]
     fn chain_equals_the_hand_written_rows() {
         let mut seen = 0;

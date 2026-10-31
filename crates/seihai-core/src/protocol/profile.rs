@@ -212,7 +212,17 @@ pub enum LoginShape {
     /// Shape D: shape C's id 7 and id 1 in **one** plain zlib frame at the
     /// default level (`78 9C`); replies are gen 5. Real 3.04.
     Gen5OneFrame,
+    /// Shape S: the client sends nothing and waits for the listserver to
+    /// send the list. Real 1.41 rev 1 (lab, 2026-10-30; Graal_analysis
+    /// `client-internals/version-profiles/README.md`). Seihai adds one thing:
+    /// when no reply comes within [`SILENT_LIST_WAIT`] it sends shape B, so
+    /// a listserver that waits for a request still answers.
+    Silent,
 }
+
+/// How long a shape S login waits for the listserver to speak before
+/// Seihai sends shape B. The real 1.41 waits with no limit.
+pub const SILENT_LIST_WAIT: std::time::Duration = std::time::Duration::from_secs(3);
 
 impl LoginShape {
     /// `A`, `B` or `C`, as in the notes.
@@ -222,6 +232,7 @@ impl LoginShape {
             LoginShape::NewmainAccount => "B",
             LoginShape::Gen5 => "C",
             LoginShape::Gen5OneFrame => "D",
+            LoginShape::Silent => "S",
         }
     }
 }
@@ -1265,8 +1276,8 @@ mod tests {
         use LoginShape::*;
         use ShapeBasis::*;
         let want = [
-            ("1.41", NewmainAccount, Unknown),
-            ("1.42", NewmainOnly, Inferred),
+            ("1.41", Silent, Captured),
+            ("1.42", NewmainOnly, Captured),
             ("2.00", NewmainOnly, Captured),
             ("2.01", NewmainOnly, Inferred),
             ("2.02", NewmainOnly, Inferred),
@@ -1369,8 +1380,12 @@ mod tests {
         assert!(d.protocol.plo.contains(166) && !c.protocol.plo.contains(166));
         assert!(d.props.own.contains(42) && !c.props.own.contains(42));
         assert_eq!((a.token, b.token, c.token, d.token), ("GNW15041", "GNW20041", "GNW06051", "GNW24061"));
-        // 2.05 is the first build with .nw levels and the server name in the title.
-        assert!(!d.levels.nw && p(ClientVersion::V205).levels.nw);
+        // .nw levels: 1.41 and 1.42 have the loader, 2.00 to 2.04 drop it,
+        // 2.05 brings it back. 2.05 is also the first with the server name in
+        // the title.
+        assert!(p(ClientVersion::V141).levels.nw && p(ClientVersion::V142).levels.nw);
+        assert!(!p(ClientVersion::V200).levels.nw && !a.levels.nw && !d.levels.nw);
+        assert!(p(ClientVersion::V205).levels.nw);
         assert_eq!(b.window_title(Some("X")), "Graal 2.02 rev2");
         assert_eq!(by_label("2.02 rev2").unwrap().version, ClientVersion::V202R2);
     }

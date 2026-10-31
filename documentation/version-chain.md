@@ -72,7 +72,7 @@ If the new build lands between two existing ones, the step after it must be re-c
 
 - It does not say a value is true; it says what Seihai's row holds and how well it is backed. Rows marked inferred are the builds with no binary (2.1 to 2.16, 2.3).
 - The table lists changes in Seihai's profile fields only. Behaviour of a build that is not a profile field (payload layouts, timings) lives in `protocol.md` and the notes.
-- Found while building it (left as it was, so behaviour is unchanged): the 1.41 row carries the 2.05 death and combat rules, because it was built from the 2.05 template; 1.42 clears them. No 1.41 handler was traced. The TOML lists GLEVNW01 (`.nw`) as readable by 1.41 and 1.42, while the rows of 1.33 to 2.04 have `.graal` only.
+- Found while building it (left as it was, so behaviour is unchanged): the 1.41 row carries the 2.05 death and combat rules, because it was built from the 2.05 template; 1.42 clears them. No 1.41 handler was traced. (The rows of 1.33 to 2.04 also had `.graal` only, though the 1.41 and 1.42 binaries carry the GLEVNW01 loader; 1.41 and 1.42 now read `.nw`.)
 
 ## The table
 
@@ -173,25 +173,26 @@ Generated; do not edit between the markers.
 #### 1.41 (`GNW13110`, binary)
 
 - protocol: **encryption**: Gen2 -> Gen3
-- protocol: **listserver**: none -> listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape B (login frame inferred, not captured; no evidence for this shape)
+- protocol: **listserver**: none -> listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape S (login frame captured from a real client)
 - protocol: **pli (client ids sent)**: -31 PACKETCOUNT (35 -> 34 ids)
 - props: **own-player props**: +35 BODYIMG, +36 RATING (35 -> 37 ids)
 - props: **other-player props**: +35 BODYIMG, +36 RATING (23 -> 25 ids)
 - props: **npc_max**: 34 -> 35
+- levels: **nw**: no -> yes
 - life: **death**: none -> 2.05 rules (name-group test)
 - life: **combat**: 1.39 rules (one swing step a tick, the rest 2.05) -> 2.05 rules
 - ui: **server_list**: direct (www.graalonline.com:14900) -> one list
 - ui: **gs1_commands**: 111 -> 126
 - unknown (drops): the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced
 - unknown (listserver): original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured
-- unknown (listserver): login frame inferred, not captured, and no evidence for its shape: Seihai keeps shape B (id 0 `newmain`, then id 1 with the account), what it sent before the lab captures; whether a real 1.41 sends the account to the listserver is unknown
+- unknown (listserver): the real 1.41 rev 1 sent nothing to the lab listserver, which spoke first (shape S, 2026-10-30); whether the public service speaks first to a silent client is not known, so after 3 s with no reply Seihai sends shape B (id 0 `newmain`, then id 1 with the account), which 14923 answered on 2026-10-25
 - unknown (life): death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)
-- unknown (levels): the version-profile TOML lists GLEVNW01 (.nw) as readable by 1.41 and 1.42 and drops it at 2.00; the rows of 1.33 to 2.04 have .graal only
-- source: binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126
+- unknown (levels): the .nw loader was found by a string and function scan of the binary; no .nw level was loaded in a real 1.41
+- source: binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126, .nw (GLEVNW01) loader
 
 #### 1.42 (`GNW08011`, binary, linked 2001-01-10)
 
-- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape B (login frame inferred, not captured; no evidence for this shape) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured)
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape S (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +42 NEWWORLDTIME, +44 HASNPCSERVER, +45 FILEUPTODATE, +150 NPCDEL2, +151 HIDENPCS, +153 SAY2 (45 -> 51 ids)
 - protocol: **pli (client ids sent)**: +34 UPDATEFILE (34 -> 35 ids)
 - life: **death**: 2.05 rules (name-group test) -> none
@@ -202,13 +203,13 @@ Generated; do not edit between the markers.
 - mannerisms: **mannerisms**: 1.39 (blink after the hurt pose, hide keeps the carry poses, 4-tile knockback) -> NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses)
 - drops: **drops**: client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE -> server drops (PLO_ITEMADD), pickups go through PLI_ITEMTAKE
 - unknown (listserver): built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured
-- unknown (listserver): login frame inferred, not captured: Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; a real 1.42 frame was never captured, and no run on the public service has used shape A, so the port is assumed
+- unknown (listserver): the real NewMain 26 sent shape A (id 0 `newmain` only) to the lab listserver (2026-10-30), which Seihai sends; no run on the public service has used shape A, so the port is assumed
 - source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)
 
 #### 2.00 (`GNW24011`, binary, linked 2001-02-01)
 
-- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
+- levels: **nw**: yes -> no
 - life: **death**: none -> 2.05 rules (name-group test)
 - life: **combat**: none -> 2.00 rules (raw sword power, fewer packet gates)
 - ui: **gs1_commands**: 134 -> 142
@@ -217,7 +218,7 @@ Generated; do not edit between the markers.
 - unknown (life): death read in the 2.00 r0 decompile; 2.00 r1 to 2.04 checked by their constants only (timer cap, input gate, dead bit, respawn AP steps). No real 2.00 death was captured yet
 - unknown (listserver): Seihai now sends the real 2.00 frame (shape A, captured in the lab: id 0 `newmain` only, no account). That frame has not been run on the public service. The 2026-10-25 matrix used Seihai's older classic login (shape B), which 14923 answered with a plain zlib id-0 list (4 rows) while 14922 stayed silent; the port is assumed for shape A until a run. A real 2.00's reply was not captured
 - unknown (token): the token is not in gs2lib, so a stock GServer-v2 does not know it
-- source: binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)
+- source: binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, .nw loader dropped, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)
 
 #### 2.01 (`GNW23021`, binary, linked 2001-03-08)
 
@@ -513,19 +514,21 @@ Generated; do not edit between the markers.
 
 #### 5.31r4 (`G3D26090`, binary, linked 2011-01-05)
 
-- no change against the step before
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - unknown (pli): not read; 5.00r7's set is kept
-- unknown (ui): before the warp it draws no tiles (5.24 and 5.30r3 do); Seihai draws them for every lobby build
+- unknown (ui): why it draws no tiles before the warp was not traced in the binary; the lab shows it, and the warp alone brings the tiles back
 - source: unpacked from Themida and lab (clock set back): same PLO set and token as 5.30r3; draws no tiles before the warp
 
 #### 6.00r2 (`G3D26090`, binary, linked 2011-06-12)
 
 - protocol: **plo (server ids handled)**: -165 MOVE, -169 UPGRADEURL (95 -> 93 ids)
 - protocol: **pli (client ids sent)**: +45 PROCESSRUNNING, +48 SHOOT2, +162 RC_UNKNOWN162; -21 PUTNPC, -80 PROFILEGET, -81 PROFILESET (59 -> 59 ids)
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - protocol: **gen5_long_frames**: no -> yes
 - ui: **chat_text**: ChatText { face: Arial, height: 24 } -> ChatText { face: TempusSans, height: 24 }
 - unknown (pli): not read; Linux 6.01r1's set (6.03r7's without 160) is taken
 - unknown (framing): the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
+- unknown (ui): whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
 - source: unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24, 6.x long frame lengths
 
 #### 6.015 (`G3D3007A`, inferred)
@@ -556,9 +559,9 @@ Generated; do not edit between the markers.
 
 #### 6.03r7 (`G3D0311C`, binary, linked 2012-11-16)
 
-- no change against the step before
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - unknown (token): the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)
-- source: unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date
+- source: unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date; draws no tiles before the warp
 
 #### 6.03r7 Linux (`G3D0511C`, binary, linked 2012-11-11)
 
