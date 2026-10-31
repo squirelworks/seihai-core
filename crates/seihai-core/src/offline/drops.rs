@@ -104,7 +104,9 @@ impl OfflineSession {
             for e in items::tick(&mut self.floor_items, self.player_x, self.player_y, can_take) {
                 if let ItemEvent::Taken { item, x, y } = e {
                     self.sound_events.push(SoundEvent { file: "extra.wav".into(), x: x + 1.0, y: y + 1.0 });
-                    if !online || !self.drops.server_take {
+                    // A laid glove, sword or shield is no server item: it
+                    // is given here and nothing is sent (2.05).
+                    if !online || !self.drops.server_take || !items::is_floor_item(item) {
                         self.apply_pickup(item);
                     }
                 }
@@ -125,6 +127,10 @@ impl OfflineSession {
             .into_iter()
             .filter_map(|e| match e {
                 ItemEvent::Rolled { item, x, y } => d.add_to_server.then(|| items::item_add_message(item, x, y)),
+                // A lay: 1.38 on (the builds that tell the server of an item
+                // they add), floor items only.
+                ItemEvent::Laid { item, x, y } => (lay_to_server(d) && items::is_floor_item(item)).then(|| items::item_add_message(item, x, y)),
+                ItemEvent::Taken { item, .. } if !items::is_floor_item(item) => None,
                 ItemEvent::Taken { item, x, y } if d.server_take => Some(items::item_take_message(item, x, y)),
                 ItemEvent::Taken { x, y, .. } => Some(items::item_del_message(x, y)),
                 ItemEvent::Expired { x, y } => d.del_on_expiry.then(|| items::item_del_message(x, y)),
@@ -155,4 +161,11 @@ impl OfflineSession {
             }
         }
     }
+}
+
+/// Whether this build tells the server of an item it lays: 1.38 to 1.41
+/// send the roll, and 1.42 on have the server drop; both send
+/// `PLI_ITEMADD` from their item add. 1.33 to 1.37 use UDP only.
+fn lay_to_server(d: crate::protocol::ItemDrops) -> bool {
+    d.add_to_server || !d.client_roll
 }
