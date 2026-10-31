@@ -136,7 +136,7 @@ impl SessionScripts {
     pub fn sync_player(&mut self, s: &OfflineSession) {
         // The board as it is now: cuts, lifts and the server's board
         // changes all show in `board[]` reads.
-        self.world.core.board = s.current_level.as_ref().map(|l| (0..64 * 64).map(|i| l.tile_id_at(i % 64, i / 64).unwrap_or(0)).collect());
+        self.world.core.board = s.current_level.as_ref().map(|l| l.tile_ids());
         let p = &mut self.world.core.player;
         let (ox, oy) = gmap_origin(s);
         p.x = s.player_x as f64 + ox;
