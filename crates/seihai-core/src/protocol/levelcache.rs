@@ -25,7 +25,7 @@ pub struct CachedLevel {
     pub board: Vec<u16>,
     pub board_lines: Vec<String>,
     pub links: Vec<String>,
-    pub signs: Vec<String>,
+    pub signs: Vec<Vec<u8>>,
 }
 
 /// Levels by lower-case name.

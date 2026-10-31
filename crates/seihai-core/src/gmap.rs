@@ -74,7 +74,7 @@ pub struct LevelSlot {
     pub board: Option<Vec<u16>>,
     pub board_lines: Vec<String>,
     pub links: Vec<String>,
-    pub signs: Vec<String>,
+    pub signs: Vec<Vec<u8>>,
     pub chests: Vec<Vec<u8>>,
 }
 

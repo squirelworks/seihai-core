@@ -940,11 +940,11 @@ impl Level {
 
     /// Add the server's `PLO_LEVELSIGN` records (`x, y, text`, see
     /// [`decode_sign_record`]).
-    pub fn add_server_signs(&mut self, records: &[String]) {
+    pub fn add_server_signs(&mut self, records: &[Vec<u8>]) {
         self.signs.extend(
             records
                 .iter()
-                .filter_map(|r| decode_sign_record(r.as_bytes()))
+                .filter_map(|r| decode_sign_record(r))
                 .map(|(x, y, text)| Sign { x, y, text }),
         );
     }
@@ -1920,10 +1920,15 @@ mod tests {
         assert!(board.chests[0].opened && !board.chests[1].opened);
         assert_eq!((board.chests[1].x, board.chests[1].y, board.chests[1].item.as_str(), board.chests[1].sign_index), (5, 6, "greenrupee", 2));
         // A sign: x 7, y 8, text "AB" (alphabet codes 0, 1).
-        let sign: String = [0x20u8 + 7, 0x20 + 8, 0x20, 0x21].iter().map(|&b| b as char).collect();
-        board.add_server_signs(&[sign]);
-        assert_eq!(board.signs.len(), 1);
+        let sign = vec![0x20u8 + 7, 0x20 + 8, 0x20, 0x21];
+        // The beta4 lab gserver's record for `SIGN 30 22` with the text
+        // "Hello" (2026-10-30): the last byte is 0x80.
+        let beta4 = vec![0x3eu8, 0x36, 0x27, 0x3e, 0x45, 0x45, 0x48, 0x80];
+        board.add_server_signs(&[sign, beta4]);
+        assert_eq!(board.signs.len(), 2);
         assert_eq!((board.signs[0].x, board.signs[0].y, board.signs[0].text.as_str()), (7, 8, "AB"));
+        assert_eq!((board.signs[1].x, board.signs[1].y), (30, 22));
+        assert!(board.signs[1].text.starts_with("Hello"), "{:?}", board.signs[1].text);
     }
 
     #[test]
