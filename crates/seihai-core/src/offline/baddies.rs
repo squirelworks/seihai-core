@@ -125,7 +125,8 @@ impl OfflineSession {
         // The level the props are for is the one now loaded.
         self.baddy_serial = Some(self.level_serial);
         let player = self.player_seed();
-        let i = match self.baddies.iter().position(|b| b.id == id) {
+        let known = self.baddies.iter().position(|b| b.id == id);
+        let i = match known {
             Some(i) => i,
             None => {
                 let mut rng = self.item_rng;
@@ -138,7 +139,11 @@ impl OfflineSession {
         let mut w = self.around(Vec::new());
         let died = baddies[i].apply_props(props, &mut w);
         let sounds = std::mem::take(&mut w.sounds);
-        self.sound_events.extend(sounds);
+        // Mode 9 for a baddy this client no longer has: the leader that
+        // killed it has already played its death.
+        if known.is_some() || !died {
+            self.sound_events.extend(sounds);
+        }
         if died {
             baddies.remove(i);
         }
@@ -221,8 +226,10 @@ impl OfflineSession {
         let ext = self.baddy_image_ext.clone();
         let mut sends = Vec::new();
         for bd in baddies.iter_mut() {
-            bd.tick(&mut w, role.thinks());
-            if role.online && role.leader {
+            let died = bd.tick(&mut w, role.thinks());
+            // The real 2.22 leader's last message for a dying baddy is its
+            // counter at 0; the server then sends mode 9 (`lan-222kill`).
+            if role.online && role.leader && !died {
                 let now = bd.props(&ext);
                 match &bd.sent {
                     // The first tick only keeps the props, as the program
@@ -394,5 +401,50 @@ mod tests {
         assert_eq!(m, [9 + 32, 0x87, 0x79, 0x20, 0x8b, 0x21, b'\n']);
         let m = crate::arrows::arrow_add_message(70.0, 55.5, 3, false, b::ARROW_SPRITE + 3, 0);
         assert_eq!(&m[3..6], [0x23, 0x8e, 0x21]);
+    }
+
+    /// The kill as the real 2.22 leader sends it (`lan-222kill`, testbaddy):
+    /// the hurt carries power with an empty image, mode 3 and counter 7
+    /// after the first knockback step; the death is mode 5 with counter 14
+    /// down to 0, and nothing after it (the server sends mode 9).
+    #[test]
+    fn the_kill_matches_the_2_22_leader() {
+        let mut s = OfflineSession::new();
+        s.current_level = Some(Level::parse("GLEVNW01\n").unwrap());
+        s.item_rng = crate::items::DelphiRandom::new(1);
+        let profile = ClientVersion::V222.profile();
+        s.life.set_rules(profile.life.death);
+        s.combat.set_rules(profile.life.combat);
+        s.baddy_role = BaddyRole { online: true, leader: true };
+        (s.player_x, s.player_y, s.sword_power, s.player_dir) = (30.0, 30.0, 1, crate::offline::DIR_WEST);
+        s.receive_baddy_props(&[0x21, 0x21, 0x7c, 0x22, 0x7c, 0x23, 0x20, 0x24, 0x22, 0x2d, b'b', b'a', b'd', b'd', b'y', b'g', b'r', b'a', b'y', b'.', b'p', b'n', b'g', 0x25, 0x20, 0x26, 0x20, 0x27, 0x2a]);
+        s.tick_baddies(100, &[]);
+        let mut sent: Vec<Vec<u8>> = Vec::new();
+        for _ in 0..2 {
+            let b = &mut s.baddies[0];
+            (b.x, b.y, b.dir, b.mode, b.counter) = (28.5, 30.5, 1, mode::WALK, 20);
+            assert!(s.start_swing());
+            for _ in 0..30 {
+                s.tick_combat(50);
+                s.tick_baddies(50, &[]);
+                sent.extend(s.take_baddy_sends());
+            }
+        }
+        for _ in 0..60 {
+            s.tick_baddies(50, &[]);
+            sent.extend(s.take_baddy_sends());
+        }
+        assert!(s.baddies.is_empty());
+        let has = |m: &Vec<u8>, pairs: &[u8]| pairs.chunks(2).all(|p| m.windows(2).any(|w| w == p));
+        // The hurts: power 1 then 0 with the empty image, mode 3, counter 7.
+        let hurts: Vec<&Vec<u8>> = sent.iter().filter(|m| has(m, &[0x25, 0x23, 0x26, 0x27])).collect();
+        assert_eq!(hurts.len(), 2, "{sent:?}");
+        assert!(hurts[0].windows(3).any(|w| w == [0x24, 0x21, 0x20]));
+        assert!(hurts[1].windows(3).any(|w| w == [0x24, 0x20, 0x20]));
+        assert!(hurts.iter().all(|m| m.windows(2).any(|w| w[0] == 0x21) && m.windows(2).any(|w| w[0] == 0x22)), "moved in the hurt think");
+        // The death: mode 5 with counter 14, and the last message counter 0.
+        let die = sent.iter().position(|m| m[..] == [0x2f, 0x21, 0x25, 0x25, 0x26, 0x2e, b'\n']).expect("death message");
+        assert_eq!(sent.last().unwrap()[..], [0x2f, 0x21, 0x26, 0x20, b'\n']);
+        assert_eq!(sent.len() - die, 15);
     }
 }
