@@ -122,6 +122,15 @@ mod tests {
         assert!(!s.paused, "the hit gate is unchanged");
         s.reading = None;
         assert_eq!(s.pause_status(), 0);
+        // Pause and an open sign share the bit: ending one keeps it while
+        // the other lasts.
+        s.reading = Some("Hello".into());
+        s.toggle_pause();
+        s.reading = None;
+        assert_eq!(s.pause_status(), PAUSED_STATUS, "closing the sign while paused");
+        s.reading = Some("Hello".into());
+        s.toggle_pause();
+        assert_eq!(s.pause_status(), PAUSED_STATUS, "unpausing while a sign is open");
     }
 
     #[test]
