@@ -458,12 +458,11 @@ Generated; do not edit between the markers.
 - protocol: **plo (server ids handled)**: +107 BOARDLAYER, +108 UNKNOWN108; -41 STARTMESSAGE (98 -> 99 ids)
 - protocol: **pli (client ids sent)**: +162 RC_UNKNOWN162 (57 -> 58 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends mac,"","",""
-- unknown (plo): the note gives the set as 4.20r8's without 41 and 196 (99 ids) but counts 97; the binary was not re-read, the listed set is kept. 41 may be handled outside the switch
-- unknown (pli): the Mac send ids were not read; 4.20r8's set is taken
+- unknown (pli): only 162 (the answer to 108) was confirmed in the Mac binary; the rest of 4.20r8's set is taken
 - unknown (login): the fourth field is empty in the binary; Seihai sends it, like the other two, as an empty quoted string
 - unknown (live): never run (PowerPC)
 - unknown (3d): Torque protocol 21 is not modelled here; seihai-ato::torque has its profile
-- source: binary (Mac OS X PPC, not run): 4.20r8's PLO set without 41 and 196, login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty>
+- source: binary (Mac OS X PPC, not run): 4.20r8's PLO set without 41 and 196 (a 97-case switch plus 100 and 108 before it; 108 subtype 0 answers with 162), login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty>
 
 #### 4.20r8 (`G3D20126`, binary, linked 2007-01)
 
