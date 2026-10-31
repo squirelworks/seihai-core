@@ -491,7 +491,7 @@ Generated; do not edit between the markers.
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - protocol: **gen5_round_down**: no -> yes
 - unknown (pli): not read; 5.00r7's set is kept
-- unknown (framing): a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
+- unknown (framing): a server must step as 5.12 does; GServer-v2 rounds up, so Seihai pads its zlib bodies to a multiple of 4, where both counts agree
 - source: unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed
 
 #### 5.24r4 (`G3D15010`, binary, linked 2010-02-01)

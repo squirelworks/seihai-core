@@ -15,6 +15,54 @@ pub fn zlib_compress(data: &[u8]) -> io::Result<Vec<u8>> {
     enc.finish()
 }
 
+/// Compress `data` with zlib into a stream whose length is a multiple of 4.
+///
+/// 5.12 steps the gen-5 cipher once per whole 4-byte group of a compressed
+/// body (`len / 4`), and GServer-v2 once per started group
+/// (`len.div_ceil(4)`). The two agree only when the length is a multiple of
+/// 4 or the body is 16 bytes or longer (both stop at 4 steps). 5.12 sends
+/// even a one-message body compressed, so a short body put the two sides
+/// out of step, and GServer-v2 could read nothing Seihai sent after it.
+///
+/// The stream is the normal deflate output, sync-flushed so it ends on a
+/// byte, then 0–3 empty stored blocks (5 bytes each) and an empty final
+/// stored block, so any zlib reader inflates it to the same bytes.
+pub fn zlib_compress_len4(data: &[u8]) -> io::Result<Vec<u8>> {
+    let mut c = flate2::Compress::new(Compression::default(), true);
+    let mut out = Vec::with_capacity(data.len() + 64);
+    let mut input = data;
+    loop {
+        out.reserve(64);
+        let before = c.total_in();
+        c.compress_vec(input, &mut out, flate2::FlushCompress::Sync).map_err(io::Error::other)?;
+        input = &input[(c.total_in() - before) as usize..];
+        if input.is_empty() && out.len() < out.capacity() {
+            break;
+        }
+    }
+    // Stream so far + k empty blocks of 5 + the final block of 5 + Adler-32.
+    let k = (4 - (out.len() + 9) % 4) % 4;
+    for _ in 0..k {
+        out.extend_from_slice(&[0x00, 0x00, 0x00, 0xFF, 0xFF]);
+    }
+    out.extend_from_slice(&[0x01, 0x00, 0x00, 0xFF, 0xFF]);
+    out.extend_from_slice(&adler32(data).to_be_bytes());
+    Ok(out)
+}
+
+fn adler32(data: &[u8]) -> u32 {
+    let (mut a, mut b) = (1u32, 0u32);
+    for chunk in data.chunks(5552) {
+        for &x in chunk {
+            a += x as u32;
+            b += a;
+        }
+        a %= 65521;
+        b %= 65521;
+    }
+    (b << 16) | a
+}
+
 /// Compress `data` with zlib at the best level: the stream starts `78 DA`,
 /// as in the real clients' listserver frames (checked on real 2.05, 2.17.1,
 /// 2.22 and 2.31 frames). Same deflate body and checksum as the default
@@ -114,5 +162,20 @@ mod tests {
         let mut cur = std::io::Cursor::new(frame);
         let got = read_zlib_frame(&mut cur).unwrap();
         assert_eq!(got, body);
+    }
+
+    #[test]
+    fn len4_zlib_is_a_multiple_of_4_and_inflates_the_same() {
+        for n in 0..200usize {
+            let data: Vec<u8> = (0..n).map(|i| (i * 7 % 13) as u8 + b'a').collect();
+            let z = zlib_compress_len4(&data).unwrap();
+            assert_eq!(z.len() % 4, 0, "{n} bytes gave {}", z.len());
+            assert_eq!(zlib_decompress(&z).unwrap(), data, "{n} bytes");
+            let mut d = flate2::Decompress::new(true);
+            let mut back = Vec::with_capacity(n + 16);
+            let st = d.decompress_vec(&z, &mut back, flate2::FlushDecompress::Finish).unwrap();
+            assert_eq!(st, flate2::Status::StreamEnd);
+            assert_eq!(d.total_in() as usize, z.len(), "no bytes left over");
+        }
     }
 }
