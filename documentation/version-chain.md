@@ -513,19 +513,21 @@ Generated; do not edit between the markers.
 
 #### 5.31r4 (`G3D26090`, binary, linked 2011-01-05)
 
-- no change against the step before
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - unknown (pli): not read; 5.00r7's set is kept
-- unknown (ui): before the warp it draws no tiles (5.24 and 5.30r3 do); Seihai draws them for every lobby build
+- unknown (ui): why it draws no tiles before the warp was not traced in the binary; the lab shows it, and the warp alone brings the tiles back
 - source: unpacked from Themida and lab (clock set back): same PLO set and token as 5.30r3; draws no tiles before the warp
 
 #### 6.00r2 (`G3D26090`, binary, linked 2011-06-12)
 
 - protocol: **plo (server ids handled)**: -165 MOVE, -169 UPGRADEURL (95 -> 93 ids)
 - protocol: **pli (client ids sent)**: +45 PROCESSRUNNING, +48 SHOOT2, +162 RC_UNKNOWN162; -21 PUTNPC, -80 PROFILEGET, -81 PROFILESET (59 -> 59 ids)
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - protocol: **gen5_long_frames**: no -> yes
 - ui: **chat_text**: ChatText { face: Arial, height: 24 } -> ChatText { face: TempusSans, height: 24 }
 - unknown (pli): not read; Linux 6.01r1's set (6.03r7's without 160) is taken
 - unknown (framing): the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
+- unknown (ui): whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
 - source: unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24, 6.x long frame lengths
 
 #### 6.015 (`G3D3007A`, inferred)
@@ -556,9 +558,9 @@ Generated; do not edit between the markers.
 
 #### 6.03r7 (`G3D0311C`, binary, linked 2012-11-16)
 
-- no change against the step before
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - unknown (token): the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)
-- source: unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date
+- source: unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date; draws no tiles before the warp
 
 #### 6.03r7 Linux (`G3D0511C`, binary, linked 2012-11-11)
 
