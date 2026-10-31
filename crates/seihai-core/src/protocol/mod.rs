@@ -20,6 +20,7 @@ pub mod offline_builds;
 mod list;
 pub mod flagset;
 pub mod login;
+pub mod seclogin;
 mod profile;
 mod props;
 pub mod showimg;
