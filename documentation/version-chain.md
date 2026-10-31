@@ -434,4 +434,69 @@ Generated; do not edit between the markers.
 - unknown (login): OSTYPE mac is from the binary; the code page (1250), the files in the first frame (bigmap.txt, minimap.txt) and the head and default-weapon checks are 3.04's
 - unknown (3d): the 3D mode (Torque GameConnection, Graal3D protocol 19, on UDP listed port + 1) is not modelled here; seihai-ato::torque has its profile
 - source: binary (Mac OS X PPC Mach-O), not run: OSTYPE mac; PLO 67, 74, 82, 104, 131-134, 187 and MOVE2 (189) in, 44 out; RC file browser, script upload and text request ids; X2/Y2/Z2; UDP off in the shipped prefs
+
+#### 5.00r7 (`G3D22067`, binary, linked 2007-07)
+
+- protocol: **listserver**: listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame inferred, not captured) -> none
+- protocol: **plo (server ids handled)**: +105 UPDATEPACKAGESIZE, +106 UPDATEPACKAGEDONE, +107 BOARDLAYER, +140 NPCWEAPONSCRIPT, +170 GHOSTMODE, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +190 SERVERLISTCONNECTED, +191 SHOOT2, +193 UNKNOWN193, +194 CLEARWEAPONS, +195 LOADGANI, +197 LOADSCRIPT; -100 RAWDATA (88 -> 100 ids)
+- protocol: **pli (client ids sent)**: +44 PROCESSLIST, +47 VERIFYWANTSEND, +79 RC_CHAT, +92 RC_FILEBROWSER_DOWN, +130 REQUESTUPDATEBOARD, +159 UPDATEPACKAGEREQUESTFILE, +161 UPDATECLASS; -40 SHOOT, -43 MUTEPLAYER (54 -> 59 ids)
+- protocol: **login frame**: head and default-weapon files, props without head or colours with OS mac and code page 1250, status icons -> none
+- protocol: **login lobby**: none -> first server "Login", nothing drawn until 178, login line ends win,"","",""
+- ui: **server_list**: 3 tabs -> direct (loginserver.graalonline.com:14900)
+- ui: **chat_text**: ChatText { face: TempusSans, height: 24 } -> ChatText { face: Arial, height: 24 }
+- unknown (pli): only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
+- unknown (login): Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); whether a server accepts all three empty is not known
+- unknown (login): the base-file requests after the language (47 or 23 basepackage.gupd) are not sent
+- unknown (props): own and other prop sets are 3.153's; no 5.x parser was read
+- unknown (ui): chat is a bold sans serif in the lab; its cell height is not known, 24 is kept
+- unknown (3d): the Torque 3D mode (Graal3DEngine.dll, protocol 24) is not modelled
+- source: binary (unpacked engine DLL) and lab (lab-v5-2026-10-30): PLO set of 100 ids, send ids from the send wrappers, login id 5 with G3D22067 and the win,<3 md5> list in the plain zlib frame, then 37 in its own gen-5 frame; Login mode until 178
+
+#### 5.12 (`G3D14097`, binary, linked 2007-10-19)
+
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
+- protocol: **gen5_round_down**: no -> yes
+- unknown (pli): not read; 5.00r7's set is kept
+- unknown (framing): a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
+- source: unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed
+
+#### 5.24r4 (`G3D15010`, binary, linked 2010-02-01)
+
+- protocol: **plo (server ids handled)**: +109 UNKNOWN109, +198 SERVEROPTIONS; -75 PROFILE, -132 UNKNOWN132, -133 UNKNOWN133, -171 BIGMAP, -193 UNKNOWN193 (100 -> 97 ids)
+- protocol: **gen5_round_down**: yes -> no
+- unknown (pli): not read; 5.00r7's set is kept
+- unknown (files): stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md
+- unknown (plo): 109 (probably a file redirect) and 198 (one GINT5) are in the set but not decoded
+- source: unpacked from MoleBox and lab: 97 PLO ids (75, 132, 133, 171 and 193 out, 109 and 198 in), one MSVC exe, short bodies sent uncompressed as 2.22, font=Arial
+
+#### 5.30r3 (`G3D26090`, binary, linked 2010-10-18)
+
+- protocol: **plo (server ids handled)**: -41 STARTMESSAGE, -181 UNKNOWN181 (97 -> 95 ids)
+- unknown (pli): not read; 5.00r7's set is kept
+- source: unpacked from Themida and lab (clock set back): 95 PLO ids (41 and 181 out), bundles no files
+
+#### 5.31r4 (`G3D26090`, binary, linked 2011-01-05)
+
+- no change against the step before
+- unknown (pli): not read; 5.00r7's set is kept
+- unknown (ui): before the warp it draws no tiles (5.24 and 5.30r3 do); Seihai draws them for every lobby build
+- source: unpacked from Themida and lab (clock set back): same PLO set and token as 5.30r3; draws no tiles before the warp
+
+#### 6.00r2 (`G3D26090`, binary, linked 2011-06-12)
+
+- protocol: **plo (server ids handled)**: -165 MOVE, -169 UPGRADEURL (95 -> 93 ids)
+- protocol: **pli (client ids sent)**: +45 PROCESSRUNNING, +48 SHOOT2, +162 RC_UNKNOWN162; -21 PUTNPC, -80 PROFILEGET, -81 PROFILESET (59 -> 59 ids)
+- ui: **chat_text**: ChatText { face: Arial, height: 24 } -> ChatText { face: TempusSans, height: 24 }
+- unknown (pli): not read; Linux 6.01r1's set (6.03r7's without 160) is taken
+- unknown (framing): the 0xFFFF long-frame form of 6.x is not handled
+- source: unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24
+
+#### 6.03r7 (`G3D0311C`, binary, linked 2012-11-16)
+
+- protocol: **plo (server ids handled)**: +111 SETNETCOOKIE; -175 SHOOT, -184 TAKESCREENSHOT (93 -> 92 ids)
+- protocol: **pli (client ids sent)**: +160 RC_FOLDERDELETE (59 -> 60 ids)
+- unknown (token): the Linux 6.03r7 sends G3D0511C; this row is the Windows build
+- unknown (plo): 111 (writes creationtime.dat) is in the set but not decoded
+- unknown (framing): the 0xFFFF long-frame form of 6.x is not handled
+- source: unpacked from Themida and lab: 92 PLO ids (175 and 184 out, 111 in), equal to Linux 6.03r7; send ids from Linux 6.03r7 (same release); no expiry date
 <!-- version-chain:end -->

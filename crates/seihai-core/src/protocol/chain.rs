@@ -27,6 +27,7 @@ use super::profile::{
     ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, TAMPER_217, TAMPER_222,
     TAMPER_230, TAMPER_231,
 };
+use super::lobby::{Lobby, LOBBY_500, LOBBY_512};
 use super::login::{LoginInfo, LOGIN_217, LOGIN_222, LOGIN_231, LOGIN_304, LOGIN_3153};
 use super::showimg::ShowImgInfo;
 use super::tampercheck::TamperInfo;
@@ -111,6 +112,8 @@ pub struct Delta {
     pub tamper: Option<Option<TamperInfo>>,
     pub showimg: Option<Option<ShowImgInfo>>,
     pub login: Option<Option<LoginInfo>>,
+    pub lobby: Option<Option<Lobby>>,
+    pub gen5_round_down: Option<bool>,
     pub udp: Option<bool>,
     pub udp_off_by_default: Option<bool>,
     // Props.
@@ -168,6 +171,8 @@ impl Delta {
         tamper: None,
         showimg: None,
         login: None,
+        lobby: None,
+        gen5_round_down: None,
         udp: None,
         udp_off_by_default: None,
         own_props: IdDelta::NONE,
@@ -262,6 +267,8 @@ pub const fn apply(prev: VersionProfile, s: &Step) -> VersionProfile {
     p.protocol.tamper = pick(p.protocol.tamper, d.tamper);
     p.protocol.showimg = pick(p.protocol.showimg, d.showimg);
     p.protocol.login = pick(p.protocol.login, d.login);
+    p.protocol.lobby = pick(p.protocol.lobby, d.lobby);
+    p.protocol.gen5_round_down = pick(p.protocol.gen5_round_down, d.gen5_round_down);
     p.protocol.udp = pick(p.protocol.udp, d.udp);
     p.protocol.udp_off_by_default = pick(p.protocol.udp_off_by_default, d.udp_off_by_default);
 
@@ -329,6 +336,8 @@ pub const ORIGIN: VersionProfile = VersionProfile {
         tamper: None,
         showimg: None,
         login: None,
+        lobby: None,
+        gen5_round_down: false,
         // No direct data packages before 1.28 beta 2.
         udp: false,
         udp_off_by_default: false,
@@ -1028,6 +1037,141 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "3d", what: "the 3D mode (Torque GameConnection, Graal3D protocol 19, on UDP listed port + 1) is not modelled here; seihai-ato::torque has its profile" },
         ],
     },
+    // The 5.x and 6.x Windows builds (Graal_analysis `protocol/v5x-clients.md`,
+    // `v6x-clients.md`, `v5v6-windows-unpacked.md`, `v5v6-lab-play.md`,
+    // `version-profiles/5.00-6.03.toml`). They follow 3.153 in the chain, but
+    // their 3D mode is not modelled and they play on the flat path: no
+    // listserver protocol, a game server named `Login` first, and a server
+    // warp (178) before anything but the level is drawn. 6.036 has no binary
+    // and no token, so it has no step (see `documentation/v5v6-profiles.md`).
+    Step {
+        version: ClientVersion::V500R7,
+        label: "5.00r7",
+        token: "G3D22067",
+        date: "2007-07",
+        basis: Basis::Binary,
+        delta: Delta {
+            // Against 3.153: 100 out; 105-107, 140, 170, 182, 183, 190, 191, 193-195 and 197 in.
+            plo: IdDelta::plus_minus(&[105, 106, 107, 140, 170, 182, 183, 190, 191, 193, 194, 195, 197], &[100]),
+            // The binary's constant send ids plus 11 and 38 (lab), with the ids both
+            // 3.153 and 6.03r7 send taken as sent; 40 and 43 are in neither 5.00r7 nor 6.03r7.
+            pli: IdDelta::plus_minus(&[44, 47, 79, 92, 130, 159, 161], &[40, 43]),
+            // No listserver: the game server named `Login` serves the list as scripted GUI.
+            listserver: Some(None),
+            login: Some(None),
+            lobby: Some(Some(LOBBY_500)),
+            server_list: Some(ServerList::Direct { default: "loginserver.graalonline.com:14900" }),
+            chat_text: Some(ChatText { face: ChatFace::Arial, height: 24 }),
+            ..Delta::NONE
+        },
+        source: "binary (unpacked engine DLL) and lab (lab-v5-2026-10-30): PLO set of 100 ids, send ids from the send wrappers, login id 5 with G3D22067 and the win,<3 md5> list in the plain zlib frame, then 37 in its own gen-5 frame; Login mode until 178",
+        unknown: &[
+            Unknown { area: "pli", what: "only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them" },
+            Unknown { area: "login", what: "Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); whether a server accepts all three empty is not known" },
+            Unknown { area: "login", what: "the base-file requests after the language (47 or 23 basepackage.gupd) are not sent" },
+            Unknown { area: "props", what: "own and other prop sets are 3.153's; no 5.x parser was read" },
+            Unknown { area: "ui", what: "chat is a bold sans serif in the lab; its cell height is not known, 24 is kept" },
+            Unknown { area: "3d", what: "the Torque 3D mode (Graal3DEngine.dll, protocol 24) is not modelled" },
+        ],
+    },
+    Step {
+        version: ClientVersion::V512,
+        label: "5.12",
+        token: "G3D14097",
+        date: "2007-10-19",
+        basis: Basis::Binary,
+        delta: Delta {
+            lobby: Some(Some(LOBBY_512)),
+            gen5_round_down: Some(true),
+            ..Delta::NONE
+        },
+        source: "unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed",
+        unknown: &[
+            Unknown { area: "pli", what: "not read; 5.00r7's set is kept" },
+            Unknown { area: "framing", what: "a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy" },
+        ],
+    },
+    Step {
+        version: ClientVersion::V524R4,
+        label: "5.24r4",
+        token: "G3D15010",
+        date: "2010-02-01",
+        basis: Basis::Binary,
+        delta: Delta {
+            plo: IdDelta::plus_minus(&[109, 198], &[75, 132, 133, 171, 193]),
+            gen5_round_down: Some(false),
+            ..Delta::NONE
+        },
+        source: "unpacked from MoleBox and lab: 97 PLO ids (75, 132, 133, 171 and 193 out, 109 and 198 in), one MSVC exe, short bodies sent uncompressed as 2.22, font=Arial",
+        unknown: &[
+            Unknown { area: "pli", what: "not read; 5.00r7's set is kept" },
+            Unknown { area: "files", what: "stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md" },
+            Unknown { area: "plo", what: "109 (probably a file redirect) and 198 (one GINT5) are in the set but not decoded" },
+        ],
+    },
+    Step {
+        version: ClientVersion::V530R3,
+        label: "5.30r3",
+        token: "G3D26090",
+        date: "2010-10-18",
+        basis: Basis::Binary,
+        delta: Delta {
+            plo: IdDelta::plus_minus(&[], &[41, 181]),
+            ..Delta::NONE
+        },
+        source: "unpacked from Themida and lab (clock set back): 95 PLO ids (41 and 181 out), bundles no files",
+        unknown: &[Unknown { area: "pli", what: "not read; 5.00r7's set is kept" }],
+    },
+    Step {
+        version: ClientVersion::V531R4,
+        label: "5.31r4",
+        token: "G3D26090",
+        date: "2011-01-05",
+        basis: Basis::Binary,
+        delta: Delta::NONE,
+        source: "unpacked from Themida and lab (clock set back): same PLO set and token as 5.30r3; draws no tiles before the warp",
+        unknown: &[
+            Unknown { area: "pli", what: "not read; 5.00r7's set is kept" },
+            Unknown { area: "ui", what: "before the warp it draws no tiles (5.24 and 5.30r3 do); Seihai draws them for every lobby build" },
+        ],
+    },
+    Step {
+        version: ClientVersion::V600R2,
+        label: "6.00r2",
+        token: "G3D26090",
+        date: "2011-06-12",
+        basis: Basis::Binary,
+        delta: Delta {
+            plo: IdDelta::plus_minus(&[], &[165, 169]),
+            // Linux 6.01r1's set (three months later; 6.00r2 is behind Themida).
+            pli: IdDelta::plus_minus(&[45, 48, 162], &[21, 80, 81]),
+            chat_text: Some(ChatText { face: ChatFace::TempusSans, height: 24 }),
+            ..Delta::NONE
+        },
+        source: "unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24",
+        unknown: &[
+            Unknown { area: "pli", what: "not read; Linux 6.01r1's set (6.03r7's without 160) is taken" },
+            Unknown { area: "framing", what: "the 0xFFFF long-frame form of 6.x is not handled" },
+        ],
+    },
+    Step {
+        version: ClientVersion::V603R7,
+        label: "6.03r7",
+        token: "G3D0311C",
+        date: "2012-11-16",
+        basis: Basis::Binary,
+        delta: Delta {
+            plo: IdDelta::plus_minus(&[111], &[175, 184]),
+            pli: IdDelta::plus(&[160]),
+            ..Delta::NONE
+        },
+        source: "unpacked from Themida and lab: 92 PLO ids (175 and 184 out, 111 in), equal to Linux 6.03r7; send ids from Linux 6.03r7 (same release); no expiry date",
+        unknown: &[
+            Unknown { area: "token", what: "the Linux 6.03r7 sends G3D0511C; this row is the Windows build" },
+            Unknown { area: "plo", what: "111 (writes creationtime.dat) is in the set but not decoded" },
+            Unknown { area: "framing", what: "the 0xFFFF long-frame form of 6.x is not handled" },
+        ],
+    },
 ];
 
 /// The resolved rows, one per step.
@@ -1207,6 +1351,17 @@ fn login_text(l: &Option<LoginInfo>) -> String {
     }
 }
 
+fn lobby_text(l: &Option<Lobby>) -> String {
+    match l {
+        None => "none".into(),
+        Some(l) => format!(
+            "first server {:?}, nothing drawn until 178, login line ends {}",
+            l.first_server,
+            String::from_utf8_lossy(&l.login_tail())
+        ),
+    }
+}
+
 fn death_text(d: &Option<DeathRules>) -> String {
     match d {
         None => "none".into(),
@@ -1249,6 +1404,8 @@ pub fn diff(a: &VersionProfile, b: &VersionProfile) -> Vec<Change> {
     value_change(&mut o, "protocol", "tamper", &pa.tamper, &pb.tamper, tamper_text);
     value_change(&mut o, "protocol", "showimg (id 24)", &pa.showimg, &pb.showimg, showimg_text);
     value_change(&mut o, "protocol", "login frame", &pa.login, &pb.login, login_text);
+    value_change(&mut o, "protocol", "login lobby", &pa.lobby, &pb.lobby, lobby_text);
+    value_change(&mut o, "protocol", "gen5_round_down", &pa.gen5_round_down, &pb.gen5_round_down, yes_no);
     value_change(&mut o, "protocol", "udp", &pa.udp, &pb.udp, yes_no);
     value_change(&mut o, "protocol", "udp_off_by_default", &pa.udp_off_by_default, &pb.udp_off_by_default, yes_no);
     let (ra, rb) = (&a.props, &b.props);
@@ -1543,8 +1700,8 @@ mod tests {
             date: "",
             basis: Basis::Inferred,
             delta: Delta {
-                plo: IdDelta::plus(&[190]),
-                pli: IdDelta::plus_minus(&[47], &[24]),
+                plo: IdDelta::plus(&[192]),
+                pli: IdDelta::plus_minus(&[31], &[24]),
                 npc_max: Some(80),
                 ..Delta::NONE
             },
@@ -1552,8 +1709,8 @@ mod tests {
             unknown: &[Unknown { area: "all", what: "made up" }],
         };
         let p = apply(last, &next);
-        assert!(p.protocol.plo.contains(190) && !last.protocol.plo.contains(190));
-        assert!(p.protocol.pli.contains(47) && !p.protocol.pli.contains(24));
+        assert!(p.protocol.plo.contains(192) && !last.protocol.plo.contains(192));
+        assert!(p.protocol.pli.contains(31) && !p.protocol.pli.contains(24));
         assert_eq!(p.props.npc_max, 80);
         // Everything the step does not mention is the last row.
         assert_eq!(p.ui, last.ui);

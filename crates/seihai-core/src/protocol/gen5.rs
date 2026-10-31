@@ -33,6 +33,8 @@ pub enum Gen5Comp {
 pub struct Gen5 {
     it: u32,
     key: u8,
+    /// 5.12's step count on zlib and bz2 bodies (see [`Self::round_down`]).
+    round_down: bool,
 }
 
 impl Gen5 {
@@ -41,13 +43,31 @@ impl Gen5 {
         Self {
             it: GEN3_SEED,
             key,
+            round_down: false,
         }
+    }
+
+    /// The same cipher with 5.12's step count: on zlib (`0x04`) and bz2
+    /// (`0x06`) bodies the iterator steps once per whole 4-byte group
+    /// (`len / 4`, rounded down, still at most 4), and a partial last group
+    /// is left as it is. Uncompressed bodies step as in every other build.
+    /// Read from 5.12's frame decoder; the lab proxy that let 5.12 play on
+    /// GServer-v2 decodes it this way (Graal_analysis
+    /// `protocol/v5v6-lab-play.md`).
+    pub fn round_down(mut self) -> Self {
+        self.round_down = true;
+        self
+    }
+
+    /// True for 5.12's step count.
+    pub fn is_round_down(&self) -> bool {
+        self.round_down
     }
 
     /// Resume from a known iterator state (for replaying captures that
     /// start mid-session).
     pub fn with_state(it: u32, key: u8) -> Self {
-        Self { it, key }
+        Self { it, key, round_down: false }
     }
 
     /// Current iterator state.
@@ -68,7 +88,8 @@ impl Gen5 {
             Gen5Comp::None => 12,
             Gen5Comp::Zlib | Gen5Comp::Bz2 => 4,
         };
-        for chunk in body.chunks_mut(4).take(limit) {
+        let groups = if self.round_down && comp != Gen5Comp::None { body.len() / 4 } else { body.len().div_ceil(4) };
+        for chunk in body.chunks_mut(4).take(groups.min(limit)) {
             self.it = self.it.wrapping_mul(GEN3_MUL).wrapping_add(self.key as u32);
             for (b, k) in chunk.iter_mut().zip(self.it.to_le_bytes()) {
                 *b ^= k;
@@ -191,6 +212,31 @@ mod tests {
         assert_ne!(encoded, body);
         let decoded = dec.decode(encoded, Gen5Comp::Zlib);
         assert_eq!(decoded, body);
+    }
+
+    /// 5.12: a 7-byte zlib body steps once and leaves bytes 4 to 6 alone; a
+    /// raw body steps as before.
+    #[test]
+    fn round_down_on_compressed_only() {
+        let mut down = Gen5::new(0x4B).round_down();
+        let mut up = Gen5::new(0x4B);
+        let mut a = vec![0u8; 7];
+        let mut b = vec![0u8; 7];
+        down.xor_body(&mut a, Gen5Comp::Zlib);
+        up.xor_body(&mut b, Gen5Comp::Zlib);
+        assert_eq!(a[..4], b[..4]);
+        assert_eq!(a[4..], [0, 0, 0]);
+        assert_ne!(down.state(), up.state());
+        let mut once = Gen5::new(0x4B);
+        once.xor_body(&mut [0u8; 4], Gen5Comp::Zlib);
+        assert_eq!(down.state(), once.state());
+        // A whole number of groups, or a raw body, steps the same either way.
+        let (mut d2, mut u2) = (Gen5::new(9).round_down(), Gen5::new(9));
+        d2.xor_body(&mut [0u8; 8], Gen5Comp::Zlib);
+        u2.xor_body(&mut [0u8; 8], Gen5Comp::Zlib);
+        d2.xor_body(&mut [0u8; 7], Gen5Comp::None);
+        u2.xor_body(&mut [0u8; 7], Gen5Comp::None);
+        assert_eq!(d2.state(), u2.state());
     }
 
     #[test]

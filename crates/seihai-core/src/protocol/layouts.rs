@@ -189,6 +189,17 @@ pub fn parse_server_warp(payload: &[u8]) -> Option<ServerWarp> {
     Some(ServerWarp { name: latin1(name), host: latin1(host), port: latin1(port) })
 }
 
+/// `PLO_SERVERWARP` (178) as the 5.x and 6.x lobby builds read it: the same
+/// four fields, split on commas only (see
+/// [`super::lobby::split_warp_fields`]), so `0,Lab Server,127.0.0.1,14900`
+/// keeps the name `Lab Server`. Fewer than four fields is no warp, as for
+/// the 2.x reader.
+pub fn parse_server_warp_lobby(payload: &[u8]) -> Option<ServerWarp> {
+    let f = super::lobby::split_warp_fields(payload);
+    let [_, name, host, port, ..] = &f[..] else { return None };
+    Some(ServerWarp { name: latin1(name), host: latin1(host), port: latin1(port) })
+}
+
 /// `PLO_SHOWIMG` (32): `GSHORT` sender id, then the sender's `PLI_SHOWIMGPLAYER`
 /// payload unchanged. GServer-v2 forwards the payload as it came (a real
 /// 2.31 client's is the one byte 9) to every other player in the level
