@@ -278,6 +278,16 @@ pub struct OfflineSession {
     /// `seteffect red,green,blue,alpha`: the colour the map is shaded with
     /// (default 0,0,0,0, no shading).
     pub screen_effect: [f32; 4],
+    /// `freezeplayer time`: milliseconds left in which the player cannot
+    /// move. 0 when not frozen.
+    pub script_freeze_ms: u64,
+    /// `hideplayer time`: milliseconds left in which the player is not
+    /// drawn. 0 when shown.
+    pub script_hide_ms: u64,
+    /// `showstats bits`: the status bar parts that show (the HUD's bit
+    /// layout, `documentation/hud.md`). `None` until a script sets it:
+    /// everything shows.
+    pub stats: Option<u16>,
     /// Images a weapon script put up with `showimg`: weapons act as the
     /// player, so these sit on the player's level at the player's height.
     /// Cleared when a level is loaded.
@@ -591,6 +601,9 @@ impl OfflineSession {
             sitting: false,
             sleeping: false,
             screen_effect: [0.0; 4],
+            script_freeze_ms: 0,
+            script_hide_ms: 0,
+            stats: None,
             player_images: Vec::new(),
             lava_ticks: 0,
             lava_ms: 0,
