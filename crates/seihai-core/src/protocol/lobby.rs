@@ -41,10 +41,12 @@ pub struct Lobby {
 /// the 4.x engines; `win,<md5>,"",<md5>` in the 5.00r7 lab capture).
 pub const LOBBY_404: Lobby = Lobby { first_server: "Login", platform: "win", os_version: None, after_login: Some(LOBBY_LOGIN_4X) };
 /// The Mac 4.20r6: `mac`, a hash of the Ethernet MAC, a hash of
-/// `stat("/etc")` and an empty fourth field (read in the binary, never run).
-/// Its after-login messages are taken from the Windows 4.x engines, with
-/// `OSTYPE` `mac` (the value 3.153's Mac binary writes).
-pub const LOBBY_420_MAC: Lobby = Lobby { platform: "mac", after_login: Some(LobbyLogin { os_props: ("mac", 1252), ..LOBBY_LOGIN_4X }), ..LOBBY_404 };
+/// `stat("/etc")` and an empty fourth field (read in the binary; the lab run
+/// on Mac OS X 10.4 sent `mac,"",<32 hex>,""`). Its after-login messages are
+/// taken from the Windows 4.x engines, with `OSTYPE` `mac` and
+/// `TEXTCODEPAGE` 0, as the real client sent them in both Tiger lab runs
+/// (Graal_analysis `version-profiles/lab-mac-tiger-2026-10-31.md`).
+pub const LOBBY_420_MAC: Lobby = Lobby { platform: "mac", after_login: Some(LobbyLogin { os_props: ("mac", 0), ..LOBBY_LOGIN_4X }), ..LOBBY_404 };
 /// 5.00r7: the same login line as 4.x. Its after-login messages were not
 /// recorded.
 pub const LOBBY_500: Lobby = Lobby { after_login: None, ..LOBBY_404 };
@@ -371,6 +373,17 @@ mod tests {
         // The server's paused and dead bits do not go back.
         let own = [18 + 0x20, 29 + 0x20];
         assert_eq!(lobby_props_message(&LOBBY_LOGIN_4X, &own, "Real404", None), m);
+    }
+
+    /// The real Mac 4.20r6's own props (Tiger lab, 2026-10-31, the first
+    /// capture and the harness rerun): nickname `unknown`, STATUS 20,
+    /// UDPPORT 0, ADDITFLAGS 0, `English`, `mac`, TEXTCODEPAGE 0.
+    #[test]
+    fn props_match_the_real_mac_420r6() {
+        let own = [18 + 0x20, 20 + 0x20];
+        let info = LOBBY_420_MAC.after_login.unwrap();
+        let m = lobby_props_message(&info, &own, "unknown", None);
+        assert_eq!(m, b"\x22 'unknown24?   A T'Englishk#macl   \n");
     }
 
     #[test]

@@ -1097,7 +1097,7 @@ pub const CHAIN: &[Step] = &[
             lobby: Some(Some(LOBBY_420_MAC)),
             ..Delta::NONE
         },
-        source: "binary (Mac OS X PPC) and one lab run on Mac OS X 10.4 in qemu (Graal_analysis version-profiles/lab-mac-tiger-2026-10-31.md): 4.20r8's PLO set without 41 and 196 (a 97-case switch plus 100 and 108 before it; 108 subtype 0 answers with 162), login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty> (captured as mac,\"\",<32 hex>,\"\"), sends 2, 23, 24, 34, 37, 44, 46 and 157 seen",
+        source: "binary (Mac OS X PPC) and one lab run on Mac OS X 10.4 in qemu (Graal_analysis version-profiles/lab-mac-tiger-2026-10-31.md): 4.20r8's PLO set without 41 and 196 (a 97-case switch plus 100 and 108 before it; 108 subtype 0 answers with 162), login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty> (captured as mac,\"\",<32 hex>,\"\"), first props with OSTYPE mac and code page 0 (in both lab runs), sends 2, 23, 24, 34, 37, 44, 46 and 157 seen",
         unknown: &[
             Unknown { area: "pli", what: "162 (the answer to 108) is from the Mac binary and 2, 23, 24, 34, 37, 44, 46 and 157 were seen in the lab; the rest of 4.20r8's set is taken" },
             Unknown { area: "login", what: "the real client sent mac,\"\",<md5 hex of the /etc stat>,\"\" in the lab (the MAC field empty under qemu's NIC); Seihai sends all three machine fields as empty quoted strings" },
