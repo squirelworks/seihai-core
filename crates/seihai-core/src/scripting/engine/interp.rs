@@ -662,7 +662,12 @@ impl<'a> Run<'a> {
             },
             "strtofloat" => Val::Num(s(0).trim().parse().unwrap_or(0.0)),
             "hasweapon" => Val::Num(0.0),
-            "keydown" | "keydown2" => Val::Num(0.0),
+            // `keydown(i)`: the host's key bits (always clear while paused).
+            "keydown" => {
+                let i = n(0).trunc();
+                Val::Num(if (0.0..16.0).contains(&i) && self.core.keys_down & (1 << i as u32) != 0 { 1.0 } else { 0.0 })
+            }
+            "keydown2" => Val::Num(0.0),
             // The argument names the list (a flag), as in `#I(list,i)`.
             "sarraylen" => {
                 let list = s(0);
@@ -843,6 +848,14 @@ impl<'a> Run<'a> {
             return;
         }
         match cmd.exec {
+            // `setfocus x,y` / `resetfocus`: 2.05 has no executor for them,
+            // but 2gta's title level (`splashscreen.nw`, written for 2.1+
+            // clients) moves the player to y 65 and draws its title around
+            // `setfocus 30,30`, so later builds must move the view. Inferred
+            // from that script, not read in a 2.1+ binary.
+            Exec::NoExec if self.era() >= Era::V21 && matches!(cmd.name, "setfocus" | "resetfocus") => {
+                self.effect_command(cmd.name, vals);
+            }
             Exec::NoExec => self.note(format!("`{}` compiles but does nothing in 2.05", cmd.name)),
             Exec::Ext => {
                 if cmd.name == "sendtoserver" {

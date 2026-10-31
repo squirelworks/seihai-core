@@ -232,6 +232,10 @@ pub struct Core {
     pub online: bool,
     /// The server announced an NPC server.
     pub npc_server: bool,
+    /// The keys held, as `keydown(i)` reads them: bit i for index i (0..3
+    /// the directions, 4..6 A/S/D, 7 map, 8 tab, 9 Q, 10 P;
+    /// `newfeatures2001.txt`). Set by the host each frame.
+    pub keys_down: u16,
     pub(super) pending: VecDeque<Pending>,
     /// Collision of the current level: 64 by 64 tiles, row by row, true
     /// where blocked. `None` until the host provides it (then nothing is
@@ -305,6 +309,7 @@ impl ScriptWorld {
                 tokens: Vec::new(),
                 online: false,
                 npc_server: false,
+                keys_down: 0,
                 pending: VecDeque::new(),
                 walls: None,
                 water: None,

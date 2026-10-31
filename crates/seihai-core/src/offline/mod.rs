@@ -291,6 +291,13 @@ pub struct OfflineSession {
     /// layout, `documentation/hud.md`). `None` until a script sets it:
     /// everything shows.
     pub stats: Option<u16>,
+    /// `setfocus x,y` (2.1+): the level point, in tiles, the view is
+    /// centred on instead of the player. `None` follows the player
+    /// (`resetfocus`, and every new level).
+    pub view_focus: Option<(f32, f32)>,
+    /// The keys held this frame, as script `keydown(i)` reads them (see
+    /// `ScriptCore::keys_down`). Set by the client each frame.
+    pub keys_down: u16,
     /// Images a weapon script put up with `showimg`: weapons act as the
     /// player, so these sit on the player's level at the player's height.
     /// Cleared when a level is loaded.
@@ -608,6 +615,8 @@ impl OfflineSession {
             script_freeze_ms: 0,
             script_hide_ms: 0,
             stats: None,
+            view_focus: None,
+            keys_down: 0,
             player_images: Vec::new(),
             lava_ticks: 0,
             lava_ms: 0,

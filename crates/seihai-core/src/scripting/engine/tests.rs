@@ -147,7 +147,8 @@ fn unknown_functions_and_events_do_not_crash() {
 
 #[test]
 fn commands_with_no_executor_are_noted() {
-    let (mut w, id) = npc("if (created) { setfocus 1,2; join foo; message ok; }");
+    // (`setfocus` moves the view from 2.1 on, so it is not one of them here.)
+    let (mut w, id) = npc("if (created) { seturllevel foo; join foo; message ok; }");
     w.fire(id, "created", &[]);
     assert_eq!(messages(&mut w), vec!["ok"]);
     assert!(w.take_log().iter().filter(|l| l.contains("does nothing")).count() == 2);

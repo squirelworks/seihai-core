@@ -77,6 +77,8 @@ impl SessionScripts {
             }
         }
         self.world.core.level = level_name.to_string();
+        // A new level's view follows the player until a script moves it.
+        session.view_focus = None;
         // A weapon's images belong to the level the player was on.
         session.player_images.clear();
         let resumed = session.gmap.is_some() && self.world.unpark_level(level_name);
@@ -137,6 +139,8 @@ impl SessionScripts {
         // The board as it is now: cuts, lifts and the server's board
         // changes all show in `board[]` reads.
         self.world.core.board = s.current_level.as_ref().map(|l| l.tile_ids());
+        // 2.05: "keydown(index) is always false when the player is paused".
+        self.world.core.keys_down = if s.paused { 0 } else { s.keys_down };
         let p = &mut self.world.core.player;
         let (ox, oy) = gmap_origin(s);
         p.x = s.player_x as f64 + ox;
@@ -676,6 +680,13 @@ impl SessionScripts {
                         s.script_hide_ms = ms;
                     }
                 }
+                // `setfocus x,y` and `resetfocus` (2.1+ only; the engine
+                // drops them for 2.05): where the view is centred.
+                Effect::Command { ref name, ref args, .. } if name == "setfocus" => {
+                    let num = |i: usize| args.get(i).map_or(0.0, |v| v.num()) as f32;
+                    s.view_focus = Some((num(0), num(1)));
+                }
+                Effect::Command { ref name, .. } if name == "resetfocus" => s.view_focus = None,
                 // `showstats bits`: which parts of the status bar show.
                 Effect::Command { ref name, ref args, .. } if name == "showstats" => {
                     let bits = args.first().map_or(0.0, |v| v.num());
