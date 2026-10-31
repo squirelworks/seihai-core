@@ -16,6 +16,11 @@
 //!   applies it and (online) sends `PLI_ITEMDEL`.
 //! * **Timeout.** After 164 ticks of 50 ms the item goes; online from 1.38
 //!   the client sends `PLI_ITEMDEL` (2.05 lab: 8.20 s after the drop).
+//! * **Chest.** An opened chest shows its item one tile above it for 24
+//!   ticks, and its end sends `PLI_ITEMDEL` at that place too. Real 2.22 on
+//!   GServer-RS (2026-10-31): three chests, each `PLI_OPENCHEST` followed
+//!   1.19 to 1.20 s later by C>S 13 at `(x, y - 1)`
+//!   (`documentation/chest-drawing.md`).
 //!
 //! The UDP messages 1.33 to 1.41 also send to the other players (19, 20)
 //! are not sent: Seihai has no UDP.
@@ -38,6 +43,9 @@ pub const ITEM_NAMES: [&str; 25] = [
 pub const MAX_RUPEES: i32 = 9_999_999;
 pub const MAX_BOMBS: i32 = 99;
 pub const MAX_DARTS: i32 = 99;
+
+/// Ticks the item of an opened chest is shown: 24, 1.2 s.
+pub const CHEST_SHOW_TICKS: i32 = 24;
 
 /// The lift-table entries that drop: the bush rolls, the pot leaves a heart.
 const LIFT_BUSH: usize = 0;
@@ -80,6 +88,12 @@ impl OfflineSession {
         self.item_events.push(ItemEvent::Rolled { item, x, y });
     }
 
+    /// Show the item of the chest at `(x, y)` one tile above it; its end is
+    /// an item timeout there.
+    pub(crate) fn show_chest_item(&mut self, x: i32, y: i32) {
+        self.chest_shows.push((x as f32, (y - 1) as f32, CHEST_SHOW_TICKS));
+    }
+
     /// An item the server put down (`PLO_ITEMADD`).
     pub fn add_server_item(&mut self, it: FloorItem) {
         self.floor_items.push(it);
@@ -97,6 +111,15 @@ impl OfflineSession {
         self.item_ms += ms;
         while self.item_ms >= ITEM_TICK_MS {
             self.item_ms -= ITEM_TICK_MS;
+            let events = &mut self.item_events;
+            self.chest_shows.retain_mut(|(x, y, left)| {
+                *left -= 1;
+                if *left > 0 {
+                    return true;
+                }
+                events.push(ItemEvent::Expired { x: *x, y: *y });
+                false
+            });
             if self.floor_items.is_empty() {
                 continue;
             }
