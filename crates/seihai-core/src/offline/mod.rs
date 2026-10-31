@@ -12,6 +12,7 @@ use crate::life::{respawn_half_hearts, Life, LifeEvent};
 use crate::protocol::{BoardModify, PlayerUpdate};
 use std::collections::{HashMap, HashSet};
 
+mod baddies;
 mod drops;
 mod hide;
 mod pause;
@@ -22,6 +23,7 @@ pub use pause::{focus_pauses, name_label, pause_message_bits, server_status_base
 pub use pushpull::{NpcMoved, Grab, Jump, PushPull, Trigger};
 pub use servernpcs::{block_flags, Linked, ServerNpcSync, NPC_SEND_INTERVAL};
 use pushpull::StepResult;
+pub use baddies::BaddyRole;
 
 /// Facing, in Graal order (ganis and the 2.05 wire): 0 up, 1 left,
 /// 2 down, 3 right.
@@ -164,6 +166,17 @@ pub struct OfflineSession {
     bomb_sends: Vec<Vec<u8>>,
     /// Arrows in flight (see [`crate::arrows`]).
     pub arrows: Vec<crate::arrows::Arrow>,
+    /// The level's baddies (see `offline/baddies.rs`).
+    pub baddies: Vec<crate::baddies::Baddy>,
+    /// Who runs them: set by the game loop from the connection and
+    /// `PLO_ISLEADER`.
+    pub baddy_role: BaddyRole,
+    /// The picture extension of the build (`.png`, `.gif` for 2.0x).
+    pub baddy_image_ext: String,
+    baddy_serial: Option<u64>,
+    baddy_clock_ms: u64,
+    baddy_phase: bool,
+    baddy_sends: Vec<Vec<u8>>,
     /// Milliseconds carried over between arrow ticks.
     arrow_ms: u64,
     /// `PLI_ARROWADD` messages since the last [`Self::take_arrow_sends`].
@@ -524,6 +537,13 @@ impl OfflineSession {
             bomb_ms: 0,
             bomb_sends: Vec::new(),
             arrows: Vec::new(),
+            baddies: Vec::new(),
+            baddy_role: BaddyRole::default(),
+            baddy_image_ext: ".png".into(),
+            baddy_serial: None,
+            baddy_clock_ms: 0,
+            baddy_phase: false,
+            baddy_sends: Vec::new(),
             arrow_ms: 0,
             arrow_sends: Vec::new(),
             present_players: Vec::new(),
@@ -1209,6 +1229,12 @@ impl OfflineSession {
                     self.pelts.push(npc);
                     stop = true;
                 }
+            }
+            if !stop {
+                // A baddy takes 3, or 1 from the bush or a bomb
+                // (documentation/throwing.md).
+                let power = if o.sprite == Some(261) || o.kind == usize::MAX { 1 } else { 3 };
+                stop = self.throw_hits_baddy(wx, wy, o.dir, power);
             }
             if !stop && !o.own && self.victim().state == crate::combat::Vulnerability::Hurtable && o.hits_player(self.player_x, self.player_y) {
                 self.thrown_hit(&o);

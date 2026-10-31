@@ -6,6 +6,7 @@
 
 pub mod arrows;
 pub mod assets;
+pub mod baddies;
 pub mod bombs;
 pub mod chatlists;
 pub mod combat;

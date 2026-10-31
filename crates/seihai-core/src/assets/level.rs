@@ -280,6 +280,11 @@ pub struct ObjectTables {
     /// Array 16: the stone blocks. Entry 0 can be pushed, entry 1 pulled
     /// (see [`crate::ledge`]).
     pub blocks: Vec<Object2x2>,
+    /// Arrays 20, 22 and 23: the baddy poses, its death puff and the swamp
+    /// soldier in the water (see [`crate::baddies::DrawTables`]).
+    pub baddy_poses: Vec<Vec<u32>>,
+    pub baddy_puff: Vec<Vec<u32>>,
+    pub baddy_swamp: Vec<Vec<u32>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -324,6 +329,12 @@ fn leaps_from(node: Option<&ArrNode>) -> Vec<Vec<Vec<u32>>> {
             _ => Vec::new(),
         })
         .collect()
+}
+
+/// A list of int lists (arrays 20, 22, 23).
+fn lists_from(node: Option<&ArrNode>) -> Vec<Vec<u32>> {
+    let Some(ArrNode::List(items)) = node else { return Vec::new() };
+    items.iter().map(|i| if let ArrNode::Ints(v) = i { v.clone() } else { Vec::new() }).collect()
 }
 
 fn ledges_from(node: Option<&ArrNode>) -> [Vec<u16>; 4] {
@@ -383,6 +394,9 @@ impl ObjectTables {
             },
             ledges: ledges_from(nodes.get(8)),
             blocks: objects_from(nodes.get(16)),
+            baddy_poses: lists_from(nodes.get(20)),
+            baddy_puff: lists_from(nodes.get(22)),
+            baddy_swamp: lists_from(nodes.get(23)),
         };
         (!t.cut.is_empty() || !t.lift.is_empty()).then_some(t)
     }
