@@ -212,6 +212,7 @@ impl OfflineSession {
             bd.hurt(&mut w, clash, power, dx, dy, role.follows());
             if role.follows() && !clash {
                 sends.push(b::hurt_message(bd.id, dx, dy, power));
+                sends.push(b::follower_hurt_props(bd));
             }
         }
         let sounds = std::mem::take(&mut w.sounds);
@@ -292,6 +293,7 @@ impl OfflineSession {
         self.sound_events.extend(sounds);
         if role.follows() {
             self.baddy_sends.push(b::hurt_message(baddies[i].id, dx, dy, power * 2));
+            self.baddy_sends.push(b::follower_hurt_props(&baddies[i]));
         }
         self.baddies = baddies;
         true
@@ -446,5 +448,28 @@ mod tests {
         let die = sent.iter().position(|m| m[..] == [0x2f, 0x21, 0x25, 0x25, 0x26, 0x2e, b'\n']).expect("death message");
         assert_eq!(sent.last().unwrap()[..], [0x2f, 0x21, 0x26, 0x20, b'\n']);
         assert_eq!(sent.len() - die, 15);
+    }
+
+    /// A real 2.22 follower's sword hit (`lan-222hurt`): PLI_BADDYHURT
+    /// `21 28 60 21`, then the baddy's power and mode as PLI_BADDYPROPS
+    /// `21 24 21 20 25 23`. The player stood at 42, 45; the baddy at its
+    /// spawn point 46, 46 fits dx -3.5, dy 0.
+    #[test]
+    fn a_follower_hit_matches_the_2_22_capture() {
+        let mut s = OfflineSession::new();
+        s.current_level = Some(Level::parse("GLEVNW01\n").unwrap());
+        s.baddy_role = BaddyRole { online: true, leader: false };
+        let profile = ClientVersion::V222.profile();
+        s.combat.set_rules(profile.life.combat);
+        (s.player_x, s.player_y, s.sword_power, s.player_dir) = (42.0, 45.0, 1, crate::offline::DIR_EAST);
+        s.receive_baddy_props(&[0x21, 0x21, 0x7c, 0x22, 0x7c, 0x23, 0x20, 0x24, 0x22, 0x2d, b'b', b'a', b'd', b'd', b'y', b'g', b'r', b'a', b'y', b'.', b'p', b'n', b'g', 0x25, 0x20, 0x26, 0x20, 0x27, 0x2a]);
+        assert!(s.start_swing());
+        let mut sent = Vec::new();
+        for _ in 0..6 {
+            s.tick_combat(50);
+            s.tick_baddies(50, &[]);
+            sent.extend(s.take_baddy_sends());
+        }
+        assert_eq!(sent, [vec![16 + 32, 0x21, 0x28, 0x60, 0x21, b'\n'], vec![15 + 32, 0x21, 0x24, 0x21, 0x20, 0x25, 0x23, b'\n']]);
     }
 }

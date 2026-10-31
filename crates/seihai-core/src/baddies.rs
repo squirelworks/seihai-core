@@ -1006,11 +1006,19 @@ pub fn props_message(id: u8, before: &[Vec<u8>], now: &[Vec<u8>]) -> Option<Vec<
 
 /// The `PLI_BADDYHURT` (16) message (`0x50c7b8`): the id, the hitter's
 /// centre less the baddy's on each axis (limited to 4 tiles, in sixteenths
-/// from -4) and the power. Read from the program, not seen on the wire yet.
+/// from -4) and the power. A real 2.22 follower sent `21 28 60 21`
+/// (`lan-222hurt`).
 pub fn hurt_message(id: u8, dx: f64, dy: f64, power: i32) -> Vec<u8> {
     let q = |v: f64| ((v.clamp(-4.0, 4.0) + 4.0) * 16.0 + 0.0001).floor() as i32;
     let g = |v: i32| (v.clamp(0, 223) + 32) as u8;
     vec![16 + 32, g(i32::from(id)), g(q(dx)), g(q(dy)), g(power), b'\n']
+}
+
+/// The `PLI_BADDYPROPS` a follower sends after its `PLI_BADDYHURT`: the new
+/// power with an empty image, and mode 3 (`lan-222hurt`: `21 24 21 20 25 23`).
+pub fn follower_hurt_props(b: &Baddy) -> Vec<u8> {
+    let g = |v: i32| (v.clamp(0, 223) + 32) as u8;
+    vec![15 + 32, g(i32::from(b.id)), 4 + 32, g(b.power), 32, 5 + 32, g(i32::from(mode::HURT)), b'\n']
 }
 
 /// A `PLO_BADDYHURT` (27) the leader gets: id, `dx`, `dy`, power.
