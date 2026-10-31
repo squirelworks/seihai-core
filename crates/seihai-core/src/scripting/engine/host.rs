@@ -246,6 +246,36 @@ impl SessionScripts {
         }
     }
 
+    /// Give each level NPC without a `setshape` the size of its picture:
+    /// the image part it shows, else the whole image, whose size in pixels
+    /// `image_size` knows once the image is loaded. That rectangle is what
+    /// `playertouchsme` tests. Before, every such NPC was 2 by 2 tiles, so
+    /// 2gta's wide `tulepathcheck.png` exit at the top of
+    /// `onlinestartlocal.nw` (an NPC at 29,0 that runs `setlevel2` on
+    /// touch) could not be touched from y 0, where the feet are at 2.75.
+    pub fn size_npcs(&mut self, session: &OfflineSession, image_size: impl Fn(&str) -> Option<(u32, u32)>) {
+        let Some(level) = session.current_level.as_ref() else { return };
+        for id in self.world.ids() {
+            let Some(o) = self.world.obj_mut(id) else { continue };
+            if o.kind != ObjKind::Npc {
+                continue;
+            }
+            let Some(n) = level.npcs.get(o.tag) else { continue };
+            if n.shape.is_some() {
+                continue;
+            }
+            let size = match n.image_part {
+                Some((_, _, w, h)) => Some((w.max(0) as u32, h.max(0) as u32)),
+                None if !n.image.is_empty() => image_size(&n.image),
+                None => None,
+            };
+            if let Some((w, h)) = size.filter(|&(w, h)| w > 0 && h > 0) {
+                o.w_px = f64::from(w);
+                o.h_px = f64::from(h);
+            }
+        }
+    }
+
     /// Advance script time by `ms` and run what falls due. Also notices
     /// the end of sign reading (`playerendsreading`).
     pub fn tick(&mut self, session: &mut OfflineSession, ms: u64) {
