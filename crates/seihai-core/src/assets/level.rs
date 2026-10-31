@@ -1279,6 +1279,24 @@ impl Level {
         None
     }
 
+    /// Every layer-0 tile id, row by row (64 × 64), with 0 where the level
+    /// defines none: what [`Self::tile_id_at`] gives for each spot, in one
+    /// pass over the runs instead of one per tile. Where runs overlap the
+    /// first one wins, as it does in [`Self::tile_at`].
+    pub fn tile_ids(&self) -> Vec<u16> {
+        let mut board = vec![0u16; 64 * 64];
+        for run in self.boards.iter().rev().filter(|r| r.layer == 0 && (0..64).contains(&r.y)) {
+            for i in 0..run.width.max(0) {
+                let x = run.x + i;
+                if (0..64).contains(&x) {
+                    // A run shorter than its width still covers the rest, as nothing.
+                    board[run.y as usize * 64 + x as usize] = run.tiles.get(i as usize).map_or(0, |t| tile_id(*t));
+                }
+            }
+        }
+        board
+    }
+
     /// Tile id at (x, y), if present.
     pub fn tile_id_at(&self, x: i32, y: i32) -> Option<u16> {
         self.tile_at(x, y).map(tile_id)
@@ -1924,6 +1942,29 @@ mod tests {
         assert_eq!(l.signs[0].text, "line");
     }
     use crate::assets::crc32;
+
+    #[test]
+    fn tile_ids_match_tile_id_at_with_overlapping_runs() {
+        let mut l = Level::from_board(&(0..4096).map(|i| (i % 4096) as u16).collect::<Vec<_>>());
+        let run = |x: i32, y: i32, width: i32, layer: i32, ids: &[u16]| BoardRun { x, y, width, layer, tiles: ids.iter().map(|&t| tile_code(t)).collect() };
+        // Runs put first win where they overlap; one runs off the board's
+        // left and right, one is shorter than its width, one is off the
+        // board, one is on another layer.
+        l.boards.insert(0, run(-2, 3, 5, 0, &[100, 101, 102, 103, 104]));
+        l.boards.insert(0, run(60, 3, 8, 0, &[200, 201, 202, 203, 204, 205, 206, 207]));
+        l.boards.insert(0, run(10, 5, 4, 0, &[300]));
+        l.boards.insert(0, run(1, 70, 3, 0, &[400, 401, 402]));
+        l.boards.insert(0, run(0, 0, 3, 1, &[500, 501, 502]));
+        l.boards.push(run(0, 3, 64, 0, &[600; 64]));
+        let ids = l.tile_ids();
+        for i in 0..4096 {
+            assert_eq!(ids[i], l.tile_id_at(i as i32 % 64, i as i32 / 64).unwrap_or(0), "tile {i}");
+        }
+        assert_eq!(ids[3 * 64], 102);
+        assert_eq!(&ids[5 * 64 + 10..5 * 64 + 14], &[300, 0, 0, 0]);
+        // A level with no board reads as all 0.
+        assert!(Level::parse("GLEVNW01\n").unwrap().tile_ids().iter().all(|&t| t == 0));
+    }
 
     #[test]
     fn server_chest_and_sign_records_reach_the_level() {
