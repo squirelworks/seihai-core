@@ -35,8 +35,12 @@ pub enum Offline {
     /// then `D` lines relayed to the room). Seihai has no relay client, and
     /// no public relay is left.
     RelayLobby {
-        /// The room the build joins. `<level>` stands for the level file name.
+        /// The room players meet in: one per level. `<level>` is the level
+        /// file name, `<base>` the name without its extension.
         room: &'static str,
+        /// The Delphi betas open a second connection to one fixed room for
+        /// the whole game (`Graal3` for 5th Graal); the Java builds do not.
+        lobby: Option<&'static str>,
         /// The relay port the build dials (or pre-fills).
         port: u16,
     },
@@ -75,7 +79,7 @@ impl OfflineBuild {
     pub fn reason(&self) -> String {
         match self.offline {
             Offline::NoNetwork => "This build has no networking.".to_string(),
-            Offline::RelayLobby { room, port } => format!(
+            Offline::RelayLobby { room, port, .. } => format!(
                 "This build joins room `{room}` on a GServ relay (port {port}). Seihai has no relay client and no public relay is left, so it plays offline."
             ),
             Offline::UnknownToken(t) => {
@@ -84,7 +88,7 @@ impl OfflineBuild {
         }
     }
 
-    /// Room name the build joins on the relay, if it uses one.
+    /// The per-level room the build joins on the relay, if it uses one.
     pub fn room(&self) -> Option<&'static str> {
         match self.offline {
             Offline::RelayLobby { room, .. } => Some(room),
@@ -93,8 +97,8 @@ impl OfflineBuild {
     }
 }
 
-const fn relay(room: &'static str, port: u16) -> Offline {
-    Offline::RelayLobby { room, port }
+const fn relay(room: &'static str, lobby: Option<&'static str>, port: u16) -> Offline {
+    Offline::RelayLobby { room, lobby, port }
 }
 
 const fn beta(
@@ -102,6 +106,7 @@ const fn beta(
     archive: &'static str,
     date: &'static str,
     room: &'static str,
+    lobby: &'static str,
     levels: &'static str,
 ) -> OfflineBuild {
     OfflineBuild {
@@ -110,7 +115,7 @@ const fn beta(
         date,
         family: Family::DelphiBeta,
         // Every Delphi beta pre-fills 127.0.0.1:14801 (build-catalogue.md).
-        offline: relay(room, 14801),
+        offline: relay(room, Some(lobby), 14801),
         levels,
         plays_as: ClientVersion::V121,
         start_level: None,
@@ -140,38 +145,38 @@ pub const OFFLINE_BUILDS: &[OfflineBuild] = &[
         archive: "zeldaonline2",
         date: "1998-07",
         family: Family::Java,
-        offline: relay("Z<level>1.6", 14801),
+        offline: relay("Z<base>1.6", None, 14801),
         levels: "Z3-V1.03",
         plays_as: ClientVersion::V121,
         start_level: None,
     },
-    beta("1st Graal", "1stgraal-1", "1998-09-06", "Zelda2", Z3),
-    beta("2nd Graal", "2ndgraal", "1998-09-16", "Zelda2", GR01),
-    beta("3rd Graal", "3rdgraal", "1998-09-30", "Graal", GR01),
-    beta("4th Graal", "4thgraal", "1998-10-05", "Graal", GR01),
-    beta("4th Graal alpha", "4thgraalalpha", "1998-10-12", "Graal2", GR01),
-    beta("5th Graal", "5thgraal", "1998-10-19", "Graal3", GR02),
-    beta("5th Graal alpha", "5thgraalalpha", "1998-10-29", "Graal3", GR02),
-    beta("6th Graal (beta 5)", "6thgraal", "1998-11-09", "Graal4", GR02),
-    beta("7th Graal (beta 7)", "7thgraal", "1998-12-04", "Graal5", GR03),
-    beta("8th Graal (beta 8)", "8thgraal", "1998-12-08", "Graal5", GR03),
-    beta("9th Graal alpha", "9thgraalalpha", "1998-12-16", "Graal5", GR03),
-    beta("9th Graal (beta 9)", "9thgraal", "1998-12-18", "Graal5", GR03),
-    beta("10th Graal (1.0)", "10thgraal", "1998-12-22", "Graal6", GR03),
-    beta("11th Graal (1.0)", "11thgraal", "1998-12-23", "Graal6", GR03),
-    beta("12th Graal (1.0)", "12thgraal", "1999-01-05", "Graal6", GR03),
-    beta("13th Graal (1.1 beta 1)", "13thgraal", "1999-01-12", "Graal7", GR03),
-    beta("14th Graal (1.1)", "14thgraal", "1999-01-15", "Graal8", GR03),
-    beta("15th Graal (1.1)", "15thgraal", "1999-01-25", "Graal8", GR03),
-    beta("1.1.9 Gold Edition", "graal1.1.9", "1999-02-11", "Graal8", GR03),
-    beta("1.1", "graal1.1", "1999-02-14", "Graal8", GR03),
+    beta("1st Graal", "1stgraal-1", "1998-09-06", "Z<base>", "Zelda2", Z3),
+    beta("2nd Graal", "2ndgraal", "1998-09-16", "Z<base>", "Zelda2", GR01),
+    beta("3rd Graal", "3rdgraal", "1998-09-30", "G<level>", "Graal", GR01),
+    beta("4th Graal", "4thgraal", "1998-10-05", "G<level>", "Graal", GR01),
+    beta("4th Graal alpha", "4thgraalalpha", "1998-10-12", "G2<level>", "Graal2", GR01),
+    beta("5th Graal", "5thgraal", "1998-10-19", "G3<level>", "Graal3", GR02),
+    beta("5th Graal alpha", "5thgraalalpha", "1998-10-29", "G3<level>", "Graal3", GR02),
+    beta("6th Graal (beta 5)", "6thgraal", "1998-11-09", "G4<level>", "Graal4", GR02),
+    beta("7th Graal (beta 7)", "7thgraal", "1998-12-04", "G5<level>", "Graal5", GR03),
+    beta("8th Graal (beta 8)", "8thgraal", "1998-12-08", "G5<level>", "Graal5", GR03),
+    beta("9th Graal alpha", "9thgraalalpha", "1998-12-16", "G5<level>", "Graal5", GR03),
+    beta("9th Graal (beta 9)", "9thgraal", "1998-12-18", "G5<level>", "Graal5", GR03),
+    beta("10th Graal (1.0)", "10thgraal", "1998-12-22", "G6<level>", "Graal6", GR03),
+    beta("11th Graal (1.0)", "11thgraal", "1998-12-23", "G6<level>", "Graal6", GR03),
+    beta("12th Graal (1.0)", "12thgraal", "1999-01-05", "G6<level>", "Graal6", GR03),
+    beta("13th Graal (1.1 beta 1)", "13thgraal", "1999-01-12", "G7<level>", "Graal7", GR03),
+    beta("14th Graal (1.1)", "14thgraal", "1999-01-15", "G8<level>", "Graal8", GR03),
+    beta("15th Graal (1.1)", "15thgraal", "1999-01-25", "G8<level>", "Graal8", GR03),
+    beta("1.1.9 Gold Edition", "graal1.1.9", "1999-02-11", "G8<level>", "Graal8", GR03),
+    beta("1.1", "graal1.1", "1999-02-14", "G8<level>", "Graal8", GR03),
     OfflineBuild {
         label: "Java Graal",
         archive: "javagraal",
         date: "2000-07",
         family: Family::Java,
         // Only its own codebase host on 14802 (the Cyberjoueur relay).
-        offline: relay("G2<level>", 14802),
+        offline: relay("G2<level>", None, 14802),
         levels: GR03,
         plays_as: ClientVersion::V121,
         start_level: Some("level13.graal"),
@@ -203,9 +208,9 @@ pub fn by_label(label: &str) -> Option<&'static OfflineBuild> {
     OFFLINE_BUILDS.iter().find(|b| b.label == label)
 }
 
-/// Whether two offline-only builds would meet in one room on the same GServ
-/// relay: both use a relay and join the same room name. A `<level>` room is
-/// one room per level, so it never equals a fixed room.
+/// Whether two offline-only builds would meet on the same GServ relay: both
+/// join the same per-level room name for a level (seen live 2026-10-31 for
+/// Java Graal and 4th Graal alpha, both `G2<level>`).
 pub fn share_a_room(a: &OfflineBuild, b: &OfflineBuild) -> bool {
     match (a.room(), b.room()) {
         (Some(x), Some(y)) => x == y,
@@ -241,21 +246,21 @@ mod tests {
         }
     }
 
-    /// Java Graal joins one room per level (`G2<level>`); 5th Graal joins the
-    /// fixed room `Graal3`. GServ links only players in the same room, so the
-    /// two never meet, even on one relay.
+    /// Java Graal joins `G2<level>`, 5th Graal `G3<level>`. GServ links only
+    /// players in the same room, so the two never meet on a stock relay (a
+    /// bridge that renames `G2` to `G3` makes them meet: seen live
+    /// 2026-10-31). 4th Graal alpha joins `G2<level>` too and meets Java
+    /// Graal with no bridge (also seen live).
     #[test]
-    fn java_graal_and_5th_graal_do_not_share_a_room() {
+    fn java_graal_meets_4th_graal_alpha_not_5th_graal() {
         let java = by_label("Java Graal").unwrap();
         let fifth = by_label("5th Graal").unwrap();
         assert!(!share_a_room(java, fifth));
-        // The builds that do meet: same fixed room.
+        assert!(share_a_room(java, by_label("4th Graal alpha").unwrap()));
+        let g2: Vec<_> = OFFLINE_BUILDS.iter().filter(|b| share_a_room(java, b) && b.label != java.label).map(|b| b.label).collect();
+        assert_eq!(g2, ["4th Graal alpha"]);
         assert!(share_a_room(fifth, by_label("5th Graal alpha").unwrap()));
         assert!(share_a_room(by_label("3rd Graal").unwrap(), by_label("4th Graal").unwrap()));
-        // No Delphi beta joins a `G2` room.
-        for b in OFFLINE_BUILDS.iter().filter(|b| b.family == Family::DelphiBeta) {
-            assert!(!share_a_room(java, b), "{}", b.label);
-        }
     }
 
     #[test]
