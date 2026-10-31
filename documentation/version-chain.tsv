@@ -344,5 +344,10 @@ step	label	token	basis	kind	area	field	detail
 43	6.034	G3D2505C	inferred	unknown	date	-	link date not known
 43	6.034	G3D2505C	inferred	source	-	-	GServer-v2's allowedversions.txt (G3D2505C for 6.0.3.4) and stock gs2lib (CLVER_6_034); PLO and PLI from Linux 6.03r7 (92 PLO ids, 60 send ids); the rest as 6.015
 44	6.03r7	G3D0311C	binary	same	-	-	no change against the step before
-44	6.03r7	G3D0311C	binary	unknown	token	-	the Linux 6.03r7 sends G3D0511C; this row is the Windows build
+44	6.03r7	G3D0311C	binary	unknown	token	-	the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)
 44	6.03r7	G3D0311C	binary	source	-	-	unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date
+45	6.03r7 Linux	G3D0511C	binary	changed	protocol	login lobby	first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends linux,"","","",""
+45	6.03r7 Linux	G3D0511C	binary	unknown	login	-	the four machine ids are sent as empty quoted strings; the real kernel string field was not captured, and whether it is quoted is not known
+45	6.03r7 Linux	G3D0511C	binary	unknown	lab	-	the Linux client was not run; the Windows 6.03r7 lab run (2026-10-31) stands in for it
+45	6.03r7 Linux	G3D0511C	binary	unknown	files	-	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for
+45	6.03r7 Linux	G3D0511C	binary	source	-	-	binary (Linux x64 ELF, not packed): token stored as the scrambled string g3d0511c, login list linux plus four machine ids (eth0 MAC md5, /etc inode md5, empty, kernel string); PLO and PLI sets are the ones the Windows row took from it; gs2lib names the token 6.037 (Linux)

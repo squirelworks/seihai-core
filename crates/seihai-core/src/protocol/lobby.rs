@@ -51,6 +51,13 @@ pub const LOBBY_500: Lobby = Lobby { after_login: None, ..LOBBY_404 };
 /// 5.12 to 6.03r7: the quoted Windows version as a fifth field.
 pub const LOBBY_512: Lobby = Lobby { os_version: Some("\"6.2 9200 \""), ..LOBBY_500 };
 
+/// The Linux 6.03r7: `linux`, then four machine ids (MD5 hex of the `eth0`
+/// MAC, MD5 hex of the inode of `/etc`, an empty field, and the kernel
+/// release and version), read in the binary (Graal_analysis
+/// `protocol/v6x-clients.md`), never captured. Seihai sends all four as
+/// `""`, as it does the Windows hashes; the kernel string is not invented.
+pub const LOBBY_603_LINUX: Lobby = Lobby { platform: "linux", os_version: Some(EMPTY_MACHINE_FIELD), ..LOBBY_512 };
+
 /// The machine field Seihai sends for each of the three hashes.
 pub const EMPTY_MACHINE_FIELD: &str = "\"\"";
 
@@ -331,6 +338,7 @@ mod tests {
         assert_eq!(LOBBY_420_MAC.login_tail(), b"mac,\"\",\"\",\"\"");
         assert_eq!(LOBBY_500.login_tail(), b"win,\"\",\"\",\"\"");
         assert_eq!(LOBBY_512.login_tail(), b"win,\"\",\"\",\"\",\"6.2 9200 \"");
+        assert_eq!(LOBBY_603_LINUX.login_tail(), b"linux,\"\",\"\",\"\",\"\"");
     }
 
     #[test]

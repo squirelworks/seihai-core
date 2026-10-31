@@ -558,6 +558,14 @@ Generated; do not edit between the markers.
 #### 6.03r7 (`G3D0311C`, binary, linked 2012-11-16)
 
 - no change against the step before
-- unknown (token): the Linux 6.03r7 sends G3D0511C; this row is the Windows build
+- unknown (token): the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)
 - source: unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date
+
+#### 6.03r7 Linux (`G3D0511C`, binary, linked 2012-11-11)
+
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends linux,"","","",""
+- unknown (login): the four machine ids are sent as empty quoted strings; the real kernel string field was not captured, and whether it is quoted is not known
+- unknown (lab): the Linux client was not run; the Windows 6.03r7 lab run (2026-10-31) stands in for it
+- unknown (files): Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for
+- source: binary (Linux x64 ELF, not packed): token stored as the scrambled string g3d0511c, login list linux plus four machine ids (eth0 MAC md5, /etc inode md5, empty, kernel string); PLO and PLI sets are the ones the Windows row took from it; gs2lib names the token 6.037 (Linux)
 <!-- version-chain:end -->

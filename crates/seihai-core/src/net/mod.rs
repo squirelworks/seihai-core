@@ -2861,7 +2861,7 @@ mod tests {
             .filter(|p| p.version.sends_enter_level())
             .map(|p| p.label)
             .collect();
-        assert_eq!(with, ["2.3", "2.31", "3.153", "4.04r2", "4.20r6", "4.20r8", "5.00r7", "5.12", "5.24r4", "5.30r3", "5.31r4", "6.00r2", "6.015", "6.034", "6.03r7"]);
+        assert_eq!(with, ["2.3", "2.31", "3.153", "4.04r2", "4.20r6", "4.20r8", "5.00r7", "5.12", "5.24r4", "5.30r3", "5.31r4", "6.00r2", "6.015", "6.034", "6.03r7", "6.03r7 Linux"]);
     }
 
     /// 46 goes first in the frame, then the props message that follows it.

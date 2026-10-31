@@ -47,7 +47,7 @@ pub enum ClientVersion {
     V138,
     /// Graal 1.39 (`GNW07080`). Gen 2.
     V139,
-    /// Graal 1.41 (`GNW13110`). First gen 3.
+    /// Graal 1.41 rev 1 (`GNW13110`), also accepted as `1.41r1`. First gen 3.
     V141,
     /// Graal 1.42 NewMain (`GNW08011`). Gen 3.
     V142,
@@ -119,6 +119,10 @@ pub enum ClientVersion {
     V6034,
     /// Graal 6.03 rev 7 (`G3D0311C`), Windows. Gen 5.
     V603R7,
+    /// Graal 6.03 rev 7 (`G3D0511C`), the Linux x64 build. Gen 5. The same
+    /// release as the Windows 6.03r7, with its own token and a `linux` login
+    /// list; gs2lib calls it "6.037 (Linux)".
+    V603R7Linux,
 }
 
 impl ClientVersion {
@@ -241,7 +245,17 @@ impl ClientVersion {
 
     /// The version with this GUI label.
     pub fn from_label(label: &str) -> Option<ClientVersion> {
-        super::profile::by_label(label).map(|p| p.version)
+        super::profile::by_label(label).map(|p| p.version).or_else(|| Self::from_alias(label))
+    }
+
+    /// Other names a version is known by. `1.41r1` is what GServer's
+    /// `allowedversions.txt` and the "1.41r1 - iPhone Belote 1.5" range call
+    /// the 1.41 row: the only 1.41 binary is rev 1 (`GNW13110`).
+    fn from_alias(label: &str) -> Option<ClientVersion> {
+        match label {
+            "1.41r1" | "1.41 rev1" | "1.41 rev 1" => Some(Self::V141),
+            _ => None,
+        }
     }
 
     /// The version to run for a launcher label: a profile's own, or the
@@ -267,6 +281,7 @@ impl ClientVersion {
             Self::V230, Self::V231, Self::V304, Self::V3153,
             Self::V404R2, Self::V420R6, Self::V420R8,
             Self::V500R7, Self::V512, Self::V524R4, Self::V530R3, Self::V531R4, Self::V600R2, Self::V6015, Self::V6034, Self::V603R7,
+            Self::V603R7Linux,
         ]
     }
 }
@@ -280,6 +295,15 @@ impl Default for ClientVersion {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `1.41r1` (GServer's name for the 1.41 binary) picks the 1.41 row.
+    #[test]
+    fn alias_labels() {
+        assert_eq!(ClientVersion::from_label("1.41r1"), Some(ClientVersion::V141));
+        assert_eq!(ClientVersion::from_label("1.41"), Some(ClientVersion::V141));
+        assert_eq!(ClientVersion::from_label("6.03r7 Linux"), Some(ClientVersion::V603R7Linux));
+        assert_eq!(ClientVersion::V603R7Linux.token(), "G3D0511C");
+    }
 
     #[test]
     fn tokens_are_eight_chars() {
