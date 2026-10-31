@@ -34,7 +34,7 @@ pub use dispatch::{
 pub use extras::MapSpec;
 pub use frame::{read_zlib_frame, write_zlib_frame, write_zlib_frame_best, zlib_compress, zlib_compress_best, zlib_decompress};
 pub use gen3::Gen3;
-pub use gen5::{choose_comp, read_frame, read_frame_or_plain, write_frame, Gen5, Gen5Comp};
+pub use gen5::{choose_comp, read_frame, read_frame_len, read_frame_or_plain, write_frame, FrameLen, Gen5, Gen5Comp};
 pub use list::{parse_list_reply, parse_svrlist, ListReply, ServerEntry};
 pub use props::{
     decode_pos_precise, encode_pos_classic, encode_pos_precise, parse_player_props, parse_player_props_in, parse_player_props_with, PlayerProp,

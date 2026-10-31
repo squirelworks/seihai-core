@@ -486,17 +486,16 @@ Generated; do not edit between the markers.
 
 - protocol: **plo (server ids handled)**: -165 MOVE, -169 UPGRADEURL (95 -> 93 ids)
 - protocol: **pli (client ids sent)**: +45 PROCESSRUNNING, +48 SHOOT2, +162 RC_UNKNOWN162; -21 PUTNPC, -80 PROFILEGET, -81 PROFILESET (59 -> 59 ids)
+- protocol: **gen5_long_frames**: no -> yes
 - ui: **chat_text**: ChatText { face: Arial, height: 24 } -> ChatText { face: TempusSans, height: 24 }
 - unknown (pli): not read; Linux 6.01r1's set (6.03r7's without 160) is taken
-- unknown (framing): the 0xFFFF long-frame form of 6.x is not handled
-- source: unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24
+- unknown (framing): the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
+- source: unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24, 6.x long frame lengths
 
 #### 6.03r7 (`G3D0311C`, binary, linked 2012-11-16)
 
 - protocol: **plo (server ids handled)**: +111 SETNETCOOKIE; -175 SHOOT, -184 TAKESCREENSHOT (93 -> 92 ids)
 - protocol: **pli (client ids sent)**: +160 RC_FOLDERDELETE (59 -> 60 ids)
 - unknown (token): the Linux 6.03r7 sends G3D0511C; this row is the Windows build
-- unknown (plo): 111 (writes creationtime.dat) is in the set but not decoded
-- unknown (framing): the 0xFFFF long-frame form of 6.x is not handled
-- source: unpacked from Themida and lab: 92 PLO ids (175 and 184 out, 111 in), equal to Linux 6.03r7; send ids from Linux 6.03r7 (same release); no expiry date
+- source: unpacked from Themida and lab: 92 PLO ids (175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date
 <!-- version-chain:end -->

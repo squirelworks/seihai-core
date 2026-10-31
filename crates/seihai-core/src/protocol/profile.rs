@@ -351,6 +351,10 @@ pub struct Protocol {
     /// 5.12's frame decoder and needed by the lab proxy to talk to it
     /// (Graal_analysis `protocol/v5v6-lab-play.md`, "5.12's cipher step count").
     pub gen5_round_down: bool,
+    /// 6.x frame lengths: a frame of 0xFFFF bytes or more has `FF FF` and
+    /// then a `u32be` length ([`super::FrameLen::Long`]). Read from the
+    /// Linux 6.01 and 6.03 builds (Graal_analysis `protocol/v6x-clients.md`).
+    pub gen5_long_frames: bool,
     /// Peer-to-peer UDP channel present.
     pub udp: bool,
     /// UDP off by default (`noudp=true` in the shipped config).
