@@ -4,6 +4,7 @@
 //! where noted; login and framing follow the cleaned 2.05/2.22 observations.
 
 mod udp;
+pub mod warp_retry;
 
 pub use udp::{
     decode_udp, encode_udp, encode_udp_move, udp_key, PeerChannel, UDP_ID_BOMBADD, UDP_ID_CHAT,
@@ -552,8 +553,9 @@ impl std::fmt::Display for LoginFailure {
 /// the login 46. The same steps serve the first login and the reconnect
 /// that follows a `PLO_SERVERWARP` (178), which in a real 2.31 client is a
 /// complete fresh login (new random key, same account and password, no
-/// listserver step). The reader is not started: call
-/// [`Connection::spawn_reader`] on the result.
+/// listserver step). A warp login turned away because the account is still
+/// in use is retried by the caller ([`warp_retry`]). The reader is not
+/// started: call [`Connection::spawn_reader`] on the result.
 pub fn login_gserver(
     addr: &str,
     version: ClientVersion,
