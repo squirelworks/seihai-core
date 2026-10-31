@@ -359,7 +359,6 @@ Generated; do not edit between the markers.
 - protocol: **showimg (id 24)**: every 5100 ms -> every 5100 ms, only with others in the level
 - protocol: **login frame**: files, process list, props, idle.gani at once, status icons, language and tamper check in the login frame, 96 ms after the level without 182 -> files, process list, props with OS wind and code page 1252, idle.gani at once, status icons
 - protocol: **udp_off_by_default**: no -> yes
-- levels: **link_boxes**: no -> yes
 - ui: **server_list**: 2 tabs -> 3 tabs
 - mannerisms: **mannerisms**: 2.05 (hidden ganis, pull stays, swim runs on) -> 2.22 (as 2.05, swim restarts at the stop)
 - unknown (pli): send sites of ids 36, 42 and 45 were not matched in the binary, so 36 and 45 are not sent

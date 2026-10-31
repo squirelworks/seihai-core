@@ -9,7 +9,7 @@
 //! shows to others as `name (paused)`.
 //!
 //! * **P** toggles pause. A window without the focus is paused as well.
-//! * STATUS gets bit 0x01 while paused.
+//! * STATUS gets bit 0x01 while paused, and while a sign is open (real 2.00).
 //! * A paused player cannot be hurt, unless the level is a `sparringzone`.
 //!   Seihai has no sparring zones, so a paused player is never hurt.
 //! * Other players' names get ` (paused)` when their STATUS has the bit
@@ -49,9 +49,12 @@ impl OfflineSession {
         self.paused = self.pause_key || !self.focused;
     }
 
-    /// The STATUS bits pausing adds.
+    /// The STATUS bits pausing adds. Reading a sign sets the bit too: real
+    /// 2.00 went from STATUS 20 to 21 when its sign panel opened and back to
+    /// 20 when it closed (Mirae capture `lan-200sign2`, 2026-10-31). Only the
+    /// bit is sent; the hit gate still follows [`OfflineSession::paused`].
     pub fn pause_status(&self) -> u8 {
-        if self.paused {
+        if self.paused || self.reading.is_some() {
             PAUSED_STATUS
         } else {
             0
@@ -109,6 +112,25 @@ mod tests {
         assert_eq!(s.pause_status(), PAUSED_STATUS);
         assert!(!s.toggle_pause());
         assert_eq!(s.pause_status(), 0);
+    }
+
+    #[test]
+    fn an_open_sign_sets_the_status_bit_but_does_not_pause() {
+        let mut s = OfflineSession::new();
+        s.reading = Some("Hello".into());
+        assert_eq!(s.pause_status(), PAUSED_STATUS);
+        assert!(!s.paused, "the hit gate is unchanged");
+        s.reading = None;
+        assert_eq!(s.pause_status(), 0);
+        // Pause and an open sign share the bit: ending one keeps it while
+        // the other lasts.
+        s.reading = Some("Hello".into());
+        s.toggle_pause();
+        s.reading = None;
+        assert_eq!(s.pause_status(), PAUSED_STATUS, "closing the sign while paused");
+        s.reading = Some("Hello".into());
+        s.toggle_pause();
+        assert_eq!(s.pause_status(), PAUSED_STATUS, "unpausing while a sign is open");
     }
 
     #[test]

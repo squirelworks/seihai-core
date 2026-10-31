@@ -209,14 +209,6 @@ impl Link {
     pub fn contains(&self, x: i32, y: i32) -> bool {
         x >= self.x && x < self.x + self.width && y >= self.y && y < self.y + self.height
     }
-
-    /// True if the box `(x0, y0)..(x1, y1)`, in tiles, overlaps the link's
-    /// rectangle. Boxes that only touch an edge do not overlap.
-    pub fn overlaps(&self, x0: f32, y0: f32, x1: f32, y1: f32) -> bool {
-        let (lx0, ly0) = (self.x as f32, self.y as f32);
-        let (lx1, ly1) = ((self.x + self.width) as f32, (self.y + self.height) as f32);
-        x1 > lx0 && x0 < lx1 && y1 > ly0 && y0 < ly1
-    }
 }
 
 /// A sign (SIGN / SIGNEND). Text is already plain for GLEVNW01.
