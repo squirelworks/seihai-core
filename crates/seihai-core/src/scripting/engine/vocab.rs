@@ -198,6 +198,7 @@ pub static COMMANDS: &[Cmd] = &[
     c("enableselectweapons", "", V204, Effect),
     c("disableselectweapons", "", V204, Effect),
     c("showstats", "R", V200, Effect),
+    c("enablefeatures", "R", V21, Effect),
     c("attachplayertoobj", "RR", V204, Effect),
     c("detachplayer", "", V204, Effect),
     c("toinventory", "S", V200, Effect),

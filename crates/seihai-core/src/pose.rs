@@ -170,12 +170,17 @@ pub struct PoseGanis {
     /// Hiding under the carried object, standing and walking.
     pub hiddenstill: Option<Gani>,
     pub hidden: Option<Gani>,
+    /// Reading the M map (2.01+): `maps1` when it opens, the looping
+    /// `maps2` after it, `maps3` when it closes.
+    pub maps1: Option<Gani>,
+    pub maps2: Option<Gani>,
+    pub maps3: Option<Gani>,
 }
 
 impl PoseGanis {
     /// Every loaded pose GANI.
     pub fn all(&self) -> impl Iterator<Item = &Gani> {
-        [&self.sword, &self.hurt, &self.sit, &self.sleep, &self.idle, &self.carrystill, &self.carry, &self.dead, &self.push, &self.grab, &self.pull, &self.lift, &self.hiddenstill, &self.hidden, &self.spin]
+        [&self.sword, &self.hurt, &self.sit, &self.sleep, &self.idle, &self.carrystill, &self.carry, &self.dead, &self.push, &self.grab, &self.pull, &self.lift, &self.hiddenstill, &self.hidden, &self.spin, &self.maps1, &self.maps2, &self.maps3]
             .into_iter()
             .flatten()
     }
@@ -201,6 +206,18 @@ pub enum PoseKind {
     Spin,
     HiddenStill,
     Hidden,
+    Maps1,
+    Maps2,
+    Maps3,
+}
+
+/// The M-map reading animation, and how long its phase has run (ms).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MapPose {
+    /// The map is open: `maps1`, then `maps2` (its `SETBACKTO`).
+    Reading(u64),
+    /// The map closed: `maps3` once, then back to standing.
+    Closing(u64),
 }
 
 /// A pose step ready to draw.
@@ -233,6 +250,9 @@ impl PoseKind {
             PoseKind::Spin => "spin.gani",
             PoseKind::HiddenStill => "hiddenstill.gani",
             PoseKind::Hidden => "hidden.gani",
+            PoseKind::Maps1 => "maps1.gani",
+            PoseKind::Maps2 => "maps2.gani",
+            PoseKind::Maps3 => "maps3.gani",
         }
     }
 
@@ -255,6 +275,9 @@ impl PoseKind {
             PoseKind::Spin,
             PoseKind::HiddenStill,
             PoseKind::Hidden,
+            PoseKind::Maps1,
+            PoseKind::Maps2,
+            PoseKind::Maps3,
         ]
             .into_iter()
             .find(|k| k.file().eq_ignore_ascii_case(name))
@@ -292,6 +315,66 @@ fn pick_player<'a>(kind: PoseKind, p: &'a crate::assets::GaniPlayer) -> Option<P
 }
 
 impl OfflineSession {
+    /// The map opened: the reading animation starts when the player stands
+    /// still or sits (2.01 notes: "only when you stand still or sit"), not
+    /// while walking, carrying, swimming, hidden or dead.
+    pub fn start_map_reading(&mut self) -> bool {
+        let still = !self.walking && self.carried.is_none() && !self.in_water && !self.hidden && !self.life.is_dead();
+        if still && self.poses.maps1.is_some() {
+            self.map_pose = Some(MapPose::Reading(0));
+        }
+        self.map_pose.is_some()
+    }
+
+    /// The map closed: `maps3` plays once (if the reading pose was on).
+    pub fn stop_map_reading(&mut self) {
+        if let Some(MapPose::Reading(_)) = self.map_pose {
+            self.map_pose = self.poses.maps3.as_ref().map(|_| MapPose::Closing(0));
+        }
+    }
+
+    /// Advance the reading animation by `dt` ms. True when it changed
+    /// phase (maps3 ran out). Walking or being hurt ends it.
+    pub fn tick_map_pose(&mut self, dt: u64) -> bool {
+        match self.map_pose {
+            Some(_) if self.walking || self.carried.is_some() || self.life.is_dead() => {
+                self.map_pose = None;
+                true
+            }
+            Some(MapPose::Reading(ms)) => {
+                self.map_pose = Some(MapPose::Reading(ms + dt));
+                false
+            }
+            Some(MapPose::Closing(ms)) => {
+                let total = self.poses.maps3.as_ref().map_or(0, |g| g.total_ticks() as u64 * GANI_STEP_MS);
+                if ms + dt >= total {
+                    self.map_pose = None;
+                    true
+                } else {
+                    self.map_pose = Some(MapPose::Closing(ms + dt));
+                    false
+                }
+            }
+            None => false,
+        }
+    }
+
+    /// The reading pose's frame: `maps1` by its waits, then `maps2`
+    /// looped; or `maps3` once after closing.
+    fn map_pose_frame(&self) -> Option<PoseFrame<'_>> {
+        match self.map_pose? {
+            MapPose::Reading(ms) => {
+                let tick = (ms / GANI_STEP_MS) as usize;
+                once(PoseKind::Maps1, &self.poses.maps1, tick).or_else(|| {
+                    let into = tick.saturating_sub(self.poses.maps1.as_ref().map_or(0, |g| g.total_ticks()));
+                    at_tick(PoseKind::Maps2, &self.poses.maps2, into, true)
+                })
+                .or_else(|| pick(PoseKind::Maps1, &self.poses.maps1, usize::MAX))
+            }
+            MapPose::Closing(ms) => once(PoseKind::Maps3, &self.poses.maps3, (ms / GANI_STEP_MS) as usize),
+        }
+    }
+
     /// Attach a pose animation.
     pub fn set_pose_gani(&mut self, kind: PoseKind, gani: Gani) {
         match kind {
@@ -307,6 +390,9 @@ impl OfflineSession {
             PoseKind::Grab => self.poses.grab = Some(gani),
             PoseKind::Pull => self.poses.pull = Some(gani),
             PoseKind::Lift => self.poses.lift = Some(gani),
+            PoseKind::Maps1 => self.poses.maps1 = Some(gani),
+            PoseKind::Maps2 => self.poses.maps2 = Some(gani),
+            PoseKind::Maps3 => self.poses.maps3 = Some(gani),
             PoseKind::Spin => self.poses.spin = Some(gani),
             PoseKind::HiddenStill => self.poses.hiddenstill = Some(gani),
             PoseKind::Hidden => self.poses.hidden = Some(gani),
@@ -482,6 +568,9 @@ impl OfflineSession {
             if let Some(p) = pick(PoseKind::CarryStill, &self.poses.carrystill, 0) {
                 return Some(p);
             }
+        }
+        if let Some(p) = self.map_pose_frame() {
+            return Some(p);
         }
         // Over the walk too: 2.05 sets these after the walk pose.
         if self.sitting {

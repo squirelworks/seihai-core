@@ -723,10 +723,27 @@ impl SessionScripts {
                     let bits = args.first().map_or(0.0, |v| v.num());
                     s.stats = Some(bits.max(0.0).min(f64::from(u16::MAX)) as u16);
                 }
+                // `enablefeatures bits`: which client keys work (bit 1: M).
+                Effect::Command { ref name, ref args, .. } if name == "enablefeatures" => {
+                    let bits = args.first().map_or(0.0, |v| v.num());
+                    s.features = Some(bits.max(0.0).min(f64::from(u32::MAX)) as u32);
+                }
                 // `seteffect r,g,b,a`: the whole map is shaded with that colour.
                 Effect::Command { ref name, ref args, .. } if name == "seteffect" => {
                     let num = |i: usize| args.get(i).map_or(0.0, |v| v.num()) as f32;
                     s.screen_effect = [num(0), num(1), num(2), num(3)];
+                }
+                // `setmap image,levelnames,x,y`: the M map's picture and grid
+                // (applied at once, 2.05), and x, y: where a player whose level
+                // is not on the map is drawn, in levels (GServer's
+                // `serveroptions.txt` notes for the same four fields).
+                Effect::Command { ref name, ref args, .. } if name == "setmap" => {
+                    let file = |i: usize| args.get(i).map(|v| v.text().trim().to_string()).unwrap_or_default();
+                    let num = |i: usize| args.get(i).map_or(0.0, |v| v.num()) as f32;
+                    let (image, txt) = (file(0), file(1));
+                    if !image.is_empty() && !txt.is_empty() {
+                        s.script_map = Some((image, txt, num(2), num(3)));
+                    }
                 }
                 // Collision shape for an NPC.
                 Effect::SetShape { obj, w, h, .. } => {
@@ -833,6 +850,25 @@ mod tests {
         SIGN 5 5\n\
         Read me\n\
         SIGNEND\n";
+
+    /// The 2.05 tutorial's map NPC (`tutorial_b-4.graal`).
+    #[test]
+    fn setmap_names_the_m_maps_picture_and_grid() {
+        let mut s = session("GLEVNW01\nNPC - 1 1\nif (playerenters) {\n  setmap tutorialmap.png,tutorialmap.txt,1.5,3.8;\n}\nNPCEND\n");
+        let mut sc = SessionScripts::new(ClientVersion::V205);
+        assert!(s.script_map.is_none());
+        sc.load_level(&mut s, "tutorial_b-4.graal");
+        assert_eq!(s.script_map, Some(("tutorialmap.png".to_string(), "tutorialmap.txt".to_string(), 1.5, 3.8)));
+    }
+
+    #[test]
+    fn enablefeatures_without_bit_1_turns_the_map_key_off() {
+        let mut s = session("GLEVNW01\nNPC - 1 1\nif (playerenters) { enablefeatures 126; }\nNPCEND\n");
+        let mut sc = SessionScripts::new(ClientVersion::V222);
+        sc.load_level(&mut s, "nomap.nw");
+        assert_eq!(s.features, Some(0x7e));
+        assert!(!s.map_key_enabled());
+    }
 
     #[test]
     fn noplayerkilling_marks_the_level_until_the_next_one_loads() {
