@@ -862,6 +862,9 @@ pub(super) const TAMPER_230: TamperInfo = TamperInfo { words: None, resend: Tamp
 // player is in the level, 2.31 every 5.13 s always.
 pub(super) const SHOWIMG_222: ShowImgInfo = ShowImgInfo { period: Duration::from_millis(5100), needs_others: true };
 pub(super) const SHOWIMG_231: ShowImgInfo = ShowImgInfo { period: Duration::from_millis(5130), needs_others: false };
+/// The real 4.04r2 (lab, 2026-10-31): alone in the level, 5.142 to 5.151 s
+/// apart, the first at the end of the after-burst frames.
+pub(super) const SHOWIMG_404: ShowImgInfo = ShowImgInfo { period: Duration::from_millis(5145), needs_others: false };
 // 2.17.1 (lab, 2026-10-30, `documentation/difftest-217.md` item 3): alone in the
 // level on both lab servers, the first one in the post-login frame, then 5.07
 // to 5.11 s apart while idle (median 5.10 s over the five runs).

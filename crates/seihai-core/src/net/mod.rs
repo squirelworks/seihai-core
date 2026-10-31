@@ -379,6 +379,20 @@ pub fn levelwarpmod_message(mod_time: u32, x: f32, y: f32, level: &str) -> Vec<u
 }
 
 /// `PLI_WANTFILE` (23): the file name, nothing else.
+/// `PLI_VERIFYWANTSEND` (47): the GUINT5 CRC-32 of the client's copy, then
+/// the name. The server sends the file only when its copy differs. The real
+/// 4.04r2 asks a cached `basepackage.gupd` this way (lab, 2026-10-31), as
+/// 5.00r7 does; with no copy it sends `PLI_WANTFILE` (23).
+pub fn verify_want_message(crc: u32, name: &str) -> Vec<u8> {
+    let mut msg = vec![47 + 0x20];
+    for shift in [28, 21, 14, 7, 0] {
+        msg.push(((crc >> shift) & 0x7F) as u8 + 0x20);
+    }
+    msg.extend_from_slice(&to_latin1(name));
+    msg.push(b'\n');
+    msg
+}
+
 pub fn wantfile_message(name: &str) -> Vec<u8> {
     let mut msg = vec![23 + 0x20];
     msg.extend_from_slice(&to_latin1(name));
@@ -605,12 +619,17 @@ pub fn login_gserver(
     password: &str,
     send_tampercheck: bool,
 ) -> Result<GserverSession, LoginFailure> {
-    login_gserver_with(addr, version, key, account, password, send_tampercheck, |n| wantfile_message(n))
+    login_gserver_with(addr, version, key, account, password, send_tampercheck, true, |n| wantfile_message(n))
 }
 
 /// As [`login_gserver`]. `check` gives the file message for each of the
 /// profile's first-frame files ([`crate::protocol::login::LoginInfo::first_frame_files`]):
 /// `PLI_UPDATEFILE` for a file the client has, `PLI_WANTFILE` otherwise.
+/// It gives the same for a 4.x build's file requests after the language
+/// ([`crate::protocol::lobby::LobbyLogin`]); `first_session` is true for
+/// the first login of the run (a lobby build's Login server), which alone
+/// asks the first-session files (`bigmap.txt`).
+#[allow(clippy::too_many_arguments)]
 pub fn login_gserver_with(
     addr: &str,
     version: ClientVersion,
@@ -618,6 +637,7 @@ pub fn login_gserver_with(
     account: &str,
     password: &str,
     send_tampercheck: bool,
+    first_session: bool,
     check: impl Fn(&str) -> Vec<u8>,
 ) -> Result<GserverSession, LoginFailure> {
     let mut conn =
@@ -628,11 +648,21 @@ pub fn login_gserver_with(
     let mut warnings = Vec::new();
     let tamper = if send_tampercheck { TamperSender::for_version(version) } else { None };
     let tamper_unavailable = send_tampercheck && tamper.is_none();
+    let after_login = version.profile().protocol.lobby.and_then(|l| l.after_login);
     if !bundle {
         conn.login_versioned(version, key, account, password)
             .map_err(|error| LoginFailure { connect: false, error })?;
-        if let Err(e) = conn.send_post_login_with(version, "English", tamper.as_ref()) {
-            warnings.push(format!("post-login send failed: {e}"));
+        let mut msgs = conn.post_login_messages(version, "English", tamper.as_ref());
+        // The real 4.04r2 and 4.20r8 ask their base files in the frame of
+        // the language (lab, 2026-10-31).
+        if let Some(a) = after_login {
+            let first = if first_session { a.first_session_files } else { &[] };
+            msgs.extend(a.after_language.iter().chain(first).map(|n| check(n)));
+        }
+        if !msgs.is_empty() {
+            if let Err(e) = conn.send_messages(&msgs) {
+                warnings.push(format!("post-login send failed: {e}"));
+            }
         }
     } else {
         // The real 2.17.1: login line, language and tamper check in one frame.
@@ -643,8 +673,9 @@ pub fn login_gserver_with(
             .map_err(|error| LoginFailure { connect: false, error })?;
     }
     let mut enter_level = EnterLevelSender::for_version(version);
-    if version.profile().protocol.login.is_some() {
-        // The post-login frame carries it (see `protocol::login`).
+    if version.profile().protocol.login.is_some() || after_login.is_some() {
+        // The post-login frame carries it (see `protocol::login`; for 4.x,
+        // `protocol::lobby::LobbyBurst`).
         enter_level.owe_login();
     } else if let Err(e) = enter_level.at_login(&mut conn) {
         warnings.push(format!("enter-level send failed: {e}"));
@@ -1915,6 +1946,14 @@ mod tests {
     /// zlib-compressed (5.12 compresses even short bodies) with 5.12's
     /// round-down step count. 5.24r4 sends the same line with its own
     /// token, the language raw and stepped as every other build.
+    /// The real 4.04r2's check of its cached `basepackage.gupd` (`GRPKG001`
+    /// and a newline, CRC-32 0x15a8ea07), lab 2026-10-31.
+    #[test]
+    fn verify_want_matches_the_real_404() {
+        assert_eq!(crate::assets::crc32::crc32(b"GRPKG001\n"), 0x15a8ea07);
+        assert_eq!(verify_want_message(0x15a8ea07, "basepackage.gupd"), b"O!MCt'basepackage.gupd\n");
+    }
+
     #[test]
     fn lobby_logins_on_the_wire() {
         let (mut conn, mut srv) = pair();
@@ -3257,6 +3296,26 @@ mod tests {
         // A build with no tamper constant (2.3) says so.
         let s = login_gserver(&addr, ClientVersion::V230, 0x33, "ab", "cd", true).unwrap();
         assert!(s.tamper.is_none() && s.tamper_unavailable);
+    }
+
+    /// The real 4.04r2 (lab, 2026-10-31): the language and the update-package
+    /// requests in the frame after the login line, `bigmap.txt` in the first
+    /// session only; the login 46 is held for the after-burst frames.
+    #[test]
+    fn login_gserver_404_asks_its_base_files() {
+        for (first, want) in [
+            (true, &b"EEnglish\n7basepackage.gupd\n7basepackage.gupd\n7bigmap.txt\n"[..]),
+            (false, &b"EEnglish\n7basepackage.gupd\n7basepackage.gupd\n"[..]),
+        ] {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let addr = listener.local_addr().unwrap().to_string();
+            let s = login_gserver_with(&addr, ClientVersion::V404R2, 0x31, "ab", "cd", false, first, wantfile_message).unwrap();
+            assert!(s.warnings.is_empty());
+            assert!(s.enter_level.login_owed());
+            let (mut srv, _) = listener.accept().unwrap();
+            assert!(read_frame(&mut srv).starts_with(b"%QG3D17026"));
+            assert_eq!(gen5_body(&mut srv, &mut Gen5::new(0x31)), want);
+        }
     }
 
     /// The real 2.17.1 (lab, 2026-10-30): the login line, the language and

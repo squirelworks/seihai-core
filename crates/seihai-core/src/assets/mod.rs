@@ -1,7 +1,7 @@
 //! Asset loading and export (levels, GANIs, images).
 
 pub mod builtin;
-mod crc32;
+pub mod crc32;
 mod gani;
 pub mod gif;
 mod level;

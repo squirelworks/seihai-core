@@ -34,10 +34,18 @@
 //! (`Y=0.5, 44=1` south, `X=63, 43=0` west, `X=0.5, 43=1` east). See
 //! [`WalkCadence::cross`].
 //!
-//! The 2.31 client sends `X2`/`Y2` every 50 ms instead, and is not handled
-//! here.
+//! The real 4.04r2 and 4.20r8 (lab, 2026-10-31, `documentation/v4-profiles.md`)
+//! walk on a 50 ms cadence with the precise `X2`/`Y2` (78, 79) instead of
+//! X/Y: the first step sends `GANI` (`walk`), `SPRITE` when the direction
+//! changed and the axis that moved; every next tick the axes that moved
+//! (both on a diagonal), 8 px a tick; `idle` alone the tick after the last
+//! step. A sword swing is `GANI` (`sword`) alone. The Login-lobby builds
+//! (4.x and later) use this precise form ([`WalkCadence::for_version`]).
+//!
+//! The 2.31 client sends `X2`/`Y2` every 50 ms as well, but no walk GANI was
+//! recorded for it, and it is not handled here.
 
-use super::props::encode_pos_classic;
+use super::props::{encode_pos_classic, encode_pos_precise};
 use super::ClientVersion;
 
 /// The 2.22 client's shortest gap between two of its own props messages,
@@ -53,12 +61,16 @@ pub const IDLE_AFTER_TICKS_304: u32 = 1;
 /// 2026-10-30 `gmap_cross` captures).
 pub const IDLE_AFTER_TICKS_217: u32 = 1;
 
+/// The same for the 4.x builds: one tick, in every walk of the lab runs.
+pub const IDLE_AFTER_TICKS_4X: u32 = 1;
+
 /// What the player shows, as the props would carry it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WalkState {
-    /// `X` and `Y` in half tiles.
-    pub x: u8,
-    pub y: u8,
+    /// `X` and `Y` as the build sends them: half tiles (X, Y), or the
+    /// precise `X2`/`Y2` value ([`encode_pos_precise`]).
+    pub x: u16,
+    pub y: u16,
     pub sprite: u8,
     /// The GANI name, when the pose is one this sender names (`walk`,
     /// `idle`, `sword`). `None` leaves the GANI prop alone.
@@ -66,8 +78,14 @@ pub struct WalkState {
 }
 
 impl WalkState {
+    /// The classic form: X and Y in half tiles.
     pub fn new(x: f32, y: f32, sprite: u8, gani: Option<&'static str>) -> Self {
-        Self { x: encode_pos_classic(x), y: encode_pos_classic(y), sprite, gani }
+        Self { x: u16::from(encode_pos_classic(x)), y: u16::from(encode_pos_classic(y)), sprite, gani }
+    }
+
+    /// The precise form: `X2`/`Y2`.
+    pub fn new_precise(x: f32, y: f32, sprite: u8, gani: Option<&'static str>) -> Self {
+        Self { x: encode_pos_precise(x), y: encode_pos_precise(y), sprite, gani }
     }
 }
 
@@ -78,24 +96,39 @@ pub struct WalkCadence {
     sent: Option<WalkState>,
     tick: u32,
     sent_tick: Option<u32>,
-    pos: (u8, u8),
+    pos: (u16, u16),
     moved_tick: u32,
     idle_after: u32,
+    /// Ticks between two props messages.
+    interval: u32,
+    /// Positions go out as `X2`/`Y2` (78, 79), not X/Y (15, 16).
+    precise: bool,
     /// Cell props of a gmap crossing not sent yet: the new cell x (43) and
     /// cell y (44).
     cell: (Option<u8>, Option<u8>),
 }
 
 impl WalkCadence {
-    /// The builds this sender is for: 2.17, 2.22 and 3.04.
+    /// The builds this sender is for: 2.17, 2.22 and 3.04, and the 4.x
+    /// builds with recorded after-login messages (precise, every tick).
     pub fn for_version(v: ClientVersion) -> Option<Self> {
-        let idle_after = match v {
-            ClientVersion::V217 => IDLE_AFTER_TICKS_217,
-            ClientVersion::V222 => IDLE_AFTER_TICKS,
-            ClientVersion::V304 => IDLE_AFTER_TICKS_304,
+        let (idle_after, interval, precise) = match v {
+            ClientVersion::V217 => (IDLE_AFTER_TICKS_217, INTERVAL_TICKS, false),
+            ClientVersion::V222 => (IDLE_AFTER_TICKS, INTERVAL_TICKS, false),
+            ClientVersion::V304 => (IDLE_AFTER_TICKS_304, INTERVAL_TICKS, false),
+            _ if v.profile().protocol.lobby.is_some_and(|l| l.after_login.is_some()) => (IDLE_AFTER_TICKS_4X, 1, true),
             _ => return None,
         };
-        Some(Self { sent: None, tick: 0, sent_tick: None, pos: (0, 0), moved_tick: 0, idle_after, cell: (None, None) })
+        Some(Self { sent: None, tick: 0, sent_tick: None, pos: (0, 0), moved_tick: 0, idle_after, interval, precise, cell: (None, None) })
+    }
+
+    /// The walk state for this sender's position form.
+    pub fn state(&self, x: f32, y: f32, sprite: u8, gani: Option<&'static str>) -> WalkState {
+        if self.precise {
+            WalkState::new_precise(x, y, sprite, gani)
+        } else {
+            WalkState::new(x, y, sprite, gani)
+        }
     }
 
     /// The last props sent had `walk` as the GANI: the server knows the
@@ -145,7 +178,7 @@ impl WalkCadence {
         if gani.is_none() && cur.x == last.x && cur.y == last.y && cur.sprite == last.sprite && cell_x.is_none() && cell_y.is_none() {
             return None;
         }
-        if self.sent_tick.is_some_and(|t| n.wrapping_sub(t) < INTERVAL_TICKS) {
+        if self.sent_tick.is_some_and(|t| n.wrapping_sub(t) < self.interval) {
             return None;
         }
         let mut m = vec![2 + 0x20];
@@ -154,13 +187,18 @@ impl WalkCadence {
             m.push(g.len() as u8 + 0x20);
             m.extend(g.as_bytes());
         }
+        let send_x = cur.x != last.x || cell_x.is_some();
+        let send_y = cur.y != last.y || cell_y.is_some();
         // Ascending ids: GANI 10, X 15, Y 16, SPRITE 17, then the cell props
-        // 43 and 44 (the real 2.22's `X, GMAPLEVELX`).
-        if cur.x != last.x || cell_x.is_some() {
-            m.extend([15 + 0x20, cur.x.wrapping_add(0x20)]);
-        }
-        if cur.y != last.y || cell_y.is_some() {
-            m.extend([16 + 0x20, cur.y.wrapping_add(0x20)]);
+        // 43 and 44 (the real 2.22's `X, GMAPLEVELX`), then X2 78 and Y2 79
+        // (4.x: `GANI, SPRITE, X2`).
+        if !self.precise {
+            if send_x {
+                m.extend([15 + 0x20, (cur.x as u8).wrapping_add(0x20)]);
+            }
+            if send_y {
+                m.extend([16 + 0x20, (cur.y as u8).wrapping_add(0x20)]);
+            }
         }
         if cur.sprite != last.sprite {
             m.extend([17 + 0x20, cur.sprite.wrapping_add(0x20)]);
@@ -170,6 +208,16 @@ impl WalkCadence {
         }
         if let Some(cy) = cell_y {
             m.extend([44 + 0x20, cy.wrapping_add(0x20)]);
+        }
+        if self.precise {
+            if send_x {
+                m.push(78 + 0x20);
+                m.extend(crate::net::gshort(cur.x));
+            }
+            if send_y {
+                m.push(79 + 0x20);
+                m.extend(crate::net::gshort(cur.y));
+            }
         }
         self.cell = (None, None);
         m.push(b'\n');
@@ -406,5 +454,55 @@ mod tests {
         for _ in 0..4 {
             assert_eq!(c.tick(WalkState::new(0.0, 30.0, 3, Some("idle"))), None);
         }
+    }
+
+    /// The real 4.04r2 (lab, 2026-10-31, `proxy-r404.log`): right from 30
+    /// for five steps, then a diagonal; `walk` + SPRITE + X2 on the first
+    /// step, one axis (or both) every tick, `idle` the tick after the last.
+    #[test]
+    fn the_404_walk() {
+        let v = ClientVersion::V404R2;
+        let mut c = WalkCadence::for_version(v).unwrap();
+        let st = |c: &WalkCadence, x: f32, y: f32, sprite: u8, g| c.state(x, y, sprite, Some(g));
+        let s0 = st(&c, 30.0, 30.0, 2, "idle");
+        assert_eq!(c.tick(s0), None);
+        assert_eq!(c.tick(s0), None);
+        let mut out = Vec::new();
+        for i in 1..=5 {
+            let s = st(&c, 30.0 + 0.5 * i as f32, 30.0, 3, "walk");
+            out.push(c.tick(s));
+        }
+        let s = st(&c, 32.5, 30.0, 3, "idle");
+        out.push(c.tick(s));
+        out.push(c.tick(s));
+        let s = st(&c, 33.0, 30.0, 3, "walk");
+        out.push(c.tick(s));
+        let s = st(&c, 33.5, 30.5, 3, "walk");
+        out.push(c.tick(s));
+        let got: Vec<Option<Vec<u8>>> = out;
+        let want: Vec<Option<&[u8]>> = vec![
+            Some(b"\"*$walk1#n'p\n"),
+            Some(b"\"n'\x80\n"),
+            Some(b"\"n'\x90\n"),
+            Some(b"\"n( \n"),
+            Some(b"\"n(0\n"),
+            Some(b"\"*$idle\n"),
+            None,
+            Some(b"\"*$walkn(@\n"),
+            Some(b"\"n(Po'p\n"),
+        ];
+        assert_eq!(got.iter().map(|m| m.as_deref()).collect::<Vec<_>>(), want);
+    }
+
+    /// The precise form is for the 4.x builds with recorded after-login
+    /// messages; 5.x and 6.x keep their plain walk.
+    #[test]
+    fn precise_cadence_builds() {
+        for v in [ClientVersion::V404R2, ClientVersion::V420R6, ClientVersion::V420R8] {
+            assert!(WalkCadence::for_version(v).is_some_and(|c| c.precise && c.interval == 1), "{}", v.label());
+        }
+        assert!(WalkCadence::for_version(ClientVersion::V500R7).is_none());
+        assert!(WalkCadence::for_version(ClientVersion::V231).is_none());
+        assert!(!WalkCadence::for_version(ClientVersion::V222).unwrap().precise);
     }
 }

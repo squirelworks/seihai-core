@@ -282,6 +282,11 @@ pub fn download_dir(profile: &VersionProfile, name: &str) -> Vec<&'static str> {
     if matches!(ext, ".nw" | ".graal" | ".zelda") {
         return vec!["levels"];
     }
+    // The real 4.04r2 keeps update packages in `updatepackages/` (lab,
+    // 2026-10-31).
+    if ext == ".gupd" {
+        return vec!["updatepackages"];
+    }
     let sub = if base.starts_with("bomy") || base.starts_with("b_") {
         "bomys"
     } else if ext == ".gani" {
@@ -302,6 +307,23 @@ pub fn download_dir(profile: &VersionProfile, name: &str) -> Vec<&'static str> {
         "webgifs"
     };
     vec!["levels", sub]
+}
+
+/// The CRC-32 of a cached copy of `name` under the first of `roots` that
+/// has one, in the folder [`download_dir`] gives it (or at the root). The
+/// 4.x builds check a cached update package with `PLI_VERIFYWANTSEND` (47)
+/// and this value ([`crate::net::verify_want_message`]).
+pub fn cached_crc32(roots: &[&Path], profile: &VersionProfile, name: &str) -> Option<u32> {
+    let rel = clean_name(name)?;
+    roots.iter().find_map(|r| {
+        let mut p = r.to_path_buf();
+        for c in download_dir(profile, &rel) {
+            p.push(c);
+        }
+        p.push(&rel);
+        std::fs::read(&p).or_else(|_| std::fs::read(r.join(&rel))).ok()
+    })
+    .map(|d| crate::assets::crc32::crc32(&d))
 }
 
 /// Is this the name of an image the client draws (`.png`, `.gif`, `.mng`,
@@ -624,7 +646,19 @@ impl FileSession {
         let Some(clean) = clean_name(name) else { return Vec::new() };
         let local = self.store.local_mod_time(&clean);
         let local = local.or_else(|| self.store.memory_file(&clean).map(|m| m.mod_time.unwrap_or(0)));
-        self.requests.need(name, local).iter().map(FileRequest::message).collect()
+        let msgs = self.requests.need(name, local).iter().map(FileRequest::message).collect();
+        self.with_gani_updates(msgs)
+    }
+
+    /// A 4.x build follows each `WANTFILE` for a GANI with `PLI_UPDATEGANI`
+    /// (157, [`crate::protocol::lobby::with_gani_updates`]); other builds
+    /// send the messages as they are.
+    fn with_gani_updates(&self, msgs: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+        if self.store.resolver().profile().protocol.lobby.is_some_and(|l| l.after_login.is_some()) {
+            crate::protocol::lobby::with_gani_updates(msgs)
+        } else {
+            msgs
+        }
     }
 
     /// The player took a step. On the first two steps of a connection the
@@ -691,7 +725,7 @@ impl FileSession {
                 out.up_to_date.push(n.to_string());
             }
         }
-        out.send = next.iter().map(FileRequest::message).collect();
+        out.send = self.with_gani_updates(next.iter().map(FileRequest::message).collect());
         out
     }
 }
@@ -1055,5 +1089,19 @@ mod tests {
         let saved = root.join("levels/webgifs/img1.png");
         assert_eq!(mod_time_of(&saved), Some(1_600_000_000));
         fs::remove_dir_all(&root).ok();
+    }
+
+    /// A 4.x build keeps update packages in `updatepackages/` and checks a
+    /// cached one by its CRC-32 (lab, 2026-10-31).
+    #[test]
+    fn update_packages_and_their_crc() {
+        let p = crate::protocol::ClientVersion::V404R2.profile();
+        assert_eq!(download_dir(p, "basepackage.gupd"), ["updatepackages"]);
+        let a = tmp("gupd-a");
+        let b = tmp("gupd-b");
+        assert_eq!(cached_crc32(&[&a, &b], p, "basepackage.gupd"), None);
+        fs::create_dir_all(b.join("updatepackages")).unwrap();
+        fs::write(b.join("updatepackages").join("basepackage.gupd"), b"GRPKG001\n").unwrap();
+        assert_eq!(cached_crc32(&[&a, &b], p, "basepackage.gupd"), Some(0x15a8ea07));
     }
 }

@@ -439,15 +439,16 @@ Generated; do not edit between the markers.
 
 - protocol: **listserver**: listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame inferred, not captured) -> none
 - protocol: **plo (server ids handled)**: +105 UPDATEPACKAGESIZE, +106 UPDATEPACKAGEDONE, +170 GHOSTMODE, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +190 SERVERLISTCONNECTED, +191 SHOOT2, +193 UNKNOWN193, +194 CLEARWEAPONS, +195 LOADGANI (88 -> 98 ids)
-- protocol: **pli (client ids sent)**: +44 PROCESSLIST, +79 RC_CHAT, +92 RC_FILEBROWSER_DOWN, +130 REQUESTUPDATEBOARD, +161 UPDATECLASS; -40 SHOOT, -43 MUTEPLAYER (54 -> 57 ids)
+- protocol: **pli (client ids sent)**: +44 PROCESSLIST, +47 VERIFYWANTSEND, +79 RC_CHAT, +92 RC_FILEBROWSER_DOWN, +130 REQUESTUPDATEBOARD, +161 UPDATECLASS; -40 SHOOT, -43 MUTEPLAYER (54 -> 58 ids)
+- protocol: **showimg (id 24)**: none -> every 5145 ms
 - protocol: **login frame**: head and default-weapon files, props without head or colours with OS mac and code page 1250, status icons -> none
-- protocol: **login lobby**: none -> first server "Login", nothing drawn until 178, login line ends win,"","",""
+- protocol: **login lobby**: none -> first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252
 - ui: **server_list**: 3 tabs -> direct (loginserver.graalonline.com:14900)
 - ui: **chat_text**: ChatText { face: TempusSans, height: 24 } -> ChatText { face: Arial, height: 24 }
 - unknown (pli): the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34, 38 and 46 seen in the lab; the 2026-10-31 live run saw 2, 4, 9, 23, 24, 34, 37, 38, 44, 46, 152, 154 and 157, all in the set)
 - unknown (login): Seihai sends the three machine fields as an empty quoted string, as for 5.00r7; the real client sends three MD5s
-- unknown (login): the base-file requests after the language (basepackage.gupd, bigmap.txt), 152 and 154 (PM and lister setup) and the own props burst are not sent
-- unknown (walk): SPRITE, X2 and Y2 go out with every step; the real client sends only what changed and GANI walk/idle (lab, 2026-10-31)
+- unknown (login): the after-login messages follow the real client (lab, 2026-10-31), but the nickname is Seihai's setting (default the account), 44 lists Seihai's own window title, and the client's file checks of its GUI images (plisticon, plistcat, state.png, pics1.png) are not sent
+- unknown (walk): the 50 ms X2/Y2 cadence with GANI walk/idle follows the lab; pushing, grabbing, carrying and the bow were not compared
 - unknown (serverwarp): the lab's 178 reached the game server, but the warp text it used was not recorded; split on commas only, as the 5.x and 6.x builds
 - unknown (props): own and other prop sets are 3.153's; no 4.x prop parser was read (the lab saw X2/Y2, 78 and 79)
 - unknown (ui): chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
@@ -457,8 +458,8 @@ Generated; do not edit between the markers.
 #### 4.20r6 (`G3D27076`, binary, linked 2006-09)
 
 - protocol: **plo (server ids handled)**: +107 BOARDLAYER, +108 UNKNOWN108; -41 STARTMESSAGE (98 -> 99 ids)
-- protocol: **pli (client ids sent)**: +162 RC_UNKNOWN162 (57 -> 58 ids)
-- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends mac,"","",""
+- protocol: **pli (client ids sent)**: +162 RC_UNKNOWN162 (58 -> 59 ids)
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252 -> first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS mac and code page 1252
 - unknown (pli): only 162 (the answer to 108) was confirmed in the Mac binary; the rest of 4.20r8's set is taken
 - unknown (login): the fourth field is empty in the binary; Seihai sends it, like the other two, as an empty quoted string
 - unknown (live): never run (PowerPC)
@@ -468,7 +469,7 @@ Generated; do not edit between the markers.
 #### 4.20r8 (`G3D20126`, binary, linked 2007-01)
 
 - protocol: **plo (server ids handled)**: +41 STARTMESSAGE, +196 (99 -> 101 ids)
-- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends mac,"","","" -> first server "Login", nothing drawn until 178, login line ends win,"","",""
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS mac and code page 1252 -> first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252
 - unknown (pli): provisional: some sends pass the id in a register, so the set is a floor; 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's
 - unknown (binary): only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 - unknown (plo): 196 (same layout as 193) is read and dropped by the client; Seihai drops it too
@@ -477,7 +478,9 @@ Generated; do not edit between the markers.
 #### 5.00r7 (`G3D22067`, binary, linked 2007-07)
 
 - protocol: **plo (server ids handled)**: +140 NPCWEAPONSCRIPT, +197 LOADSCRIPT; -100 RAWDATA, -108 UNKNOWN108, -196 (101 -> 100 ids)
-- protocol: **pli (client ids sent)**: +47 VERIFYWANTSEND, +159 UPDATEPACKAGEREQUESTFILE; -162 RC_UNKNOWN162 (58 -> 59 ids)
+- protocol: **pli (client ids sent)**: +159 UPDATEPACKAGEREQUESTFILE; -162 RC_UNKNOWN162 (59 -> 59 ids)
+- protocol: **showimg (id 24)**: every 5145 ms -> none
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252 -> first server "Login", nothing drawn until 178, login line ends win,"","",""
 - unknown (pli): only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
 - unknown (login): Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); stock GServer-v2 accepts all three empty (lab, 2026-10-31), other servers are untested
 - unknown (login): the base-file requests after the language (47 or 23 basepackage.gupd) are not sent
