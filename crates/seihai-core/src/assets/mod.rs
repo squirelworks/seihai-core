@@ -5,6 +5,7 @@ pub mod crc32;
 mod gani;
 pub mod gif;
 mod level;
+pub mod mng;
 mod objects;
 mod png;
 pub(crate) mod resolve;
@@ -27,4 +28,5 @@ pub use level::{
     Link, Npc, NpcImage, Object2x2, ObjectTables, Sign, Tile, TileKind, TileTypes, new_world_tile_type, image_vis_height, SCREEN_HEIGHT, TYPE_BED_BOTTOM, TYPE_CHAIR, TYPE_THROW_THROUGH, TYPE_WATER,
 };
 pub use zelda::{is_zelda, Computer, ZeldaLayout, ZeldaLevel, ZeldaLink, ZeldaMagic, ZeldaSign};
+pub use mng::{is_mng, read_mng, ImageAnimations, MngAnimation};
 pub use png::{read_png_rgb, read_png_rgba, read_png_rgba_recolored, write_png_indexed, write_png_rgb};
