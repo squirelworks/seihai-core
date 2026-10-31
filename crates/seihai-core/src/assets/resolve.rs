@@ -248,6 +248,12 @@ impl AssetResolver {
         self.level_in(name, false)
     }
 
+    /// A level in the server cache folders only (what a server sent), with
+    /// no mod-time check: the copy the F5 window offers to open offline.
+    pub fn cached_level(&self, name: &str) -> Option<PathBuf> {
+        self.level_in(name, true)
+    }
+
     /// [`Self::level`], in the per-server cache only (`cache_only`) or in
     /// every layer.
     fn level_in(&self, name: &str, cache_only: bool) -> Option<PathBuf> {
@@ -724,6 +730,21 @@ mod tests {
         touch(&cache, "levels/new1.nw");
         crate::filecache::set_mod_time(&cache.join("levels/new1.nw"), 1_000).unwrap();
         assert_eq!(r.level_at_mod_time("new1.nw", Some(1_000)), Some(cache.join("levels/new1.nw")));
+    }
+
+    /// The F5 window's "open offline" copy: the server cache's file at
+    /// any time, never the install's.
+    #[test]
+    fn cached_level_is_the_server_cache_copy_only() {
+        let install = tmp("cached-install");
+        let cache = tmp("cached-cache");
+        touch(&install, "levels/onlinestartlocal.nw");
+        let r = AssetResolver::empty(ClientVersion::V222.profile())
+            .with_assets(Some(AssetRoot::new(&install)))
+            .with_cache(Some(cache.clone()));
+        assert_eq!(r.cached_level("onlinestartlocal.nw"), None);
+        touch(&cache, "levels/onlinestartlocal.nw");
+        assert_eq!(r.cached_level("onlinestartlocal.nw"), Some(cache.join("levels/onlinestartlocal.nw")));
     }
 
     #[test]
