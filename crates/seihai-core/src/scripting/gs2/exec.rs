@@ -15,6 +15,7 @@
 //! (`documentation/gs2-commands.md`).
 
 use super::lists::{self, Value};
+use super::maths;
 use super::strings::{self, client_int};
 use super::{Op, Operand, Script};
 use crate::scripting::engine::vocab::{self, Exec};
@@ -136,6 +137,8 @@ pub struct Machine {
     scheduled: Vec<Scheduled>,
     /// Events whose frame came while a run was asleep, in order.
     due: Vec<(String, Vec<Val>)>,
+    /// The objects of the `with` blocks the run is in, innermost last.
+    with: Vec<Root>,
 }
 
 /// Seconds to whole frames, as GServer-v2 does it: `(int)(t * 20)`.
@@ -169,6 +172,7 @@ impl Machine {
             timeout: 0,
             scheduled: Vec::new(),
             due: Vec::new(),
+            with: Vec::new(),
         }
     }
 
@@ -199,6 +203,7 @@ impl Machine {
         self.stack.clear();
         self.frames.clear();
         self.loops.clear();
+        self.with.clear();
         self.pc = 0;
         self.running = true;
         self.exec(host)
@@ -213,6 +218,7 @@ impl Machine {
         self.stack.clear();
         self.frames.clear();
         self.loops.clear();
+        self.with.clear();
         self.stack.push(Slot::Marker);
         for a in args.iter().rev() {
             self.stack.push(match a {
@@ -302,6 +308,11 @@ impl Machine {
         self.script.functions.iter().find(|f| f.name == name || f.name == public).map(|f| f.start)
     }
 
+    /// What `this` is: the innermost `with` object, else the script's own.
+    fn this_root(&self) -> Root {
+        self.with.last().copied().unwrap_or(Root::This)
+    }
+
     fn store(root: Root) -> Root {
         match root {
             Root::ThisO => Root::This,
@@ -315,6 +326,7 @@ impl Machine {
         self.running = false;
         self.stack.clear();
         self.frames.clear();
+        self.with.clear();
         Outcome::Stopped(why)
     }
 
@@ -343,13 +355,14 @@ impl Machine {
                 if let Some(v) = self.frames.last().and_then(|f| f.locals.get(name)) {
                     return v.clone();
                 }
-                if name.eq_ignore_ascii_case("timeout") {
+                let this = self.this_root();
+                if this == Root::This && name.eq_ignore_ascii_case("timeout") {
                     return Val::Num(self.timeout()).into();
                 }
-                if let Some(v) = host.get_prop(Root::This, name) {
+                if let Some(v) = host.get_prop(this, name) {
                     return v.into();
                 }
-                for r in [Root::This, Root::Level, Root::Global] {
+                for r in [Self::store(this), Root::Level, Root::Global] {
                     if let Some(v) = self.vars.get(&(r, name.to_string())) {
                         return v.clone();
                     }
@@ -387,14 +400,18 @@ impl Machine {
                     f.locals.insert(name.to_string(), value);
                     return;
                 }
-                if name.eq_ignore_ascii_case("timeout") {
+                let this = self.this_root();
+                if this == Root::This && name.eq_ignore_ascii_case("timeout") {
                     self.timeout = frames(value.num());
                     return;
                 }
-                if host.set_prop(Root::This, name, &value.val()) {
+                if host.set_prop(this, name, &value.val()) {
                     return;
                 }
-                [Root::This, Root::Level].into_iter().find(|r| self.vars.contains_key(&(*r, name.to_string()))).unwrap_or(Root::Global)
+                // A new name goes to the global object, or inside `with`
+                // to the `with` object.
+                let new = if self.with.is_empty() { Root::Global } else { Self::store(this) };
+                [Self::store(this), Root::Level].into_iter().find(|r| self.vars.contains_key(&(*r, name.to_string()))).unwrap_or(new)
             }
         };
         self.vars.insert((target, name.to_string()), value);
@@ -586,7 +603,7 @@ impl Machine {
                         Op::TypeFalse => Slot::Num(0.0),
                         Op::TypeNull => Slot::Obj(None),
                         Op::Pi => Slot::Num(std::f64::consts::PI),
-                        Op::This => Slot::Obj(Some((Root::This, String::new()))),
+                        Op::This => Slot::Obj(Some((self.this_root(), String::new()))),
                         Op::ThisO => Slot::Obj(Some((Root::ThisO, String::new()))),
                         Op::Player => Slot::Obj(Some((Root::Player, String::new()))),
                         Op::PlayerO => Slot::Obj(Some((Root::PlayerO, String::new()))),
@@ -938,6 +955,91 @@ impl Machine {
                     }
                 }
 
+                // Below the top is S1, the top S0; see `gs2-commands.md`.
+                Op::Exp => {
+                    let Some(a) = self.pop_num(host) else { return fault(self, host) };
+                    self.push(Slot::Num(a.exp()));
+                }
+                // log(S0) / log(S1): S1 is the base. A base of 0 or less gives 0.
+                Op::Log => {
+                    let (Some(x), Some(base)) = (self.pop_num(host), self.pop_num(host)) else { return fault(self, host) };
+                    self.push(Slot::Num(if base > 0.0 { x.ln() / base.ln() } else { 0.0 }));
+                }
+                Op::GetAngle | Op::GetDir => {
+                    let (Some(dy), Some(dx)) = (self.pop_num(host), self.pop_num(host)) else { return fault(self, host) };
+                    self.push(Slot::Num(if ins.op == Op::GetAngle { maths::angle(dx, dy) } else { maths::dir(dx, dy) }));
+                }
+                Op::VecX | Op::VecY => {
+                    let Some(d) = self.pop_num(host) else { return fault(self, host) };
+                    let (x, y) = maths::vec(d);
+                    self.push(Slot::Num(if ins.op == Op::VecX { x } else { y }));
+                }
+                Op::ShiftLeft | Op::ShiftRight => {
+                    let (Some(b), Some(a)) = (self.pop_num(host), self.pop_num(host)) else { return fault(self, host) };
+                    let (a, b) = (client_int(a), client_int(b));
+                    let f = if ins.op == Op::ShiftLeft { maths::shl(a, b) } else { maths::shr(a, b) };
+                    self.push(Slot::Num(f as f64));
+                }
+                // `x in |a, b|`; a list `x` is in when each element is.
+                Op::InRange => {
+                    let (Some(b), Some(a), Some(x)) = (self.pop_num(host), self.pop_num(host), self.pop()) else {
+                        return fault(self, host);
+                    };
+                    let inside = |v: f64| v >= a && v <= b;
+                    let yes = match self.value_full(x, host) {
+                        Value::List(l) if !l.is_empty() => l.iter().all(|e| inside(e.num())),
+                        v => inside(v.num()),
+                    };
+                    self.push(Slot::Num(yes as i32 as f64));
+                }
+                // 0 number, 1 string, 2 object, 3 a list with elements, -1
+                // anything else (`0x53`).
+                Op::ObjType => {
+                    let Some(o) = self.pop() else { return fault(self, host) };
+                    let t = match o {
+                        Slot::Obj(None) | Slot::Marker => -1.0,
+                        Slot::Obj(Some((_, ref path))) if path.is_empty() => 2.0,
+                        o => match self.value_full(o, host) {
+                            Value::List(l) if !l.is_empty() => 3.0,
+                            Value::List(_) => -1.0,
+                            Value::Val(Val::Num(_)) => 0.0,
+                            Value::Val(Val::Str(_)) => 1.0,
+                        },
+                    };
+                    self.push(Slot::Num(t));
+                }
+                // The list below, the value on top: the client's order, which
+                // is not the order gs2-parser pushes.
+                Op::ObjIndices => {
+                    let (Some(v), Some(o)) = (self.pop(), self.pop()) else { return fault(self, host) };
+                    let v = self.value_full(v, host);
+                    let l = self.list_of(&o, host);
+                    let found = l.iter().enumerate().filter(|(_, e)| e.same(&v, compare)).map(|(i, _)| Value::Val(Val::Num(i as f64))).collect();
+                    self.push(Slot::List(found));
+                }
+                // `setarray(a, n)`: pads with 0 or cuts to `n` (0..=10 000).
+                Op::SetArray => {
+                    let (Some(n), Some(o)) = (self.pop_num(host), self.pop()) else { return fault(self, host) };
+                    let n = client_int(n).clamp(0, 10_000) as usize;
+                    self.edit_list(&o, host, |l| l.resize(n, Value::Val(Val::Num(0.0))));
+                }
+                // A null object (or one Seihai cannot name) skips the block.
+                Op::With => {
+                    let Some(o) = self.pop() else { return fault(self, host) };
+                    match o {
+                        Slot::Obj(Some((root, path))) if path.is_empty() => self.with.push(root),
+                        other => {
+                            if let Slot::Obj(Some((_, path))) = other {
+                                host.log(format!("gs2: with ({path}) at op {at}: Seihai has no object references, block skipped"));
+                            }
+                            self.pc = int.unwrap_or(0).max(0) as usize;
+                        }
+                    }
+                }
+                Op::WithEnd => {
+                    self.with.pop();
+                }
+
                 Op::Unknown(n) => host.log(format!("gs2: unknown opcode {n} at op {at}, skipped")),
                 other => host.log(format!("gs2: {other} at op {at} is not run yet (Stage D), skipped")),
             }
@@ -1104,6 +1206,10 @@ fn num(args: &[Val], i: usize) -> f64 {
 impl Host for EffectHost {
     fn command(&mut self, name: &str, args: &[Val]) -> Option<Val> {
         let obj = self.obj;
+        // Built-in names match in any case, and `this.showimg(…)` is the
+        // script's own `showimg`, as for the timer commands.
+        let lower = name.to_ascii_lowercase();
+        let name = lower.strip_prefix("this.").or_else(|| lower.strip_prefix("thiso.")).unwrap_or(&lower);
         match name {
             // `set "name"` or `set "name=value"`, as GS1 reads it.
             "set" => {
