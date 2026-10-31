@@ -1,6 +1,6 @@
 //! Parse every unique NPC script in the fixtures and report failures.
 //!
-//! Run with: cargo test -p seihai --test script_stress -- --nocapture
+//! Run with: cargo test -p seihai-core --test script_stress -- --nocapture
 //! Set `STRESS_ALL=1` to list every script with diagnostics, not just the
 //! first 40.
 

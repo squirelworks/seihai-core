@@ -591,7 +591,7 @@ fn listserver_requests_are_redacted_and_keep_no_raw() {
 
 /// Writes the synthetic session used above, so the examples in
 /// `documentation/capture-viewer.md` can be re-run:
-/// `SEIHAI_VIEWER_SAMPLE_OUT=/path/sample.pcap cargo test -p seihai --lib write_sample_pcap -- --ignored`
+/// `SEIHAI_VIEWER_SAMPLE_OUT=/path/sample.pcap cargo test -p seihai-core --lib write_sample_pcap -- --ignored`
 #[test]
 #[ignore = "writes a file; run by hand"]
 fn write_sample_pcap() {
