@@ -189,7 +189,7 @@ pub fn parse_server_warp(payload: &[u8]) -> Option<ServerWarp> {
     Some(ServerWarp { name: latin1(name), host: latin1(host), port: latin1(port) })
 }
 
-/// `PLO_SERVERWARP` (178) as the 5.x and 6.x lobby builds read it: the same
+/// `PLO_SERVERWARP` (178) as the 4.x, 5.x and 6.x lobby builds read it: the same
 /// four fields, split on commas only (see
 /// [`super::lobby::split_warp_fields`]), so `0,Lab Server,127.0.0.1,14900`
 /// keeps the name `Lab Server`. Fewer than four fields is no warp, as for

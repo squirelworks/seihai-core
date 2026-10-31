@@ -1,6 +1,6 @@
-//! The 5.x and 6.x "Login" lobby.
+//! The 4.x, 5.x and 6.x "Login" lobby.
 //!
-//! From 5.00 on there is no listserver protocol. The client opens a normal
+//! From 4.04 on there is no listserver protocol. The client opens a normal
 //! game connection to a server it names `Login` and is shown the server list
 //! and account screens as scripted GUI there. While the current server's name
 //! starts with "login" (any case) the client draws the level, chests and
@@ -9,7 +9,8 @@
 //! it names, under the new name. Sources, all in Graal_analysis:
 //! `protocol/v5x-clients.md`, `protocol/v6x-clients.md`,
 //! `protocol/v5v6-windows-unpacked.md`, `protocol/v5v6-lab-play.md` and
-//! `version-profiles/lab-v5-2026-10-30.md`.
+//! `version-profiles/lab-v5-2026-10-30.md`; for 4.x, `protocol/v4x-clients.md`,
+//! `client-internals/live-behaviour-404.md` and `version-profiles/4.04-4.20.toml`.
 //!
 //! The login line of these builds ends with an unprefixed comma list after
 //! the password: the platform (`win`), three machine fields (MD5 hex of the
@@ -33,8 +34,14 @@ pub struct Lobby {
     pub os_version: Option<&'static str>,
 }
 
-/// 5.00r7: four fields (`win,<md5>,"",<md5>` in the lab capture).
-pub const LOBBY_500: Lobby = Lobby { first_server: "Login", platform: "win", os_version: None };
+/// 4.04r2, 4.20r8 and 5.00r7: four fields (`win` and three MD5s, read in
+/// the 4.x engines; `win,<md5>,"",<md5>` in the 5.00r7 lab capture).
+pub const LOBBY_404: Lobby = Lobby { first_server: "Login", platform: "win", os_version: None };
+/// The Mac 4.20r6: `mac`, a hash of the Ethernet MAC, a hash of
+/// `stat("/etc")` and an empty fourth field (read in the binary, never run).
+pub const LOBBY_420_MAC: Lobby = Lobby { platform: "mac", ..LOBBY_404 };
+/// 5.00r7: the same as 4.x.
+pub const LOBBY_500: Lobby = LOBBY_404;
 /// 5.12 to 6.03r7: the quoted Windows version as a fifth field.
 pub const LOBBY_512: Lobby = Lobby { os_version: Some("\"6.2 9200 \""), ..LOBBY_500 };
 
@@ -82,6 +89,8 @@ mod tests {
 
     #[test]
     fn tails() {
+        assert_eq!(LOBBY_404.login_tail(), b"win,\"\",\"\",\"\"");
+        assert_eq!(LOBBY_420_MAC.login_tail(), b"mac,\"\",\"\",\"\"");
         assert_eq!(LOBBY_500.login_tail(), b"win,\"\",\"\",\"\"");
         assert_eq!(LOBBY_512.login_tail(), b"win,\"\",\"\",\"\",\"6.2 9200 \"");
     }
