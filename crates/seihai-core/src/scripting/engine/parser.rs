@@ -353,13 +353,15 @@ impl<'a> Parser<'a> {
                 self.end_stmt();
                 Some(Stmt::Return(v))
             }
-            "break" => {
+            // `break();` and `continue();`, written like calls, as 2gta's
+            // scripts have them: the empty `()` is dropped.
+            "break" | "continue" => {
+                if self.is_op("(") && self.second_is_op(")") {
+                    self.next();
+                    self.next();
+                }
                 self.end_stmt();
-                Some(Stmt::Break)
-            }
-            "continue" => {
-                self.end_stmt();
-                Some(Stmt::Continue)
+                Some(if w == "break" { Stmt::Break } else { Stmt::Continue })
             }
             "elseif" => {
                 // `elseif` at statement start is an `if`.
@@ -1158,6 +1160,15 @@ mod twogta_recovery {
         let s = parse("this.a := 3; this.b := this.a + 1;", Era::V21);
         assert!(s.diagnostics.is_empty(), "{:?}", s.diagnostics);
         assert_eq!(s.to_string(), "(= this.a 3)\n(= this.b (+ this.a 1))\n");
+    }
+
+    #[test]
+    fn break_and_continue_written_as_calls() {
+        let s = parse("while (1) { if (a) continue(); break(); }\nthis.b = 1;", Era::V21);
+        assert!(s.diagnostics.is_empty(), "{:?}", s.diagnostics);
+        assert_eq!(s.to_string(), "(while 1 (block (if a (continue)) (break)))\n(= this.b 1)\n");
+        // Anything inside the parentheses is still an error.
+        assert!(!parse("while (1) { break(1); }", Era::V21).diagnostics.is_empty());
     }
 
     #[test]
