@@ -356,4 +356,29 @@ mod tests {
         }
         assert!(s.baddies.iter().all(|b| b.removed) || s.baddies.is_empty());
     }
+
+    /// The hunt as the real 2.00 sends it (`lan-200west`, baddy 2): look with
+    /// counter 44, hunt with 16 counting down to 5 on the spot, then 0, and a
+    /// half tile a think with the counter cycling 3, 2, 1, 0.
+    #[test]
+    fn the_hunt_matches_the_2_00_capture() {
+        let mut s = session("30 22 0");
+        let mut seen: Vec<(u8, i32, f64, f64)> = Vec::new();
+        for n in 0..4000 {
+            s.tick_combat(50);
+            s.tick_baddies(50, &[]);
+            if n % 2 == 1 {
+                let b = &s.baddies[0];
+                seen.push((b.mode, b.counter, b.x, b.y));
+            }
+        }
+        let start = seen.iter().position(|v| v.0 == mode::HUNT).expect("never hunted");
+        assert_eq!(seen[start - 1].0, mode::LOOK);
+        let counters: Vec<i32> = seen[start..start + 17].iter().map(|v| v.1).collect();
+        assert_eq!(counters, [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 0, 3, 2, 1, 0]);
+        for w in seen[start + 12..start + 17].windows(2) {
+            let step = (w[1].2 - w[0].2).abs().max((w[1].3 - w[0].3).abs());
+            assert!((0.2..=0.5).contains(&step), "step {step}");
+        }
+    }
 }
