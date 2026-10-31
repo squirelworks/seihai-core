@@ -363,6 +363,44 @@ mod tests {
         assert!(bodies[2].ends_with(b"plisticonno pms.png\n"));
     }
 
+    /// The send path the other way: build the 2.22 client's first frame
+    /// from its messages (`PLI_LANGUAGE` "English", then the 2.22
+    /// tampercheck, `documentation/protocol.md`), pick the compression and
+    /// encode it the way `net` does, and get the captured bytes back. A
+    /// rounded-down step count (5.12's, or a codec that steps per whole
+    /// group only) leaves the last byte unXORed and fails here.
+    #[test]
+    fn lab_222_first_client_frame_is_rebuilt_byte_for_byte() {
+        let mut plain = b"EEnglish\n".to_vec();
+        plain.push(39 + 0x20);
+        plain.extend(hex("250e4d0f962b03ede631"));
+        plain.push(b'\n');
+        let comp = choose_comp(plain.len());
+        assert_eq!(comp, Gen5Comp::None);
+        let mut g = Gen5::new(43);
+        let wire = write_frame(comp, &g.encode(plain.clone(), comp));
+        let raw = hex("02065dbfb1166cc3b487443600a1ca0db3c4609eed04");
+        assert_eq!(&wire[..2], &(raw.len() as u16).to_be_bytes());
+        assert_eq!(&wire[2..], &raw[..]);
+        assert_eq!(g.state(), 497_901_838);
+        // 21 bytes is five whole groups and one byte: per whole group only,
+        // the final `\n` goes out in the clear and the capture differs.
+        let mut whole_only = Gen5::new(43).encode(plain[..20].to_vec(), comp);
+        whole_only.push(plain[20]);
+        assert_ne!(whole_only, raw[1..]);
+    }
+
+    /// The server's 7-byte uncompressed frame (`PLO 42` and its text)
+    /// rebuilt from the exported state.
+    #[test]
+    fn lab_222_short_server_frame_is_rebuilt_byte_for_byte() {
+        let plain = vec![42 + 0x20, b'm', b'S', b'8', b'r', b'\n'];
+        let mut g = Gen5::with_state(194_979_936, 11);
+        let wire = write_frame(choose_comp(plain.len()), &g.encode(plain, Gen5Comp::None));
+        assert_eq!(&wire[2..], &hex("02a124beb5d097")[..]);
+        assert_eq!(g.state(), 3_340_213_666);
+    }
+
     #[test]
     fn unknown_ctype_is_an_error() {
         let framed = [0u8, 2, 0x09, 0x00];
@@ -402,4 +440,5 @@ mod tests {
         assert_eq!(frame[2], 0x04);
         assert_eq!(&frame[3..], b"abc");
     }
+
 }
