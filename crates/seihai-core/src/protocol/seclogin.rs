@@ -62,6 +62,8 @@ pub const MAX_TAIL: usize = 1024;
 
 const SIG_CONTEXT: &[u8] = b"seihai-login-v1/server-hello\0";
 const KEY_INFO: &[u8] = b"seihai-login-v1/c2s key";
+const CHANNEL_C2S: &[u8] = b"seihai-channel-v1/c2s key";
+const CHANNEL_S2C: &[u8] = b"seihai-channel-v1/s2c key";
 
 /// Why a handshake step failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,7 +86,7 @@ impl fmt::Display for Error {
             Error::Malformed(what) => write!(f, "malformed secure-login message: {what}"),
             Error::BadSignature => f.write_str("the server's signature on the secure login does not verify"),
             Error::WeakKey => f.write_str("the key exchange gave a weak shared secret"),
-            Error::BadSeal => f.write_str("the sealed login did not open"),
+            Error::BadSeal => f.write_str("a sealed message did not open (wrong key, or changed in transit)"),
             Error::TooLong => write!(f, "the login is over {MAX_TAIL} bytes"),
         }
     }
@@ -131,8 +133,18 @@ fn signed_bytes(c1: &[u8], server_eph: &[u8; 32], server_id: &[u8; 32]) -> Vec<u
     m
 }
 
-/// The transcript hash and the sealing key.
-fn derive(shared: &x25519_dalek::SharedSecret, signed: &[u8], sig: &[u8; 64]) -> Result<([u8; 32], [u8; 32]), Error> {
+/// The keys of one handshake.
+struct Keys {
+    th: [u8; 32],
+    /// Seals C2 (the login).
+    key: [u8; 32],
+    /// Channel keys ([`Channel`]): client to server, server to client.
+    c2s: [u8; 32],
+    s2c: [u8; 32],
+}
+
+/// The transcript hash and the keys.
+fn derive(shared: &x25519_dalek::SharedSecret, signed: &[u8], sig: &[u8; 64]) -> Result<Keys, Error> {
     if !shared.was_contributory() {
         return Err(Error::WeakKey);
     }
@@ -140,11 +152,13 @@ fn derive(shared: &x25519_dalek::SharedSecret, signed: &[u8], sig: &[u8; 64]) ->
     h.update(signed);
     h.update(sig);
     let th: [u8; 32] = h.finalize().into();
-    let mut key = [0u8; 32];
-    Hkdf::<Sha256>::new(Some(&th), shared.as_bytes())
-        .expand(KEY_INFO, &mut key)
-        .expect("32 bytes is a valid HKDF-SHA256 length");
-    Ok((th, key))
+    let hk = Hkdf::<Sha256>::new(Some(&th), shared.as_bytes());
+    let expand = |info: &[u8]| {
+        let mut k = [0u8; 32];
+        hk.expand(info, &mut k).expect("32 bytes is a valid HKDF-SHA256 length");
+        k
+    };
+    Ok(Keys { th, key: expand(KEY_INFO), c2s: expand(CHANNEL_C2S), s2c: expand(CHANNEL_S2C) })
 }
 
 /// The long-term key a server signs its hello with.
@@ -260,8 +274,8 @@ impl ClientHandshake {
         let signed = signed_bytes(&self.hello, &eph, &id);
         verifying.verify_strict(&signed, &Signature::from_bytes(&sig)).map_err(|_| Error::BadSignature)?;
         let shared = self.secret.diffie_hellman(&PublicKey::from(eph));
-        let (th, key) = derive(&shared, &signed, &sig)?;
-        Ok(Verified { server_key: id, sealer: Sealer { th, key } })
+        let k = derive(&shared, &signed, &sig)?;
+        Ok(Verified { server_key: id, sealer: Sealer { th: k.th, key: k.key, c2s: k.c2s, s2c: k.s2c } })
     }
 }
 
@@ -277,6 +291,8 @@ pub struct Verified {
 pub struct Sealer {
     th: [u8; 32],
     key: [u8; 32],
+    c2s: [u8; 32],
+    s2c: [u8; 32],
 }
 
 fn pad(tail: &[u8]) -> Result<Vec<u8>, Error> {
@@ -300,6 +316,12 @@ fn unpad(p: &[u8]) -> Result<Vec<u8>, Error> {
 }
 
 impl Sealer {
+    /// The client's end of an encrypted [`Channel`] instead of a sealed
+    /// login (the gserver to listserver link, `documentation/secure-login.md`).
+    pub fn into_channel(self) -> Channel {
+        Channel::new(self.c2s, self.s2c)
+    }
+
     /// C2: the token and the sealed `tail`, without a line feed. `tail` is
     /// what follows the version token in the classic message (for a
     /// gserver: the account GSTRING, the password GSTRING and any 5.x/6.x
@@ -358,12 +380,12 @@ impl ClientHello {
         let signed = signed_bytes(&self.line, &eph, &id);
         let sig = identity.key.sign(&signed).to_bytes();
         let shared = secret.diffie_hellman(&PublicKey::from(self.client_key));
-        let (th, key) = derive(&shared, &signed, &sig)?;
+        let k = derive(&shared, &signed, &sig)?;
         let mut s1 = TOKEN_B.to_vec();
         for part in [&eph[..], &id[..], &sig[..]] {
             s1.extend_from_slice(B64.encode(part).as_bytes());
         }
-        Ok((s1, Opener { th, key }))
+        Ok((s1, Opener { th: k.th, key: k.key, c2s: k.c2s, s2c: k.s2c }))
     }
 }
 
@@ -371,9 +393,16 @@ impl ClientHello {
 pub struct Opener {
     th: [u8; 32],
     key: [u8; 32],
+    c2s: [u8; 32],
+    s2c: [u8; 32],
 }
 
 impl Opener {
+    /// The server's end of an encrypted [`Channel`].
+    pub fn into_channel(self) -> Channel {
+        Channel::new(self.s2c, self.c2s)
+    }
+
     /// The tail sealed in C2 (one line, with or without its line feed).
     pub fn open(self, c2: &[u8]) -> Result<Vec<u8>, Error> {
         let c2 = c2.strip_suffix(b"\n").unwrap_or(c2);
@@ -382,6 +411,168 @@ impl Opener {
         let cipher = ChaCha20Poly1305::new(&self.key.into());
         let p = cipher.decrypt(&[0u8; 12].into(), Payload { msg: &ct, aad: &self.th }).map_err(|_| Error::BadSeal)?;
         unpad(&p)
+    }
+}
+
+/// The inner token of the gserver to listserver link: C1 carries it where
+/// a login carries a build's token.
+pub const LINK_TOKEN: &str = "SVLINK01";
+
+/// The most plaintext one channel record holds.
+pub const MAX_RECORD: usize = 16 * 1024;
+
+/// An encrypted, authenticated byte stream after a handshake: each record
+/// is `u16be length` and ChaCha20-Poly1305 of up to [`MAX_RECORD`] bytes,
+/// under one key per direction, with the record count as the nonce
+/// (4 zero bytes, then `u64be`). A record that does not open ends the link.
+/// Records are opened in order, so a dropped, repeated or reordered record
+/// fails.
+pub struct Channel {
+    send: ChaCha20Poly1305,
+    recv: ChaCha20Poly1305,
+    sent: u64,
+    got: u64,
+}
+
+fn nonce(n: u64) -> [u8; 12] {
+    let mut b = [0u8; 12];
+    b[4..].copy_from_slice(&n.to_be_bytes());
+    b
+}
+
+impl Channel {
+    fn new(send: [u8; 32], recv: [u8; 32]) -> Self {
+        Self { send: ChaCha20Poly1305::new(&send.into()), recv: ChaCha20Poly1305::new(&recv.into()), sent: 0, got: 0 }
+    }
+
+    /// The records (with their length headers) carrying `data`.
+    pub fn seal(&mut self, data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(data.len() + 18);
+        for chunk in data.chunks(MAX_RECORD) {
+            let ct = self.send.encrypt(&nonce(self.sent).into(), chunk).expect("a record is within the AEAD limit");
+            self.sent += 1;
+            out.extend_from_slice(&(ct.len() as u16).to_be_bytes());
+            out.extend_from_slice(&ct);
+        }
+        out
+    }
+
+    /// Open one record's body (the bytes after its length).
+    pub fn open(&mut self, record: &[u8]) -> Result<Vec<u8>, Error> {
+        let pt = self.recv.decrypt(&nonce(self.got).into(), record).map_err(|_| Error::BadSeal)?;
+        self.got += 1;
+        Ok(pt)
+    }
+
+    /// The two directions apart, for a link that reads on one thread and
+    /// writes on another.
+    pub fn split(self) -> (ChannelSend, ChannelRecv) {
+        (ChannelSend { key: self.send, n: self.sent }, ChannelRecv { key: self.recv, n: self.got })
+    }
+
+    /// Wrap a blocking stream: what is written is sealed, what is read is
+    /// opened.
+    pub fn wrap<S: std::io::Read + std::io::Write>(self, inner: S) -> SecureStream<S> {
+        SecureStream { inner, ch: self, buf: Vec::new(), at: 0 }
+    }
+}
+
+/// The sending half of a [`Channel`].
+pub struct ChannelSend {
+    key: ChaCha20Poly1305,
+    n: u64,
+}
+
+impl ChannelSend {
+    /// The records (with their length headers) carrying `data`.
+    pub fn seal(&mut self, data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(data.len() + 18);
+        for chunk in data.chunks(MAX_RECORD) {
+            let ct = self.key.encrypt(&nonce(self.n).into(), chunk).expect("a record is within the AEAD limit");
+            self.n += 1;
+            out.extend_from_slice(&(ct.len() as u16).to_be_bytes());
+            out.extend_from_slice(&ct);
+        }
+        out
+    }
+}
+
+/// The receiving half of a [`Channel`].
+pub struct ChannelRecv {
+    key: ChaCha20Poly1305,
+    n: u64,
+}
+
+impl ChannelRecv {
+    /// Read and open the next record from `r`. `Ok(None)` at a clean end
+    /// of stream.
+    pub fn read_record<R: std::io::Read>(&mut self, r: &mut R) -> std::io::Result<Option<Vec<u8>>> {
+        let mut len = [0u8; 2];
+        match r.read_exact(&mut len) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+            Err(e) => return Err(e),
+        }
+        let mut rec = vec![0u8; u16::from_be_bytes(len) as usize];
+        r.read_exact(&mut rec)?;
+        let pt = self
+            .key
+            .decrypt(&nonce(self.n).into(), rec.as_slice())
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, Error::BadSeal.to_string()))?;
+        self.n += 1;
+        Ok(Some(pt))
+    }
+}
+
+/// A [`Channel`] over a blocking stream.
+pub struct SecureStream<S> {
+    inner: S,
+    ch: Channel,
+    buf: Vec<u8>,
+    at: usize,
+}
+
+impl<S> SecureStream<S> {
+    pub fn get_ref(&self) -> &S {
+        &self.inner
+    }
+
+    #[cfg(test)]
+    fn into_channel_for_test(self) -> Channel {
+        self.ch
+    }
+}
+
+impl<S: std::io::Read + std::io::Write> std::io::Read for SecureStream<S> {
+    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        while self.at >= self.buf.len() {
+            let mut len = [0u8; 2];
+            match self.inner.read_exact(&mut len) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(0),
+                Err(e) => return Err(e),
+            }
+            let mut rec = vec![0u8; u16::from_be_bytes(len) as usize];
+            self.inner.read_exact(&mut rec)?;
+            self.buf = self.ch.open(&rec).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
+            self.at = 0;
+        }
+        let n = out.len().min(self.buf.len() - self.at);
+        out[..n].copy_from_slice(&self.buf[self.at..self.at + n]);
+        self.at += n;
+        Ok(n)
+    }
+}
+
+impl<S: std::io::Read + std::io::Write> std::io::Write for SecureStream<S> {
+    fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+        let records = self.ch.seal(data);
+        self.inner.write_all(&records)?;
+        Ok(data.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
     }
 }
 
@@ -564,6 +755,50 @@ mod tests {
         assert_eq!(id.public_key(), again.public_key());
         assert_eq!(decode_key(&encode_key(&id.public_key())), Some(id.public_key()));
         assert!(fingerprint(&id.public_key()).starts_with("SHA256:"));
+    }
+
+    #[test]
+    fn channel_carries_bytes_both_ways_and_refuses_tampering() {
+        use std::io::{Read, Write};
+        let id = ServerIdentity::generate();
+        let c = ClientHandshake::new(b"", LINK_TOKEN, b"").unwrap();
+        let hello = ClientHello::parse(c.hello(), 0).unwrap().unwrap();
+        assert_eq!(hello.inner_token(), LINK_TOKEN);
+        let (s1, opener) = hello.respond(&id).unwrap();
+        let mut client = c.finish(&s1).unwrap().sealer.into_channel();
+        let mut server = opener.into_channel();
+        let big = vec![b'x'; MAX_RECORD + 10];
+        let wire = client.seal(&big);
+        assert!(!wire.windows(4).any(|w| w == b"xxxx"));
+        // Two records; read them back through a stream.
+        let mut s = server.wrap(std::io::Cursor::new(wire));
+        let mut back = Vec::new();
+        s.read_to_end(&mut back).unwrap();
+        assert_eq!(back, big);
+        // A record repeated, or opened by the wrong direction, does not open.
+        let r = client.seal(b"secret");
+        let mut server = s.into_channel_for_test();
+        assert_eq!(server.open(&r[2..]).unwrap(), b"secret");
+        assert!(server.open(&r[2..]).is_err(), "a repeated record fails");
+        let mut client2 = client;
+        let back = server.seal(b"pong");
+        assert_eq!(client2.open(&back[2..]).unwrap(), b"pong");
+        let mine = client2.seal(b"mine");
+        assert!(client2.open(&mine[2..]).is_err(), "a record from the own direction fails");
+        // The halves of a fresh pair, each direction counted on its own.
+        let c = ClientHandshake::new(b"", LINK_TOKEN, b"").unwrap();
+        let (s1, op) = ClientHello::parse(c.hello(), 0).unwrap().unwrap().respond(&id).unwrap();
+        let (mut tx, _) = c.finish(&s1).unwrap().sealer.into_channel().split();
+        let (_, mut rx) = op.into_channel().split();
+        let recs = [tx.seal(b"one"), tx.seal(b"two")].concat();
+        let mut r = recs.as_slice();
+        assert_eq!(rx.read_record(&mut r).unwrap().unwrap(), b"one");
+        assert_eq!(rx.read_record(&mut r).unwrap().unwrap(), b"two");
+        assert_eq!(rx.read_record(&mut r).unwrap(), None);
+        // Writing through the stream makes one record per write.
+        let mut w = client2.wrap(std::io::Cursor::new(Vec::new()));
+        w.write_all(b"hi").unwrap();
+        assert_eq!(w.get_ref().get_ref().len(), 2 + 2 + 16);
     }
 
     #[test]
