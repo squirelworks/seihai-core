@@ -1,9 +1,9 @@
 //! Laying items: hold the attack key (S) and press A to pick an item, then A
 //! to put it down in front of the player.
 //!
-//! Read in the 2.05 rev 2 client (the key handlers at `0x4fc39c` and
-//! `0x4fde54`, the item test at `0x4fe4cc`, the take-away at `0x4ff0b8`, the
-//! item add at `0x53ec34` and its send at `0x50c470`). The readme of 1.21
+//! Read in the 2.05 rev 2 client (its key handlers, the test of which items
+//! the player has, what laying takes away, and the item add and its send).
+//! The readme of 1.21
 //! names it: "Laying Items: Select Item: hold Attack Button (S) + press
 //! Action Button (A); Lay Item: Action Button (A)". The same 24-entry lay
 //! order and `item2.wav` are in every Windows build from 1.1 to 2.31, so
@@ -40,8 +40,8 @@ use crate::assets::TileKind;
 use crate::items::{self, FloorItem, ItemEvent};
 use crate::sound::SoundEvent;
 
-/// The order A with S held goes through the items (2.05 rev 2 `0x54b478`;
-/// the full heart container is not in it).
+/// The order A with S held goes through the items (2.05 rev 2; the full heart
+/// container is not in it).
 pub const LAY_ORDER: [u8; 24] = [0, 1, 2, 19, 3, 4, 5, 6, 16, 8, 12, 23, 7, 20, 21, 22, 9, 15, 17, 10, 13, 18, 14, 24];
 
 /// Where a laid item goes, from the player's sprite top-left, by facing
@@ -68,8 +68,8 @@ pub enum LayCost {
 }
 
 impl OfflineSession {
-    /// What laying `item` would take, if the player has it now (2.05
-    /// `0x4fe4cc` and `0x4ff0b8`). A sword or shield is layable only as the
+    /// What laying `item` would take, if the player has it now (2.05). A
+    /// sword or shield is layable only as the
     /// exact power it gives: the sword item at sword power 1, the battle axe
     /// at 2, and so on.
     pub fn lay_cost(&self, item: u8) -> Option<LayCost> {
@@ -169,7 +169,7 @@ impl OfflineSession {
     }
 
     /// The point in front of the player is neither a wall (or a chest) nor
-    /// water (2.05 `0x4f7918`).
+    /// water (2.05).
     fn lay_spot_free(&self) -> bool {
         let (fx, fy) = self.facing_point();
         if self.blocked_point(fx, fy) {

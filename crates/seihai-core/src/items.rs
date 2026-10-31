@@ -192,8 +192,7 @@ fn item_message(id: u8, item: u8, x: f32, y: f32) -> Vec<u8> {
 }
 
 /// Whether `item` lies on the floor as a pickup ([`FLOOR_ITEMS`]): only
-/// these are told to the server when added or taken (2.05 `0x50c470`,
-/// `0x50c574`).
+/// these are told to the server when added or taken (2.05).
 pub fn is_floor_item(item: u8) -> bool {
     FLOOR_ITEMS.get(usize::from(item)).copied().unwrap_or(false)
 }
