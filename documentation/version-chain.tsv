@@ -289,7 +289,7 @@ step	label	token	basis	kind	area	field	detail
 36	5.00r7	G3D22067	binary	changed	protocol	plo (server ids handled)	+140 NPCWEAPONSCRIPT, +197 LOADSCRIPT; -100 RAWDATA, -108 UNKNOWN108, -196 (101 -> 100 ids)
 36	5.00r7	G3D22067	binary	changed	protocol	pli (client ids sent)	+47 VERIFYWANTSEND, +159 UPDATEPACKAGEREQUESTFILE; -162 RC_UNKNOWN162 (58 -> 59 ids)
 36	5.00r7	G3D22067	binary	unknown	pli	-	only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
-36	5.00r7	G3D22067	binary	unknown	login	-	Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); whether a server accepts all three empty is not known
+36	5.00r7	G3D22067	binary	unknown	login	-	Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); stock GServer-v2 accepts all three empty (lab, 2026-10-31), other servers are untested
 36	5.00r7	G3D22067	binary	unknown	login	-	the base-file requests after the language (47 or 23 basepackage.gupd) are not sent
 36	5.00r7	G3D22067	binary	unknown	props	-	own and other prop sets are 3.153's; no 5.x parser was read
 36	5.00r7	G3D22067	binary	unknown	ui	-	chat is a bold sans serif in the lab; its cell height is not known, 24 is kept
