@@ -365,6 +365,12 @@ pub enum LevelObject {
     BombDel { x: f32, y: f32 },
     Explosion { sender: u16, explosion: crate::bombs::Explosion },
     Arrow { sender: u16, arrow: crate::arrows::ArrowAdd },
+    /// `PLO_BADDYPROPS` (2): the id, then props, for the level named.
+    BaddyProps { level: Option<String>, payload: Vec<u8> },
+    /// `PLO_BADDYHURT` (27), for the leader: id, dx, dy, power.
+    BaddyHurt(Vec<u8>),
+    /// A new level: the old level's baddies are gone.
+    BaddiesClear,
 }
 
 /// Lines kept in the chat history.
@@ -743,6 +749,12 @@ impl SessionState {
                 if let Ok(s) = String::from_utf8(msg.payload.clone()) {
                     self.baddies.push(s);
                 }
+                let level = self.level_name.clone().or_else(|| self.current_level_name());
+                self.level_objects.push(LevelObject::BaddyProps { level, payload: msg.payload.clone() });
+            }
+            27 => {
+                // PLO_BADDYHURT: another player hit a baddy of the level we lead.
+                self.level_objects.push(LevelObject::BaddyHurt(msg.payload.clone()));
             }
             3 => {
                 // PLO_NPCPROPS
@@ -1147,6 +1159,12 @@ impl SessionState {
     /// server names the gmap after each level it sends, the neighbours the
     /// client asked for included.
     fn enter_level(&mut self, name: String) {
+        // Leading is per level: the server says it again (`PLO_ISLEADER`)
+        // after the level when this client leads the new one.
+        if self.level_name.as_deref() != Some(name.as_str()) {
+            self.is_leader = false;
+            self.level_objects.push(LevelObject::BaddiesClear);
+        }
         let Some(mut g) = self.gmap.take() else {
             if self.level_name.as_deref() != Some(name.as_str()) {
                 self.keep_level_in_cache();

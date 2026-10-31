@@ -650,6 +650,18 @@ impl CombatState {
         self.swing.map(|(i, _)| usize::from(i))
     }
 
+    /// Milliseconds since the swing began, or `None` with no swing out.
+    pub fn swing_elapsed_ms(&self) -> Option<u64> {
+        let r = self.rules.as_ref()?;
+        let (i, acc) = self.swing?;
+        let frames = r.swing_sprite_last - r.swing_sprite_first + 1;
+        let per = match self.swing_ticks {
+            Some(t) => (u64::from(t) * TICK_MS / u64::from(frames)).max(1),
+            None => u64::from(r.swing_step_ticks.max(1)) * TICK_MS,
+        };
+        Some(u64::from(i) * per + acc)
+    }
+
     /// Milliseconds since hurt mode began, or `None` when not hurt.
     pub fn hurt_elapsed_ms(&self) -> Option<u64> {
         let r = self.rules.as_ref()?;
