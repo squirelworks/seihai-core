@@ -811,6 +811,42 @@ fn connect_any(addrs: &[SocketAddr], timeout: Duration) -> io::Result<TcpStream>
     }))
 }
 
+/// Check that `m` is one whole client→server message: an id byte (0x20 or
+/// more), then a payload with no line feed, then one closing `\n`. The
+/// servers split a frame body into messages at each `\n` (GServer-v2
+/// `readString("\n")`), so a line feed inside a payload, or a missing one
+/// at the end, turns one message into two or two into one. On gen 3 each
+/// message carries its own insertion step, so that shifts the server's
+/// iterator for the rest of the session.
+pub fn check_wire_message(m: &[u8]) -> Result<(), &'static str> {
+    match m {
+        [] => Err("empty"),
+        [id, ..] if *id < 0x20 => Err("id byte below 0x20"),
+        [.., last] if *last != b'\n' => Err("no closing line feed"),
+        [_] => Err("no id"),
+        _ if m[..m.len() - 1].contains(&b'\n') => Err("line feed inside the payload"),
+        _ => Ok(()),
+    }
+}
+
+/// `m` for a log line: the id, the length and the bytes, printable ones as
+/// text and the rest as `\xNN`.
+pub fn describe_message(m: &[u8]) -> String {
+    let id = m.first().map_or(-1, |b| i32::from(*b) - 0x20);
+    let mut s = format!("id {id} len {} ", m.len());
+    for &b in m.iter().skip(1).take(160) {
+        if (0x20..0x7f).contains(&b) && b != b'\\' {
+            s.push(b as char);
+        } else {
+            s.push_str(&format!("\\x{b:02x}"));
+        }
+    }
+    if m.len() > 161 {
+        s.push_str("...");
+    }
+    s
+}
+
 /// TCP connection to a listserver or gserver.
 pub struct Connection {
     stream: TcpStream,
@@ -852,6 +888,9 @@ pub struct Connection {
     /// Only `client.` flags go to the server: set at login for the
     /// Login-lobby builds and 2.3/2.31 ([`sends_client_flags_only`], [`Self::queue_flag`]).
     client_flags_only: bool,
+    /// Where each message sent is written, before its cipher
+    /// ([`Self::set_send_log`]); the debug `packets.log`.
+    send_log: Option<Box<dyn std::io::Write + Send>>,
     /// Set once the reader runs ([`Self::spawn_reader`]): the reader's
     /// thread owns the socket from then on, and frames to send go to it.
     io_thread: Option<IoThread>,
@@ -879,7 +918,7 @@ impl Connection {
         let addrs: Vec<SocketAddr> = addr.to_socket_addrs()?.collect();
         let stream = connect_any(&addrs, CONNECT_TIMEOUT)?;
         stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-        Ok(Self { stream, gen3: None, gen5: None, gen5_in: None, frame_len: FrameLen::Short, pli: None, zlib_best: false, flags_out: Vec::new(), flags_since: None, files_out: Vec::new(), files_since: None, last_walk: None, precise_walk: false, client_flags_only: false, io_thread: None })
+        Ok(Self { stream, gen3: None, gen5: None, gen5_in: None, frame_len: FrameLen::Short, pli: None, zlib_best: false, flags_out: Vec::new(), flags_since: None, files_out: Vec::new(), files_since: None, last_walk: None, precise_walk: false, client_flags_only: false, send_log: None, io_thread: None })
     }
 
     /// Close the connection in both directions. A reader thread from
@@ -901,6 +940,23 @@ impl Connection {
                 Ok(())
             }
             None => self.stream.write_all(data),
+        }
+    }
+
+    /// Write every message sent from now on to `log`, one line each, as
+    /// [`describe_message`] gives it (before the gen-3 byte or gen-5 XOR),
+    /// with the reason when a malformed one is dropped.
+    pub fn set_send_log(&mut self, log: Box<dyn std::io::Write + Send>) {
+        self.send_log = Some(log);
+    }
+
+    fn log_send(&mut self, m: &[u8], dropped: Option<&str>) {
+        if let Some(f) = self.send_log.as_mut() {
+            let _ = match dropped {
+                Some(why) => writeln!(f, "send DROPPED ({why}) {}", describe_message(m)),
+                None => writeln!(f, "send {}", describe_message(m)),
+            };
+            let _ = f.flush();
         }
     }
 
@@ -940,6 +996,12 @@ impl Connection {
         line.push(b'\n');
         let mut gen3 = (version.encryption() == EncryptionGen::Gen3).then(|| Gen3::new(key));
         for m in then {
+            if let Err(why) = check_wire_message(m) {
+                self.log_send(m, Some(why));
+                eprintln!("not sent: malformed message ({why}): {}", describe_message(m));
+                continue;
+            }
+            self.log_send(m, None);
             match gen3.as_mut() {
                 Some(g) => line.extend(g.encode(m)),
                 None => line.extend_from_slice(m),
@@ -1104,6 +1166,17 @@ impl Connection {
         }
         let mut body = Vec::new();
         for m in msgs {
+            // A message that is not one whole line would be split or merged
+            // by the server's line reader. On a gen-3 link that also moves
+            // the server's insertion iterator off ours, and from then on
+            // every message reads as garbage ("Disconnected for sending
+            // invalid packets"). Such a message is dropped, not sent.
+            if let Err(why) = check_wire_message(m) {
+                self.log_send(m, Some(why));
+                eprintln!("not sent: malformed message ({why}): {}", describe_message(m));
+                continue;
+            }
+            self.log_send(m, None);
             match self.gen3.as_mut() {
                 Some(g) => body.extend(g.encode(m)),
                 None => body.extend_from_slice(m),
@@ -1923,6 +1996,37 @@ mod tests {
         let props = parse_player_props(&msg[1..msg.len() - 1]);
         let vals: Vec<(u8, Option<u8>)> = props.iter().map(|p| (p.id, p.gchar())).collect();
         assert_eq!(vals, vec![(15, Some(61)), (16, Some(24)), (17, Some(2))]);
+    }
+
+    #[test]
+    fn wire_messages_are_one_whole_line() {
+        assert!(check_wire_message(b"2/\x7f0t1 \n").is_ok());
+        assert!(check_wire_message(b"7\n").is_ok());
+        assert_eq!(check_wire_message(b""), Err("empty"));
+        assert_eq!(check_wire_message(b"\n"), Err("id byte below 0x20"));
+        assert_eq!(check_wire_message(b"2/\x7f"), Err("no closing line feed"));
+        assert_eq!(check_wire_message(b"2gr.x=1\ngr.y=2\n"), Err("line feed inside the payload"));
+        assert_eq!(describe_message(b"7a\\b\x01\n"), "id 23 len 6 a\\x5cb\\x01\\x0a");
+    }
+
+    /// A message with a line feed inside would read as two messages on the
+    /// server, which would step its gen-3 iterator once more than Seihai's
+    /// for the rest of the session. It is dropped, and the iterator does not
+    /// step for it: the next message still decodes.
+    #[test]
+    fn a_malformed_message_is_dropped_and_gen3_stays_in_step() {
+        let (mut conn, mut srv) = pair();
+        conn.login_versioned(ClientVersion::V205, 0x31, "ab", "cd").unwrap();
+        let _ = read_frame(&mut srv);
+        let good = crate::protocol::flagset::flag_message("a", Some("1"));
+        let bad = b"\x32b=1\nc=2\n".to_vec();
+        conn.send_messages(&[bad, good.clone()]).unwrap();
+        conn.send_messages(&[good.clone()]).unwrap();
+        assert_eq!(gen3_messages(0x31, &read_frame(&mut srv)), vec![good.clone()]);
+        let mut g = Gen3::new(0x31);
+        let _ = g.next_insertion(good.len());
+        let body = read_frame(&mut srv);
+        assert_eq!(g.decode(&body).unwrap(), good);
     }
 
     fn read_raw(s: &mut TcpStream) -> Vec<u8> {
