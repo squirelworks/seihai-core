@@ -86,7 +86,7 @@ impl fmt::Display for Error {
             Error::Malformed(what) => write!(f, "malformed secure-login message: {what}"),
             Error::BadSignature => f.write_str("the server's signature on the secure login does not verify"),
             Error::WeakKey => f.write_str("the key exchange gave a weak shared secret"),
-            Error::BadSeal => f.write_str("the sealed login did not open"),
+            Error::BadSeal => f.write_str("a sealed message did not open (wrong key, or changed in transit)"),
             Error::TooLong => write!(f, "the login is over {MAX_TAIL} bytes"),
         }
     }
@@ -464,10 +464,63 @@ impl Channel {
         Ok(pt)
     }
 
+    /// The two directions apart, for a link that reads on one thread and
+    /// writes on another.
+    pub fn split(self) -> (ChannelSend, ChannelRecv) {
+        (ChannelSend { key: self.send, n: self.sent }, ChannelRecv { key: self.recv, n: self.got })
+    }
+
     /// Wrap a blocking stream: what is written is sealed, what is read is
     /// opened.
     pub fn wrap<S: std::io::Read + std::io::Write>(self, inner: S) -> SecureStream<S> {
         SecureStream { inner, ch: self, buf: Vec::new(), at: 0 }
+    }
+}
+
+/// The sending half of a [`Channel`].
+pub struct ChannelSend {
+    key: ChaCha20Poly1305,
+    n: u64,
+}
+
+impl ChannelSend {
+    /// The records (with their length headers) carrying `data`.
+    pub fn seal(&mut self, data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(data.len() + 18);
+        for chunk in data.chunks(MAX_RECORD) {
+            let ct = self.key.encrypt(&nonce(self.n).into(), chunk).expect("a record is within the AEAD limit");
+            self.n += 1;
+            out.extend_from_slice(&(ct.len() as u16).to_be_bytes());
+            out.extend_from_slice(&ct);
+        }
+        out
+    }
+}
+
+/// The receiving half of a [`Channel`].
+pub struct ChannelRecv {
+    key: ChaCha20Poly1305,
+    n: u64,
+}
+
+impl ChannelRecv {
+    /// Read and open the next record from `r`. `Ok(None)` at a clean end
+    /// of stream.
+    pub fn read_record<R: std::io::Read>(&mut self, r: &mut R) -> std::io::Result<Option<Vec<u8>>> {
+        let mut len = [0u8; 2];
+        match r.read_exact(&mut len) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+            Err(e) => return Err(e),
+        }
+        let mut rec = vec![0u8; u16::from_be_bytes(len) as usize];
+        r.read_exact(&mut rec)?;
+        let pt = self
+            .key
+            .decrypt(&nonce(self.n).into(), rec.as_slice())
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, Error::BadSeal.to_string()))?;
+        self.n += 1;
+        Ok(Some(pt))
     }
 }
 
@@ -732,6 +785,16 @@ mod tests {
         assert_eq!(client2.open(&back[2..]).unwrap(), b"pong");
         let mine = client2.seal(b"mine");
         assert!(client2.open(&mine[2..]).is_err(), "a record from the own direction fails");
+        // The halves of a fresh pair, each direction counted on its own.
+        let c = ClientHandshake::new(b"", LINK_TOKEN, b"").unwrap();
+        let (s1, op) = ClientHello::parse(c.hello(), 0).unwrap().unwrap().respond(&id).unwrap();
+        let (mut tx, _) = c.finish(&s1).unwrap().sealer.into_channel().split();
+        let (_, mut rx) = op.into_channel().split();
+        let recs = [tx.seal(b"one"), tx.seal(b"two")].concat();
+        let mut r = recs.as_slice();
+        assert_eq!(rx.read_record(&mut r).unwrap().unwrap(), b"one");
+        assert_eq!(rx.read_record(&mut r).unwrap().unwrap(), b"two");
+        assert_eq!(rx.read_record(&mut r).unwrap(), None);
         // Writing through the stream makes one record per write.
         let mut w = client2.wrap(std::io::Cursor::new(Vec::new()));
         w.write_all(b"hi").unwrap();
