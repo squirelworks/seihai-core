@@ -1276,7 +1276,7 @@ mod tests {
             ("2.3", Gen5, Inferred),
             ("2.31", Gen5, Captured),
             ("3.04", Gen5OneFrame, Captured),
-            ("3.153", Gen5OneFrame, Inferred),
+            ("3.153", Gen5OneFrame, Captured),
         ];
         for (label, shape, basis) in want {
             let l = by_label(label).unwrap().protocol.listserver.unwrap();
