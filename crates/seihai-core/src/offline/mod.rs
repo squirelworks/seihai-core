@@ -172,6 +172,12 @@ pub struct OfflineSession {
     /// bomb's piece or a shot names its owner only while the owner is here
     /// ([`crate::bombs::player_owner`]).
     pub present_players: Vec<u16>,
+    /// Other players that stop the walk, in the player's own cell's
+    /// coordinates (sprite top-left, tiles). Filled online for the builds
+    /// that walk into other players as into a wall (real 2.22, lab
+    /// 2026-10-30: `GANI=push` against a player one tile ahead); empty
+    /// otherwise.
+    pub solid_players: Vec<(f32, f32)>,
     /// NPCs an arrow hit since the last [`Self::take_shots`].
     shots: Vec<usize>,
     /// Landings since the last [`Self::take_landings`].
@@ -514,6 +520,7 @@ impl OfflineSession {
             arrow_ms: 0,
             arrow_sends: Vec::new(),
             present_players: Vec::new(),
+            solid_players: Vec::new(),
             shots: Vec::new(),
             landings: Vec::new(),
             throw_ms: 0,
@@ -1896,6 +1903,16 @@ impl OfflineSession {
         self.pending_link = None;
     }
 
+    /// True if `(px, py)` is in the 2 x 2 tile box of one of the
+    /// [`Self::solid_players`], from `(x + 0.5, y + 1)` (their body, as far
+    /// as one lab stop shows it).
+    fn player_blocks_at(&self, px: f64, py: f64) -> bool {
+        self.solid_players.iter().any(|&(x, y)| {
+            let (x, y) = (x as f64 + 0.5, y as f64 + 1.0);
+            px >= x && px < x + 2.0 && py >= y && py < y + 2.0
+        })
+    }
+
     /// True if the walking test finds the point `(px, py)` (tiles,
     /// current-cell coordinates) blocked: a wall tile (or off the board), or
     /// a chest record covering it (2 x 2 tiles, edges included, open or
@@ -1911,7 +1928,7 @@ impl OfflineSession {
         if self.dev.wallhack() {
             return false;
         }
-        if self.npc_blocks_at(px as f32, py as f32, except) {
+        if self.npc_blocks_at(px as f32, py as f32, except) || self.player_blocks_at(px, py) {
             return true;
         }
         let (fx, fy) = ((px + WALK_FLOOR_EPS) as f32, (py + WALK_FLOOR_EPS) as f32);
@@ -3870,6 +3887,25 @@ mod tests {
         s.opened_chests.insert((3, 3));
         walk(&mut s, 0.5, 0.0, 2);
         assert!(s.opened_chests.is_empty());
+    }
+
+    /// Lab 2026-10-30, real 2.22: walking east on row 58 stops at 57.5
+    /// against another player at (59.5, 58); with the list cleared the walk
+    /// goes on.
+    #[test]
+    fn other_players_stop_walking_when_listed_as_solid() {
+        let mut s = OfflineSession::new();
+        s.current_level = Some(Level::parse("GLEVNW01\n").unwrap());
+        s.player_x = 50.0;
+        s.player_y = 58.0;
+        s.solid_players = vec![(59.5, 58.0)];
+        for _ in 0..40 {
+            s.try_move(0.5, 0.0);
+        }
+        assert_eq!(s.player_x, 57.5);
+        s.solid_players.clear();
+        s.try_move(0.5, 0.0);
+        assert_eq!(s.player_x, 58.0);
     }
 
     #[test]
