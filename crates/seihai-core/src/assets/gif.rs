@@ -93,8 +93,9 @@ pub fn read_gif_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io:
                     lzw.extend_from_slice(data.get(pos..pos + n).ok_or_else(|| bad("truncated image data"))?);
                     pos += n;
                 }
-                let indices = lzw_decode(&lzw, min_code, iw * ih)?;
                 let (w, h) = (sw.max(ix + iw), sh.max(iy + ih));
+                super::png::check_image_size(w as u64, h as u64)?;
+                let indices = lzw_decode(&lzw, min_code, iw * ih)?;
                 let mut rgba = vec![0u8; w * h * 4];
                 let rows: Vec<usize> = if iflags & 0x40 != 0 { interlaced_rows(ih) } else { (0..ih).collect() };
                 for (src_row, &y) in rows.iter().enumerate() {

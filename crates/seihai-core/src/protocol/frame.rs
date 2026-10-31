@@ -25,12 +25,29 @@ pub fn zlib_compress_best(data: &[u8]) -> io::Result<Vec<u8>> {
     enc.finish()
 }
 
-/// Decompress a zlib body.
-pub fn zlib_decompress(data: &[u8]) -> io::Result<Vec<u8>> {
-    let mut dec = ZlibDecoder::new(data);
+/// The largest body Seihai inflates from one frame. No real frame comes
+/// near it (a 6.x long frame carrying a whole file is the biggest seen),
+/// but without a bound a server could send a small compression bomb: in
+/// the 2026-10-31 stress test a 60 KB bz2 frame grew one client to 617 MB,
+/// and a 6.x long frame can hold enough zlib for tens of gigabytes.
+pub const MAX_BODY: usize = 32 << 20;
+
+/// Read all of `r` into a vector, failing once it passes [`MAX_BODY`].
+pub(crate) fn read_bounded<R: Read>(r: R, what: &str) -> io::Result<Vec<u8>> {
     let mut out = Vec::new();
-    dec.read_to_end(&mut out)?;
+    r.take(MAX_BODY as u64 + 1).read_to_end(&mut out)?;
+    if out.len() > MAX_BODY {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("{what} body is over {} MB once decompressed", MAX_BODY >> 20),
+        ));
+    }
     Ok(out)
+}
+
+/// Decompress a zlib body (at most [`MAX_BODY`] bytes of output).
+pub fn zlib_decompress(data: &[u8]) -> io::Result<Vec<u8>> {
+    read_bounded(ZlibDecoder::new(data), "zlib")
 }
 
 /// Write a gen-2/3 frame: `u16be len` + zlib(body).

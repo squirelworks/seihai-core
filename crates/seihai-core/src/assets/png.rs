@@ -109,6 +109,25 @@ fn zlib_rows(data: &[u8], stride: usize) -> io::Result<Vec<u8>> {
     enc.finish()
 }
 
+/// The most pixels Seihai decodes from one image (8192 x 8192, 256 MB as
+/// RGBA). Images come from the server, and the size is the file's own
+/// claim: a 74-byte PNG that says 60000 x 60000 used to make the client
+/// ask for 14 GB and abort (stress test, 2026-10-31). No Graal image is
+/// near this.
+pub const MAX_IMAGE_PIXELS: u64 = 8192 * 8192;
+
+/// Refuse a width and height over [`MAX_IMAGE_PIXELS`] (or zero) before
+/// anything is allocated for them.
+pub(crate) fn check_image_size(width: u64, height: u64) -> io::Result<()> {
+    if width == 0 || height == 0 || width.saturating_mul(height) > MAX_IMAGE_PIXELS {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("image size {width} x {height} is over the limit of {MAX_IMAGE_PIXELS} pixels"),
+        ));
+    }
+    Ok(())
+}
+
 /// Minimal PNG reader.
 ///
 /// Handles non-interlaced grayscale, RGB, palette (1/2/4/8-bit, with
@@ -188,13 +207,15 @@ pub fn read_png_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io:
             entry.copy_from_slice(&rgb);
         }
     }
-    let mut dec = ZlibDecoder::new(&idat[..]);
-    let mut raw = Vec::new();
-    dec.read_to_end(&mut raw)?;
-
+    check_image_size(u64::from(width), u64::from(height))?;
     // Filters work on whole bytes; sub-byte pixels use a 1-byte step.
     let bpp = (channels * bit_depth as usize).div_ceil(8);
     let stride = (width as usize * channels * bit_depth as usize).div_ceil(8);
+    // Inflate no more than the rows need (a filter byte and `stride` bytes
+    // each): the IDAT stream is the server's too.
+    let want = (stride + 1) * height as usize;
+    let mut raw = Vec::new();
+    ZlibDecoder::new(&idat[..]).take(want as u64).read_to_end(&mut raw)?;
     let mut pixels = Vec::with_capacity(width as usize * height as usize * 4);
     let mut prev = vec![0u8; stride];
     let mut row = vec![0u8; stride];
@@ -267,6 +288,33 @@ fn paeth(a: u8, b: u8, c: u8) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A PNG or GIF header that claims a huge size is refused before any
+    /// allocation (a 60000 x 60000 PNG of 74 bytes used to abort the client).
+    #[test]
+    fn huge_claimed_sizes_are_refused() {
+        fn chunk(tag: &[u8], d: &[u8]) -> Vec<u8> {
+            let mut c = (d.len() as u32).to_be_bytes().to_vec();
+            c.extend_from_slice(tag);
+            c.extend_from_slice(d);
+            c.extend(crc32(&[tag, d].concat()).to_be_bytes());
+            c
+        }
+        for (w, h) in [(60000u32, 60000u32), (1, u32::MAX >> 1), (u32::MAX >> 1, u32::MAX >> 1)] {
+            let mut ihdr = w.to_be_bytes().to_vec();
+            ihdr.extend(h.to_be_bytes());
+            ihdr.extend([8, 6, 0, 0, 0]);
+            let mut enc = ZlibEncoder::new(Vec::new(), Compression::default());
+            enc.write_all(&[0u8; 1000]).unwrap();
+            let png = [&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A][..], &chunk(b"IHDR", &ihdr), &chunk(b"IDAT", &enc.finish().unwrap()), &chunk(b"IEND", b"")].concat();
+            let e = read_png_rgba(&png).unwrap_err();
+            assert_eq!(e.kind(), io::ErrorKind::InvalidData, "{w} x {h}");
+        }
+        let mut gif = b"GIF89a".to_vec();
+        gif.extend([0xFF, 0xFF, 0xFF, 0xFF, 0x80, 0, 0, 0, 0, 0, 0, 0, 0]);
+        gif.extend([0x2C, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0, 2, 2, 0x44, 1, 0, b';']);
+        assert!(read_png_rgba(&gif).is_err());
+    }
 
     /// A server's `.gif` goes through the same reader as a PNG (laundry
     /// list P6: such images were never drawn).
