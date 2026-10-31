@@ -27,19 +27,33 @@ pub fn ani_name(raw: &str) -> Option<String> {
     (!n.is_empty()).then_some(n)
 }
 
+/// The GANI file stem of an NPC's animation: the part before the first
+/// comma. From 4.x on the server sends an NPC's gani prop as the name and
+/// then its parameters, `zlttp_gralats,3` (the gralat's value), and the
+/// file is `zlttp_gralats.gani`.
+pub fn ani_file(ani: &str) -> &str {
+    ani.split(',').next().unwrap_or(ani).trim()
+}
+
 impl OfflineSession {
-    /// Attach a GANI for the NPCs, by name (`idle`, `walk`, ...).
+    /// Attach a GANI for the NPCs, by name (`idle`, `walk`, ...). Any
+    /// parameters after a comma are dropped (see [`ani_file`]).
     pub fn set_npc_gani(&mut self, name: &str, gani: Gani) {
-        self.npc_ganis.insert(name.to_ascii_lowercase(), gani);
+        self.npc_ganis.insert(ani_file(name).to_ascii_lowercase(), gani);
+    }
+
+    /// The loaded GANI for an NPC's animation, parameters or not.
+    pub fn npc_gani(&self, ani: &str) -> Option<&Gani> {
+        self.npc_ganis.get(ani_file(ani))
     }
 
     /// Animation names that NPCs of this level use and that are not loaded.
     pub fn wanted_npc_anis(&self) -> Vec<String> {
         let mut v: Vec<String> = Vec::new();
         for n in self.current_level.iter().flat_map(|l| l.npcs.iter()) {
-            if let Some(a) = &n.ani {
-                if !self.npc_ganis.contains_key(a) && !v.contains(a) {
-                    v.push(a.clone());
+            if let Some(a) = n.ani.as_deref().map(ani_file).filter(|a| !a.is_empty()) {
+                if !self.npc_ganis.contains_key(a) && !v.iter().any(|w| w == a) {
+                    v.push(a.to_string());
                 }
             }
         }
@@ -53,7 +67,7 @@ impl OfflineSession {
         let mut changed = false;
         for npc in level.npcs.iter_mut() {
             let Some(name) = npc.ani.clone() else { continue };
-            let Some(gani) = self.npc_ganis.get(&name) else { continue };
+            let Some(gani) = self.npc_ganis.get(ani_file(&name)) else { continue };
             let frames = gani.frame_count();
             if frames == 0 {
                 continue;
