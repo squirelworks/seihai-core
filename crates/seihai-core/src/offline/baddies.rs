@@ -450,6 +450,99 @@ mod tests {
         assert_eq!(sent.len() - die, 15);
     }
 
+    /// The six baddies the server gave the real 2.22 leader in `lan-222d`
+    /// (+86020 ms): `x * 2`, `y * 2`, type, power, image, mode, counter,
+    /// dir and head, all +32, with the level's three verses.
+    fn lan_222d_baddies() -> Vec<Vec<u8>> {
+        type Row = (u8, u8, u8, u8, u8, &'static str, u8, u8, u8);
+        let rows: [Row; 6] = [
+            (0x21, 0x69, 0x6c, 0x20, 0x22, "baddygray.png", 0x22, 0x28, 0x2f),
+            (0x22, 0x93, 0x60, 0x21, 0x23, "baddyblue.png", 0x22, 0x23, 0x2f),
+            (0x23, 0x91, 0x60, 0x22, 0x24, "baddyred.png", 0x22, 0x21, 0x2f),
+            (0x24, 0x97, 0x75, 0x23, 0x23, "baddyblue.png", 0x22, 0x27, 0x20),
+            (0x25, 0x20, 0x8e, 0x25, 0x21, "baddyhare.png", 0x27, 0x42, 0x2a),
+            (0x26, 0x93, 0x60, 0x27, 0x26, "baddygold.png", 0x22, 0x23, 0x2f),
+        ];
+        let text = |m: &mut Vec<u8>, t: &str| {
+            m.push(t.len() as u8 + 32);
+            m.extend_from_slice(t.as_bytes());
+        };
+        rows.iter()
+            .map(|&(id, x, y, kind, power, image, md, counter, dir)| {
+                let mut m = vec![id, 0x21, x, 0x22, y, 0x23, kind, 0x24, power];
+                text(&mut m, image);
+                m.extend_from_slice(&[0x25, md, 0x26, counter, 0x27, dir]);
+                for (prop, verse) in [(0x28, "Halt, intruder!"), (0x29, "Ouch!"), (0x2a, "You got me...")] {
+                    m.push(prop);
+                    text(&mut m, verse);
+                }
+                m
+            })
+            .collect()
+    }
+
+    /// The send rate of a leader, as the real clients pace it. The real
+    /// 2.22 (`lan-222d`) and 2.00 (`lan-200west`) leaders send one
+    /// PLI_BADDYPROPS per baddy per 100 ms think, with only the props that
+    /// changed, and all of a think's messages in one frame: 48 to 60 a
+    /// second for 6 baddies, for as long as the leader stays in the level.
+    /// The walk and look counters change on every think, so a moving baddy
+    /// is in nearly every think. Seihai does the same, no more.
+    #[test]
+    fn a_leader_sends_one_message_per_baddy_per_think_like_2_22() {
+        let mut s = OfflineSession::new();
+        s.current_level = Some(Level::parse("GLEVNW01\n").unwrap());
+        s.item_rng = crate::items::DelphiRandom::new(1);
+        let profile = ClientVersion::V222.profile();
+        s.life.set_rules(profile.life.death);
+        s.combat.set_rules(profile.life.combat);
+        s.baddy_role = BaddyRole { online: true, leader: true };
+        (s.player_x, s.player_y) = (5.0, 5.0);
+        for m in lan_222d_baddies() {
+            s.receive_baddy_props(&m);
+        }
+        assert_eq!(s.baddies.len(), 6);
+        // Ten seconds of 50 ms player ticks; a think is every second one.
+        let mut batches: Vec<Vec<Vec<u8>>> = Vec::new();
+        for _ in 0..200 {
+            s.tick_combat(50);
+            s.tick_baddies(50, &[]);
+            // The shooting soldier's arrows go out too (PLI_ARROWADD, 9), as
+            // in the capture; the rate is about the props.
+            let sent: Vec<Vec<u8>> = s.take_baddy_sends().into_iter().filter(|m| m[0] == 15 + 32).collect();
+            if !sent.is_empty() {
+                batches.push(sent);
+            }
+        }
+        // The first think only keeps the props (the server has them), so
+        // 99 thinks send.
+        assert!(batches.len() <= 99, "{} batches", batches.len());
+        for b in &batches {
+            let mut ids: Vec<u8> = b.iter().map(|m| m[1]).collect();
+            ids.sort_unstable();
+            ids.dedup();
+            assert_eq!(ids.len(), b.len(), "a baddy twice in one think: {b:?}");
+            // Never the whole baddy again: the image and verses went once.
+            assert!(b.iter().all(|m| m.len() < 20), "full props resent: {b:?}");
+        }
+        let total: usize = batches.iter().map(Vec::len).sum();
+        // `lan-222d`: 48 to 60 a second over its full seconds, 0.99 s of
+        // thinks here.
+        assert!((470..=594).contains(&total), "{total} messages in 10 s");
+    }
+
+    /// A baddy whose props did not change since the last think sends
+    /// nothing, as in the seconds of `lan-222d` where only 5 of the 6
+    /// baddies are on the wire.
+    #[test]
+    fn an_unchanged_baddy_sends_nothing() {
+        let now = vec![vec![0x21], vec![0x69], vec![0x6c]];
+        assert_eq!(b::props_message(1, &now, &now), None);
+        let mut moved = now.clone();
+        moved[1] = vec![0x6a];
+        assert_eq!(b::props_message(1, &now, &moved), Some(vec![15 + 32, 0x21, 0x21, 0x6a, b'\n']));
+    }
+
     /// A real 2.22 follower's sword hit (`lan-222hurt`): PLI_BADDYHURT
     /// `21 28 60 21`, then the baddy's power and mode as PLI_BADDYPROPS
     /// `21 24 21 20 25 23`. The player stood at 42, 45; the baddy at its
