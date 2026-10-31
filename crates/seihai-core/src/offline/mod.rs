@@ -118,38 +118,15 @@ pub fn next_step_clock(last: std::time::Instant, now: std::time::Instant, interv
     }
 }
 
-/// The box, as offsets from the player's position in tiles, that the real
-/// 2.22 and 2.31 clients test against level links, by walking direction
-/// (`DIR_NORTH`, `DIR_WEST`, `DIR_SOUTH`, `DIR_EAST`): `(x0, y0, x1, y1)`.
-///
-/// Measured in the private lab on 2026-10-25, with the player put on half-tile
-/// positions and walking into a rectangle link and the edge links; the only
-/// thing the captures show is *where on the half-tile grid the first warp
-/// goes out*, so each edge is a value inside the range the captures allow
-/// (see `documentation/link-geometry.md`):
-///
-/// * a left or right step fires once the leading edge, `x + 0.25` or
-///   `x + 2.75`, is inside the link; the box is as tall as the feet strip
-///   (`y + 2` to `y + 3`);
-/// * an up or down step fires once the leading edge, `y + 0.75` or
-///   `y + 3.25`, is inside the link; the box is one tile wide, centred on
-///   `x + 1.5`.
-pub const LINK_BOX: [(f32, f32, f32, f32); 4] = [
-    (1.0, 0.75, 2.0, 1.25), // north
-    (0.25, 2.0, 0.75, 3.0), // west
-    (1.0, 2.75, 2.0, 3.25), // south
-    (2.25, 2.0, 2.75, 3.0), // east
-];
-
-/// The point, as an offset from the player's position in tiles, that builds
-/// without [`LINK_BOX`] test against level links, by facing (`DIR_NORTH`,
-/// `DIR_WEST`, `DIR_SOUTH`, `DIR_EAST`).
+/// The point, as an offset from the player's position in tiles, that the
+/// client tests against level links, by facing (`DIR_NORTH`, `DIR_WEST`,
+/// `DIR_SOUTH`, `DIR_EAST`).
 ///
 /// Read from the 2.05 client's link routine: a table of four `(x, y)`
-/// doubles indexed by the facing. The same 64 bytes are in every 0.x, 1.x
-/// and 2.0x Graal.exe checked (9th and 15th Graal, 1.1, 1.1.9, 1.3b, 1.21,
-/// 1.38, 1.39, 1.41.1, 2.00, 2.04, 2.05, 2.17); that they are the link probe there too is
-/// inferred. See `documentation/link-geometry.md`.
+/// doubles indexed by the facing. The same 64 bytes are in every Graal.exe
+/// checked, 9th Graal to 2.31. Real 2.00 and 2.22 walk-ins match it, as do
+/// the 2.22 and 2.31 link probes of 2026-10-25 (see
+/// `documentation/link-geometry.md`).
 pub const LINK_PROBE: [(f32, f32); 4] = [
     (1.5, 1.0), // north
     (0.5, 2.0), // west
@@ -360,9 +337,6 @@ pub struct OfflineSession {
     /// False from an arrival until the player has moved: a link cannot
     /// fire on the spot the player was put on.
     armed: bool,
-    /// Test links with [`LINK_BOX`] (the profile's `levels.link_boxes`)
-    /// instead of the legacy foot point.
-    pub link_boxes: bool,
     /// Tile the player arrived on. Links that contain it stay off until
     /// the player steps out of them.
     arrival_tile: Option<(i32, i32)>,
@@ -621,7 +595,6 @@ impl OfflineSession {
             gmap: None,
             big_map: None,
             armed: true,
-            link_boxes: false,
             arrival_tile: None,
             swim_sent: false,
             level_serial: 0,
@@ -1705,16 +1678,8 @@ impl OfflineSession {
         };
         let (px0, py0) = (self.player_x, self.player_y);
         let dir = self.player_dir & 3;
-        let b = LINK_BOX[usize::from(dir)];
         let q = LINK_PROBE[usize::from(dir)];
-        let boxes = self.link_boxes;
-        let hit = |l: &Link| {
-            if boxes {
-                l.overlaps(px0 + b.0, py0 + b.1, px0 + b.2, py0 + b.3)
-            } else {
-                probe_in_link(l, px0 + q.0, py0 + q.1, dir)
-            }
-        };
+        let hit = |l: &Link| probe_in_link(l, px0 + q.0, py0 + q.1, dir);
         if let Some(t) = self.arrival_tile {
             // Still on the way out of the arrival link?
             if level.links.iter().any(|l| l.contains(t.0, t.1) && hit(l)) {
@@ -3557,7 +3522,7 @@ mod tests {
     }
 
     /// The lab's `new1.nw`: the server's board, its one west-edge link from
-    /// `PLO_LEVELLINK`, no tile types, 2.22 link boxes. Walking west from the
+    /// `PLO_LEVELLINK`, no tile types. Walking west from the
     /// start fires the link, with the link's own arrival x.
     #[test]
     fn a_server_edge_link_fires_without_tile_types() {
@@ -3565,7 +3530,6 @@ mod tests {
         lvl.add_server_links(&["testworld.nw 0 0 1 64 61 playery".to_string()]);
         let mut s = body_at(lvl, 30.0, 32.0);
         s.tiletypes = None;
-        s.link_boxes = true;
         let mut fired = None;
         for _ in 0..200 {
             if s.try_move(-0.5, 0.0).is_some() && s.check_links() {
@@ -3577,17 +3541,17 @@ mod tests {
         assert_eq!((dest.as_str(), x, y), ("testworld.nw", 61.0, 32.0));
     }
 
-    /// The lab's `new1.nw` west link (`LINK testworld.nw 0 28 1 6`) on a
-    /// build without link boxes (2.00): the player stops at x -0.5 at the
-    /// edge, and the probe (x + 0.5, y + 2) is in the link from y 26 to 32.
+    /// The lab's `new1.nw` west link (`LINK testworld.nw 0 28 1 6`): the
+    /// player stops at x -0.5 at the edge, and the probe (x + 0.5, y + 2) is
+    /// in the link from y 26 to 32. Real 2.00 and 2.22 (lab, 2026-10-31)
+    /// warp on rows 26 to 32, at x 0.5, and not on 25.5, 32.5 or 33.
     #[test]
-    fn a_west_edge_link_fires_on_builds_without_link_boxes() {
+    fn a_west_edge_link_fires_where_real_2_00_and_2_22_do() {
         let fire_at = |y: f32| {
             let mut lvl = level(|_, _| OPEN);
             lvl.add_server_links(&["testworld.nw 0 28 1 6 61 playery".to_string()]);
             let mut s = body_at(lvl, 6.0, y);
             s.tiletypes = None;
-            assert!(!s.link_boxes);
             for _ in 0..40 {
                 if s.try_move(-0.5, 0.0).is_some() && s.check_links() {
                     return s.pending_link.take().map(|(d, nx, ny)| (d, nx, ny, s.player_x));
@@ -3595,11 +3559,12 @@ mod tests {
             }
             None
         };
-        for y in [26.0, 28.5, 30.0, 31.5, 32.0] {
+        for y in [26.0, 28.0, 28.5, 30.0, 31.5, 32.0] {
             assert_eq!(fire_at(y), Some(("testworld.nw".into(), 61.0, y, 0.5)), "y {y}");
         }
         assert_eq!(fire_at(25.5), None);
         assert_eq!(fire_at(32.5), None);
+        assert_eq!(fire_at(33.0), None);
     }
 
     /// A Z3-V1 level read from disk drives the same link rules: a negative
@@ -3687,7 +3652,7 @@ mod tests {
     }
 
     /// A level with the lab's links: a rectangle (10, 28, 2 by 5) and the
-    /// four edge strips, and a session with probe boxes on that walks from
+    /// four edge strips, and a session that walks from
     /// `(x, y)` in direction `(dx, dy)`; returns the position the first link
     /// fires at, or `None` after `steps` steps.
     fn first_fire(x: f32, y: f32, dx: f32, dy: f32, steps: usize) -> Option<(f32, f32)> {
@@ -3697,7 +3662,6 @@ mod tests {
         lvl.links.push(link("lv_w.nw", 0, 62, 64, 2, None, Some(4.0)));
         lvl.links.push(link("lv_s.nw", 62, 0, 2, 64, Some(4.0), None));
         let mut s = session_at(lvl, 0.0, 0.0);
-        s.link_boxes = true;
         s.player_x = x;
         s.player_y = y;
         s.arrive(x, y);
@@ -3716,7 +3680,7 @@ mod tests {
     // position the client reported.
 
     #[test]
-    fn probe_boxes_fire_where_the_real_client_does_on_the_rectangle_link() {
+    fn the_probe_fires_where_the_real_client_does_on_the_rectangle_link() {
         // Down at x 8.5 ... 10.5 reached the link after reporting y 24.5.
         for x in [8.5, 9.0, 9.5, 10.0, 10.5] {
             assert_eq!(first_fire(x, 20.0, 0.0, 0.5, 40), Some((x, 25.0)), "down at x {x}");
@@ -3735,7 +3699,7 @@ mod tests {
     }
 
     #[test]
-    fn probe_boxes_miss_the_rectangle_link_where_the_real_client_does() {
+    fn the_probe_misses_the_rectangle_link_where_the_real_client_does() {
         // Beside the link (x 8.0 and 11.0 or more going down; 7 and 7.5 and
         // 11 to 12 in the first lab run).
         for x in [7.0, 7.5, 8.0, 11.0, 11.5, 12.0] {
@@ -3752,14 +3716,14 @@ mod tests {
     }
 
     #[test]
-    fn probe_boxes_fire_where_the_real_client_does_on_the_edges() {
+    fn the_probe_fires_where_the_real_client_does_on_the_edges() {
         assert_eq!(first_fire(30.0, 56.0, 0.0, 0.5, 40), Some((30.0, 59.0))); // south edge
         assert_eq!(first_fire(30.0, 6.0, 0.0, -0.5, 40), Some((30.0, 1.0))); // north edge
         assert_eq!(first_fire(56.0, 30.5, 0.5, 0.0, 40), Some((59.5, 30.5))); // east edge
     }
 
     #[test]
-    fn profiles_without_probe_boxes_use_the_2_05_probe_point() {
+    fn the_south_probe_includes_the_far_edge() {
         // Facing south the probe is (x + 1.5, y + 3), far edges included.
         let mut lvl = level(|_, _| OPEN);
         lvl.links.push(link("lv_c.nw", 10, 28, 2, 5, Some(60.0), Some(30.0)));
@@ -3767,7 +3731,6 @@ mod tests {
         s.player_x = 8.5;
         s.player_y = 20.0;
         s.arrive(8.5, 20.0);
-        assert!(!s.link_boxes);
         let mut fired = None;
         for _ in 0..40 {
             s.try_move(0.0, 0.5);

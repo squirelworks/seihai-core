@@ -406,11 +406,6 @@ pub struct Levels {
     /// 2.04: those binaries send id 30, but no document or capture says
     /// they use it for cached levels.
     pub cached_links: bool,
-    /// A link fires when the walking direction's probe box (see
-    /// `offline::LINK_BOX`) overlaps its rectangle, as on the real 2.22 and
-    /// 2.31 clients (lab, 2026-10-25). Without it the legacy foot-point rule
-    /// stays: builds nobody measured.
-    pub link_boxes: bool,
 }
 
 /// The HUD sheet (`state.png`) a build ships. A version's own asset folder
