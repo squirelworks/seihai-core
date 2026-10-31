@@ -260,7 +260,7 @@ fn decode_conn(c: &TcpConn, name: &str, kind: Kind, opts: &DecodeOptions, mask: 
             key = k;
             if let Some(k) = k {
                 if gen5 {
-                    c_cipher5 = Some(Gen5::new(k));
+                    c_cipher5 = Some(gen5_for(ver, listserver, k));
                 }
                 if gen3 {
                     c_cipher3 = Some(Gen3::new(k));
@@ -302,19 +302,22 @@ fn decode_conn(c: &TcpConn, name: &str, kind: Kind, opts: &DecodeOptions, mask: 
         frame_no += 1;
     }
     // ---- server to client ---------------------------------------------
-    let mut s_cipher5: Option<Gen5> = if gen5 { key.map(Gen5::new) } else { None };
+    let mut s_cipher5: Option<Gen5> = if gen5 { key.map(|k| gen5_for(ver, listserver, k)) } else { None };
+    // 6.x game servers send `FF FF` + u32 lengths for long frames.
+    let long = !listserver && ver.profile().protocol.gen5_long_frames;
     let mut splitter = Splitter::default();
     let bytes = &c.s2c.bytes;
     let mut off = 0;
     let mut frame_no = 0u32;
     while off + 2 <= bytes.len() {
-        let n = usize::from(u16::from_be_bytes([bytes[off], bytes[off + 1]]));
+        let fl = if long { crate::protocol::FrameLen::Long } else { crate::protocol::FrameLen::Short };
+        let Some((head, n)) = fl.header(&bytes[off..]) else { break };
         let ts = c.s2c.ts_at(off);
-        let Some(body) = bytes.get(off + 2..off + 2 + n) else {
+        let Some(body) = bytes.get(off + head..off + head + n) else {
             push_event(&mut out, &cx, Dir::S2C, ts, frame_no, ID_BADFRAME, "BADFRAME".into(), bytes.len() - off, vec![f("reason", "truncated frame")]);
             break;
         };
-        off += 2 + n;
+        off += head + n;
         let plain = if gen5 {
             decode_gen5_body(body, s_cipher5.as_mut())
         } else {
@@ -372,6 +375,17 @@ fn decode_conn(c: &TcpConn, name: &str, kind: Kind, opts: &DecodeOptions, mask: 
 }
 
 /// Undo the gen-5 framing of one body (compression byte, XOR, inflate).
+/// The gen-5 cipher a game connection of `ver` uses: 5.12 steps its
+/// compressed bodies with the round-down count (`gen5_round_down`). Without
+/// it every 5.12 client frame read as BADFRAME (stress test, 2026-10-31).
+fn gen5_for(ver: ClientVersion, listserver: bool, key: u8) -> Gen5 {
+    if !listserver && ver.profile().protocol.gen5_round_down {
+        Gen5::new(key).round_down()
+    } else {
+        Gen5::new(key)
+    }
+}
+
 fn decode_gen5_body(body: &[u8], cipher: Option<&mut Gen5>) -> Result<Vec<u8>, String> {
     let (&ct, rest) = body.split_first().ok_or("empty gen-5 frame")?;
     let comp = match ct {
@@ -678,6 +692,16 @@ fn describe_s2c(ver: ClientVersion, id: i32, p: &[u8], mask: &mut Masker) -> (St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 5.12 game links use the round-down step count in both directions;
+    /// other builds and every listserver link do not.
+    #[test]
+    fn gen5_cipher_follows_the_profile() {
+        assert!(gen5_for(ClientVersion::V512, false, 0x21).is_round_down());
+        assert!(!gen5_for(ClientVersion::V512, true, 0x21).is_round_down());
+        assert!(!gen5_for(ClientVersion::V222, false, 0x21).is_round_down());
+        assert!(!gen5_for(ClientVersion::V603R7, false, 0x21).is_round_down());
+    }
     use crate::difftest::pcap::tests::synth_pcap;
     use crate::protocol::{write_zlib_frame, Gen5};
 

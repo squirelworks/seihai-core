@@ -1768,11 +1768,12 @@ fn parse_sign(lines: &[String]) -> Option<Sign> {
     }
     let x: i32 = header[1].parse().ok()?;
     let y: i32 = header[2].parse().ok()?;
-    let text = lines[1..lines.len().saturating_sub(1)]
-        .iter()
-        .map(|s| s.as_str())
-        .collect::<Vec<_>>()
-        .join("\n");
+    // As in `parse_baddy`: a file cut right after the header has no text.
+    let mut body = &lines[1..];
+    if body.last().is_some_and(|l| l.trim() == "SIGNEND") {
+        body = &body[..body.len() - 1];
+    }
+    let text = body.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n");
     Some(Sign { x, y, text })
 }
 
@@ -1790,11 +1791,14 @@ fn parse_baddy(lines: &[String]) -> Option<Baddy> {
     let x: f32 = header[1].parse().ok()?;
     let y: f32 = header[2].parse().ok()?;
     let kind = header[3].to_string();
-    let verses = lines[1..lines.len().saturating_sub(1)]
-        .iter()
-        .map(|s| s.as_str())
-        .collect::<Vec<_>>()
-        .join("\n");
+    // The verses are the lines between the header and BADDYEND. A file
+    // that ends right after the header (a cut download) has none; slicing
+    // `1..0` used to panic there (stress test fuzzing, 2026-10-31).
+    let mut body = &lines[1..];
+    if body.last().is_some_and(|l| l.trim() == "BADDYEND") {
+        body = &body[..body.len() - 1];
+    }
+    let verses = body.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n");
     Some(Baddy { x, y, kind, verses })
 }
 
@@ -1906,6 +1910,19 @@ pub fn decode_sign_record(line: &[u8]) -> Option<(i32, i32, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A `.nw` cut right after a BADDY or SIGN header (a broken download or
+    /// cache file) parses instead of panicking on `lines[1..0]`.
+    #[test]
+    fn a_level_cut_after_a_header_parses() {
+        for tail in ["BADDY 10 10 0", "SIGN 10 10", "BADDY 10 10 0\n", "SIGN 10 10\n"] {
+            let text = format!("GLEVNW01\n{tail}");
+            assert!(Level::parse(&text).is_ok(), "{tail:?}");
+        }
+        let l = Level::parse("GLEVNW01\nBADDY 10 10 3\nhi\n\n\nBADDYEND\nSIGN 1 2\nline\nSIGNEND\n").unwrap();
+        assert_eq!(l.baddies[0].verses, "hi\n\n");
+        assert_eq!(l.signs[0].text, "line");
+    }
     use crate::assets::crc32;
 
     #[test]

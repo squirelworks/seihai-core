@@ -710,6 +710,16 @@ fn socket_thread(
                 Err(mpsc::TryRecvError::Disconnected) => queue_open = false,
             }
         }
+        // The Connection was dropped (its sender with it) and everything it
+        // queued is out: close the socket and end. Before, the thread kept
+        // reading a link nobody used, and the server kept the player online
+        // until its own timeout (stress test, 2026-10-31).
+        // The game loop hears of it as a closed connection, if it still
+        // listens.
+        if !queue_open && pending.is_empty() {
+            let _ = stream.shutdown(std::net::Shutdown::Both);
+            return fail(&frames, io::Error::new(io::ErrorKind::NotConnected, "closed on Seihai's side"));
+        }
         while !pending.is_empty() {
             match stream.write(&pending) {
                 Ok(0) => return fail(&frames, io::ErrorKind::WriteZero.into()),
@@ -925,6 +935,12 @@ impl Connection {
     /// [`Self::spawn_reader`] then ends with an error.
     pub fn shutdown(&self) -> io::Result<()> {
         self.stream.shutdown(std::net::Shutdown::Both)
+    }
+
+    /// True if this connection's client version has message `id` in its
+    /// send set (always true before the login fixed the version).
+    pub fn can_send(&self, id: u8) -> bool {
+        self.pli.as_ref().map_or(true, |p| p.contains(id))
     }
 
     /// Send a raw byte buffer.
@@ -1637,7 +1653,17 @@ impl Connection {
     }
 
     /// Fire a trigger action at `(x, y)` ([`trigger_action_message`]).
+    ///
+    /// A build without `PLI_TRIGGERACTION` (38) in its send set (1.39 and
+    /// 1.41 among them) sends nothing and this is `Ok`: the try still runs
+    /// locally. It used to be an `Unsupported` error, and the game loop
+    /// dropped the connection on it, so a 1.39 player who pushed a wall went
+    /// silently offline while the socket stayed open (stress test,
+    /// 2026-10-31).
     pub fn send_trigger_action(&mut self, x: f32, y: f32, action: &str, param: &str) -> io::Result<()> {
+        if !self.can_send(38) {
+            return Ok(());
+        }
         self.send_messages(&[trigger_action_message(x, y, action, param)])
     }
 
@@ -2076,6 +2102,43 @@ mod tests {
         conn.send_post_login(ClientVersion::V524R4, "English").unwrap();
         assert!(read_frame(&mut srv).starts_with(b"%kG3D15010%guest(7Y3bdzjfwin,"));
         assert_eq!(gen5_body(&mut srv, &mut Gen5::new(0x4B)), b"EEnglish\n");
+    }
+
+    /// 1.39 has no `PLI_TRIGGERACTION` (38): a push try sends nothing and is
+    /// not an error, so the game loop keeps the connection (stress test,
+    /// 2026-10-31: the error used to drop it).
+    #[test]
+    fn trigger_action_is_skipped_where_the_build_has_none() {
+        let (mut conn, mut srv) = pair();
+        conn.login_versioned(ClientVersion::V139, 0x21, "guest", "pw").unwrap();
+        let _ = read_frame(&mut srv);
+        assert!(!conn.can_send(38));
+        conn.send_trigger_action(30.0, 30.0, "pushed", "0").unwrap();
+        srv.set_read_timeout(Some(Duration::from_millis(300))).unwrap();
+        let mut b = [0u8; 64];
+        assert!(srv.read(&mut b).is_err(), "nothing went out");
+
+        let (mut conn, mut srv) = pair();
+        conn.login_versioned(ClientVersion::V205, 0x21, "guest", "pw").unwrap();
+        let _ = read_frame(&mut srv);
+        assert!(conn.can_send(38));
+        conn.send_trigger_action(30.0, 30.0, "pushed", "0").unwrap();
+    }
+
+    /// Dropping a `Connection` whose reader thread runs closes the socket
+    /// (the server sees EOF at once) and tells the receiver it is closed.
+    #[test]
+    fn dropping_the_connection_closes_the_socket() {
+        let (mut conn, mut srv) = pair();
+        conn.login_versioned(ClientVersion::V222, 0x21, "guest", "pw").unwrap();
+        let _ = read_frame(&mut srv);
+        let rx = conn.spawn_reader_timed().unwrap();
+        drop(conn);
+        srv.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        let mut b = [0u8; 64];
+        assert_eq!(srv.read(&mut b).unwrap(), 0, "the server sees EOF");
+        let (_, got) = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(got.unwrap_err().kind(), io::ErrorKind::NotConnected);
     }
 
     /// A 6.x build reads a server frame of 0xFFFF bytes or more as `FF FF`
