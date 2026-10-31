@@ -68,7 +68,57 @@ fn control_fixture_runs_loops_and_switch_and_logs_what_it_skips() {
     // n = 1 + 3 + 4 = 8, counted down to 1 by the while loop: case 1.
     assert_eq!(h.effects, [Effect::Say2 { text: "one".into() }]);
     assert!(h.log.iter().any(|l| l.contains("OP_IN_RANGE") && l.contains("Stage D")), "{:?}", h.log);
-    assert!(h.log.iter().any(|l| l == "gs2: function setTimer not found"), "{:?}", h.log);
+    // `setTimer` is the machine's own now (Stage D, timers).
+    assert!(!h.log.iter().any(|l| l.contains("setTimer")), "{:?}", h.log);
+    assert_eq!(m.timeout(), 0.1);
+}
+
+#[test]
+fn timers_fixture_runs_the_timeout_and_scheduled_events_frame_by_frame() {
+    let mut m = machine("timers.gs2bc");
+    let mut h = host();
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    // setTimer(0.1) is two frames of 1/20 s.
+    assert_eq!(m.timeout(), 0.1);
+    let mut ran = Vec::new();
+    for frame in 1..=8 {
+        for (event, out) in m.tick(&mut h) {
+            assert_eq!(out, Outcome::Done, "{event}");
+            ran.push((frame, event));
+        }
+    }
+    // onTimeout re-arms itself with `this.timeout = 0.05` (one frame) until
+    // it has run three times; Ping comes at 0.25 s (frame 5), Kept at 0.3 s
+    // (frame 6). Dropped was cancelled, by its name without the `on`.
+    let names = |n: &str| n.to_string();
+    assert_eq!(
+        ran,
+        [(2, names("onTimeout")), (3, names("onTimeout")), (4, names("onTimeout")), (5, names("onPing")), (6, names("onKept"))]
+    );
+    assert_eq!(m.var(Root::This, "ticks"), Some(&Val::Num(3.0)));
+    // Inside onTimeout the timer has already run out.
+    assert_eq!(m.var(Root::This, "left"), Some(&Val::Num(0.0)));
+    assert_eq!(m.var(Root::This, "ping"), Some(&Val::Num(7.0)));
+    assert_eq!(m.var(Root::This, "kept"), Some(&Val::Num(2.0)));
+    assert_eq!(m.var(Root::This, "dropped"), None);
+    assert_eq!(m.timeout(), 0.0);
+    assert!(h.log.is_empty(), "{:?}", h.log);
+}
+
+#[test]
+fn an_event_that_comes_due_during_a_sleep_waits_for_the_run_to_end() {
+    let mut m = machine("timers.gs2bc");
+    let mut h = host();
+    // onSleepy sets a one-frame timer, then sleeps.
+    assert_eq!(m.call_event("onSleepy", &[], &mut h), Outcome::Sleep(0.1));
+    // The timer runs out while the run is asleep: nothing starts.
+    assert!(m.tick(&mut h).is_empty());
+    assert_eq!(m.resume(&mut h), Outcome::Done);
+    assert_eq!(m.var(Root::This, "woke"), Some(&Val::Num(1.0)));
+    // The next frame runs the timeout that came due.
+    let ran: Vec<String> = m.tick(&mut h).into_iter().map(|(e, _)| e).collect();
+    assert_eq!(ran, ["onTimeout"]);
+    assert_eq!(m.var(Root::This, "ticks"), Some(&Val::Num(1.0)));
 }
 
 #[test]

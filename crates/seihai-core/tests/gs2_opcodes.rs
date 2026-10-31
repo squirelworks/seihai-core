@@ -166,7 +166,7 @@ fn walk(name: &str, s: &Script, ops: &HashMap<u8, Row>) -> Vec<(u8, Option<i64>)
     out
 }
 
-const FIXTURES: &[&str] = &["shared.gs2bc", "control.gs2bc", "objects.gs2bc", "calls.gs2bc"];
+const FIXTURES: &[&str] = &["shared.gs2bc", "control.gs2bc", "objects.gs2bc", "calls.gs2bc", "timers.gs2bc"];
 
 #[test]
 fn every_fixture_walks_cleanly_with_the_documented_table() {

@@ -9,6 +9,10 @@
 //! these. Opcodes outside that set are logged and skipped; they are
 //! Stage D. Behaviour is from the 3.153 client's VM, as described in
 //! `documentation/gs2-executor.md`. Nothing here runs on the classic path.
+//!
+//! The timer commands (`settimer`, `timeout`, `scheduleevent`,
+//! `cancelevents`) are the machine's own and run on [`Machine::tick`]
+//! (`documentation/gs2-commands.md`).
 
 use super::{Op, Operand, Script};
 use crate::scripting::engine::vocab::{self, Exec};
@@ -26,6 +30,10 @@ const LOOP_LIMIT: u32 = 10_000;
 const CALL_LIMIT: usize = 10_000;
 /// Seihai's own guard against a script that never yields.
 const STEP_LIMIT: u64 = 2_000_000;
+/// One timer frame in seconds. GServer-v2 counts `timeout` and scheduled
+/// events in frames of 1/20 s (`TNPC::runScriptTimer`); call
+/// [`Machine::tick`] once per frame.
+pub const TICK: f64 = 0.05;
 
 /// The object roots a script can name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -91,6 +99,15 @@ struct Frame {
     locals: HashMap<String, Val>,
 }
 
+/// A `scheduleevent` waiting for its frame.
+struct Scheduled {
+    /// Frames left.
+    left: u32,
+    /// The event without its `on` (`Ping` for `onPing`).
+    event: String,
+    args: Vec<Val>,
+}
+
 /// A loaded script and its variables.
 pub struct Machine {
     script: Script,
@@ -100,11 +117,45 @@ pub struct Machine {
     pc: usize,
     loops: HashMap<usize, u32>,
     running: bool,
+    /// `timeout` in frames; 0 is off.
+    timeout: u32,
+    scheduled: Vec<Scheduled>,
+    /// Events whose frame came while a run was asleep, in order.
+    due: Vec<(String, Vec<Val>)>,
+}
+
+/// Seconds to whole frames, as GServer-v2 does it: `(int)(t * 20)`.
+fn frames(secs: f64) -> u32 {
+    if secs > 0.0 {
+        (secs * 20.0) as u32
+    } else {
+        0
+    }
+}
+
+/// An event name without a leading `on`, as the client's dispatcher
+/// takes both `Ping` and `onPing`.
+fn event_name(name: &str) -> &str {
+    match name.get(..2) {
+        Some(p) if p.eq_ignore_ascii_case("on") && name.len() > 2 => &name[2..],
+        _ => name,
+    }
 }
 
 impl Machine {
     pub fn new(script: Script) -> Machine {
-        Machine { script, vars: HashMap::new(), stack: Vec::new(), frames: Vec::new(), pc: 0, loops: HashMap::new(), running: false }
+        Machine {
+            script,
+            vars: HashMap::new(),
+            stack: Vec::new(),
+            frames: Vec::new(),
+            pc: 0,
+            loops: HashMap::new(),
+            running: false,
+            timeout: 0,
+            scheduled: Vec::new(),
+            due: Vec::new(),
+        }
     }
 
     pub fn script(&self) -> &Script {
@@ -150,6 +201,69 @@ impl Machine {
         self.exec(host)
     }
 
+    /// The `timeout` left, in seconds (0 when off).
+    pub fn timeout(&self) -> f64 {
+        self.timeout as f64 * TICK
+    }
+
+    /// Advances the timers by one frame ([`TICK`]) and runs what is due:
+    /// `onTimeout` when `timeout` reaches 0, then each scheduled event
+    /// whose frame came, in the order they were scheduled. While a run is
+    /// asleep nothing new starts (starting an event would end it); what
+    /// came due waits for a later frame. Returns each event run and how
+    /// it ended.
+    pub fn tick(&mut self, host: &mut dyn Host) -> Vec<(String, Outcome)> {
+        if self.timeout > 0 {
+            self.timeout -= 1;
+            if self.timeout == 0 {
+                self.due.push(("Timeout".into(), Vec::new()));
+            }
+        }
+        let mut i = 0;
+        while i < self.scheduled.len() {
+            let e = &mut self.scheduled[i];
+            e.left = e.left.saturating_sub(1);
+            if e.left == 0 {
+                let e = self.scheduled.remove(i);
+                self.due.push((e.event, e.args));
+            } else {
+                i += 1;
+            }
+        }
+        let mut ran = Vec::new();
+        while !self.running && !self.due.is_empty() {
+            let (event, args) = self.due.remove(0);
+            let name = format!("on{event}");
+            let out = self.call_event(&name, &args, host);
+            ran.push((name, out));
+        }
+        ran
+    }
+
+    /// The timer commands. `None` if `name` is not one of them.
+    fn timer_command(&mut self, name: &str, args: &[Val]) -> Option<Val> {
+        let lower = name.to_ascii_lowercase();
+        let cmd = lower.strip_prefix("this.").or_else(|| lower.strip_prefix("thiso.")).unwrap_or(&lower);
+        match cmd {
+            "settimer" => self.timeout = frames(args.first().map_or(0.0, Val::num)),
+            "scheduleevent" => {
+                let event = event_name(&args.get(1).map(Val::text).unwrap_or_default()).to_string();
+                // GServer-v2 never fires a 0-frame event (it counts down
+                // past 0); Seihai runs it on the next frame.
+                let left = frames(args.first().map_or(0.0, Val::num)).max(1);
+                self.scheduled.push(Scheduled { left, event, args: args.get(2..).unwrap_or_default().to_vec() });
+            }
+            "cancelevents" => {
+                let event = args.first().map(Val::text).unwrap_or_default();
+                let event = event_name(&event);
+                self.scheduled.retain(|e| !e.event.eq_ignore_ascii_case(event));
+                self.due.retain(|e| !e.0.eq_ignore_ascii_case(event));
+            }
+            _ => return None,
+        }
+        Some(Val::Num(0.0))
+    }
+
     /// Continues after `Outcome::Sleep`.
     pub fn resume(&mut self, host: &mut dyn Host) -> Outcome {
         if !self.running {
@@ -187,6 +301,7 @@ impl Machine {
                 Some(f) => f.locals.get(name).cloned().unwrap_or_default(),
                 None => self.vars.get(&(Root::Global, name.to_string())).cloned().unwrap_or_default(),
             },
+            Some(Root::This | Root::ThisO) if name.eq_ignore_ascii_case("timeout") => Val::Num(self.timeout()),
             Some(r) => {
                 if let Some(v) = host.get_prop(r, name) {
                     return v;
@@ -198,6 +313,9 @@ impl Machine {
             None => {
                 if let Some(v) = self.frames.last().and_then(|f| f.locals.get(name)) {
                     return v.clone();
+                }
+                if name.eq_ignore_ascii_case("timeout") {
+                    return Val::Num(self.timeout());
                 }
                 if let Some(v) = host.get_prop(Root::This, name) {
                     return v;
@@ -225,6 +343,10 @@ impl Machine {
                 }
                 return;
             }
+            Some(Root::This | Root::ThisO) if name.eq_ignore_ascii_case("timeout") => {
+                self.timeout = frames(value.num());
+                return;
+            }
             Some(r) => {
                 if host.set_prop(r, name, &value) {
                     return;
@@ -234,6 +356,10 @@ impl Machine {
             None => {
                 if let Some(f) = self.frames.last_mut().filter(|f| f.locals.contains_key(name)) {
                     f.locals.insert(name.to_string(), value);
+                    return;
+                }
+                if name.eq_ignore_ascii_case("timeout") {
+                    self.timeout = frames(value.num());
                     return;
                 }
                 if host.set_prop(Root::This, name, &value) {
@@ -561,7 +687,7 @@ impl Machine {
             None => name.1.clone(),
             Some(r) => format!("{}.{}", root_name(r), name.1),
         };
-        let result = match host.command(&full, &args) {
+        let result = match self.timer_command(&full, &args).or_else(|| host.command(&full, &args)) {
             Some(v) => v,
             None => {
                 host.log(format!("gs2: function {full} not found"));
