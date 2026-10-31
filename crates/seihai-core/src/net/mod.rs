@@ -265,10 +265,12 @@ pub fn max_power_message(hearts: u8) -> Vec<u8> {
 
 /// `PLI_PLAYERPROPS` (2) with the player's own hearts report, in the
 /// order the real client writes it: CURPOWER (2, half hearts), GANI (10, a
-/// GSTRING) and SPRITE (17), each only when given. The real 2.05 client's
+/// GSTRING), X (15) and Y (16) in half tiles, and SPRITE (17), each only
+/// when given. The real 2.00's hit with its first knockback step, run 2:
+/// `22 24 2A 24 "hurt" 2F 5F 31 A2`. The real 2.05 client's
 /// hit report, lab run 1 (2026-10-29 note), was `22 25 2A 24 "hurt" 31 A0`:
 /// 5 half hearts, `hurt`, sprite 128 (hurt sprite 32, facing up).
-pub fn power_props_message(cur_half: Option<u8>, gani: Option<&str>, sprite: Option<u8>) -> Vec<u8> {
+pub fn power_props_message(cur_half: Option<u8>, gani: Option<&str>, pos: (Option<u8>, Option<u8>), sprite: Option<u8>) -> Vec<u8> {
     let mut m = vec![2 + 0x20];
     if let Some(c) = cur_half {
         m.push(2 + 0x20);
@@ -277,6 +279,12 @@ pub fn power_props_message(cur_half: Option<u8>, gani: Option<&str>, sprite: Opt
     if let Some(g) = gani {
         m.push(10 + 0x20);
         push_gstring_latin1(&mut m, g);
+    }
+    for (id, v) in [(15u8, pos.0), (16, pos.1)] {
+        if let Some(v) = v {
+            m.push(id + 0x20);
+            m.push(v.wrapping_add(0x20));
+        }
     }
     if let Some(s) = sprite {
         m.push(17 + 0x20);
