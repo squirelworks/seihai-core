@@ -1135,7 +1135,12 @@ impl Connection {
                 Err(e) => return Err(list_read_error(e)),
             };
             let part = parse_list_reply(&body);
-            reply.servers.extend(part.servers);
+            // Each id 0 list is the whole list. The public 14923 port sends
+            // an old one and then the current one; showing both listed most
+            // servers twice. A later list replaces the earlier one.
+            if !part.servers.is_empty() {
+                reply.servers = part.servers;
+            }
             reply.status = part.status.or(reply.status);
             reply.site_url = part.site_url.or(reply.site_url);
             reply.error = part.error.or(reply.error);
@@ -2741,8 +2746,9 @@ mod tests {
     /// The public 14923 shape seen on 2026-10-25 (item 14), 2.22-style gen-5
     /// login: one id 0 list with the old rows right after the handshake, a
     /// second id 0 list with the current rows about 350 ms later, then the
-    /// status frame. Both lists must come back, in that order, and the
-    /// status ends the wait.
+    /// status frame. The second list replaces the first (keeping both showed
+    /// most servers twice in the launcher, 2026-10-31), and the status ends
+    /// the wait.
     #[test]
     fn fetch_server_list_two_lists_then_status() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -2762,8 +2768,8 @@ mod tests {
             Connection::fetch_server_list(&addr, ClientVersion::V222, "ab", "cd").unwrap();
         assert!(t.elapsed() < Duration::from_millis(1200), "status should end the wait");
         let names: Vec<_> = reply.servers.iter().map(|e| e.name.as_str()).collect();
-        assert_eq!(names, ["Old A", "Old B", "New A", "New B", "New C"]);
-        assert_eq!(reply.servers[2].kind, "P");
+        assert_eq!(names, ["New A", "New B", "New C"]);
+        assert_eq!(reply.servers[0].kind, "P");
         assert!(reply.status.is_some());
         done_tx.send(()).unwrap();
         server.join().unwrap();
@@ -2790,7 +2796,7 @@ mod tests {
         let reply =
             Connection::fetch_server_list(&addr, ClientVersion::V222, "ab", "cd").unwrap();
         let names: Vec<_> = reply.servers.iter().map(|e| e.name.as_str()).collect();
-        assert_eq!(names, ["Old A", "New A"]);
+        assert_eq!(names, ["New A"], "the later list replaces the earlier one");
         assert!(reply.status.is_some());
         done_tx.send(()).unwrap();
         server.join().unwrap();

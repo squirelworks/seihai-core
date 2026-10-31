@@ -885,6 +885,23 @@ pub struct Level {
 }
 
 impl Level {
+    /// Every NPC's script, each under a header line with its index, image
+    /// and position (as the script log names them), for the debug folder:
+    /// the packet log cuts each packet short, so a script error ("line 250:
+    /// unmatched `}`") could not be read against its source.
+    pub fn npc_scripts_dump(&self) -> String {
+        let mut out = String::new();
+        for (i, n) in self.npcs.iter().enumerate() {
+            let image = if n.image.is_empty() { "-" } else { n.image.as_str() };
+            out.push_str(&format!("//// npc {i}: {image} at {},{} ({} lines)\n", n.x, n.y, n.script.lines().count()));
+            out.push_str(&n.script);
+            if !n.script.ends_with('\n') {
+                out.push('\n');
+            }
+        }
+        out
+    }
+
     /// Build a level from a 64×64 board of tile ids, row by row, as the
     /// server sends it in `PLO_BOARDPACKET`. Links, signs and chests
     /// arrive in their own packets and start empty here.

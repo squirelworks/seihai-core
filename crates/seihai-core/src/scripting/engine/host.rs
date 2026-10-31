@@ -251,6 +251,8 @@ impl SessionScripts {
             self.world.broadcast("playerendsreading");
         }
         self.was_reading = reading;
+        session.script_freeze_ms = session.script_freeze_ms.saturating_sub(ms);
+        session.script_hide_ms = session.script_hide_ms.saturating_sub(ms);
         self.world.tick(ms);
         self.apply(session);
     }
@@ -661,6 +663,23 @@ impl SessionScripts {
                             set(&mut i.effect, 1, color);
                         }
                     }
+                }
+                // `freezeplayer time` and `hideplayer time`: the player cannot
+                // move, or is not drawn, for `time` seconds. A second call
+                // sets the time left anew.
+                Effect::Command { ref name, ref args, .. } if name == "freezeplayer" || name == "hideplayer" => {
+                    let secs = args.first().map_or(0.0, |v| v.num()).max(0.0);
+                    let ms = (secs * 1000.0).round() as u64;
+                    if name == "freezeplayer" {
+                        s.script_freeze_ms = ms;
+                    } else {
+                        s.script_hide_ms = ms;
+                    }
+                }
+                // `showstats bits`: which parts of the status bar show.
+                Effect::Command { ref name, ref args, .. } if name == "showstats" => {
+                    let bits = args.first().map_or(0.0, |v| v.num());
+                    s.stats = Some(bits.max(0.0).min(f64::from(u16::MAX)) as u16);
                 }
                 // `seteffect r,g,b,a`: the whole map is shaded with that colour.
                 Effect::Command { ref name, ref args, .. } if name == "seteffect" => {
