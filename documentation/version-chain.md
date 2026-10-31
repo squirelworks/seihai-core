@@ -479,7 +479,7 @@ Generated; do not edit between the markers.
 - protocol: **plo (server ids handled)**: +140 NPCWEAPONSCRIPT, +197 LOADSCRIPT; -100 RAWDATA, -108 UNKNOWN108, -196 (101 -> 100 ids)
 - protocol: **pli (client ids sent)**: +47 VERIFYWANTSEND, +159 UPDATEPACKAGEREQUESTFILE; -162 RC_UNKNOWN162 (58 -> 59 ids)
 - unknown (pli): only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
-- unknown (login): Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); whether a server accepts all three empty is not known
+- unknown (login): Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); stock GServer-v2 accepts all three empty (lab, 2026-10-31), other servers are untested
 - unknown (login): the base-file requests after the language (47 or 23 basepackage.gupd) are not sent
 - unknown (props): own and other prop sets are 3.153's; no 5.x parser was read
 - unknown (ui): chat is a bold sans serif in the lab; its cell height is not known, 24 is kept

@@ -1147,7 +1147,7 @@ pub const CHAIN: &[Step] = &[
         source: "binary (unpacked engine DLL) and lab (lab-v5-2026-10-30): PLO set of 100 ids, send ids from the send wrappers, login id 5 with G3D22067 and the win,<3 md5> list in the plain zlib frame, then 37 in its own gen-5 frame; Login mode until 178",
         unknown: &[
             Unknown { area: "pli", what: "only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them" },
-            Unknown { area: "login", what: "Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); whether a server accepts all three empty is not known" },
+            Unknown { area: "login", what: "Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); stock GServer-v2 accepts all three empty (lab, 2026-10-31), other servers are untested" },
             Unknown { area: "login", what: "the base-file requests after the language (47 or 23 basepackage.gupd) are not sent" },
             Unknown { area: "props", what: "own and other prop sets are 3.153's; no 5.x parser was read" },
             Unknown { area: "ui", what: "chat is a bold sans serif in the lab; its cell height is not known, 24 is kept" },
