@@ -1,0 +1,28 @@
+// Timers: setTimer, the timeout variable, scheduleevent and cancelevents.
+function onCreated() {
+  this.ticks = 0;
+  setTimer(0.1);
+  scheduleevent(0.25, "Ping", 7);
+  scheduleevent(0.3, "onDropped", 1);
+  scheduleevent(0.3, "Kept", 2);
+  cancelevents("Dropped");
+}
+function onTimeout() {
+  this.ticks++;
+  this.left = this.timeout;
+  if (this.ticks < 3) this.timeout = 0.05;
+}
+function onPing(n) {
+  this.ping = n;
+}
+function onDropped(n) {
+  this.dropped = n;
+}
+function onKept(n) {
+  this.kept = n;
+}
+function onSleepy() {
+  setTimer(0.05);
+  sleep(0.1);
+  this.woke = 1;
+}
