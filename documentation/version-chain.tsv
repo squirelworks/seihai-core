@@ -263,9 +263,10 @@ step	label	token	basis	kind	area	field	detail
 33	4.04r2	G3D17026	binary	changed	protocol	login lobby	none -> first server "Login", nothing drawn until 178, login line ends win,"","",""
 33	4.04r2	G3D17026	binary	changed	ui	server_list	3 tabs -> direct (loginserver.graalonline.com:14900)
 33	4.04r2	G3D17026	binary	changed	ui	chat_text	ChatText { face: TempusSans, height: 24 } -> ChatText { face: Arial, height: 24 }
-33	4.04r2	G3D17026	binary	unknown	pli	-	the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34 and 38 seen in the lab)
+33	4.04r2	G3D17026	binary	unknown	pli	-	the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34, 38 and 46 seen in the lab; the 2026-10-31 live run saw 2, 4, 9, 23, 24, 34, 37, 38, 44, 46, 152, 154 and 157, all in the set)
 33	4.04r2	G3D17026	binary	unknown	login	-	Seihai sends the three machine fields as an empty quoted string, as for 5.00r7; the real client sends three MD5s
-33	4.04r2	G3D17026	binary	unknown	login	-	the base-file requests after the language (basepackage.gupd, bigmap.txt) are not sent
+33	4.04r2	G3D17026	binary	unknown	login	-	the base-file requests after the language (basepackage.gupd, bigmap.txt), 152 and 154 (PM and lister setup) and the own props burst are not sent
+33	4.04r2	G3D17026	binary	unknown	walk	-	SPRITE, X2 and Y2 go out with every step; the real client sends only what changed and GANI walk/idle (lab, 2026-10-31)
 33	4.04r2	G3D17026	binary	unknown	serverwarp	-	the lab's 178 reached the game server, but the warp text it used was not recorded; split on commas only, as the 5.x and 6.x builds
 33	4.04r2	G3D17026	binary	unknown	props	-	own and other prop sets are 3.153's; no 4.x prop parser was read (the lab saw X2/Y2, 78 and 79)
 33	4.04r2	G3D17026	binary	unknown	ui	-	chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7

@@ -1071,9 +1071,10 @@ pub const CHAIN: &[Step] = &[
         },
         source: "binary (stock engine DLL unpacked from the Thinstall installer) and one live lab run (live-behaviour-404): 98 PLO ids, login id 5 with G3D17026 and win,<3 md5> in the plain zlib frame, then 37; Login mode while the server name starts with login, until 178",
         unknown: &[
-            Unknown { area: "pli", what: "the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34 and 38 seen in the lab)" },
+            Unknown { area: "pli", what: "the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34, 38 and 46 seen in the lab; the 2026-10-31 live run saw 2, 4, 9, 23, 24, 34, 37, 38, 44, 46, 152, 154 and 157, all in the set)" },
             Unknown { area: "login", what: "Seihai sends the three machine fields as an empty quoted string, as for 5.00r7; the real client sends three MD5s" },
-            Unknown { area: "login", what: "the base-file requests after the language (basepackage.gupd, bigmap.txt) are not sent" },
+            Unknown { area: "login", what: "the base-file requests after the language (basepackage.gupd, bigmap.txt), 152 and 154 (PM and lister setup) and the own props burst are not sent" },
+            Unknown { area: "walk", what: "SPRITE, X2 and Y2 go out with every step; the real client sends only what changed and GANI walk/idle (lab, 2026-10-31)" },
             Unknown { area: "serverwarp", what: "the lab's 178 reached the game server, but the warp text it used was not recorded; split on commas only, as the 5.x and 6.x builds" },
             Unknown { area: "props", what: "own and other prop sets are 3.153's; no 4.x prop parser was read (the lab saw X2/Y2, 78 and 79)" },
             Unknown { area: "ui", what: "chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7" },

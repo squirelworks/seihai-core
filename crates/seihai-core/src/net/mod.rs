@@ -12,7 +12,7 @@ pub use udp::{
 };
 
 use crate::protocol::{
-    bz2_compress, choose_comp, encode_pos_classic, read_zlib_frame, write_frame, write_gstring,
+    bz2_compress, choose_comp, encode_pos_classic, encode_pos_precise, read_zlib_frame, write_frame, write_gstring,
     write_login, write_zlib_frame, write_zlib_frame_best, zlib_compress, ClientVersion, EncryptionGen, FrameLen, Gen3, Gen5, LoginShape, TamperSender,
     Gen5Comp, IdSet, LevelRequest, ListReply, LoginRequest, PlayerUpdate, SessionState,
 };
@@ -67,6 +67,20 @@ pub fn position_message_sprite(x: f32, y: f32, sprite: u8) -> Vec<u8> {
         sprite.wrapping_add(0x20),
         b'\n',
     ]
+}
+
+/// The walk props of the Login-lobby builds (4.x to 6.x): SPRITE (17), then
+/// the precise X2 (78) and Y2 (79) as GSHORTs, in ascending id order. The
+/// real 4.04r2 and 4.20r8 (lab, 2026-10-31, `documentation/v4-profiles.md`)
+/// and the 5.x and 6.x builds (Graal_analysis `protocol/v5v6-lab-play.md`)
+/// send X2/Y2 every 50 ms while walking and never the classic X/Y (15, 16).
+pub fn position_message_precise(x: f32, y: f32, sprite: u8) -> Vec<u8> {
+    let mut m = vec![2 + 0x20, 17 + 0x20, sprite.wrapping_add(0x20), 78 + 0x20];
+    m.extend_from_slice(&gshort(encode_pos_precise(x)));
+    m.push(79 + 0x20);
+    m.extend_from_slice(&gshort(encode_pos_precise(y)));
+    m.push(b'\n');
+    m
 }
 
 /// Extra messages that go in the same frame right after 46 on a level
@@ -771,6 +785,12 @@ pub struct Connection {
     /// X, Y and SPRITE again is not re-sent (the real client sends props
     /// only when they change).
     last_walk: Option<Vec<u8>>,
+    /// Walk updates carry X2/Y2 ([`position_message_precise`]) instead of
+    /// X/Y: set at login for the Login-lobby builds.
+    precise_walk: bool,
+    /// Only `client.` flags go to the server: set at login for the
+    /// Login-lobby builds ([`Self::queue_flag`]).
+    client_flags_only: bool,
     /// Set once the reader runs ([`Self::spawn_reader`]): the reader's
     /// thread owns the socket from then on, and frames to send go to it.
     io_thread: Option<IoThread>,
@@ -798,7 +818,7 @@ impl Connection {
         let addrs: Vec<SocketAddr> = addr.to_socket_addrs()?.collect();
         let stream = connect_any(&addrs, CONNECT_TIMEOUT)?;
         stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-        Ok(Self { stream, gen3: None, gen5: None, gen5_in: None, frame_len: FrameLen::Short, pli: None, zlib_best: false, flags_out: Vec::new(), flags_since: None, files_out: Vec::new(), files_since: None, last_walk: None, io_thread: None })
+        Ok(Self { stream, gen3: None, gen5: None, gen5_in: None, frame_len: FrameLen::Short, pli: None, zlib_best: false, flags_out: Vec::new(), flags_since: None, files_out: Vec::new(), files_since: None, last_walk: None, precise_walk: false, client_flags_only: false, io_thread: None })
     }
 
     /// Close the connection in both directions. A reader thread from
@@ -868,6 +888,8 @@ impl Connection {
         let frame = if self.zlib_best { write_zlib_frame_best(&line)? } else { write_zlib_frame(&line)? };
         self.send_raw(&frame)?;
         self.pli = Some(version.profile().protocol.pli);
+        self.precise_walk = version.profile().protocol.lobby.is_some();
+        self.client_flags_only = self.precise_walk;
         self.take_flags();
         match version.encryption() {
             EncryptionGen::Gen3 => self.gen3 = gen3,
@@ -1149,6 +1171,12 @@ impl Connection {
     /// A version that cannot send the id drops the flag here, so it never
     /// holds up the walk update it would ride with.
     pub fn queue_flag(&mut self, name: &str, value: Option<&str>) {
+        // The real 4.04r2 runs a GS1 weapon's `setstring gr.x,..`,
+        // `setstring client.probe,2` and `set probeflag`, and sends only
+        // `client.probe=2` (lab, 2026-10-31, `documentation/v4-profiles.md`).
+        if self.client_flags_only && !name.starts_with("client.") {
+            return;
+        }
         let m = crate::protocol::flagset::flag_message(name, value);
         if self.pli.as_ref().is_some_and(|pli| !pli.contains(m[0] - 0x20)) {
             return;
@@ -1216,7 +1244,8 @@ impl Connection {
     /// the direction in its low two bits.
     pub fn send_position(&mut self, x: f32, y: f32, dir: u8) -> io::Result<()> {
         self.last_walk = None;
-        self.send_messages(&[position_message(x, y, dir)])
+        let m = self.walk_message(x, y, dir % 4);
+        self.send_messages(&[m])
     }
 
 
@@ -1363,6 +1392,16 @@ impl Connection {
         self.send_messages(&msgs)
     }
 
+    /// The walk props for this login: X/Y/SPRITE, or SPRITE/X2/Y2 for a
+    /// Login-lobby build.
+    fn walk_message(&self, x: f32, y: f32, sprite: u8) -> Vec<u8> {
+        if self.precise_walk {
+            position_message_precise(x, y, sprite)
+        } else {
+            position_message_sprite(x, y, sprite)
+        }
+    }
+
     /// Send a walk update for the given position (see [`Self::send_position`]).
     pub fn send_walk(&mut self, upd: &PlayerUpdate) -> io::Result<()> {
         self.send_position(upd.x, upd.y, upd.dir)
@@ -1371,7 +1410,7 @@ impl Connection {
     /// A walk update with an explicit SPRITE value (`dir + 4 * S`): the
     /// sword swing and hurt mode ([`crate::combat::CombatState::sprite`]).
     pub fn send_walk_sprite(&mut self, upd: &PlayerUpdate, sprite: u8) -> io::Result<()> {
-        let walk = position_message_sprite(upd.x, upd.y, sprite);
+        let walk = self.walk_message(upd.x, upd.y, sprite);
         let changed = self.last_walk.as_ref() != Some(&walk);
         // Queued file requests ride with a walk update only.
         let mut msgs = if changed { self.take_files() } else { Vec::new() };
@@ -1612,6 +1651,35 @@ mod tests {
         assert_eq!(count_props_message(Some(19), None), vec![0x22, 0x24, 19 + 0x20, b'\n']);
         assert_eq!(count_props_message(None, Some(14)), vec![0x22, 0x25, 14 + 0x20, b'\n']);
         assert_eq!(count_props_message(Some(0), Some(3)), vec![0x22, 0x24, 0x20, 0x25, 0x23, b'\n']);
+    }
+
+    #[test]
+    fn precise_walk_matches_the_real_404() {
+        // The real 4.04r2's first step right from x 30 (lab, 2026-10-31):
+        // `*$walk1#n'p`, that is GANI walk, SPRITE 3, X2 976 (30.5 tiles).
+        // Then the next step: `n'\x80` (X2 992, 31 tiles).
+        let m = position_message_precise(30.5, 30.5, 3);
+        assert_eq!(&m[..6], &[2 + 0x20, b'1', b'#', b'n', b'\'', b'p']);
+        assert_eq!(&m[6..9], &[b'o', b'\'', b'p']);
+        assert_eq!(*m.last().unwrap(), b'\n');
+        assert_eq!(&position_message_precise(31.0, 0.0, 0)[4..6], b"'\x80");
+    }
+
+    #[test]
+    fn lobby_builds_walk_with_x2_y2_and_send_client_flags_only() {
+        for (v, precise) in [(ClientVersion::V222, false), (ClientVersion::V404R2, true), (ClientVersion::V420R8, true)] {
+            let (mut conn, mut srv) = pair();
+            conn.login_versioned(v, 5, "acct", "pw").unwrap();
+            let _ = read_frame(&mut srv);
+            assert_eq!(conn.precise_walk, precise, "{}", v.label());
+            assert_eq!(conn.walk_message(30.0, 30.5, 2)[1], if precise { 17 } else { 15 } + 0x20, "{}", v.label());
+            conn.queue_flag("gr.x", Some("30"));
+            conn.queue_flag("probeflag", None);
+            conn.queue_flag("client.probe", Some("2"));
+            let sent: Vec<Vec<u8>> = conn.take_flags();
+            let want: Vec<&[u8]> = if precise { vec![b"\x32client.probe=2\n"] } else { vec![b"\x32gr.x=30\n", b"\x33probeflag\n", b"\x32client.probe=2\n"] };
+            assert_eq!(sent, want, "{}", v.label());
+        }
     }
 
     fn read_frame(s: &mut TcpStream) -> Vec<u8> {
