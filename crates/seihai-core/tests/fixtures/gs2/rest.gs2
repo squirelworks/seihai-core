@@ -1,0 +1,30 @@
+// The rest of the shared set: exp, log, getangle, getdir, vecx, vecy,
+// shifts, in |a, b|, type, indices, setarray and with.
+function onCreated() {
+  this.e = exp(0);
+  this.l = log(2, 8);
+  this.ga = getangle(1, -1);
+  this.gd = getdir(-3, 1);
+  this.vx = vecx(3);
+  this.vy = vecy(2);
+  this.sh = 1 << 4;
+  this.sr = 256 >> 2;
+  this.inr = 5 in |1, 9|;
+  this.outr = 10 in |1, 9|;
+  temp.li = {1, 2, 1};
+  temp.one = 1;
+  temp.ix = temp.li.indices(temp.one);
+  this.ixn = temp.ix.size();
+  this.tl = temp.li.type();
+  this.tn = this.e.type();
+  setarray(this.arr, 3);
+  this.an = this.arr.size();
+  with (player) {
+    x = 12;
+    this.inw = 1;
+  }
+  with (null) {
+    this.never = 1;
+  }
+  this.px = player.x;
+}

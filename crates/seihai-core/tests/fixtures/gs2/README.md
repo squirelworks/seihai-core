@@ -20,6 +20,9 @@ byte for byte. No byte here was written by hand.
   `charat`, `substring`, `starts` and `ends` methods.
 - `lists.gs2`: a list literal, `a[i]` read and written, the list methods,
   `tokenize`, `positions`, `in`, `for`-each, and `new[n][m]` with `a[i, j]`.
+- `rest.gs2`: `exp`, `log`, `getangle`, `getdir`, `vecx`, `vecy`, the
+  shifts, `in |a, b|`, `type`, `indices`, `setarray`, and `with` on the
+  player and on null.
 - `objects.gs2`: a public function, `format`, an array literal, `for`-each,
   `@`/`SPC`, string methods, `new[3][2]`, `new TStaticVar()`, `with`, and
   some maths built-ins.

@@ -11,6 +11,7 @@ use std::fmt::{self, Write as _};
 
 pub mod exec;
 pub mod lists;
+pub mod maths;
 pub mod strings;
 
 macro_rules! ops {
