@@ -122,6 +122,28 @@ fn an_event_that_comes_due_during_a_sleep_waits_for_the_run_to_end() {
 }
 
 #[test]
+fn strings_fixture_runs_the_string_built_ins() {
+    let mut m = machine("strings.gs2bc");
+    let mut h = host();
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    let v = |n: &str| m.var(Root::This, n).cloned().unwrap_or_else(|| panic!("{n} not set"));
+    let s = |t: &str| Val::from(t);
+    assert_eq!(v("trimmed"), s("Hello, Graal"));
+    assert_eq!(v("len"), Val::Num(12.0));
+    assert_eq!((v("at"), v("none")), (Val::Num(7.0), Val::Num(-1.0)));
+    assert_eq!((v("c"), v("out")), (s("e"), s("")));
+    assert_eq!((v("sub"), v("clip")), (s("Gra"), s("Hello, Graal")));
+    assert_eq!((v("st"), v("en"), v("no")), (Val::Num(1.0), Val::Num(1.0), Val::Num(0.0)));
+    assert_eq!((v("ch"), v("tr")), (s("A"), s("as is")));
+    assert_eq!(v("f1"), s("42|    7|7    |+3|005"));
+    assert_eq!(v("f2"), s("ab|    cd|ef|%|1.5"));
+    // 9.7 rounds down; the missing argument is "".
+    assert_eq!(v("f3"), s("9 and "));
+    assert_eq!(v("f4"), s("plain"));
+    assert!(h.log.is_empty(), "{:?}", h.log);
+}
+
+#[test]
 fn missing_events_are_reported() {
     let mut m = machine("shared.gs2bc");
     assert_eq!(m.call_event("onPlayerEnters", &[], &mut host()), Outcome::NoSuchEvent);

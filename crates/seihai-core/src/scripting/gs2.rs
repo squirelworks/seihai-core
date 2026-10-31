@@ -10,6 +10,7 @@
 use std::fmt::{self, Write as _};
 
 pub mod exec;
+pub mod strings;
 
 macro_rules! ops {
     ($($v:literal $name:ident $doc:literal,)*) => {

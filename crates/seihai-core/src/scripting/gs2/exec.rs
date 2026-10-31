@@ -14,6 +14,7 @@
 //! `cancelevents`) are the machine's own and run on [`Machine::tick`]
 //! (`documentation/gs2-commands.md`).
 
+use super::strings::{self, client_int};
 use super::{Op, Operand, Script};
 use crate::scripting::engine::vocab::{self, Exec};
 use crate::scripting::engine::world::ObjId;
@@ -594,7 +595,7 @@ impl Machine {
                 // Arithmetic on numbers; the compiler converts the operands.
                 Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Mod | Op::Pow | Op::BitOr | Op::BitAnd | Op::BitXor | Op::Min | Op::Max => {
                     let (Some(b), Some(a)) = (self.pop_num(host), self.pop_num(host)) else { return fault(self, host) };
-                    let (ia, ib) = (a as i32, b as i32);
+                    let (ia, ib) = (client_int(a), client_int(b));
                     self.push(Slot::Num(match ins.op {
                         Op::Add => a + b,
                         Op::Sub => a - b,
@@ -622,8 +623,8 @@ impl Machine {
                     self.push(Slot::Num(match ins.op {
                         Op::Not => (a == 0.0) as i32 as f64,
                         Op::UnarySub => -a,
-                        Op::BitInvert => !(a as i32) as f64,
-                        Op::Int => a.trunc(),
+                        Op::BitInvert => !client_int(a) as f64,
+                        Op::Int => client_int(a) as f64,
                         Op::Abs => a.abs(),
                         Op::Sin => a.sin(),
                         Op::Cos => a.cos(),
@@ -646,6 +647,57 @@ impl Machine {
                 Op::Join => {
                     let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else { return fault(self, host) };
                     self.push(Slot::Str(a.text() + &b.text()));
+                }
+
+
+                // Strings (Stage D). The compiler converts the object to a
+                // string first.
+                Op::Char | Op::ObjTrim | Op::ObjLength => {
+                    let Some(v) = self.pop_val(host) else { return fault(self, host) };
+                    self.push(match ins.op {
+                        Op::Char => Slot::Str(strings::char_of(v.num())),
+                        Op::ObjTrim => Slot::Str(strings::trim(&v.text())),
+                        _ => Slot::Num(v.text().chars().count() as f64),
+                    });
+                }
+                Op::ObjPos | Op::ObjCharAt | Op::ObjStarts | Op::ObjEnds => {
+                    let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else { return fault(self, host) };
+                    let (s, t) = (a.text(), b.text());
+                    self.push(match ins.op {
+                        Op::ObjPos => Slot::Num(strings::pos(&s, &t) as f64),
+                        Op::ObjCharAt => Slot::Str(strings::charat(&s, b.num())),
+                        Op::ObjStarts => Slot::Num(s.starts_with(t.as_str()) as i32 as f64),
+                        _ => Slot::Num(s.ends_with(t.as_str()) as i32 as f64),
+                    });
+                }
+                // Always the string, the start and the length.
+                Op::ObjSubstr => {
+                    let (Some(len), Some(start), Some(s)) = (self.pop_num(host), self.pop_num(host), self.pop_val(host)) else {
+                        return fault(self, host);
+                    };
+                    self.push(Slot::Str(strings::substring(&s.text(), start, len)));
+                }
+                // `_(s)`: the client leaves the value as it is.
+                Op::Translate => {
+                    if self.stack.is_empty() {
+                        return fault(self, host);
+                    }
+                }
+                // The pattern is on top, its arguments below it back to the
+                // marker, the first nearest; all of it becomes the result.
+                Op::Format => {
+                    let Some(m) = self.last_marker() else { return fault(self, host) };
+                    let mut vals = Vec::new();
+                    while self.stack.len() > m + 1 {
+                        let s = self.pop().unwrap();
+                        vals.push(self.value(s, host));
+                    }
+                    self.stack.truncate(m);
+                    let text = match vals.split_first() {
+                        Some((fmt, args)) => strings::format(&fmt.text(), args),
+                        None => String::new(),
+                    };
+                    self.push(Slot::Str(text));
                 }
 
                 Op::Unknown(n) => host.log(format!("gs2: unknown opcode {n} at op {at}, skipped")),

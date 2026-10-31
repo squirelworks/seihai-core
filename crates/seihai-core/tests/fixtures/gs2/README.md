@@ -16,6 +16,8 @@ byte for byte. No byte here was written by hand.
 - `timers.gs2`: `setTimer`, `this.timeout` read and written, `scheduleevent`
   with and without `on`, `cancelevents`, and a timer that runs out during a
   `sleep`.
+- `strings.gs2`: `format`, `char`, `_()`, and the `trim`, `length`, `pos`,
+  `charat`, `substring`, `starts` and `ends` methods.
 - `objects.gs2`: a public function, `format`, an array literal, `for`-each,
   `@`/`SPC`, string methods, `new[3][2]`, `new TStaticVar()`, `with`, and
   some maths built-ins.
