@@ -21,6 +21,7 @@
 
 use super::dispatch::{latin1, Weapon};
 use super::props::parse_player_props_in;
+use crate::offline::server_status_base;
 use super::{IdSet, SessionState};
 use std::time::{Duration, Instant};
 
@@ -224,10 +225,10 @@ pub fn process_list_message(names: &[&str]) -> Vec<u8> {
 /// `NICKNAME` (0), `HEADGIF` (11), `COLORS` (13), `STATUS` (18),
 /// `ADDITFLAGS` (33), `PLANGUAGE` (52), and with `os_props` `OSTYPE` (75) and
 /// `TEXTCODEPAGE` (76). Head, colours and status are copied from the server's
-/// own props as they came, except that the status goes out without the dead
-/// bit (`0x08`): a client that logs in is alive, and an account saved dead
-/// keeps the bit in its file, so the copied byte drew the player dead on
-/// other clients until the next status. Without `full` (3.04) the props have
+/// own props as they came, except that the status goes out without the
+/// paused and dead bits ([`server_status_base`]): the real 2.22 sent STATUS
+/// 20 for the server's 29 (lab, 2026-10-31, `lab-deadlogin.md`). Copying 29
+/// drew a full-hearts player dead on other clients. Without `full` (3.04) the props have
 /// no head or colours. A real client also sends `UDPPORT` (31) between
 /// `STATUS` and `ADDITFLAGS`; Seihai binds no UDP socket, so it leaves the
 /// prop out.
@@ -242,7 +243,7 @@ pub fn login_props_message(info: &LoginInfo, own_props: &[u8], account: &str, ac
         if let Some(mut raw) = raw_of(id) {
             if id == crate::life::PLPROP_STATUS {
                 if let Some(b) = raw.first_mut() {
-                    *b = crate::life::with_dead_bit(b.saturating_sub(0x20), false) + 0x20;
+                    *b = server_status_base(b.saturating_sub(0x20)) + 0x20;
                 }
             }
             m.push(id + 0x20);
@@ -597,17 +598,17 @@ mod tests {
         assert_eq!(&m[m.len() - 4..m.len() - 1], &[0x20, 0x29, 0x84]);
     }
 
-    /// An account saved dead keeps the dead bit in its STATUS; the login
-    /// props send the status without it (lab, 2026-10-31: the watching real
-    /// 2.22 drew a full-hearts Seihai dead at login).
+    /// An account saved dead keeps STATUS 29 with full hearts. The real 2.22
+    /// sent 20 back (lab, 2026-10-31, `lab-deadlogin.md`): the dead and paused
+    /// bits cleared, 0x10 and 0x04 kept.
     #[test]
-    fn login_props_clear_the_dead_bit() {
+    fn login_props_clear_the_dead_and_paused_bits() {
         let mut st = SessionState::for_version(super::super::ClientVersion::V222);
-        st.apply_body(&[9 + 0x20, 18 + 0x20, 0x20 + 0x1C, b'\n']);
+        st.apply_body(&[9 + 0x20, 18 + 0x20, 0x20 + 29, b'\n']);
         let m = login_props_message(&LOGIN_222, &st.player_props, "acct", st.own_prop_ids.as_ref());
         let props = parse_player_props_in(&m[1..m.len() - 1], false, None);
         let status = props.iter().find(|p| p.id == 18).map(|p| p.raw.clone());
-        assert_eq!(status.as_deref(), Some(&[0x20 + 0x14][..]));
+        assert_eq!(status.as_deref(), Some(&[0x20 + 20][..]));
     }
 
     /// The server's props of the lab runs: nick `stubnick`, head, colours,
