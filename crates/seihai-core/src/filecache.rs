@@ -584,6 +584,9 @@ fn find_in_root(root: &AssetRoot, resolver: &AssetResolver, rel: &str, name: &st
         ".gani" => one.gani(name),
         ".wav" => one.sound(name),
         ".nw" | ".graal" | ".zelda" | ".gmap" => one.level(name),
+        // Map level lists (`bigmap.txt`, `minimap.txt`) live in `maps/`,
+        // where the real 2.x clients keep them and save them.
+        ".txt" => return lookup(&root.root.join("maps"), rel),
         _ => None,
     }?;
     let same = found.file_name().and_then(|f| f.to_str()).is_some_and(|f| f.eq_ignore_ascii_case(&last));
@@ -1032,6 +1035,17 @@ mod tests {
         // The resolver would fall back from .gif to .png; the client's
         // name index would not.
         assert!(s.local_path("pic.gif").is_none());
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn map_level_lists_are_found_in_the_maps_folder() {
+        let root = tmp("maps");
+        fs::create_dir_all(root.join("maps")).unwrap();
+        fs::write(root.join("maps/BigMap.txt"), b"\"a.nw\"").unwrap();
+        let st = store(ClientVersion::V205, &root, false);
+        assert_eq!(st.read("bigmap.txt").as_deref(), Some(&b"\"a.nw\""[..]));
+        assert!(st.read("minimap.txt").is_none());
         fs::remove_dir_all(&root).ok();
     }
 

@@ -286,6 +286,11 @@ pub struct OfflineSession {
     /// `seteffect red,green,blue,alpha`: the colour the map is shaded with
     /// (default 0,0,0,0, no shading).
     pub screen_effect: [f32; 4],
+    /// `setmap image,levelnames,x,y`: the picture and level-names file the
+    /// M map shows from now on, and where (in levels) a player whose level
+    /// is not on it is drawn: `(image, levelnames, x, y)`. The client reads
+    /// the files.
+    pub script_map: Option<(String, String, f32, f32)>,
     /// `freezeplayer time`: milliseconds left in which the player cannot
     /// move. 0 when not frozen.
     pub script_freeze_ms: u64,
@@ -622,6 +627,7 @@ impl OfflineSession {
             sitting: false,
             sleeping: false,
             screen_effect: [0.0; 4],
+            script_map: None,
             script_freeze_ms: 0,
             script_hide_ms: 0,
             stats: None,
