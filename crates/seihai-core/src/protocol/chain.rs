@@ -1019,10 +1019,10 @@ pub const CHAIN: &[Step] = &[
         delta: Delta {
             plo: IdDelta::plus_minus(&[67, 74, 82, 104, 131, 132, 133, 134, 187, 189], &[44]),
             pli: IdDelta::plus(&[46, 50, 93, 96, 97, 98, 152, 154, 155, 156, 157, 158]),
-            // Same G3D30123 login as 3.04, but this build was never run: shape D is 3.04's.
+            // Same G3D30123 login as 3.04; the 2026-10-31 Tiger lab run sent shape D (id 7 and id 1 in one plain frame).
             listserver: Some(Some(
                 Listserver::new(ListKind::Supported, PortStatus::Assumed, Some(BuiltIn { host: "listserver.graalonline.com", port: 14922 }), Some("G3D30123"))
-                    .shape(LoginShape::Gen5OneFrame, ShapeBasis::Inferred),
+                    .shape(LoginShape::Gen5OneFrame, ShapeBasis::Captured),
             )),
             login: Some(Some(LOGIN_3153)),
             udp_off_by_default: Some(true),
@@ -1032,12 +1032,10 @@ pub const CHAIN: &[Step] = &[
             precise_pos: Some(true),
             ..Delta::NONE
         },
-        source: "binary (Mac OS X PPC Mach-O), not run: OSTYPE mac; PLO 67, 74, 82, 104, 131-134, 187 and MOVE2 (189) in, 44 out; RC file browser, script upload and text request ids; X2/Y2/Z2; UDP off in the shipped prefs",
+        source: "binary (Mac OS X PPC Mach-O) and one lab run on Mac OS X 10.4 in qemu (Graal_analysis version-profiles/lab-mac-tiger-2026-10-31.md: listserver shape D seen (id 7 and id 1 in one plain zlib frame), X2/Y2 walking, first props with OSTYPE mac and code page 1250, no 18 sent): OSTYPE mac; PLO 67, 74, 82, 104, 131-134, 187 and MOVE2 (189) in, 44 out; RC file browser, script upload and text request ids; X2/Y2/Z2; UDP off in the shipped prefs",
         unknown: &[
             Unknown { area: "pli", what: "2, 3, 15, 24, 29 and 80 are taken from 3.04; the PPC scan did not resolve those call sites" },
-            Unknown { area: "live", what: "never run" },
-            Unknown { area: "listserver", what: "shape D (id 7 and id 1 in one plain zlib frame at 78 9C) is 3.04's capture; the binary has the same G3D30123 token and gen-5 cipher" },
-            Unknown { area: "login", what: "OSTYPE mac is from the binary; the code page (1250), the files in the first frame (bigmap.txt, minimap.txt) and the head and default-weapon checks are 3.04's" },
+            Unknown { area: "login", what: "the first frame (5, 37, 34 bigmap.txt, 34 minimap.txt, the two 34s sent twice) and the first props (OSTYPE mac, code page 1250) were seen in the lab; the head and default-weapon checks are 3.04's" },
             Unknown { area: "3d", what: "the 3D mode (Torque GameConnection, Graal3D protocol 19, on UDP listed port + 1) is not modelled here; seihai-ato::torque has its profile" },
         ],
     },
@@ -1099,11 +1097,11 @@ pub const CHAIN: &[Step] = &[
             lobby: Some(Some(LOBBY_420_MAC)),
             ..Delta::NONE
         },
-        source: "binary (Mac OS X PPC, not run): 4.20r8's PLO set without 41 and 196 (a 97-case switch plus 100 and 108 before it; 108 subtype 0 answers with 162), login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty>",
+        source: "binary (Mac OS X PPC) and one lab run on Mac OS X 10.4 in qemu (Graal_analysis version-profiles/lab-mac-tiger-2026-10-31.md): 4.20r8's PLO set without 41 and 196 (a 97-case switch plus 100 and 108 before it; 108 subtype 0 answers with 162), login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty> (captured as mac,\"\",<32 hex>,\"\"), sends 2, 23, 24, 34, 37, 44, 46 and 157 seen",
         unknown: &[
-            Unknown { area: "pli", what: "only 162 (the answer to 108) was confirmed in the Mac binary; the rest of 4.20r8's set is taken" },
-            Unknown { area: "login", what: "the fourth field is empty in the binary; Seihai sends it, like the other two, as an empty quoted string" },
-            Unknown { area: "live", what: "never run (PowerPC)" },
+            Unknown { area: "pli", what: "162 (the answer to 108) is from the Mac binary and 2, 23, 24, 34, 37, 44, 46 and 157 were seen in the lab; the rest of 4.20r8's set is taken" },
+            Unknown { area: "login", what: "the real client sent mac,\"\",<md5 hex of the /etc stat>,\"\" in the lab (the MAC field empty under qemu's NIC); Seihai sends all three machine fields as empty quoted strings" },
+            Unknown { area: "flags", what: "the real client sent no 18 for the lab level's gr.x/gr.y clientside setstring; Seihai's flat path does" },
             Unknown { area: "3d", what: "Torque protocol 21 is not modelled here; seihai-ato::torque has its profile" },
         ],
     },
