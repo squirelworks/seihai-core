@@ -1,0 +1,16 @@
+[package]
+name = "seihai-draw"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# UI-less drawing shared with tools. Tiles and one gani frame go into an
+# RGBA buffer. No window, no sound, and no second level or gani parser:
+# those types come from seihai-core. The live client still draws in
+# seihai-mae; this crate does not replace that view.
+[lib]
+name = "seihai_draw"
+path = "src/lib.rs"
+
+[dependencies]
+seihai-core = { path = "../seihai-core", default-features = false }
