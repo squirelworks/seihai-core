@@ -513,10 +513,10 @@ pub struct Ui {
 
 /// How a build's own client handles the player's death.
 ///
-/// Read from the 2.05 rev 2 decompile (`decomp-findings-2026-10-24/
-/// 01-death-respawn.md`, `constants-205.tsv`); the tick is 50 ms. Later
-/// builds are taken as the same (inferred) and the builds before 2.05
-/// have no row, because their handler was not traced.
+/// Read from the 2.05 rev 2 notes (`decomp-findings-2026-10-24/
+/// 01-death-respawn.md`, `constants-205.tsv`); the tick is 50 ms. 1.39
+/// has its own row ([`DEATH_139`]). 1.41 takes the 2.05 row, 1.42 clears
+/// it, and 2.00 to 2.04 use the 2.05 numbers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DeathRules {
     /// The death timer counts up one per tick and stops here (30 = 1.5 s).
@@ -570,6 +570,19 @@ pub const DEATH_205: DeathRules = DeathRules {
 /// binaries; the 2.17.1, 2.22 and 2.31 entry code was read, the 2.1 tests'
 /// was inferred from the missing constant).
 pub const DEATH_21: DeathRules = DeathRules { entry_name_group: false, ..DEATH_205 };
+
+/// 1.39. The timer, the input lock, the dead bit and the online default
+/// spot match 2.05. Respawn hearts are the maximum: both AP thresholds are
+/// 0, so every alignment takes the last branch of [`crate::life::respawn_half_hearts`].
+/// 1.39 has no alignment-point HUD; those bands start in 1.41. There is no
+/// name-group test on the saved entry (that test is 2.00 to 2.05).
+/// Source: Graal_analysis `version-profiles/matrix/rules-139.md`.
+pub const DEATH_139: DeathRules = DeathRules {
+    low_ap_below: 0,
+    mid_ap_below: 0,
+    entry_name_group: false,
+    ..DEATH_205
+};
 
 /// How a build's client judges and sends hits from other players (the
 /// victim's side of combat). Sources: `decomp-findings-2026-10-24/
@@ -668,13 +681,14 @@ pub const COMBAT_205: CombatRules = CombatRules {
     packet_victim_gates: true,
 };
 
-/// 1.39: the swing, its sprites and hurt mode as far as they were seen in
-/// the real client; the rest is the 2.05 template (no 1.39 hit handler was
-/// traced). One swing step per 50 ms tick: the lab capture of a real 1.39
+/// 1.39. One swing step per 50 ms tick: the lab capture of a real 1.39
 /// (Graal_analysis live trace `item-drops/b4_139.txt`) sends S 6, 8, 10 at
 /// 100 ms intervals and then the idle sprite, and the video read gives a
 /// 5-tick swing that cuts the bush; the 40-tick hurt lock-out is the
 /// video's too (`player-mannerisms-live.md`, "Cross-version table").
+/// The sword box is the same as 2.05 (0 to 4 tiles ahead, under 2 sideways),
+/// traced in Graal_analysis `version-profiles/matrix/rules-139.md`. Sword
+/// power, AP immunity and the hurt sprite are still the 2.05 template.
 pub const COMBAT_139: CombatRules = CombatRules { swing_step_ticks: 1, ..COMBAT_205 };
 
 /// 2.01 and 2.02: as 2.05, but the sword power is stored without the offset
@@ -744,13 +758,15 @@ pub struct Mannerisms {
     pub hide: HidePose,
     pub pull_release: PullRelease,
     pub swim_still: SwimStill,
-    /// Knockback steps of one tile at the start of hurt mode (1.39: 4).
+    /// Knockback steps of one tile at the start of hurt mode. 1.39 uses
+    /// five, the same window as 2.05 (counter readings 39 down to 35). An
+    /// earlier video counted four; the binary's five steps are the row.
     pub knockback_ticks: u16,
 }
 
 /// 1.39 (video and memory read).
 pub const MANNER_139: Mannerisms =
-    Mannerisms { blink: Blink::AfterHurtPose, hide: HidePose::Carry, pull_release: PullRelease::StaysPull, swim_still: SwimStill::Animates, knockback_ticks: 4 };
+    Mannerisms { blink: Blink::AfterHurtPose, hide: HidePose::Carry, pull_release: PullRelease::StaysPull, swim_still: SwimStill::Animates, knockback_ticks: 5 };
 /// NewMain 1.41.1, the first gani client.
 pub const MANNER_141: Mannerisms =
     Mannerisms { blink: Blink::FromHit, hide: HidePose::Carry, pull_release: PullRelease::BackToGrab, swim_still: SwimStill::Freezes, knockback_ticks: 5 };
@@ -1406,5 +1422,26 @@ mod tests {
             "Graal 2.05 - Classic"
         );
         assert_eq!(profile(ClientVersion::V139).window_title(Some("Classic")), "Graal 1.39");
+    }
+
+    #[test]
+    fn rules_139_knockback_and_respawn() {
+        let p = profile(ClientVersion::V139);
+        assert_eq!(p.mannerisms.knockback_ticks, 5);
+        assert_eq!(p.life.death, Some(DEATH_139));
+        assert_eq!(p.life.combat, Some(COMBAT_139));
+        assert_eq!(p.life.combat.unwrap().hurt_ticks, 40);
+        assert_eq!(
+            (
+                p.life.combat.unwrap().reach_min_half,
+                p.life.combat.unwrap().reach_max_half,
+                p.life.combat.unwrap().lateral_below_half,
+            ),
+            (0, 8, 4)
+        );
+        // 1.41 keeps the AP bands. 1.42 clears the death row again.
+        assert_eq!(profile(ClientVersion::V141).life.death, Some(DEATH_205));
+        assert_eq!(profile(ClientVersion::V142).life.death, None);
+        assert_eq!(profile(ClientVersion::V133).mannerisms.knockback_ticks, 5);
     }
 }

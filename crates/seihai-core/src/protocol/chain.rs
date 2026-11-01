@@ -24,7 +24,7 @@
 use super::profile::{
     Basis, BuiltIn, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, Levels, ListKind, Listserver, LoginShape, PortStatus, Props, Protocol, ServerList, ShapeBasis, Ui,
     BUILT_IN_14921, BUILT_IN_14922,
-    ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_139, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222,
+    ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_139, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_139, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222,
     TAMPER_230, TAMPER_231,
 };
 use super::lobby::{Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_531, LOBBY_603_LINUX};
@@ -555,11 +555,12 @@ pub const CHAIN: &[Step] = &[
             chat_text: Some(ChatText { face: ChatFace::Helvetica, height: 24 }),
             gs1_commands: Some(111),
             combat: Some(Some(COMBAT_139)),
+            death: Some(Some(DEATH_139)),
             ..Delta::NONE
         },
-        source: "binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111; sword swing S 6 to 10 one per tick and the 40-tick hurt lock-out (lab capture and video)",
+        source: "binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111; sword swing S 6 to 10 one per tick, sword box 0 to 4 tiles ahead and under 2 sideways, 40-tick hurt lock-out, five knockback steps, death timer 30 with the dead bit after 27, respawn hearts to max (no AP bands)",
         unknown: &[
-            Unknown { area: "life", what: "combat: the swing steps and hurt lock-out were seen live; the reach, the hit judgement and the hurt sprite come from the 2.05 template, no 1.39 hit handler was traced; 1.33 to 1.38 keep no combat row" },
+            Unknown { area: "life", what: "sword power, AP immunity and the hurt sprite are still the 2.05 template; the six walk-probe and twelve knockback-probe offset tables are not profile fields; 1.33 to 1.38 keep no combat or death row of their own and copy the 1.39 mannerisms" },
         ],
     },
     // 1.41 is the first gen 3 build. Its row was built on the 2.05 template,
@@ -1553,6 +1554,7 @@ fn death_text(d: &Option<DeathRules>) -> String {
     match d {
         None => "none".into(),
         Some(d) if *d == DEATH_205 => "2.05 rules (name-group test)".into(),
+        Some(d) if *d == DEATH_139 => "1.39 rules (respawn to max hearts, no AP bands)".into(),
         Some(d) if *d == DEATH_21 => "2.1 rules (no name-group test)".into(),
         Some(_) => "custom".into(),
     }
@@ -1648,7 +1650,7 @@ fn drops_text(d: &ItemDrops) -> String {
 
 fn manner_text(m: &Mannerisms) -> String {
     match *m {
-        MANNER_139 => "1.39 (blink after the hurt pose, hide keeps the carry poses, 4-tile knockback)".into(),
+        MANNER_139 => "1.39 (blink after the hurt pose, hide keeps the carry poses, 5-tile knockback)".into(),
         MANNER_141 => "NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses)".into(),
         MANNER_205 => "2.05 (hidden ganis, pull stays, swim runs on)".into(),
         MANNER_222 => "2.22 (as 2.05, swim restarts at the stop)".into(),
