@@ -338,7 +338,7 @@ impl PowerReporter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::{ClientVersion, DeathRules, DEATH_205, PROFILES};
+    use crate::protocol::{ClientVersion, DeathRules, DEATH_139, DEATH_205, PROFILES};
 
     fn life() -> Life {
         Life::new(Some(DEATH_205))
@@ -474,6 +474,18 @@ mod tests {
         ] {
             assert_eq!(respawn_half_hearts(&r, ap, max), want, "ap {ap} max {max}");
         }
+    }
+
+    #[test]
+    fn respawn_hearts_139_are_always_the_maximum() {
+        let r = DEATH_139;
+        for ap in [0u8, 19, 20, 39, 40, 100] {
+            assert_eq!(respawn_half_hearts(&r, ap, 12), 12, "ap {ap}");
+            assert_eq!(respawn_half_hearts(&r, ap, 0), 0, "ap {ap}");
+        }
+        assert!(!r.entry_name_group);
+        assert_eq!((r.timer_cap, r.input_lock_until, r.status_bit_from), (30, 27, 28));
+        assert_eq!((r.default_x2, r.default_y2), (61, 60));
     }
 
     #[test]
