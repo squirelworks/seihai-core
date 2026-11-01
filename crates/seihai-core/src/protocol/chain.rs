@@ -22,7 +22,7 @@
 //! `documentation/version-chain.tsv` (a unit test fails when it is stale).
 
 use super::profile::{
-    Basis, BuiltIn, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, Levels, ListKind, Listserver, LoginShape, PortStatus, Props, Protocol, ServerList, ShapeBasis, Ui,
+    Basis, BuiltIn, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, Levels, ListKind, Listserver, LoginShape, PortStatus, Props, Protocol, ServerList, ShapeBasis, Ui, WindowPx,
     BUILT_IN_14921, BUILT_IN_14922,
     ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_139, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_139, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222,
     TAMPER_230, TAMPER_231,
@@ -144,6 +144,7 @@ pub struct Delta {
     pub chat_recall: Option<bool>,
     pub hud: Option<HudArt>,
     pub chat_text: Option<ChatText>,
+    pub window: Option<WindowPx>,
     pub minimap: Option<bool>,
     pub editor: Option<bool>,
     pub ganis: Option<bool>,
@@ -199,6 +200,7 @@ impl Delta {
         chat_recall: None,
         hud: None,
         chat_text: None,
+        window: None,
         minimap: None,
         editor: None,
         ganis: None,
@@ -309,6 +311,7 @@ pub const fn apply(prev: VersionProfile, s: &Step) -> VersionProfile {
     p.ui.ghost_mode = pick(p.ui.ghost_mode, d.ghost_mode);
     p.ui.server_in_title = pick(p.ui.server_in_title, d.server_in_title);
     p.ui.chat_text = pick(p.ui.chat_text, d.chat_text);
+    p.ui.window = pick(p.ui.window, d.window);
     p.ui.gs1_commands = pick(p.ui.gs1_commands, d.gs1_commands);
     p.mannerisms = pick(p.mannerisms, d.mannerisms);
     p.drops = pick(p.drops, d.drops);
@@ -384,6 +387,7 @@ pub const ORIGIN: VersionProfile = VersionProfile {
         ghost_mode: false,
         server_in_title: false,
         chat_text: ChatText { face: ChatFace::Dialog, height: 28 },
+        window: WindowPx { width: 648, height: 509 },
         gs1_commands: 71,
     },
     // Read in 1.39; 1.33 to 1.38 were not run and take its row.
@@ -404,7 +408,7 @@ pub const CHAIN: &[Step] = &[
         date: "1999-05-10",
         basis: Basis::Binary,
         delta: Delta::NONE,
-        source: "origin row (binary of 1.21, Graal_analysis client-internals/version-profiles/v121-v132.toml): login id 0 with token, account and password; zlib on every flush; no UDP; default server www.graalonline.com:14804",
+        source: "origin row (binary of 1.21, Graal_analysis client-internals/version-profiles/v121-v132.toml): login id 0 with token, account and password; zlib on every flush; no UDP; default server www.graalonline.com:14804; main form 648×509",
         unknown: &[
             Unknown { area: "levels", what: "Z3-V1 (.zelda): every binary from 1st Graal to 2.31 compares the level magic with Z3-V1.03 and Z3-V1.04, so the column is yes for every build; whether a build also tries .zelda for a bare level name is in no binary (Seihai tries .graal, then .zelda)" },
             Unknown { area: "pli", what: "the binaries 1.21 to 1.32 show only the send ids passed as constants; the ids below the highest one are taken as sent" },
@@ -424,10 +428,11 @@ pub const CHAIN: &[Step] = &[
             udp: Some(true),
             own_props: IdDelta { plus_ranges: &[(25, 31)], ..IdDelta::NONE },
             npc_max: Some(32),
+            window: Some(WindowPx { width: 648, height: 508 }),
             gs1_commands: Some(84),
             ..Delta::NONE
         },
-        source: "binary: PLO 30 and 35-38, send ids to 29, player props to 31, NPC props to 32, direct data packages (UDP ids 0, 10-22), language files, GS1 table 71 to 84",
+        source: "binary: PLO 30 and 35-38, send ids to 29, player props to 31, NPC props to 32, direct data packages (UDP ids 0, 10-22), language files, GS1 table 71 to 84, main form 648×508",
         unknown: &[],
     },
     Step {
@@ -589,6 +594,7 @@ pub const CHAIN: &[Step] = &[
             death: Some(Some(DEATH_205)),
             combat: Some(Some(COMBAT_205)),
             server_list: Some(ServerList::Single),
+            window: Some(WindowPx { width: 648, height: 514 }),
             gs1_commands: Some(126),
             // The GLEVNW01 loader is in the 1.41 rev 1 and NewMain 1.42
             // binaries; 2.00 to 2.04 dropped it (Graal_analysis
@@ -596,7 +602,7 @@ pub const CHAIN: &[Step] = &[
             nw: Some(true),
             ..Delta::NONE
         },
-        source: "binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126, .nw (GLEVNW01) loader",
+        source: "binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126, .nw (GLEVNW01) loader, main form 648×514",
         unknown: &[
             Unknown { area: "drops", what: "the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced" },
             Unknown { area: "listserver", what: "original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured" },
@@ -624,12 +630,13 @@ pub const CHAIN: &[Step] = &[
             combat: Some(None),
             ganis: Some(true),
             chat_text: Some(ChatText { face: ChatFace::TempusSans, height: 24 }),
+            window: Some(WindowPx { width: 648, height: 507 }),
             gs1_commands: Some(134),
             mannerisms: Some(MANNER_141),
             drops: Some(DROPS_142),
             ..Delta::NONE
         },
-        source: "binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)",
+        source: "binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, main form 648×507, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)",
         unknown: &[
             Unknown { area: "listserver", what: "built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured" },
             Unknown { area: "listserver", what: "the real NewMain 26 sent shape A (id 0 `newmain` only) to the lab listserver (2026-10-30), which Seihai sends; no run on the public service has used shape A, so the port is assumed" },
@@ -679,10 +686,11 @@ pub const CHAIN: &[Step] = &[
             plo: IdDelta::plus(&[46, 156]),
             pli: IdDelta::plus(&[35, 36]),
             combat: Some(Some(COMBAT_201)),
+            window: Some(WindowPx { width: 648, height: 514 }),
             gs1_commands: Some(144),
             ..Delta::NONE
         },
-        source: "binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144; the hurt packet gains the AP 100, no-kill and once-a-second gates",
+        source: "binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144, main form 648×514; the hurt packet gains the AP 100, no-kill and once-a-second gates",
         unknown: &[Unknown { area: "listserver", what: "2.01 to 2.04 (and 2.02 rev 2): login frame inferred, not captured. Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; no real client of these builds was captured and no run on the public service has used shape A, so the port is assumed. The 2026-10-25 matrix used Seihai's older shape B: a legacy list on 14923, nothing on 14922. 14921, the port the build carries, is dead" }],
     },
     Step {
@@ -895,9 +903,10 @@ pub const CHAIN: &[Step] = &[
             login: Some(Some(LOGIN_217)),
             npc_max: Some(73),
             heights: Some(true),
+            window: Some(WindowPx { width: 644, height: 507 }),
             ..Delta::NONE
         },
-        source: "binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, the post-login frame seen in the lab (image checks, process list, props up to the language), and id 24 about every 5.1 s when alone (lab, 2026-10-30)",
+        source: "binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, main form 644×507, the post-login frame seen in the lab (image checks, process list, props up to the language), and id 24 about every 5.1 s when alone (lab, 2026-10-30)",
         unknown: &[
             Unknown { area: "props", what: "other-player prop parser was not read; the 2.22 set is used" },
             Unknown { area: "ui", what: "GS1 command count was not read; 161 is carried" },
@@ -1571,6 +1580,10 @@ fn combat_text(c: &Option<super::profile::CombatRules>) -> String {
     }
 }
 
+fn window_text(w: &WindowPx) -> String {
+    format!("{}×{}", w.width, w.height)
+}
+
 fn list_text(l: &ServerList) -> String {
     match l {
         ServerList::Direct { default } => format!("direct ({default})"),
@@ -1633,6 +1646,7 @@ pub fn diff(a: &VersionProfile, b: &VersionProfile) -> Vec<Change> {
     value_change(&mut o, "ui", "ghost_mode", &ua.ghost_mode, &ub.ghost_mode, yes_no);
     value_change(&mut o, "ui", "server_in_title", &ua.server_in_title, &ub.server_in_title, yes_no);
     value_change(&mut o, "ui", "chat_text", &ua.chat_text, &ub.chat_text, dbg);
+    value_change(&mut o, "ui", "window", &ua.window, &ub.window, window_text);
     value_change(&mut o, "ui", "gs1_commands", &ua.gs1_commands, &ub.gs1_commands, dbg);
     value_change(&mut o, "mannerisms", "mannerisms", &a.mannerisms, &b.mannerisms, manner_text);
     value_change(&mut o, "drops", "drops", &a.drops, &b.drops, drops_text);

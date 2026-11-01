@@ -480,6 +480,18 @@ pub struct ChatText {
     pub height: u8,
 }
 
+/// Outer size of the main form, in pixels, title bar and borders included.
+///
+/// The playfield Seihai draws stays 640 by 480. These numbers are the form
+/// sizes of the executables from 1.21 through 2.31. A build with no form of
+/// its own keeps the size of the build before it: 2.12 to 2.16 keep 2.1's,
+/// 2.3 keeps 2.22's, and 3.x onward keep 2.31's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WindowPx {
+    pub width: u16,
+    pub height: u16,
+}
+
 /// Which parts of the client this version shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Ui {
@@ -507,6 +519,8 @@ pub struct Ui {
     pub server_in_title: bool,
     /// The font of the chat text over players' heads.
     pub chat_text: ChatText,
+    /// Outer size of the main form. See [`WindowPx`].
+    pub window: WindowPx,
     /// Number of GS1 commands in the script table, for reference.
     pub gs1_commands: u16,
 }
@@ -1422,6 +1436,60 @@ mod tests {
             "Graal 2.05 - Classic"
         );
         assert_eq!(profile(ClientVersion::V139).window_title(Some("Classic")), "Graal 1.39");
+    }
+
+    /// Outer size of the main form. The playfield stays 640 by 480.
+    /// 2.12 to 2.16 keep 2.1's size, 2.3 keeps 2.22's, and 3.x onward keep
+    /// 2.31's: those forms were not measured on their own.
+    #[test]
+    fn main_form_outer_size() {
+        let wh = |v: ClientVersion| profile(v).ui.window;
+        let size = |w, h| WindowPx { width: w, height: h };
+        assert_eq!(wh(ClientVersion::V121), size(648, 509));
+        for v in [
+            ClientVersion::V128B2,
+            ClientVersion::V13T,
+            ClientVersion::V131,
+            ClientVersion::V132,
+            ClientVersion::V133,
+            ClientVersion::V134,
+            ClientVersion::V135,
+            ClientVersion::V136,
+            ClientVersion::V137,
+            ClientVersion::V138,
+            ClientVersion::V139,
+        ] {
+            assert_eq!(wh(v), size(648, 508), "{}", v.label());
+        }
+        assert_eq!(wh(ClientVersion::V141), size(648, 514));
+        assert_eq!(wh(ClientVersion::V142), size(648, 507));
+        assert_eq!(wh(ClientVersion::V200), size(648, 507));
+        for v in [
+            ClientVersion::V201,
+            ClientVersion::V202,
+            ClientVersion::V202R2,
+            ClientVersion::V203,
+            ClientVersion::V204,
+            ClientVersion::V205,
+            ClientVersion::V210,
+            ClientVersion::V212,
+            ClientVersion::V213,
+            ClientVersion::V214,
+            ClientVersion::V215,
+            ClientVersion::V216,
+        ] {
+            assert_eq!(wh(v), size(648, 514), "{}", v.label());
+        }
+        let mut from_217 = false;
+        for v in ClientVersion::all_versions() {
+            if *v == ClientVersion::V217 {
+                from_217 = true;
+            }
+            if from_217 {
+                assert_eq!(wh(*v), size(644, 507), "{}", v.label());
+            }
+        }
+        assert!(from_217);
     }
 
     #[test]

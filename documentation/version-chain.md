@@ -86,7 +86,7 @@ Generated; do not edit between the markers.
 - unknown (pli): the binaries 1.21 to 1.32 show only the send ids passed as constants; the ids below the highest one are taken as sent
 - unknown (other props): 1.21 to 1.32 have no separate parser for other players' props; 1.33's set is kept
 - unknown (live): not run: the 1.21 install is an InstallShield setup
-- source: origin row (binary of 1.21, Graal_analysis client-internals/version-profiles/v121-v132.toml): login id 0 with token, account and password; zlib on every flush; no UDP; default server www.graalonline.com:14804
+- source: origin row (binary of 1.21, Graal_analysis client-internals/version-profiles/v121-v132.toml): login id 0 with token, account and password; zlib on every flush; no UDP; default server www.graalonline.com:14804; main form 648×509
 
 #### 1.28 beta 2 (`GSERV013`, binary, linked 1999-11-23)
 
@@ -95,8 +95,9 @@ Generated; do not edit between the markers.
 - protocol: **udp**: no -> yes
 - props: **own-player props**: +25 APCOUNTER, +26 MAGICPOINTS, +27 KILLSCOUNT, +28 DEATHSCOUNT, +29 ONLINESECS, +30 IPADDR, +31 UDPPORT (25 -> 32 ids)
 - props: **npc_max**: 17 -> 32
+- ui: **window**: 648×509 -> 648×508
 - ui: **gs1_commands**: 71 -> 84
-- source: binary: PLO 30 and 35-38, send ids to 29, player props to 31, NPC props to 32, direct data packages (UDP ids 0, 10-22), language files, GS1 table 71 to 84
+- source: binary: PLO 30 and 35-38, send ids to 29, player props to 31, NPC props to 32, direct data packages (UDP ids 0, 10-22), language files, GS1 table 71 to 84, main form 648×508
 
 #### 1.3 test (`GSERV014`, binary, linked 1999-11-29)
 
@@ -183,13 +184,14 @@ Generated; do not edit between the markers.
 - life: **death**: 1.39 rules (respawn to max hearts, no AP bands) -> 2.05 rules (name-group test)
 - life: **combat**: 1.39 rules (one swing step a tick, the rest 2.05) -> 2.05 rules
 - ui: **server_list**: direct (www.graalonline.com:14900) -> one list
+- ui: **window**: 648×508 -> 648×514
 - ui: **gs1_commands**: 111 -> 126
 - unknown (drops): the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced
 - unknown (listserver): original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured
 - unknown (listserver): the real 1.41 rev 1 sent nothing to the lab listserver, which spoke first (shape S, 2026-10-30); whether the public service speaks first to a silent client is not known, so after 3 s with no reply Seihai sends shape B (id 0 `newmain`, then id 1 with the account), which 14923 answered on 2026-10-25
 - unknown (life): death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)
 - unknown (levels): the .nw loader was found by a string and function scan of the binary; no .nw level was loaded in a real 1.41
-- source: binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126, .nw (GLEVNW01) loader
+- source: binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126, .nw (GLEVNW01) loader, main form 648×514
 
 #### 1.42 (`GNW08011`, binary, linked 2001-01-10)
 
@@ -200,12 +202,13 @@ Generated; do not edit between the markers.
 - life: **combat**: 2.05 rules -> none
 - ui: **ganis**: no -> yes
 - ui: **chat_text**: ChatText { face: Helvetica, height: 24 } -> ChatText { face: TempusSans, height: 24 }
+- ui: **window**: 648×514 -> 648×507
 - ui: **gs1_commands**: 126 -> 134
 - mannerisms: **mannerisms**: 1.39 (blink after the hurt pose, hide keeps the carry poses, 5-tile knockback) -> NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses)
 - drops: **drops**: client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE -> server drops (PLO_ITEMADD), pickups go through PLI_ITEMTAKE
 - unknown (listserver): built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured
 - unknown (listserver): the real NewMain 26 sent shape A (id 0 `newmain` only) to the lab listserver (2026-10-30), which Seihai sends; no run on the public service has used shape A, so the port is assumed
-- source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)
+- source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, main form 648×507, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)
 
 #### 2.00 (`GNW24011`, binary, linked 2001-02-01)
 
@@ -227,9 +230,10 @@ Generated; do not edit between the markers.
 - protocol: **plo (server ids handled)**: +46 HITOBJECTS, +156 SETACTIVELEVEL (53 -> 55 ids)
 - protocol: **pli (client ids sent)**: +35 ADJACENTLEVEL, +36 HITOBJECTS (35 -> 37 ids)
 - life: **combat**: 2.00 rules (raw sword power, fewer packet gates) -> 2.01 rules (raw sword power)
+- ui: **window**: 648×507 -> 648×514
 - ui: **gs1_commands**: 142 -> 144
 - unknown (listserver): 2.01 to 2.04 (and 2.02 rev 2): login frame inferred, not captured. Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; no real client of these builds was captured and no run on the public service has used shape A, so the port is assumed. The 2026-10-25 matrix used Seihai's older shape B: a legacy list on 14923, nothing on 14922. 14921, the port the build carries, is dead
-- source: binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144; the hurt packet gains the AP 100, no-kill and once-a-second gates
+- source: binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144, main form 648×514; the hurt packet gains the AP 100, no-kill and once-a-second gates
 
 #### 2.02 (`GNW15041`, binary, linked 2001-04-15)
 
@@ -346,11 +350,12 @@ Generated; do not edit between the markers.
 - protocol: **login frame**: none -> files, process list, props, idle.gani at once, status icons, language and tamper check in the login frame, 96 ms after the level without 182
 - props: **npc_max**: 43 -> 73
 - levels: **heights**: no -> yes
+- ui: **window**: 648×514 -> 644×507
 - unknown (props): other-player prop parser was not read; the 2.22 set is used
 - unknown (ui): GS1 command count was not read; 161 is carried
 - unknown (login): the real 2.17.1 login to a lab listserver was captured: shape B (one plain zlib frame, id 0 `newmain` then id 1 with the account, no token), which Seihai sends. What the public service does for a real 2.17.1 was not observed; Seihai's frame got a legacy list on 14923 and no reply on 14922 on 2026-10-25 (with the default zlib header 78 9C; Seihai now sends 78 DA like the real client, not yet run)
 - unknown (showimg): the binary reading gave 2.17.1 2.22's send test (others in the level), and a solo 90 s capture on 2026-10-25 saw no id 24; the five solo 2026-10-30 runs on two lab servers saw it every 5.1 s, so Seihai follows those. Why the two disagree is not known, and the gap while walking (6.5 to 9.3 s) is not modelled
-- source: binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, the post-login frame seen in the lab (image checks, process list, props up to the language), and id 24 about every 5.1 s when alone (lab, 2026-10-30)
+- source: binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, main form 644×507, the post-login frame seen in the lab (image checks, process list, props up to the language), and id 24 about every 5.1 s when alone (lab, 2026-10-30)
 
 #### 2.22 (`GNW03014`, binary)
 
