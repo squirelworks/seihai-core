@@ -565,10 +565,13 @@ mod tests {
             let d = v.death_rules().unwrap();
             assert_eq!(DeathRules { entry_name_group: true, ..d }, DEATH_205, "{}", v.label());
         }
-        for v in [ClientVersion::V133, ClientVersion::V139] {
-            assert!(!v.sends_claim(), "{}", v.label());
-            assert!(v.death_rules().is_none(), "{}", v.label());
-        }
+        // 1.39 has its own row: the 2.05 timer, and respawn hearts to the
+        // maximum (no AP bands). Id 14 is in its send set, so the claim goes out.
+        assert_eq!(ClientVersion::V139.death_rules(), Some(DEATH_139));
+        assert!(ClientVersion::V139.sends_claim());
+        // 1.33 has no death sequence.
+        assert!(!ClientVersion::V133.sends_claim());
+        assert!(ClientVersion::V133.death_rules().is_none());
     }
 
     #[test]
