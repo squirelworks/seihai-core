@@ -1797,6 +1797,8 @@ mod tests {
     /// 1.39 then got the combat row its lab capture and video show. 1.41
     /// and 1.42 then got `.nw` levels (the GLEVNW01 loader is in both
     /// binaries; Graal_analysis `client-internals/build-catalogue.md`).
+    /// 1.39 then got its death row (`DEATH_139`): the same timer as 2.05,
+    /// respawn hearts to the maximum, no AP bands.
     #[test]
     fn chain_equals_the_hand_written_rows() {
         let mut seen = 0;
