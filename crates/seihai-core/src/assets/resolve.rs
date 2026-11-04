@@ -645,22 +645,39 @@ fn first_in(dirs: &[PathBuf], names: &[String]) -> Option<PathBuf> {
     None
 }
 
+/// macOS and Windows folders ignore case by default, so a stat of a name in
+/// the wrong case still finds the file but gives back the asked-for case.
+const CASE_FOLDING_FS: bool = cfg!(any(target_os = "macos", target_os = "windows"));
+
 /// Find `rel` under `dir`, matching every component ignoring ASCII case.
+/// The path returned is spelled the way it is on disk, on every platform.
 pub(crate) fn lookup(dir: &Path, rel: &str) -> Option<PathBuf> {
-    // Exact case first: one stat, no directory read.
-    let direct = dir.join(rel);
-    if direct.is_file() {
-        return Some(direct);
+    // Exact case first: one stat, no directory read. Only where names are
+    // case-sensitive, since elsewhere the stat can't tell the cases apart.
+    if !CASE_FOLDING_FS {
+        let direct = dir.join(rel);
+        if direct.is_file() {
+            return Some(direct);
+        }
     }
     let mut cur = dir.to_path_buf();
     let mut comps = rel.split('/').peekable();
     while let Some(c) = comps.next() {
         let last = comps.peek().is_none();
-        let found = fs::read_dir(&cur).ok()?.flatten().find(|e| {
-            e.file_name().to_str().is_some_and(|n| n.eq_ignore_ascii_case(c))
-                && e.path().is_dir() != last
-        })?;
-        cur = found.path();
+        let mut exact = None;
+        let mut folded = None;
+        for e in fs::read_dir(&cur).ok()?.flatten() {
+            let Some(n) = e.file_name().to_str().map(str::to_owned) else { continue };
+            if !n.eq_ignore_ascii_case(c) || e.path().is_dir() == last {
+                continue;
+            }
+            if n == c {
+                exact = Some(e.path());
+                break;
+            }
+            folded.get_or_insert(e.path());
+        }
+        cur = exact.or(folded)?;
     }
     cur.is_file().then_some(cur)
 }
