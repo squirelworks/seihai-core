@@ -863,7 +863,14 @@ fn connect_any(addrs: &[SocketAddr], timeout: Duration) -> io::Result<TcpStream>
     let mut last = None;
     for a in addrs {
         match TcpStream::connect_timeout(a, timeout) {
-            Ok(s) => return Ok(s),
+            Ok(s) => {
+                // Small messages (a step, a file request) go out at once.
+                // With Nagle on, one waits for the ACK of the last, and
+                // the server delays that ACK: the suite stress rig saw
+                // file answers at p95 40 ms where 4 ms was the real time.
+                s.set_nodelay(true)?;
+                return Ok(s);
+            }
             Err(e) => last = Some(e),
         }
     }
@@ -3290,6 +3297,7 @@ mod tests {
         let addrs = [dead, live.local_addr().unwrap()];
         let s = connect_any(&addrs, Duration::from_secs(2)).unwrap();
         assert_eq!(s.peer_addr().unwrap(), live.local_addr().unwrap());
+        assert!(s.nodelay().unwrap(), "Nagle off on game connections");
         let (_srv, _) = live.accept().unwrap();
 
         assert!(connect_any(&[dead], Duration::from_secs(2)).is_err());
