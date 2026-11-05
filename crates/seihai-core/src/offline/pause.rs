@@ -51,7 +51,7 @@ impl OfflineSession {
 
     /// The STATUS bits pausing adds. Reading a sign sets the bit too: real
     /// 2.00 went from STATUS 20 to 21 when its sign panel opened and back to
-    /// 20 when it closed (Mirae capture `lan-200sign2`, 2026-10-31). Only the
+    /// 20 when it closed (Windows PC capture `lan-200sign2`, 2026-10-31). Only the
     /// bit is sent; the hit gate still follows [`OfflineSession::paused`].
     pub fn pause_status(&self) -> u8 {
         if self.paused || self.reading.is_some() {

@@ -253,7 +253,7 @@ pub struct ServerNpcSync {
     /// The first round after linking an NPC sends nothing: what its script
     /// set then counts as what the server has. Real 2.31 sent no
     /// `PLI_NPCPROPS` on a link into testworld, where the server's copy of
-    /// both NPCs lacked the looks and message their `created` set (Mirae,
+    /// both NPCs lacked the looks and message their `created` set (Windows PC,
     /// 2026-10-31, `lan-231c`); real 2.22 sent them on the same entry
     /// (`lan-222g`). Off (the 2.05 rule, 2.22) by default.
     pub settle_first: bool,

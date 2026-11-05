@@ -3,7 +3,7 @@
 //! (`documentation/gmap-order.md`, "NPC props on entry for 2.22").
 //!
 //! Bytes: the real 2.22 (`Graal_222.exe`) entering `testworld.nw` by a link
-//! on the Seihai LAN test server (Mirae, 2026-10-31, `lan-222g`). The server
+//! on the Seihai LAN test server (Windows PC, 2026-10-31, `lan-222g`). The server
 //! sent both NPC records in its level frame (f14); 115 ms later the client
 //! sent one `PLI_NPCPROPS` for each (f70). Seihai 2.22 before #261 sent the
 //! same two messages on the Linux lab's GServer-v2, apart from the ids.
@@ -58,7 +58,7 @@ fn on_2_22_the_first_entry_reports_what_created_set() {
 }
 
 /// The real 2.31 on the same entry, with the same two server records
-/// (Mirae, 2026-10-31, `lan-231c`): no `PLI_NPCPROPS` at all. Its first frame
+/// (Windows PC, 2026-10-31, `lan-231c`): no `PLI_NPCPROPS` at all. Its first frame
 /// after the level held only `TAMPERCHECK` and `PLAYERPROPS`.
 #[test]
 fn on_2_31_the_first_entry_reports_nothing() {
