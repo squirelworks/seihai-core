@@ -3,8 +3,8 @@
 //! `bytecode` is the OpenGS1-style reimplementation path.
 //! `gs1` is the cleaned 2.05 command table (parse-tree interpreter,
 //! opcode = 600 + index).
-//! `gs2` reads the bytecode of the GS2 compiler; `gs2::exec` runs the part
-//! that GS1 shares.
+//! `gs2` reads and writes the bytecode of the GS2 compiler; `gs2::exec` runs
+//! the part that GS1 shares. `gs2::compile` is the temporary GS1 front end.
 
 pub mod engine;
 mod bytecode;

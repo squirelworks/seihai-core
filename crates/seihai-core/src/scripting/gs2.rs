@@ -1,4 +1,4 @@
-//! GS2 bytecode reader (Stage B of the GS2 plan).
+//! GS2 bytecode (Stage B of the GS2 plan) and the temporary compiler.
 //!
 //! Reads the files the open-source gs2-parser compiler writes into segments,
 //! a string table and a list of instructions (`exec` runs them). The layout,
@@ -6,9 +6,13 @@
 //! `documentation/gs2-opcodes.md`; `Op::doc_name` gives the name used there.
 //! An opcode value the table does not name is kept as `Op::Unknown`, so a
 //! later executor can log it and skip it.
+//!
+//! [`compile`] is the temporary GS1 front end and the small GS2 compiler it
+//! lowers into (issue 371). It is expected to be phased out.
 
 use std::fmt::{self, Write as _};
 
+pub mod compile;
 pub mod exec;
 pub mod lists;
 pub mod maths;
@@ -325,6 +329,86 @@ impl Script {
         }
         out
     }
+
+    /// Writes the four segments and the trailing `0x0A`, using the operand
+    /// widths in `documentation/gs2-opcodes.md`: the smallest marker for
+    /// integers and string indexes, `F4` for a forward jump (or `F5` when
+    /// the target does not fit in 16 bits), and the smallest marker for a
+    /// backward jump.
+    pub fn write(&self) -> Vec<u8> {
+        let mut code = Vec::new();
+        for (index, ins) in self.code.iter().enumerate() {
+            code.push(ins.op.value());
+            match &ins.operand {
+                Operand::None => {}
+                Operand::Str(n) => write_str_index(&mut code, *n),
+                Operand::Int(n) => {
+                    let forward = ins.op.jumps() && *n >= 0 && (*n as usize) > index;
+                    let min_width = if forward { 2 } else { 1 };
+                    write_signed(&mut code, *n, min_width);
+                }
+                Operand::Decimal(text) => {
+                    code.push(0xF6);
+                    code.extend(text.bytes());
+                    code.push(0);
+                }
+            }
+        }
+        let mut out = Vec::new();
+        write_segment(&mut out, SEGMENT_GS1_FLAGS, &self.gs1_flags.to_be_bytes());
+        let mut funcs = Vec::new();
+        for f in &self.functions {
+            funcs.extend_from_slice(&(f.start as u32).to_be_bytes());
+            funcs.extend(f.name.bytes());
+            funcs.push(0);
+        }
+        write_segment(&mut out, SEGMENT_FUNCTIONS, &funcs);
+        let mut strings = Vec::new();
+        for s in &self.strings {
+            strings.extend(s.bytes());
+            strings.push(0);
+        }
+        write_segment(&mut out, SEGMENT_STRINGS, &strings);
+        write_segment(&mut out, SEGMENT_CODE, &code);
+        out.push(0x0A);
+        out
+    }
+}
+
+fn write_segment(out: &mut Vec<u8>, ty: u32, body: &[u8]) {
+    out.extend_from_slice(&ty.to_be_bytes());
+    out.extend_from_slice(&(body.len() as u32).to_be_bytes());
+    out.extend_from_slice(body);
+}
+
+fn write_str_index(out: &mut Vec<u8>, n: u32) {
+    if n <= u8::MAX as u32 {
+        out.push(0xF0);
+        out.push(n as u8);
+    } else if n <= u16::MAX as u32 {
+        out.push(0xF1);
+        out.extend_from_slice(&(n as u16).to_be_bytes());
+    } else {
+        out.push(0xF2);
+        out.extend_from_slice(&n.to_be_bytes());
+    }
+}
+
+/// `min_width` is 1 for the smallest marker and 2 when a forward jump must
+/// be at least `F4`.
+fn write_signed(out: &mut Vec<u8>, n: i32, min_width: u8) {
+    let fits8 = (i8::MIN as i32..=i8::MAX as i32).contains(&n);
+    let fits16 = (i16::MIN as i32..=i16::MAX as i32).contains(&n);
+    if min_width <= 1 && fits8 {
+        out.push(0xF3);
+        out.push(n as u8);
+    } else if min_width <= 2 && fits16 {
+        out.push(0xF4);
+        out.extend_from_slice(&(n as i16).to_be_bytes());
+    } else {
+        out.push(0xF5);
+        out.extend_from_slice(&n.to_be_bytes());
+    }
 }
 
 impl fmt::Display for Op {
@@ -431,5 +515,22 @@ mod tests {
         assert!(read_code(&[0xF3, 1]).is_err(), "marker in opcode position");
         assert!(Script::parse(&[0, 0, 0, 4, 0, 0, 0, 9, 1]).is_err(), "segment past the end");
         assert!(Script::parse(&[0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0]).is_err(), "no bytecode");
+    }
+
+    #[test]
+    fn writer_roundtrips_the_fixtures() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/gs2");
+        for name in ["shared", "control", "calls", "timers", "strings", "lists", "objects", "rest"] {
+            let bytes = std::fs::read(dir.join(format!("{name}.gs2bc"))).unwrap();
+            let script = Script::parse(&bytes).unwrap();
+            let again = Script::parse(&script.write()).unwrap();
+            assert_eq!(again.disassemble(), script.disassemble(), "{name}");
+            assert_eq!((again.functions, again.strings, again.gs1_flags), (script.functions, script.strings.clone(), script.gs1_flags));
+        }
+        // Some backward jumps in the other fixtures are 16 bits wide even
+        // when the target fits in a byte. `write` uses the smallest width.
+        // shared.gs2bc has only forward jumps, so the widths match the file.
+        let shared = std::fs::read(dir.join("shared.gs2bc")).unwrap();
+        assert_eq!(Script::parse(&shared).unwrap().write(), shared);
     }
 }
