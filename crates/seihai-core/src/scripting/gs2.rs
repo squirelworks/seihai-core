@@ -285,7 +285,46 @@ impl Script {
             p += 8 + len;
         }
         script.code = read_code(code.ok_or("no bytecode segment")?)?;
+        script.validate_references()?;
         Ok(script)
+    }
+
+    /// Enforce Seihai's documented operand and reference contracts before
+    /// a parsed script reaches the executor. Unknown instructions remain
+    /// available to inspection tools; their operand requirements are unknown.
+    fn validate_references(&self) -> Result<(), String> {
+        for (index, instruction) in self.code.iter().enumerate() {
+            let valid = if instruction.op.jumps() {
+                matches!(instruction.operand, Operand::Int(target) if target >= 0 && target as usize <= self.code.len())
+            } else {
+                match (&instruction.op, &instruction.operand) {
+                    (Op::TypeNumber, Operand::Int(_)) => true,
+                    (Op::TypeNumber, Operand::Decimal(text)) => text.parse::<f64>().is_ok(),
+                    (Op::TypeString | Op::TypeVar, Operand::Str(entry)) => {
+                        (*entry as usize) < self.strings.len()
+                    }
+                    (Op::Unknown(_), _) => true,
+                    (Op::TypeNumber | Op::TypeString | Op::TypeVar, _) => false,
+                    (_, Operand::None) => true,
+                    _ => false,
+                }
+            };
+            if !valid {
+                return Err(format!(
+                    "{} at op {index}: invalid or missing operand {:?}",
+                    instruction.op, instruction.operand
+                ));
+            }
+        }
+        for function in &self.functions {
+            if function.start >= self.code.len() {
+                return Err(format!(
+                    "function {:?} starts outside the bytecode at op {}",
+                    function.name, function.start
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// The string-table entry an instruction refers to.
@@ -515,6 +554,87 @@ mod tests {
         assert!(read_code(&[0xF3, 1]).is_err(), "marker in opcode position");
         assert!(Script::parse(&[0, 0, 0, 4, 0, 0, 0, 9, 1]).is_err(), "segment past the end");
         assert!(Script::parse(&[0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0]).is_err(), "no bytecode");
+    }
+
+    fn parse_test_code(code: &[u8], strings: &[u8], functions: &[u8]) -> Result<Script, String> {
+        let mut bytes = Vec::new();
+        write_segment(&mut bytes, SEGMENT_CODE, code);
+        // Resolve references after all segments, including these later tables.
+        write_segment(&mut bytes, SEGMENT_STRINGS, strings);
+        write_segment(&mut bytes, SEGMENT_FUNCTIONS, functions);
+        Script::parse(&bytes)
+    }
+
+    #[test]
+    fn parser_rejects_invalid_known_operands() {
+        let invalid: &[&[u8]] = &[
+            &[20],                                  // Number without an operand.
+            &[21],                                  // String without an operand.
+            &[22],                                  // Variable without an operand.
+            &[1],                                   // Jump without a target.
+            &[20, 0xF0, 0],                         // String reference used as a number.
+            &[21, 0xF3, 0],                         // Integer used as a string reference.
+            &[22, 0xF6, b'1', 0],                   // Decimal used as a variable reference.
+            &[1, 0xF0, 0],                          // String reference used as a jump target.
+            &[1, 0xF6, b'1', 0],                    // Decimal used as a jump target.
+            &[7, 0xF3, 0],                          // Return must not carry an operand.
+            &[20, 0xF6, b'o', b'o', b'p', b's', 0], // Invalid decimal text.
+        ];
+        for code in invalid {
+            assert!(
+                parse_test_code(code, b"value\0", b"").is_err(),
+                "accepted {code:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn parser_checks_jump_and_string_boundaries() {
+        for jump in [1, 2, 3, 4, 5, 150, 163] {
+            assert!(
+                parse_test_code(&[jump, 0xF3, 0, 7], b"", b"").is_ok(),
+                "first op for {jump}"
+            );
+            assert!(
+                parse_test_code(&[jump, 0xF3, 1, 7], b"", b"").is_ok(),
+                "last op for {jump}"
+            );
+            assert!(
+                parse_test_code(&[jump, 0xF3, 2, 7], b"", b"").is_ok(),
+                "end boundary for {jump}"
+            );
+            assert!(
+                parse_test_code(&[jump, 0xF3, 3, 7], b"", b"").is_err(),
+                "past end for {jump}"
+            );
+            assert!(
+                parse_test_code(&[jump, 0xF3, 255, 7], b"", b"").is_err(),
+                "negative target for {jump}"
+            );
+        }
+        for op in [21, 22] {
+            assert!(parse_test_code(&[op, 0xF0, 0, 7], b"value\0", b"").is_ok());
+            assert!(parse_test_code(&[op, 0xF0, 1, 7], b"value\0", b"").is_err());
+            assert!(parse_test_code(&[op, 0xF0, 0, 7], b"", b"").is_err());
+        }
+    }
+
+    #[test]
+    fn parser_checks_function_entry_boundaries() {
+        assert!(parse_test_code(&[7], b"", b"\0\0\0\0event\0").is_ok());
+        assert!(parse_test_code(&[7], b"", b"\0\0\0\x01event\0").is_err());
+        assert!(parse_test_code(&[], b"", b"\0\0\0\0event\0").is_err());
+    }
+
+    #[test]
+    fn parser_keeps_unknown_opcodes_without_guessing_their_operands() {
+        let script = parse_test_code(&[45, 0xF3, 12, 7], b"", b"").unwrap();
+        assert_eq!(script.code[0].op, Op::Unknown(45));
+        assert_eq!(script.code[0].operand, Operand::Int(12));
+        assert!(
+            parse_test_code(&[20, 0xF3, 255, 7], b"", b"").is_ok(),
+            "signed numeric literal remains valid"
+        );
     }
 
     #[test]
