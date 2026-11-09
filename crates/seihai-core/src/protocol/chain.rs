@@ -3,7 +3,7 @@
 //! Every client build Seihai can present as is one **step** in an ordered
 //! list, oldest first. A step is a name (label, token, link date, basis) and
 //! a small [`Delta`]: only what that build changed against the build before
-//! it. The first step starts from [`ORIGIN`], a fully spelled-out 1.33 row.
+//! it. The first step starts from [`ORIGIN`], a fully spelled-out 1.21 row.
 //! Resolving the chain (a `const fn`, so it costs nothing at run time) yields
 //! the [`VersionProfile`] rows in [`super::profile::PROFILES`].
 //!

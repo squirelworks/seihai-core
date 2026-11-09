@@ -1,8 +1,29 @@
 # Version chain
 
-Every client build Seihai can present as is one **step** in an ordered chain, oldest first. A step is a name (label, token, link date, basis) plus a small **delta**: only what that build changed against the build before it. The first step starts from `ORIGIN`, a fully written-out 1.33 row. Resolving the chain gives the 26 rows of `PROFILES`, so the rest of the client still reads one `VersionProfile` per version and nothing downstream changed.
+Every client build Seihai can present as is one **step** in an ordered chain, oldest first. A step is a name (label, token, link date, basis) plus a small **delta**: only what that build changed against the build before it. The first step starts from `ORIGIN`, a fully written-out 1.21 row. Resolving the chain gives one row of `PROFILES` per supported `ClientVersion`.
 
-Code: `client/src/protocol/chain.rs`. `profile.rs` keeps the row types and the shared rule constants (`DEATH_205`, `COMBAT_205`, the tamper-check constants); `PROFILES` there is the resolved chain.
+Code: `crates/seihai-core/src/protocol/chain.rs`. `profile.rs` keeps the row types and the shared rule constants (`DEATH_205`, `COMBAT_205`, the tamper-check constants); `PROFILES` there is the resolved chain.
+
+## Early-build fallback boundaries
+
+Connection profiles, server discovery and script vocabulary are separate.
+The 1.21–1.32 rows describe gen-2 game-server clients without a native
+listserver. `ClientVersion::list_version` borrows 2.05 for Seihai's server
+discovery; it does not turn the selected game profile into 2.05 or establish
+that an original early client used a listserver. Older offline-only builds
+also have distinct no-network/relay restrictions; see
+[offline-only-builds.md](offline-only-builds.md).
+
+`Era::for_version` uses the earliest documented 2.00 GS1 vocabulary as a
+compatibility fallback for pre-2.00 profiles, including 1.21–1.32. The exact
+command, function and grammar coverage of each early build remains
+incomplete. This fallback must not be described as native 2.00 vocabulary
+parity, nor may those rows silently inherit the newer 2.1 syntax. The
+connection evidence is catalogued separately in the linked early-client
+research; no native network capability follows from a scripting fallback.
+
+Research references: [early profiles](https://github.com/squirelworks/Graal_analysis/blob/main/client-internals/version-profiles/v121-v132.toml)
+and [early-client lineage](https://github.com/squirelworks/Graal_analysis/blob/main/client-internals/early-clients.md).
 
 ## What a step holds
 
