@@ -979,7 +979,7 @@ mod tests {
         // Steps 1..17 run in place (no walk gani here: the idle fallback).
         assert!(seen[..17]
             .iter()
-            .all(|p| p.map_or(true, |p| p.0 != Push && p.0 != Walk)));
+            .all(|p| p.is_none_or(|p| p.0 != Push && p.0 != Walk)));
         let push: Vec<usize> = seen[17..].iter().map(|p| p.unwrap().1).collect();
         assert_eq!(&push[..9], [0, 0, 0, 0, 1, 1, 1, 1, 2]);
         assert_eq!(push[20], 0, "the count wraps from 38 to 18: frame 0 again");
@@ -1306,14 +1306,16 @@ mod tests {
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/levels/new3.nw");
         let mut s = OfflineSession::new();
         s.current_level = Some(Level::load(path).expect("new3.nw loads"));
-        let mut t = ObjectTables::default();
-        t.ledges = [
-            vec![190, 191, 4045, 4046],
-            vec![212, 228, 563, 579, 4028, 4044],
-            vec![185, 186, 4061, 4062],
-            vec![273, 289, 4031, 4047],
-        ];
-        t.blocks = vec![PUSH_BLOCK, PULL_BLOCK];
+        let t = ObjectTables {
+            ledges: [
+                vec![190, 191, 4045, 4046],
+                vec![212, 228, 563, 579, 4028, 4044],
+                vec![185, 186, 4061, 4062],
+                vec![273, 289, 4031, 4047],
+            ],
+            blocks: vec![PUSH_BLOCK, PULL_BLOCK],
+            ..Default::default()
+        };
         let mut types = TileTypes::from_types([0; 4096]);
         for id in t
             .ledges

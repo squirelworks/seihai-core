@@ -642,7 +642,7 @@ mod tests {
         let mut p = Vec::new();
         p.extend([8 + 0x20, 31 + 0x20]);
         gstring(&mut p, "sword1.png");
-        p.extend([9 + 0x20, 11 + 0x20 + 0]);
+        p.extend([9 + 0x20, (11 + 0x20)]);
         gstring(&mut p, "shield1.png");
         p.push(11 + 0x20);
         p.push(0x20 + 100 + 9);
@@ -854,7 +854,7 @@ mod tests {
             ),
         ];
         for (v, head, status, hex) in cases {
-            let ids = v.profile().props.own.clone();
+            let ids = v.profile().props.own;
             let m = classic_login_props_message(
                 *v,
                 &classic_server_props(head, *status),
@@ -890,7 +890,7 @@ mod tests {
             (V132, format!("{base}32304120")),
         ];
         for (v, want) in cases {
-            let ids = v.profile().props.own.clone();
+            let ids = v.profile().props.own;
             let m = classic_login_props_message(
                 v,
                 &classic_server_props(&image_head(b"head3.png"), 20),

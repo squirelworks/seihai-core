@@ -826,16 +826,16 @@ fn layout_formats_are_valid() {
     assert!(!reps.is_empty());
     let j = render_layouts(&reps, Format::Json);
     let doc: serde_json::Value = serde_json::from_str(&j).unwrap_or_else(|e| panic!("{e}: {j}"));
-    assert!(doc.as_array().unwrap().len() >= 1);
+    assert!(!doc.as_array().unwrap().is_empty());
     let tsv = render_layouts(&reps, Format::Tsv);
     assert!(tsv.lines().all(|l| l.split('\t').count() == 11), "{tsv}");
     // Packet 24 in the client direction has the unknown `value` field (in
     // this test's table).
     let c = reps.iter().find(|r| r.dir == Dir::C2S).unwrap();
     assert!(
-        render_layouts(&[c.clone()], Format::Text).contains("? 1  value"),
+        render_layouts(std::slice::from_ref(c), Format::Text).contains("? 1  value"),
         "{}",
-        render_layouts(&[c.clone()], Format::Text)
+        render_layouts(std::slice::from_ref(c), Format::Text)
     );
 }
 

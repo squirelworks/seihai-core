@@ -559,7 +559,7 @@ mod tests {
     fn session_messages(v: ClientVersion, attacker: Option<u16>) -> Vec<Vec<u8>> {
         let mut l = Life::new(v.death_rules());
         let mut out = Vec::new();
-        let mut feed = |l: &mut Life, out: &mut Vec<Vec<u8>>| {
+        let feed = |l: &mut Life, out: &mut Vec<Vec<u8>>| {
             for e in l.take_events() {
                 out.extend(messages_for(e, v, 0x10));
             }

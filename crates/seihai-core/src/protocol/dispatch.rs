@@ -2230,8 +2230,10 @@ mod tests {
         body.extend_from_slice(&file);
         body.extend_from_slice(b"&a\n");
 
-        let mut state = SessionState::default();
-        state.file_has_modtime = true;
+        let mut state = SessionState {
+            file_has_modtime: true,
+            ..Default::default()
+        };
         let (one, two) = body.split_at(40);
         state.apply_body(one);
         assert!(state.incoming_files.is_empty());
@@ -2322,8 +2324,10 @@ mod tests {
 
     #[test]
     fn file_524_capture_reads_with_its_modtime() {
-        let mut st = SessionState::default();
-        st.file_has_modtime = true;
+        let mut st = SessionState {
+            file_has_modtime: true,
+            ..Default::default()
+        };
         st.apply_body(&raw_file(STATE_PNG_524));
         assert_eq!(st.incoming_files.len(), 1);
         assert_eq!(st.incoming_files[0].0, "state.png");
@@ -2344,8 +2348,10 @@ mod tests {
         assert!(old[6..6 + len].starts_with(b".png\x89PNG"));
         assert_eq!(parse_file_packet(old, true), None);
 
-        let mut st = SessionState::default();
-        st.file_has_modtime = true;
+        let mut st = SessionState {
+            file_has_modtime: true,
+            ..Default::default()
+        };
         st.apply_body(&raw_file(old));
         assert_eq!(st.incoming_files.len(), 1);
         assert_eq!(st.incoming_files[0].0, "state.png");
@@ -3598,7 +3604,7 @@ mod tests {
 
     fn table_version(label: &str) -> Option<ClientVersion> {
         let l = label.to_ascii_lowercase();
-        Some(match l.split(|c| c == ' ' || c == '(').next()? {
+        Some(match l.split([' ', '(']).next()? {
             "2.00" => ClientVersion::V200,
             "2.01" => ClientVersion::V201,
             "2.02" if l.contains("rev2") => ClientVersion::V202R2,

@@ -2127,7 +2127,7 @@ mod tests {
     fn strip_field(row: &str, from: &str, until: &str) -> String {
         let a = row.find(from).expect("field");
         let b = a + row[a..].find(until).expect("next field");
-        format!("{}{}", &row[..a].trim_end_matches(' '), &row[b..]).replace(",, udp:", ", udp:")
+        format!("{}{}", row[..a].trim_end_matches(' '), &row[b..]).replace(",, udp:", ", udp:")
     }
 
     /// Behaviour is unchanged: every build that existed before the chain
@@ -2195,8 +2195,7 @@ mod tests {
     fn deltas_are_minimal() {
         let sets =
             |p: &VersionProfile| [p.protocol.plo, p.protocol.pli, p.props.own, p.props.other];
-        for i in 1..CHAIN.len() {
-            let s = &CHAIN[i];
+        for (i, s) in CHAIN.iter().enumerate().skip(1) {
             let before = sets(&RESOLVED[i - 1]);
             let d = &s.delta;
             for (n, delta) in [d.plo, d.pli, d.own_props, d.other_props]
@@ -2237,8 +2236,7 @@ mod tests {
     /// the resolved row did not change, and an empty step has an `unknown`.
     #[test]
     fn deltas_are_effective_and_empty_steps_explain_themselves() {
-        for i in 1..CHAIN.len() {
-            let s = &CHAIN[i];
+        for (i, s) in CHAIN.iter().enumerate().skip(1) {
             let ch = changes(i);
             assert_eq!(
                 s.delta == Delta::NONE,

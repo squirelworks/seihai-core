@@ -2296,7 +2296,7 @@ mod tests {
         // Then the next step: `n'\x80` (X2 992, 31 tiles).
         let m = position_message_precise(30.5, 30.5, 3);
         assert_eq!(&m[..6], &[2 + 0x20, b'1', b'#', b'n', b'\'', b'p']);
-        assert_eq!(&m[6..9], &[b'o', b'\'', b'p']);
+        assert_eq!(&m[6..9], b"o'p");
         assert_eq!(*m.last().unwrap(), b'\n');
         assert_eq!(&position_message_precise(31.0, 0.0, 0)[4..6], b"'\x80");
     }
@@ -2620,7 +2620,7 @@ mod tests {
         let good = crate::protocol::flagset::flag_message("a", Some("1"));
         let bad = b"\x32b=1\nc=2\n".to_vec();
         conn.send_messages(&[bad, good.clone()]).unwrap();
-        conn.send_messages(&[good.clone()]).unwrap();
+        conn.send_messages(std::slice::from_ref(&good)).unwrap();
         assert_eq!(
             gen3_messages(0x31, &read_frame(&mut srv)),
             vec![good.clone()]
@@ -2748,18 +2748,9 @@ mod tests {
             ]
             .concat()
         };
-        assert_eq!(
-            ClientVersion::V603R7.profile().protocol.gen5_long_frames,
-            true
-        );
-        assert_eq!(
-            ClientVersion::V600R2.profile().protocol.gen5_long_frames,
-            true
-        );
-        assert_eq!(
-            ClientVersion::V531R4.profile().protocol.gen5_long_frames,
-            false
-        );
+        assert!(ClientVersion::V603R7.profile().protocol.gen5_long_frames);
+        assert!(ClientVersion::V600R2.profile().protocol.gen5_long_frames);
+        assert!(!ClientVersion::V531R4.profile().protocol.gen5_long_frames);
 
         let (mut conn, mut srv) = pair();
         conn.login_versioned(ClientVersion::V603R7, 0x19, "guest", "7Y3bdzjf")
@@ -3971,7 +3962,7 @@ mod tests {
         // crossing sends; Seihai has none, so the test only fixes the order.
         let props = vec![2 + 0x20, 43 + 0x20, 1 + 0x20, 78 + 0x20, 0x20, 0x20, b'\n'];
         assert!(conn
-            .send_enter_level(ClientVersion::V231, &[props.clone()])
+            .send_enter_level(ClientVersion::V231, std::slice::from_ref(&props))
             .unwrap());
         let body = gen5_body(&mut srv, &mut g);
         assert_eq!([&ENTER[..], &props[..]].concat(), body);
@@ -4056,9 +4047,7 @@ mod tests {
             // Nothing was written: the next frame is the walk we send now.
             conn.send_position(3.0, 4.0, 2).unwrap();
             srv.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
-            let body = if v == ClientVersion::V217 {
-                gen3_messages(0x31, &read_frame(&mut srv)).remove(0)
-            } else if v == ClientVersion::V205 {
+            let body = if matches!(v, ClientVersion::V217 | ClientVersion::V205) {
                 gen3_messages(0x31, &read_frame(&mut srv)).remove(0)
             } else {
                 let mut g = Gen5::new(0x31);
@@ -4100,7 +4089,7 @@ mod tests {
         assert!(sent);
         el.crossing("gm_ne.nw", sent);
         let body = gen5_body(&mut srv, &mut g);
-        let props = vec![2 + 0x20, 43 + 0x20, 1 + 0x20, 78 + 0x20, 0x20, 0x20, b'\n'];
+        let props = [2 + 0x20, 43 + 0x20, 1 + 0x20, 78 + 0x20, 0x20, 0x20, b'\n'];
         assert_eq!(body, [&ENTER[..], &props[..]].concat());
         // The server's answer names the new level: nothing more is owed.
         assert!(!el.note_level("gm_ne.nw"));

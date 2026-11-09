@@ -3054,7 +3054,7 @@ mod tests {
         s.player_y = 23.0;
         s.player_dir = DIR_EAST;
         let (px, py) = s.facing_point();
-        assert!(px >= 20.0 && px < 22.0 && py >= 24.0 && py < 26.0);
+        assert!((20.0..22.0).contains(&px) && (24.0..26.0).contains(&py));
         assert_eq!(s.interact(), Interaction::Nothing);
         assert!(s.opened_chests.is_empty());
         // West side, facing west.
@@ -3063,7 +3063,7 @@ mod tests {
         s.player_y = 23.0;
         s.player_dir = DIR_WEST;
         let (px, py) = s.facing_point();
-        assert!(px >= 20.0 && px < 22.0 && py >= 24.0 && py < 26.0);
+        assert!((20.0..22.0).contains(&px) && (24.0..26.0).contains(&py));
         assert_eq!(s.interact(), Interaction::Nothing);
         // Above the chest, facing south.
         let mut s = new();
@@ -3071,7 +3071,7 @@ mod tests {
         s.player_y = 20.0;
         s.player_dir = DIR_SOUTH;
         let (_, py) = s.facing_point();
-        assert!(py >= 24.0 && py < 26.0);
+        assert!((24.0..26.0).contains(&py));
         assert_eq!(s.interact(), Interaction::Nothing);
     }
 
@@ -3169,18 +3169,18 @@ mod tests {
     const ROCK_LEFT: [[u32; 2]; 2] = [[1834, 1850], [1835, 1851]];
 
     fn put(l: &mut Level, ax: i32, ay: i32, o: [[u32; 2]; 2]) {
-        for i in 0..2 {
-            for j in 0..2 {
-                assert!(l.set_tile_id(ax + i as i32, ay + j as i32, o[i][j] as u16));
+        for (i, column) in o.iter().enumerate() {
+            for (j, value) in column.iter().enumerate() {
+                assert!(l.set_tile_id(ax + i as i32, ay + j as i32, *value as u16));
             }
         }
     }
 
     fn get(l: &Level, ax: i32, ay: i32) -> [[u32; 2]; 2] {
         let mut o = [[0; 2]; 2];
-        for i in 0..2 {
-            for j in 0..2 {
-                o[i][j] = u32::from(l.tile_id_at(ax + i as i32, ay + j as i32).unwrap());
+        for (i, column) in o.iter_mut().enumerate() {
+            for (j, value) in column.iter_mut().enumerate() {
+                *value = u32::from(l.tile_id_at(ax + i as i32, ay + j as i32).unwrap());
             }
         }
         o
@@ -6437,8 +6437,10 @@ mod tests {
 
     /// Sprite table entries of 16 x 16 pixels for the arrow sprites.
     fn arrow_tables() -> ObjectTables {
-        let mut t = ObjectTables::default();
-        t.sprites = vec![0; 111];
+        let mut t = ObjectTables {
+            sprites: vec![0; 111],
+            ..Default::default()
+        };
         for id in 107..=110 {
             t.sprites[id] = (8 << 6) | 8;
         }

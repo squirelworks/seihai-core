@@ -532,7 +532,7 @@ mod tests {
         let mut rows = Vec::new();
         for _ in 0..h {
             rows.push(0u8);
-            rows.extend(std::iter::repeat(0u8).take(w as usize));
+            rows.extend(std::iter::repeat_n(0u8, w as usize));
         }
         let mut z = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
         std::io::Write::write_all(&mut z, &rows).unwrap();

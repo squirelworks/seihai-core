@@ -198,6 +198,25 @@ fn decode_ima(data: &[u8], fmt: &Fmt) -> Result<Vec<i16>, String> {
     Ok(out)
 }
 
+/// A tiny mono 8-bit PCM WAV for tests: `len` samples at `rate`.
+#[cfg(test)]
+pub(crate) fn test_wav(rate: u32, len: usize) -> Vec<u8> {
+    let mut out = b"RIFF".to_vec();
+    out.extend(((36 + len) as u32).to_le_bytes());
+    out.extend(b"WAVEfmt ");
+    out.extend(16u32.to_le_bytes());
+    out.extend(1u16.to_le_bytes());
+    out.extend(1u16.to_le_bytes());
+    out.extend(rate.to_le_bytes());
+    out.extend(rate.to_le_bytes());
+    out.extend(1u16.to_le_bytes());
+    out.extend(8u16.to_le_bytes());
+    out.extend(b"data");
+    out.extend((len as u32).to_le_bytes());
+    out.extend(std::iter::repeat_n(128u8, len));
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -335,23 +354,4 @@ mod tests {
         }
         eprintln!("decoded {n} files");
     }
-}
-
-/// A tiny mono 8-bit PCM WAV for tests: `len` samples at `rate`.
-#[cfg(test)]
-pub(crate) fn test_wav(rate: u32, len: usize) -> Vec<u8> {
-    let mut out = b"RIFF".to_vec();
-    out.extend(((36 + len) as u32).to_le_bytes());
-    out.extend(b"WAVEfmt ");
-    out.extend(16u32.to_le_bytes());
-    out.extend(1u16.to_le_bytes());
-    out.extend(1u16.to_le_bytes());
-    out.extend(rate.to_le_bytes());
-    out.extend(rate.to_le_bytes());
-    out.extend(1u16.to_le_bytes());
-    out.extend(8u16.to_le_bytes());
-    out.extend(b"data");
-    out.extend((len as u32).to_le_bytes());
-    out.extend(std::iter::repeat(128u8).take(len));
-    out
 }

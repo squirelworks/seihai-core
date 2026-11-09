@@ -976,7 +976,7 @@ mod tests {
             assert_eq!(r.level("house2.zelda"), None);
         }
         // A build whose profile does not read Z3-V1 would not open it.
-        let mut p = ClientVersion::V139.profile().clone();
+        let mut p = *ClientVersion::V139.profile();
         p.levels.zelda = false;
         let p: &'static VersionProfile = Box::leak(Box::new(p));
         let r = AssetResolver::new(AssetRoot::new(&d), p);
@@ -1133,7 +1133,7 @@ mod tests {
         // A PNG-only folder with its own bodies: no body at all, as the real 2.05.
         touch(&d, "pngonly/levels/bodies/body.png");
         let p = AssetResolver::new(
-            AssetRoot::new(&d.join("pngonly")),
+            AssetRoot::new(d.join("pngonly")),
             ClientVersion::V205.profile(),
         )
         .with_builtin(Some(ours.clone()));
@@ -1141,7 +1141,7 @@ mod tests {
         // A folder without player art: the built-in GIF.
         fs::create_dir_all(d.join("empty")).unwrap();
         let e = AssetResolver::new(
-            AssetRoot::new(&d.join("empty")),
+            AssetRoot::new(d.join("empty")),
             ClientVersion::V205.profile(),
         )
         .with_builtin(Some(ours.clone()));

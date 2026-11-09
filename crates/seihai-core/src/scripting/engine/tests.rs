@@ -1128,7 +1128,7 @@ fn corpus_parses_and_runs_without_panicking() {
         }
     }
     let mut top: Vec<_> = unknown.into_iter().collect();
-    top.sort_by(|a, b| b.1.cmp(&a.1));
+    top.sort_by_key(|a| std::cmp::Reverse(a.1));
     println!("corpus: {scripts} scripts, {with_diag} with parse diagnostics");
     println!("diagnostics: {diag_kinds:?}");
     println!(

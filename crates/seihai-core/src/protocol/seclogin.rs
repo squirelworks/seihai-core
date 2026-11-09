@@ -899,7 +899,7 @@ mod tests {
         assert_eq!(hello.inner_token(), LINK_TOKEN);
         let (s1, opener) = hello.respond(&id).unwrap();
         let mut client = c.finish(&s1).unwrap().sealer.into_channel();
-        let mut server = opener.into_channel();
+        let server = opener.into_channel();
         let big = vec![b'x'; MAX_RECORD + 10];
         let wire = client.seal(&big);
         assert!(!wire.windows(4).any(|w| w == b"xxxx"));

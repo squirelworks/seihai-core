@@ -2223,9 +2223,9 @@ mod tests {
         l.boards.insert(0, run(0, 0, 3, 1, &[500, 501, 502]));
         l.boards.push(run(0, 3, 64, 0, &[600; 64]));
         let ids = l.tile_ids();
-        for i in 0..4096 {
+        for (i, id) in ids.iter().enumerate() {
             assert_eq!(
-                ids[i],
+                *id,
                 l.tile_id_at(i as i32 % 64, i as i32 / 64).unwrap_or(0),
                 "tile {i}"
             );
@@ -2424,8 +2424,8 @@ CHEST 8 8 greenrupee 0
 
     #[test]
     fn tile_id_roundtrip() {
-        assert_eq!(tile_id([b'A', b'A']), 0);
-        assert_eq!(tile_id([b'/', b'/']), 4095);
+        assert_eq!(tile_id(*b"AA"), 0);
+        assert_eq!(tile_id(*b"//"), 4095);
     }
 
     #[test]
@@ -2619,7 +2619,7 @@ CHEST 8 8 greenrupee 0
         tail.extend_from_slice(b"#message x;\n");
         tail.extend_from_slice(b"#\n");
         // Chests: x, y, item, sign index, each +32.
-        tail.extend_from_slice(&[32 + 7, 32 + 8, 32 + 1, 32 + 0, b'\n']);
+        tail.extend_from_slice(&[32 + 7, 32 + 8, 32 + 1, 32, b'\n']);
         tail.extend_from_slice(&[32 + 9, 32 + 9, 32 + 99, 32 + 3, b'\n']);
         tail.extend_from_slice(b"#\n");
         // A sign: x+32, y+32, then text in the sign alphabet (each byte is its alphabet index + 32, so `a` is 58).
