@@ -10,6 +10,11 @@
 //! smallest front end that issue needs, and it is expected to be phased out.
 //! GS2-to-GS1 and server-side GS2 are out of scope. A construct this front
 //! end does not lower is a compile error.
+//!
+//! Opcode built-ins require their documented argument counts before emission;
+//! `format` needs a pattern and accepts additional values. This is Seihai's
+//! compile-time validation policy, not a claim about original-client errors.
+//! Script and host calls are not subject to those opcode-specific checks.
 
 use super::{Function, Instr, Op, Operand, Script};
 use crate::scripting::engine::ast::*;
@@ -1039,6 +1044,9 @@ impl Builder {
 
     fn command(&mut self, name: &str, args: &[Arg], line: u32) {
         self.line = line;
+        if !self.builtin_arity(name, args.len()) {
+            return;
+        }
         if name == "setarray" {
             self.setarray_command(args);
             return;
@@ -1109,6 +1117,10 @@ impl Builder {
     }
 
     fn known_builtin(&mut self, name: &str, args: &[Expr]) -> bool {
+        if !self.builtin_arity(name, args.len()) {
+            // It is a recognized but invalid built-in, not a host call.
+            return true;
+        }
         match name {
             "sleep" => {
                 if let Some(a) = args.first() {
@@ -1179,6 +1191,34 @@ impl Builder {
         }
         self.op(op);
         true
+    }
+
+    /// Seihai's accepted call shapes for the documented opcode subset.
+    /// Host calls and script functions keep their own argument contracts.
+    fn builtin_arity(&mut self, name: &str, actual: usize) -> bool {
+        let required = match name {
+            "sleep" | "sin" | "cos" | "arctan" | "abs" | "arraylen" | "sarraylen" | "int"
+            | "exp" | "char" | "vecx" | "vecy" | "makevar" => 1,
+            "random" | "setarray" | "log" | "min" | "max" | "pow" | "getangle" | "getdir" => 2,
+            "waitfor" => 3,
+            "strlen" if self.gs1 => 1,
+            "startswith" | "indexof" if self.gs1 => 2,
+            "format" => {
+                if actual > 0 {
+                    return true;
+                }
+                self.err("`format` expects at least 1 argument, got 0");
+                return false;
+            }
+            _ => return true,
+        };
+        if actual == required {
+            return true;
+        }
+        self.err(format!(
+            "`{name}` expects {required} argument(s), got {actual}"
+        ));
+        false
     }
 
     fn place(&mut self, name: &str) {

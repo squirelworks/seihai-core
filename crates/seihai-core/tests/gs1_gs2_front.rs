@@ -260,3 +260,95 @@ fn reading_an_event_flag_is_an_error() {
     assert_eq!(got.functions[0].name, "onTimeout");
     assert!(got.disassemble().contains("OP_ASSIGN"));
 }
+
+#[test]
+fn opcode_builtins_reject_missing_and_extra_arguments() {
+    let fixed = [
+        ("sleep", 1),
+        ("sin", 1),
+        ("cos", 1),
+        ("arctan", 1),
+        ("abs", 1),
+        ("arraylen", 1),
+        ("sarraylen", 1),
+        ("int", 1),
+        ("exp", 1),
+        ("char", 1),
+        ("vecx", 1),
+        ("vecy", 1),
+        ("makevar", 1),
+        ("random", 2),
+        ("setarray", 2),
+        ("log", 2),
+        ("min", 2),
+        ("max", 2),
+        ("pow", 2),
+        ("getangle", 2),
+        ("getdir", 2),
+        ("waitfor", 3),
+    ];
+    for (name, arity) in fixed {
+        for count in [0, arity - 1, arity + 1] {
+            let args = vec!["1"; count].join(", ");
+            let source = format!("function onCreated() {{ {name}({args}); }}");
+            let error = compile::compile_gs2(&source).unwrap_err().to_string();
+            assert!(
+                error.contains(name) && error.contains("expects"),
+                "{source}: {error}"
+            );
+        }
+        let args = vec!["1"; arity].join(", ");
+        let source = format!("function onCreated() {{ {name}({args}); }}");
+        compile::compile_gs2(&source).unwrap_or_else(|error| panic!("{source}: {error}"));
+    }
+}
+
+#[test]
+fn malformed_nested_builtins_and_gs1_calls_fail_compilation() {
+    for call in [
+        "sin()",
+        "sin(1, 2)",
+        "random(1)",
+        "strlen()",
+        "startswith(1)",
+        "indexof(1)",
+    ] {
+        let source = format!("if (created) {{ this.n = {call}; }}");
+        assert!(
+            compile::compile_gs1(&source, Era::V205).is_err(),
+            "{source}"
+        );
+    }
+    for source in [
+        "function onCreated() { this.n = 1 + sin(); }",
+        "function onCreated() { hostcall(cos(1, 2)); }",
+        "function onCreated() { if (random(1)) hide(); }",
+    ] {
+        assert!(compile::compile_gs2(source).is_err(), "{source}");
+    }
+    for source in [
+        "if (created) { sleep; }",
+        "if (created) { sleep 0.5, 1; }",
+        "if (created) { setarray this.a; }",
+        "if (created) { setarray this.a, 3, 4; }",
+    ] {
+        assert!(compile::compile_gs1(source, Era::V205).is_err(), "{source}");
+    }
+    // GS1's final raw text argument can itself contain commas.
+    compile::compile_gs1(
+        "if (created) { this.n = indexof(needle, hay,stack); }",
+        Era::V205,
+    )
+    .unwrap();
+}
+
+#[test]
+fn format_requires_a_pattern_but_keeps_variadic_arguments() {
+    assert!(compile::compile_gs2("function onCreated() { format(); }").is_err());
+    for args in ["\"plain\"", "\"%s %s\", 1, 2", "\"%s\", sin(1)"] {
+        let source = format!("function onCreated() {{ this.text = format({args}); }}");
+        compile::compile_gs2(&source).unwrap();
+    }
+    // A name outside the opcode subset is still a script/host call.
+    compile::compile_gs2("function onCreated() { custom(); custom(1, 2, 3, 4); }").unwrap();
+}
