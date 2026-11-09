@@ -14,6 +14,13 @@ the string table and one instruction per op index, and `disassemble()` prints
 them. It runs nothing. A value this table does not name, or a placeholder,
 comes back as `Op::Unknown`.
 
+Before returning a script, the reader validates known instructions against
+the operand kinds below, resolves string references and checks function and
+jump bounds. A jump may target the end of the instruction list; a function
+must start inside it. Unknown instructions retain their operands without a
+guessed schema. These are Seihai validation rules, not claims about how an
+original client handles malformed input.
+
 This is what the open-source compiler **writes**. What the 3.x/4.x clients or
 the official server do with each opcode at run time is not in this source.
 Where the enum has a comment on meaning, it is the compiler author's own
