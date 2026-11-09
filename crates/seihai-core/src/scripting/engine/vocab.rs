@@ -27,10 +27,13 @@ pub enum Era {
 impl Era {
     /// The vocabulary a client version scripts with. Builds before 2.00
     /// use the 2.00 set, which is the earliest the notes cover.
+    /// This is a borrowed compatibility fallback, not an exact vocabulary
+    /// recovered for every early build. It is independent of server discovery.
     pub fn for_version(v: ClientVersion) -> Era {
         use ClientVersion::*;
         match v {
-            V133 | V134 | V135 | V136 | V137 | V138 | V139 | V141 | V142 | V200 => Era::V200,
+            V121 | V128B2 | V13T | V131 | V132 | V133 | V134 | V135 | V136 | V137 | V138 | V139
+            | V141 | V142 | V200 => Era::V200,
             V201 => Era::V201,
             V202 | V202R2 => Era::V202,
             V203 => Era::V203,
