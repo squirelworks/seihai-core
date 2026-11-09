@@ -190,7 +190,7 @@ fn decode_ima(data: &[u8], fmt: &Fmt) -> Result<Vec<i16>, String> {
             }
         }
         for (i, _) in chan[0].iter().enumerate() {
-            for channel in &chan {
+            for channel in chan.iter().take(ch) {
                 out.push(channel[i]);
             }
         }
