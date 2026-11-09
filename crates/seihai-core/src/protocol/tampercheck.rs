@@ -156,7 +156,10 @@ impl TamperImage for RangeImage {
             return None;
         }
         let word = |rs: &[Vec<u8>]| crc_chain(&rs.iter().map(|r| r.as_slice()).collect::<Vec<_>>());
-        Some(TamperWords { a: word(&self.a), b: word(&self.b) })
+        Some(TamperWords {
+            a: word(&self.a),
+            b: word(&self.b),
+        })
     }
 }
 
@@ -248,9 +251,24 @@ mod tests {
     use super::*;
 
     const LAB: [(ClientVersion, u32, u32, &str); 3] = [
-        (ClientVersion::V217, 0xab637cbe, 0x3e48dc0c, "2a7bad195e231243d82c"),
-        (ClientVersion::V222, 0x5dcb77f6, 0xbc736311, "250e4d0f962b03ede631"),
-        (ClientVersion::V231, 0x9ecd4bc0, 0xecea65e2, "291655b7602e87c9eb82"),
+        (
+            ClientVersion::V217,
+            0xab637cbe,
+            0x3e48dc0c,
+            "2a7bad195e231243d82c",
+        ),
+        (
+            ClientVersion::V222,
+            0x5dcb77f6,
+            0xbc736311,
+            "250e4d0f962b03ede631",
+        ),
+        (
+            ClientVersion::V231,
+            0x9ecd4bc0,
+            0xecea65e2,
+            "291655b7602e87c9eb82",
+        ),
     ];
 
     fn hex(b: &[u8]) -> String {
@@ -270,7 +288,10 @@ mod tests {
     /// The middle bytes are not masked, so they can fall below 0x20.
     #[test]
     fn middle_bytes_are_not_masked() {
-        let w = encode_words(TamperWords { a: 0xab637cbe, b: 0x3e48dc0c });
+        let w = encode_words(TamperWords {
+            a: 0xab637cbe,
+            b: 0x3e48dc0c,
+        });
         assert!(w.iter().any(|&b| b < 0x20), "{w:02x?}");
         assert_eq!(encode_word(0), [0x20; 5]);
         assert_eq!(encode_word(0xFFFF_FFFF), [0x2f, 0x1f, 0x1f, 0x1f, 0x9f]);
@@ -278,7 +299,16 @@ mod tests {
 
     #[test]
     fn words_round_trip() {
-        for v in [0u32, 1, 0x7F, 0x80, 0xdead_beef, 0xFFFF_FFFF, 0x8000_0000, 0x1234_5678] {
+        for v in [
+            0u32,
+            1,
+            0x7F,
+            0x80,
+            0xdead_beef,
+            0xFFFF_FFFF,
+            0x8000_0000,
+            0x1234_5678,
+        ] {
             assert_eq!(decode_word(encode_word(v)), v, "{v:#x}");
         }
         for (_, a, b, _) in LAB {
@@ -304,9 +334,21 @@ mod tests {
             a: vec![b"hello".to_vec(), b"world!!".to_vec(), b"graal".to_vec()],
             b: vec![b"abc".to_vec(), b"def".to_vec()],
         };
-        assert_eq!(img.words(), Some(TamperWords { a: 0x5deaf019, b: 0xb4cfe0fd }));
+        assert_eq!(
+            img.words(),
+            Some(TamperWords {
+                a: 0x5deaf019,
+                b: 0xb4cfe0fd
+            })
+        );
         let s = TamperSender::with_image(ClientVersion::V222, &img).unwrap();
-        assert_eq!(s.payload(), &encode_words(TamperWords { a: 0x5deaf019, b: 0xb4cfe0fd }));
+        assert_eq!(
+            s.payload(),
+            &encode_words(TamperWords {
+                a: 0x5deaf019,
+                b: 0xb4cfe0fd
+            })
+        );
         assert!(RangeImage::default().words().is_none());
         assert!(TamperSender::with_image(ClientVersion::V222, &RangeImage::default()).is_none());
     }
@@ -330,13 +372,18 @@ mod tests {
     #[test]
     fn versions_without_a_value_send_nothing() {
         for v in ClientVersion::all_versions() {
-            let has = matches!(v, ClientVersion::V217 | ClientVersion::V222 | ClientVersion::V231);
+            let has = matches!(
+                v,
+                ClientVersion::V217 | ClientVersion::V222 | ClientVersion::V231
+            );
             assert_eq!(TamperSender::for_version(*v).is_some(), has, "{v:?}");
         }
         // 2.3 would send it, but its constant is unknown.
         assert!(ClientVersion::V230.sends_tampercheck());
         assert!(TamperSender::for_version(ClientVersion::V230).is_none());
-        assert!(TamperSender::with_image(ClientVersion::V205, &TamperWords { a: 1, b: 2 }).is_none());
+        assert!(
+            TamperSender::with_image(ClientVersion::V205, &TamperWords { a: 1, b: 2 }).is_none()
+        );
     }
 
     #[test]

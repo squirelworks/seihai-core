@@ -54,7 +54,11 @@ impl OfflineSession {
             return true;
         }
         let lifting = self.lift_ticks.is_some_and(|t| t < LIFT_CARRIED_TICK);
-        let can = !lifting && self.carried.as_ref().is_some_and(|c| HIDE_KINDS.contains(&c.kind));
+        let can = !lifting
+            && self
+                .carried
+                .as_ref()
+                .is_some_and(|c| HIDE_KINDS.contains(&c.kind));
         if !can || self.life.is_dead() || self.in_water {
             return false;
         }
@@ -70,7 +74,11 @@ impl OfflineSession {
             return;
         }
         if self.carried.as_ref().is_some_and(|c| c.kind == 0) {
-            self.spawn_leap(crate::throwing::cut_leap_kind(0), self.player_x + 0.5, self.player_y + 1.0);
+            self.spawn_leap(
+                crate::throwing::cut_leap_kind(0),
+                self.player_x + 0.5,
+                self.player_y + 1.0,
+            );
         }
     }
 
@@ -91,7 +99,13 @@ impl OfflineSession {
 
     /// The sprite number S of the hidden poses, if hiding.
     pub(crate) fn hidden_sprite_s(&self) -> Option<u8> {
-        self.hidden.then(|| if self.walking { HIDDEN_WALK_S[self.hide_steps % 4] } else { crate::combat::CARRY_SPRITE_S })
+        self.hidden.then(|| {
+            if self.walking {
+                HIDDEN_WALK_S[self.hide_steps % 4]
+            } else {
+                crate::combat::CARRY_SPRITE_S
+            }
+        })
     }
 }
 
@@ -106,7 +120,10 @@ mod tests {
         s.tiletypes = Some(crate::assets::TileTypes::from_types([0; 4096]));
         s.player_x = 30.0;
         s.player_y = 30.0;
-        s.carried = Some(Carried { kind, tiles: [[0, 0], [0, 0]] });
+        s.carried = Some(Carried {
+            kind,
+            tiles: [[0, 0], [0, 0]],
+        });
         s
     }
 
@@ -146,7 +163,11 @@ mod tests {
         assert_eq!(s.hide_status(), super::HIDDEN_STATUS);
         assert!(s.try_move(0.5, 0.0).is_some());
         assert_eq!(s.player_x, 30.1);
-        assert_eq!(s.sprite_value(), s.player_dir + 4 * 20, "the second step of the hidden walk");
+        assert_eq!(
+            s.sprite_value(),
+            s.player_dir + 4 * 20,
+            "the second step of the hidden walk"
+        );
         assert_eq!(s.victim().state, crate::combat::Vulnerability::Hidden);
         // D again: out, the leaves fly, full speed again.
         assert!(s.toggle_hide());

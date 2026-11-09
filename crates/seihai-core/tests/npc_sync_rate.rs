@@ -22,8 +22,16 @@ fn messages_per_second(scripts: &[(u32, &str)], secs: u64) -> Vec<usize> {
     let mut sync = ServerNpcSync::default();
     let mut heard = BTreeMap::new();
     for (k, &(id, body)) in scripts.iter().enumerate() {
-        let p = NpcProps { image: Some("a.png".into()), script: Some(body.into()), x: Some(20.0 + 4.0 * k as f32), y: Some(30.0), ..Default::default() };
-        let Linked::Added(i) = s.take_server_npc(id, &p) else { panic!("{id} not added") };
+        let p = NpcProps {
+            image: Some("a.png".into()),
+            script: Some(body.into()),
+            x: Some(20.0 + 4.0 * k as f32),
+            y: Some(30.0),
+            ..Default::default()
+        };
+        let Linked::Added(i) = s.take_server_npc(id, &p) else {
+            panic!("{id} not added")
+        };
         sc.add_npc(&mut s, i);
         heard.insert(id, (i, p));
     }
@@ -35,7 +43,8 @@ fn messages_per_second(scripts: &[(u32, &str)], secs: u64) -> Vec<usize> {
     let mut t = Duration::ZERO;
     while t < Duration::from_secs(secs) {
         sc.tick(&mut s, frame.as_millis() as u64);
-        per_second[t.as_secs() as usize] += sync.tick(s.current_level.as_ref().unwrap(), frame).len();
+        per_second[t.as_secs() as usize] +=
+            sync.tick(s.current_level.as_ref().unwrap(), frame).len();
         t += frame;
     }
     per_second
@@ -70,7 +79,10 @@ fn a_moving_npc_and_a_setcharani_loop_go_out_every_100_ms() {
         let n = messages_per_second(&[(1, script)], 5);
         let most = (Duration::from_secs(1).as_millis() / NPC_SEND_INTERVAL.as_millis()) as usize;
         for (sec, &count) in n.iter().enumerate() {
-            assert!(count <= most && count >= most - 1, "{script}second {sec}: {count} messages ({n:?})");
+            assert!(
+                count <= most && count >= most - 1,
+                "{script}second {sec}: {count} messages ({n:?})"
+            );
         }
     }
 }

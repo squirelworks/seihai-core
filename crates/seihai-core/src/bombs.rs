@@ -84,7 +84,12 @@ const PIECE_DIR: [u8; 9] = [0, 0, 1, 1, 2, 2, 2, 3, 3];
 
 /// The four arms of a cross: the step in tiles, then the middle and the
 /// end piece kinds.
-const ARMS: [((f32, f32), usize, usize); 4] = [((0.0, -2.0), 1, 0), ((-2.0, 0.0), 3, 2), ((0.0, 2.0), 5, 6), ((2.0, 0.0), 7, 8)];
+const ARMS: [((f32, f32), usize, usize); 4] = [
+    ((0.0, -2.0), 1, 0),
+    ((-2.0, 0.0), 3, 2),
+    ((0.0, 2.0), 5, 6),
+    ((2.0, 0.0), 7, 8),
+];
 
 /// The built-in weapon scripts for the bomb ids of `PLO_DEFAULTWEAPON`: 8
 /// Bomb (power 1), 12 Superbomb (2), 23 Joltbomb (3).
@@ -122,7 +127,14 @@ pub struct Bomb {
 impl Bomb {
     pub fn new(x: f32, y: f32, power: u8, fuse: i32) -> Bomb {
         let sprite = pair(power).map_or(DEFAULT_SPRITE, |p| p[0]);
-        Bomb { x, y, power, fuse, sprite, owner: None }
+        Bomb {
+            x,
+            y,
+            power,
+            fuse,
+            sprite,
+            owner: None,
+        }
     }
 
     /// One tick of the fuse. Returns true when the bomb goes off.
@@ -202,7 +214,13 @@ pub fn parse_bomb_add(b: &[u8]) -> Option<BombAdd> {
         return None;
     }
     let v = |i: usize| b[i].wrapping_sub(0x20);
-    Some(BombAdd { x: f32::from(v(0)) / 2.0, y: f32::from(v(1)) / 2.0, power: v(2) & 7, fuse: i32::from(v(3)), owned: v(2) & 8 != 0 })
+    Some(BombAdd {
+        x: f32::from(v(0)) / 2.0,
+        y: f32::from(v(1)) / 2.0,
+        power: v(2) & 7,
+        fuse: i32::from(v(3)),
+        owned: v(2) & 8 != 0,
+    })
 }
 
 /// `PLO_BOMBDEL` (12), no player id: `x*2`, `y*2`.
@@ -210,7 +228,10 @@ pub fn parse_bomb_del(b: &[u8]) -> Option<(f32, f32)> {
     if b.len() < 2 {
         return None;
     }
-    Some((f32::from(b[0].wrapping_sub(0x20)) / 2.0, f32::from(b[1].wrapping_sub(0x20)) / 2.0))
+    Some((
+        f32::from(b[0].wrapping_sub(0x20)) / 2.0,
+        f32::from(b[1].wrapping_sub(0x20)) / 2.0,
+    ))
 }
 
 /// `PLO_EXPLOSION` (36) after the sender's id.
@@ -233,7 +254,13 @@ pub fn parse_explosion(b: &[u8]) -> Option<Explosion> {
     }
     let v = |i: usize| b[i].wrapping_sub(0x20);
     let power = (v(3) & 7).clamp(1, 3);
-    Some(Explosion { radius: i32::from(v(0)), x: f32::from(v(1)) / 2.0, y: f32::from(v(2)) / 2.0, power, owned: v(3) & 8 != 0 })
+    Some(Explosion {
+        radius: i32::from(v(0)),
+        x: f32::from(v(1)) / 2.0,
+        y: f32::from(v(2)) / 2.0,
+        power,
+        owned: v(3) & 8 != 0,
+    })
 }
 
 /// Which bomb sheet a bomb or piece of `power` is drawn from.
@@ -274,7 +301,9 @@ pub fn sheet_of_sprite(id: u16) -> Option<BombSheet> {
 }
 
 fn pair(power: u8) -> Option<[u16; 2]> {
-    BOMB_SPRITES.get(usize::from(power).checked_sub(1)?).copied()
+    BOMB_SPRITES
+        .get(usize::from(power).checked_sub(1)?)
+        .copied()
 }
 
 /// A cross of `radius` arm pieces around `(x, y)`.
@@ -285,7 +314,12 @@ fn cross(out: &mut Vec<Piece>, x: f32, y: f32, radius: i32, power: u8) {
         for i in 1..radius {
             out.push(Piece::new(mid, x + sx * i as f32, y + sy * i as f32, power));
         }
-        out.push(Piece::new(end, x + sx * radius as f32, y + sy * radius as f32, power));
+        out.push(Piece::new(
+            end,
+            x + sx * radius as f32,
+            y + sy * radius as f32,
+            power,
+        ));
     }
 }
 
@@ -304,7 +338,15 @@ pub struct Piece {
 
 impl Piece {
     pub fn new(kind: usize, x: f32, y: f32, power: u8) -> Piece {
-        Piece { kind, x, y, power, life: PIECE_TICKS, sprite: PIECE_SPRITES[kind][0], owner: None }
+        Piece {
+            kind,
+            x,
+            y,
+            power,
+            life: PIECE_TICKS,
+            sprite: PIECE_SPRITES[kind][0],
+            owner: None,
+        }
     }
 
     /// Whether the player at `(px, py)` stands in this piece.
@@ -342,7 +384,14 @@ impl Piece {
 pub fn bomb_add_message(x: f32, y: f32, power: u8, from_weapon: bool, fuse: i32) -> Vec<u8> {
     let flag = if from_weapon { 8 } else { 0 };
     let g = |v: i32| (v.clamp(0, 223) as u8) + 0x20;
-    vec![4 + 0x20, g((x * 2.0).round() as i32), g((y * 2.0).round() as i32), g(i32::from(power) + flag), g(fuse), b'\n']
+    vec![
+        4 + 0x20,
+        g((x * 2.0).round() as i32),
+        g((y * 2.0).round() as i32),
+        g(i32::from(power) + flag),
+        g(fuse),
+        b'\n',
+    ]
 }
 
 #[cfg(test)]
@@ -351,8 +400,14 @@ mod tests {
 
     #[test]
     fn bombs_and_pieces_pick_their_sheet() {
-        assert_eq!([1, 2, 3].map(sheet_of_bomb), [BombSheet::One, BombSheet::One, BombSheet::Two]);
-        assert_eq!([1, 2, 3].map(sheet_of_piece), [BombSheet::One, BombSheet::One, BombSheet::Two]);
+        assert_eq!(
+            [1, 2, 3].map(sheet_of_bomb),
+            [BombSheet::One, BombSheet::One, BombSheet::Two]
+        );
+        assert_eq!(
+            [1, 2, 3].map(sheet_of_piece),
+            [BombSheet::One, BombSheet::One, BombSheet::Two]
+        );
         assert_eq!(sheet_of_sprite(65), Some(BombSheet::One));
         assert_eq!(sheet_of_sprite(321), Some(BombSheet::One));
         assert_eq!(sheet_of_sprite(348), Some(BombSheet::Two));
@@ -362,7 +417,10 @@ mod tests {
     #[test]
     fn the_message_matches_the_real_205_bomb() {
         // lab run 4: a 2.05 Bomb at 39,14 sent `6e 3c 29 57`
-        assert_eq!(bomb_add_message(39.0, 14.0, 1, true, FUSE_TICKS - SEND_LEAD), vec![0x24, 0x6e, 0x3c, 0x29, 0x57, b'\n']);
+        assert_eq!(
+            bomb_add_message(39.0, 14.0, 1, true, FUSE_TICKS - SEND_LEAD),
+            vec![0x24, 0x6e, 0x3c, 0x29, 0x57, b'\n']
+        );
     }
 
     #[test]
@@ -404,7 +462,10 @@ mod tests {
         while p.tick() {
             frames.push(p.sprite);
         }
-        assert_eq!(frames, vec![286, 286, 287, 287, 287, 288, 288, 288, 289, 289, 289]);
+        assert_eq!(
+            frames,
+            vec![286, 286, 287, 287, 287, 288, 288, 288, 289, 289, 289]
+        );
         assert!(p.hits_player(9.5, 9.0));
         assert!(!p.hits_player(8.5, 9.0));
         assert_eq!(p.knock_dir(), 2);
@@ -421,7 +482,16 @@ mod tests {
     fn a_received_bomb_reads_power_owner_and_fuse() {
         // the lab bomb as the server relays it: `6e 3c 29 57` after the id
         let b = parse_bomb_add(&[0x6e, 0x3c, 0x29, 0x57]).unwrap();
-        assert_eq!(b, BombAdd { x: 39.0, y: 14.0, power: 1, fuse: 55, owned: true });
+        assert_eq!(
+            b,
+            BombAdd {
+                x: 39.0,
+                y: 14.0,
+                power: 1,
+                fuse: 55,
+                owned: true
+            }
+        );
         assert!(!parse_bomb_add(&[0x6e, 0x3c, 0x21, 0x57]).unwrap().owned);
         assert_eq!(parse_bomb_add(&[0x6e, 0x3c, 0x29]), None);
         assert_eq!(parse_bomb_del(&[0x6e, 0x3c]), Some((39.0, 14.0)));
@@ -430,8 +500,14 @@ mod tests {
     #[test]
     fn an_explosions_power_is_1_to_3_and_bit_8_is_the_owner() {
         let e = |p: u8| parse_explosion(&[0x22, 0x40, 0x40, 0x20 + p]).unwrap();
-        assert_eq!((e(0).power, e(1).power, e(3).power, e(5).power, e(7).power), (1, 1, 3, 3, 3));
-        assert_eq!((e(2).radius, e(2).x, e(2).y, e(2).owned), (2, 16.0, 16.0, false));
+        assert_eq!(
+            (e(0).power, e(1).power, e(3).power, e(5).power, e(7).power),
+            (1, 1, 3, 3, 3)
+        );
+        assert_eq!(
+            (e(2).radius, e(2).x, e(2).y, e(2).owned),
+            (2, 16.0, 16.0, false)
+        );
         assert!(e(8 + 2).owned);
         assert_eq!(e(8 + 2).power, 2);
         assert_eq!(parse_explosion(&[0x22, 0x40, 0x40]), None);
@@ -450,7 +526,10 @@ mod tests {
         let mut b = Bomb::new(10.0, 10.0, 2, 0);
         b.owner = Some(3);
         assert!(b.pieces().iter().all(|p| p.owner == Some(3)));
-        assert!(Bomb::new(10.0, 10.0, 1, 0).pieces().iter().all(|p| p.owner.is_none()));
+        assert!(Bomb::new(10.0, 10.0, 1, 0)
+            .pieces()
+            .iter()
+            .all(|p| p.owner.is_none()));
     }
 
     #[test]

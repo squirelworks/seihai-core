@@ -80,12 +80,22 @@ pub struct WalkState {
 impl WalkState {
     /// The classic form: X and Y in half tiles.
     pub fn new(x: f32, y: f32, sprite: u8, gani: Option<&'static str>) -> Self {
-        Self { x: u16::from(encode_pos_classic(x)), y: u16::from(encode_pos_classic(y)), sprite, gani }
+        Self {
+            x: u16::from(encode_pos_classic(x)),
+            y: u16::from(encode_pos_classic(y)),
+            sprite,
+            gani,
+        }
     }
 
     /// The precise form: `X2`/`Y2`.
     pub fn new_precise(x: f32, y: f32, sprite: u8, gani: Option<&'static str>) -> Self {
-        Self { x: encode_pos_precise(x), y: encode_pos_precise(y), sprite, gani }
+        Self {
+            x: encode_pos_precise(x),
+            y: encode_pos_precise(y),
+            sprite,
+            gani,
+        }
     }
 }
 
@@ -116,10 +126,27 @@ impl WalkCadence {
             ClientVersion::V217 => (IDLE_AFTER_TICKS_217, INTERVAL_TICKS, false),
             ClientVersion::V222 => (IDLE_AFTER_TICKS, INTERVAL_TICKS, false),
             ClientVersion::V304 => (IDLE_AFTER_TICKS_304, INTERVAL_TICKS, false),
-            _ if v.profile().protocol.lobby.is_some_and(|l| l.after_login.is_some()) => (IDLE_AFTER_TICKS_4X, 1, true),
+            _ if v
+                .profile()
+                .protocol
+                .lobby
+                .is_some_and(|l| l.after_login.is_some()) =>
+            {
+                (IDLE_AFTER_TICKS_4X, 1, true)
+            }
             _ => return None,
         };
-        Some(Self { sent: None, tick: 0, sent_tick: None, pos: (0, 0), moved_tick: 0, idle_after, interval, precise, cell: (None, None) })
+        Some(Self {
+            sent: None,
+            tick: 0,
+            sent_tick: None,
+            pos: (0, 0),
+            moved_tick: 0,
+            idle_after,
+            interval,
+            precise,
+            cell: (None, None),
+        })
     }
 
     /// The walk state for this sender's position form.
@@ -172,13 +199,25 @@ impl WalkCadence {
             return None;
         };
         // A stop keeps `walk` for a tick or two after the last step.
-        let settling = last.gani == Some("walk") && n.wrapping_sub(self.moved_tick) < self.idle_after;
-        let gani = cur.gani.filter(|g| last.gani != Some(*g) && !(settling && *g == "idle"));
+        let settling =
+            last.gani == Some("walk") && n.wrapping_sub(self.moved_tick) < self.idle_after;
+        let gani = cur
+            .gani
+            .filter(|g| last.gani != Some(*g) && !(settling && *g == "idle"));
         let (cell_x, cell_y) = self.cell;
-        if gani.is_none() && cur.x == last.x && cur.y == last.y && cur.sprite == last.sprite && cell_x.is_none() && cell_y.is_none() {
+        if gani.is_none()
+            && cur.x == last.x
+            && cur.y == last.y
+            && cur.sprite == last.sprite
+            && cell_x.is_none()
+            && cell_y.is_none()
+        {
             return None;
         }
-        if self.sent_tick.is_some_and(|t| n.wrapping_sub(t) < self.interval) {
+        if self
+            .sent_tick
+            .is_some_and(|t| n.wrapping_sub(t) < self.interval)
+        {
             return None;
         }
         let mut m = vec![2 + 0x20];
@@ -221,7 +260,10 @@ impl WalkCadence {
         }
         self.cell = (None, None);
         m.push(b'\n');
-        self.sent = Some(WalkState { gani: gani.or(last.gani), ..cur });
+        self.sent = Some(WalkState {
+            gani: gani.or(last.gani),
+            ..cur
+        });
         self.sent_tick = Some(n);
         Some(m)
     }
@@ -253,14 +295,26 @@ mod tests {
         run_as(ClientVersion::V222, start, ticks, sprite)
     }
 
-    fn run_as(v: ClientVersion, start: f32, ticks: &[(f32, &'static str)], sprite: u8) -> Vec<(usize, String)> {
+    fn run_as(
+        v: ClientVersion,
+        start: f32,
+        ticks: &[(f32, &'static str)],
+        sprite: u8,
+    ) -> Vec<(usize, String)> {
         let mut c = WalkCadence::for_version(v).unwrap();
         assert_eq!(c.tick(WalkState::new(start, 30.0, 2, Some("idle"))), None);
         // Long idle first, as in both captures.
         for _ in 0..10 {
             assert_eq!(c.tick(WalkState::new(start, 30.0, 2, Some("idle"))), None);
         }
-        ticks.iter().enumerate().filter_map(|(i, &(x, g))| c.tick(WalkState::new(x, 30.0, sprite, Some(g))).map(|m| (i, props(&m)))).collect()
+        ticks
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &(x, g))| {
+                c.tick(WalkState::new(x, 30.0, sprite, Some(g)))
+                    .map(|m| (i, props(&m)))
+            })
+            .collect()
     }
 
     /// Lab 2026-10-30, real 2.22, right from 30 for eleven steps: walk +
@@ -291,7 +345,9 @@ mod tests {
         let mut c = WalkCadence::for_version(ClientVersion::V222).unwrap();
         c.tick(WalkState::new(30.0, 30.0, 3, Some("idle")));
         assert!(!c.walk_sent());
-        assert!(c.tick(WalkState::new(30.5, 30.0, 3, Some("walk"))).is_some());
+        assert!(c
+            .tick(WalkState::new(30.5, 30.0, 3, Some("walk")))
+            .is_some());
         assert!(c.walk_sent());
         for _ in 0..4 {
             c.tick(WalkState::new(30.5, 30.0, 3, Some("idle")));
@@ -304,7 +360,12 @@ mod tests {
     #[test]
     fn the_gta_walk_stops_between_two_sends() {
         let mut t: Vec<(f32, &str)> = (0..8).map(|i| (42.0 + 0.5 * i as f32, "walk")).collect();
-        t.extend([(45.5, "idle"), (45.5, "idle"), (45.5, "idle"), (45.5, "idle")]);
+        t.extend([
+            (45.5, "idle"),
+            (45.5, "idle"),
+            (45.5, "idle"),
+            (45.5, "idle"),
+        ]);
         assert_eq!(
             run(41.5, &t, 3),
             vec![
@@ -353,13 +414,21 @@ mod tests {
         t.extend([(33.0, "idle"), (33.0, "idle"), (33.0, "idle")]);
         assert_eq!(
             run_as(ClientVersion::V217, 30.5, &t, 3),
-            vec![(0, format!("*$walk/{}1#", hx(31.0))), (2, format!("/{}", hx(32.0))), (4, format!("/{}", hx(33.0))), (6, "*$idle".to_string())]
+            vec![
+                (0, format!("*$walk/{}1#", hx(31.0))),
+                (2, format!("/{}", hx(32.0))),
+                (4, format!("/{}", hx(33.0))),
+                (6, "*$idle".to_string())
+            ]
         );
     }
 
     #[test]
     fn a_sword_swing_sends_its_gani_without_a_sprite() {
-        assert_eq!(run(30.0, &[(30.0, "sword"), (30.0, "sword")], 2), vec![(0, "*%sword".to_string())]);
+        assert_eq!(
+            run(30.0, &[(30.0, "sword"), (30.0, "sword")], 2),
+            vec![(0, "*%sword".to_string())]
+        );
         assert!(WalkCadence::for_version(ClientVersion::V231).is_none());
     }
 
@@ -367,10 +436,17 @@ mod tests {
     /// `start`; a crossing is given to the sender before that step's tick,
     /// as the main loop does. The result is (step, props bytes) of each
     /// message.
-    fn walk_222(start: (f32, f32), sprite: u8, steps: &[(f32, f32, Option<crate::gmap::Crossing>)]) -> Vec<(usize, Vec<u8>)> {
+    fn walk_222(
+        start: (f32, f32),
+        sprite: u8,
+        steps: &[(f32, f32, Option<crate::gmap::Crossing>)],
+    ) -> Vec<(usize, Vec<u8>)> {
         let mut c = WalkCadence::for_version(ClientVersion::V222).unwrap();
         for _ in 0..11 {
-            assert_eq!(c.tick(WalkState::new(start.0, start.1, 2, Some("idle"))), None);
+            assert_eq!(
+                c.tick(WalkState::new(start.0, start.1, 2, Some("idle"))),
+                None
+            );
         }
         steps
             .iter()
@@ -379,13 +455,19 @@ mod tests {
                 if let Some(k) = cross {
                     c.cross(&k);
                 }
-                c.tick(WalkState::new(x, y, sprite, Some("walk"))).map(|m| (i, m[1..m.len() - 1].to_vec()))
+                c.tick(WalkState::new(x, y, sprite, Some("walk")))
+                    .map(|m| (i, m[1..m.len() - 1].to_vec()))
             })
             .collect()
     }
 
     fn crossing(from: (i32, i32), to: (i32, i32), x: f32, y: f32) -> Option<crate::gmap::Crossing> {
-        Some(crate::gmap::Crossing { from, to, local_x: x, local_y: y })
+        Some(crate::gmap::Crossing {
+            from,
+            to,
+            local_x: x,
+            local_y: y,
+        })
     }
 
     /// Props bytes from (id, value) pairs; GANI 10 takes `walk`.
@@ -407,8 +489,25 @@ mod tests {
     #[test]
     fn a_crossing_on_a_send_slot_carries_the_cell_prop_at_once() {
         let east = crossing((0, 0), (1, 0), 0.0, 30.0);
-        let got = walk_222((62.5, 30.0), 3, &[(63.0, 30.0, None), (63.5, 30.0, None), (0.0, 30.0, east), (0.5, 30.0, None), (1.0, 30.0, None)]);
-        assert_eq!(got, vec![(0, p(&[(10, 0.0), (15, 63.0), (17, 3.0)])), (2, p(&[(15, 0.0), (43, 1.0)])), (4, p(&[(15, 1.0)]))]);
+        let got = walk_222(
+            (62.5, 30.0),
+            3,
+            &[
+                (63.0, 30.0, None),
+                (63.5, 30.0, None),
+                (0.0, 30.0, east),
+                (0.5, 30.0, None),
+                (1.0, 30.0, None),
+            ],
+        );
+        assert_eq!(
+            got,
+            vec![
+                (0, p(&[(10, 0.0), (15, 63.0), (17, 3.0)])),
+                (2, p(&[(15, 0.0), (43, 1.0)])),
+                (4, p(&[(15, 1.0)]))
+            ]
+        );
     }
 
     /// The `gmap_cross` difftest, real 2.22 east (`documentation/gmap-order.md`):
@@ -417,8 +516,25 @@ mod tests {
     #[test]
     fn a_crossing_between_slots_waits_for_the_next_one() {
         let east = crossing((0, 0), (1, 0), 0.0, 30.0);
-        let got = walk_222((62.0, 30.0), 3, &[(62.5, 30.0, None), (63.0, 30.0, None), (63.5, 30.0, None), (0.0, 30.0, east), (0.5, 30.0, None)]);
-        assert_eq!(got, vec![(0, p(&[(10, 0.0), (15, 62.5), (17, 3.0)])), (2, p(&[(15, 63.5)])), (4, p(&[(15, 0.5), (43, 1.0)]))]);
+        let got = walk_222(
+            (62.0, 30.0),
+            3,
+            &[
+                (62.5, 30.0, None),
+                (63.0, 30.0, None),
+                (63.5, 30.0, None),
+                (0.0, 30.0, east),
+                (0.5, 30.0, None),
+            ],
+        );
+        assert_eq!(
+            got,
+            vec![
+                (0, p(&[(10, 0.0), (15, 62.5), (17, 3.0)])),
+                (2, p(&[(15, 63.5)])),
+                (4, p(&[(15, 0.5), (43, 1.0)]))
+            ]
+        );
     }
 
     /// Lab 2026-10-24, real 2.22 south: `Y=0.5, GMAPLEVELY=1` in the frame
@@ -426,8 +542,25 @@ mod tests {
     #[test]
     fn south_sends_y_and_the_cell_y_prop() {
         let south = crossing((0, 0), (0, 1), 30.0, 0.0);
-        let got = walk_222((30.0, 62.0), 2, &[(30.0, 62.5, None), (30.0, 63.0, None), (30.0, 63.5, None), (30.0, 0.0, south), (30.0, 0.5, None)]);
-        assert_eq!(got, vec![(0, p(&[(10, 0.0), (16, 62.5)])), (2, p(&[(16, 63.5)])), (4, p(&[(16, 0.5), (44, 1.0)]))]);
+        let got = walk_222(
+            (30.0, 62.0),
+            2,
+            &[
+                (30.0, 62.5, None),
+                (30.0, 63.0, None),
+                (30.0, 63.5, None),
+                (30.0, 0.0, south),
+                (30.0, 0.5, None),
+            ],
+        );
+        assert_eq!(
+            got,
+            vec![
+                (0, p(&[(10, 0.0), (16, 62.5)])),
+                (2, p(&[(16, 63.5)])),
+                (4, p(&[(16, 0.5), (44, 1.0)]))
+            ]
+        );
     }
 
     /// Lab 2026-10-24, real 2.22 west: the crossing at 63.5, then `X=63,
@@ -435,8 +568,25 @@ mod tests {
     #[test]
     fn west_sends_the_cell_back_to_zero() {
         let west = crossing((1, 0), (0, 0), 63.5, 30.0);
-        let got = walk_222((1.5, 30.0), 1, &[(1.0, 30.0, None), (0.5, 30.0, None), (0.0, 30.0, None), (63.5, 30.0, west), (63.0, 30.0, None)]);
-        assert_eq!(got, vec![(0, p(&[(10, 0.0), (15, 1.0), (17, 1.0)])), (2, p(&[(15, 0.0)])), (4, p(&[(15, 63.0), (43, 0.0)]))]);
+        let got = walk_222(
+            (1.5, 30.0),
+            1,
+            &[
+                (1.0, 30.0, None),
+                (0.5, 30.0, None),
+                (0.0, 30.0, None),
+                (63.5, 30.0, west),
+                (63.0, 30.0, None),
+            ],
+        );
+        assert_eq!(
+            got,
+            vec![
+                (0, p(&[(10, 0.0), (15, 1.0), (17, 1.0)])),
+                (2, p(&[(15, 0.0)])),
+                (4, p(&[(15, 63.0), (43, 0.0)]))
+            ]
+        );
     }
 
     /// The cell prop goes out once, and with its coordinate even when that
@@ -498,11 +648,23 @@ mod tests {
     /// messages; 5.x and 6.x keep their plain walk.
     #[test]
     fn precise_cadence_builds() {
-        for v in [ClientVersion::V404R2, ClientVersion::V420R6, ClientVersion::V420R8] {
-            assert!(WalkCadence::for_version(v).is_some_and(|c| c.precise && c.interval == 1), "{}", v.label());
+        for v in [
+            ClientVersion::V404R2,
+            ClientVersion::V420R6,
+            ClientVersion::V420R8,
+        ] {
+            assert!(
+                WalkCadence::for_version(v).is_some_and(|c| c.precise && c.interval == 1),
+                "{}",
+                v.label()
+            );
         }
         assert!(WalkCadence::for_version(ClientVersion::V500R7).is_none());
         assert!(WalkCadence::for_version(ClientVersion::V231).is_none());
-        assert!(!WalkCadence::for_version(ClientVersion::V222).unwrap().precise);
+        assert!(
+            !WalkCadence::for_version(ClientVersion::V222)
+                .unwrap()
+                .precise
+        );
     }
 }

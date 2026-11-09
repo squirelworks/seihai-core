@@ -27,12 +27,17 @@ pub fn read_gif_rgba(data: &[u8]) -> io::Result<(u32, u32, Vec<u8>)> {
 /// replaced first: `(index, rgb)`, as for a palette PNG (see
 /// `read_png_rgba_recolored`). The transparent index stays clear. An index
 /// past the table is left alone.
-pub fn read_gif_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<(u32, u32, Vec<u8>)> {
+pub fn read_gif_rgba_recolored(
+    data: &[u8],
+    recolor: &[(usize, [u8; 3])],
+) -> io::Result<(u32, u32, Vec<u8>)> {
     if !is_gif(data) || data.len() < 13 {
         return Err(bad("not a GIF"));
     }
     let u16_at = |i: usize| -> io::Result<usize> {
-        data.get(i..i + 2).map(|b| usize::from(u16::from_le_bytes([b[0], b[1]]))).ok_or_else(|| bad("truncated GIF"))
+        data.get(i..i + 2)
+            .map(|b| usize::from(u16::from_le_bytes([b[0], b[1]])))
+            .ok_or_else(|| bad("truncated GIF"))
     };
     let (sw, sh) = (u16_at(6)?, u16_at(8)?);
     let flags = data[10];
@@ -40,7 +45,9 @@ pub fn read_gif_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io:
     let mut global: &[u8] = &[];
     if flags & 0x80 != 0 {
         let n = 3 << ((flags & 7) + 1);
-        global = data.get(pos..pos + n).ok_or_else(|| bad("truncated colour table"))?;
+        global = data
+            .get(pos..pos + n)
+            .ok_or_else(|| bad("truncated colour table"))?;
         pos += n;
     }
     let mut transparent: Option<u8> = None;
@@ -48,7 +55,9 @@ pub fn read_gif_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io:
         match *data.get(pos).ok_or_else(|| bad("no image in GIF"))? {
             // Extension: a graphic control block may name the transparent colour.
             0x21 => {
-                let label = *data.get(pos + 1).ok_or_else(|| bad("truncated extension"))?;
+                let label = *data
+                    .get(pos + 1)
+                    .ok_or_else(|| bad("truncated extension"))?;
                 pos += 2;
                 let mut first = true;
                 loop {
@@ -57,7 +66,9 @@ pub fn read_gif_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io:
                         pos += 1;
                         break;
                     }
-                    let block = data.get(pos + 1..pos + 1 + n).ok_or_else(|| bad("truncated extension"))?;
+                    let block = data
+                        .get(pos + 1..pos + 1 + n)
+                        .ok_or_else(|| bad("truncated extension"))?;
                     if first && label == 0xF9 && n >= 4 && block[0] & 1 != 0 {
                         transparent = Some(block[3]);
                     }
@@ -66,13 +77,20 @@ pub fn read_gif_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io:
                 }
             }
             0x2C => {
-                let (ix, iy, iw, ih) = (u16_at(pos + 1)?, u16_at(pos + 3)?, u16_at(pos + 5)?, u16_at(pos + 7)?);
+                let (ix, iy, iw, ih) = (
+                    u16_at(pos + 1)?,
+                    u16_at(pos + 3)?,
+                    u16_at(pos + 5)?,
+                    u16_at(pos + 7)?,
+                );
                 let iflags = *data.get(pos + 9).ok_or_else(|| bad("truncated image"))?;
                 pos += 10;
                 let mut table = global;
                 if iflags & 0x80 != 0 {
                     let n = 3 << ((iflags & 7) + 1);
-                    table = data.get(pos..pos + n).ok_or_else(|| bad("truncated colour table"))?;
+                    table = data
+                        .get(pos..pos + n)
+                        .ok_or_else(|| bad("truncated colour table"))?;
                     pos += n;
                 }
                 let mut table = table.to_vec();
@@ -90,22 +108,33 @@ pub fn read_gif_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io:
                     if n == 0 {
                         break;
                     }
-                    lzw.extend_from_slice(data.get(pos..pos + n).ok_or_else(|| bad("truncated image data"))?);
+                    lzw.extend_from_slice(
+                        data.get(pos..pos + n)
+                            .ok_or_else(|| bad("truncated image data"))?,
+                    );
                     pos += n;
                 }
                 let (w, h) = (sw.max(ix + iw), sh.max(iy + ih));
                 super::png::check_image_size(w as u64, h as u64)?;
                 let indices = lzw_decode(&lzw, min_code, iw * ih)?;
                 let mut rgba = vec![0u8; w * h * 4];
-                let rows: Vec<usize> = if iflags & 0x40 != 0 { interlaced_rows(ih) } else { (0..ih).collect() };
+                let rows: Vec<usize> = if iflags & 0x40 != 0 {
+                    interlaced_rows(ih)
+                } else {
+                    (0..ih).collect()
+                };
                 for (src_row, &y) in rows.iter().enumerate() {
                     for x in 0..iw {
-                        let Some(&ci) = indices.get(src_row * iw + x) else { continue };
+                        let Some(&ci) = indices.get(src_row * iw + x) else {
+                            continue;
+                        };
                         if transparent == Some(ci) {
                             continue;
                         }
                         let c = usize::from(ci) * 3;
-                        let Some(rgb) = table.get(c..c + 3) else { continue };
+                        let Some(rgb) = table.get(c..c + 3) else {
+                            continue;
+                        };
                         let o = ((iy + y) * w + ix + x) * 4;
                         rgba[o..o + 4].copy_from_slice(&[rgb[0], rgb[1], rgb[2], 255]);
                     }
@@ -120,7 +149,10 @@ pub fn read_gif_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io:
 
 /// The image rows in the order an interlaced GIF stores them.
 fn interlaced_rows(h: usize) -> Vec<usize> {
-    [(0, 8), (4, 8), (2, 4), (1, 2)].iter().flat_map(|&(start, step)| (start..h).step_by(step)).collect()
+    [(0, 8), (4, 8), (2, 4), (1, 2)]
+        .iter()
+        .flat_map(|&(start, step)| (start..h).step_by(step))
+        .collect()
 }
 
 /// GIF's variable-width LZW, least significant bit first. Stops at the end
@@ -150,7 +182,9 @@ fn lzw_decode(data: &[u8], min_code: u8, want: usize) -> io::Result<Vec<u8>> {
     let mut buf = Vec::new();
     while out.len() < want {
         while nbits < size {
-            let Some(&b) = data.get(i) else { return Ok(out) };
+            let Some(&b) = data.get(i) else {
+                return Ok(out);
+            };
             bits |= u32::from(b) << nbits;
             nbits += 8;
             i += 1;
@@ -181,7 +215,11 @@ fn lzw_decode(data: &[u8], min_code: u8, want: usize) -> io::Result<Vec<u8>> {
         }
         if let Some(p) = prev {
             if next < 4096 {
-                let first = if known { suffix[first_of(code, &prefix)] } else { suffix[first_of(p, &prefix)] };
+                let first = if known {
+                    suffix[first_of(code, &prefix)]
+                } else {
+                    suffix[first_of(p, &prefix)]
+                };
                 prefix.push(p as u16);
                 suffix.push(first);
             }
@@ -219,7 +257,16 @@ mod tests {
         g.extend([0x21, 0xF9, 4, 1, 0, 0, 3, 0]);
         g.extend([0x2C, 0, 0, 0, 0, 3, 0, 2, 0, 0]);
         // LZW, min code 2: clear(4) 1 2 3 3 1 2 end(5), 3-bit codes then 4.
-        let codes: [(u32, u32); 8] = [(4, 3), (1, 3), (2, 3), (3, 3), (3, 4), (1, 4), (2, 4), (5, 4)];
+        let codes: [(u32, u32); 8] = [
+            (4, 3),
+            (1, 3),
+            (2, 3),
+            (3, 3),
+            (3, 4),
+            (1, 4),
+            (2, 4),
+            (5, 4),
+        ];
         let (mut acc, mut n, mut bytes) = (0u32, 0u32, Vec::new());
         for (c, s) in codes {
             acc |= c << n;
@@ -256,7 +303,11 @@ mod tests {
     #[test]
     fn recolour_replaces_colour_table_entries() {
         // Red (1) becomes yellow; the transparent blue (3) stays clear.
-        let (_, _, px) = read_gif_rgba_recolored(&sample(), &[(1, [255, 255, 0]), (3, [9, 9, 9]), (200, [1, 1, 1])]).unwrap();
+        let (_, _, px) = read_gif_rgba_recolored(
+            &sample(),
+            &[(1, [255, 255, 0]), (3, [9, 9, 9]), (200, [1, 1, 1])],
+        )
+        .unwrap();
         assert_eq!(&px[0..4], [255, 255, 0, 255]);
         assert_eq!(&px[4..8], [0, 255, 0, 255]);
         assert_eq!(px[11], 0);

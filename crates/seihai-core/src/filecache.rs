@@ -138,7 +138,10 @@ impl FileRequester {
                 }
                 self.update_asked.push((name.trim().to_string(), mod_time));
                 if self.update_asked.len() <= WINDOW {
-                    vec![FileRequest::Update { mod_time, name: name.trim().to_string() }]
+                    vec![FileRequest::Update {
+                        mod_time,
+                        name: name.trim().to_string(),
+                    }]
                 } else {
                     Vec::new()
                 }
@@ -161,7 +164,10 @@ impl FileRequester {
             self.update_asked.remove(i);
             if i < WINDOW && self.update_asked.len() >= WINDOW {
                 let (n, t) = self.update_asked[WINDOW - 1].clone();
-                next.push(FileRequest::Update { mod_time: t, name: n });
+                next.push(FileRequest::Update {
+                    mod_time: t,
+                    name: n,
+                });
             }
         }
         self.settled.insert(k);
@@ -200,7 +206,12 @@ impl FileRequester {
 }
 
 fn is_level_name(p: &Path) -> bool {
-    p.extension().and_then(|e| e.to_str()).is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "nw" | "graal" | "zelda" | "gmap"))
+    p.extension().and_then(|e| e.to_str()).is_some_and(|e| {
+        matches!(
+            e.to_ascii_lowercase().as_str(),
+            "nw" | "graal" | "zelda" | "gmap"
+        )
+    })
 }
 
 /// How a build's save routine lays out downloads, read in the client
@@ -263,10 +274,18 @@ impl SaveLayout {
 pub fn download_dir(profile: &VersionProfile, name: &str) -> Vec<&'static str> {
     let lname = name.trim().to_ascii_lowercase();
     let base = lname.rsplit('/').next().unwrap_or(&lname);
-    let ext = base.rfind('.').filter(|&i| i > 0).map(|i| &base[i..]).unwrap_or("");
+    let ext = base
+        .rfind('.')
+        .filter(|&i| i > 0)
+        .map(|i| &base[i..])
+        .unwrap_or("");
     let layout = SaveLayout::of(profile.version);
     if layout == SaveLayout::Flat {
-        return if matches!(ext, ".nw" | ".graal" | ".zelda") { vec!["levels"] } else { vec!["levels", "webgifs"] };
+        return if matches!(ext, ".nw" | ".graal" | ".zelda") {
+            vec!["levels"]
+        } else {
+            vec!["levels", "webgifs"]
+        };
     }
     if ext == ".wav" {
         return vec!["sounds"];
@@ -293,7 +312,10 @@ pub fn download_dir(profile: &VersionProfile, name: &str) -> Vec<&'static str> {
         "ganis"
     } else if base.starts_with("emoticon") {
         "emoticons"
-    } else if layout == SaveLayout::Full && base.starts_with("hat") && base.as_bytes().get(3).is_some_and(u8::is_ascii_digit) {
+    } else if layout == SaveLayout::Full
+        && base.starts_with("hat")
+        && base.as_bytes().get(3).is_some_and(u8::is_ascii_digit)
+    {
         "hats"
     } else if base.contains("head") {
         "heads"
@@ -315,15 +337,19 @@ pub fn download_dir(profile: &VersionProfile, name: &str) -> Vec<&'static str> {
 /// and this value ([`crate::net::verify_want_message`]).
 pub fn cached_crc32(roots: &[&Path], profile: &VersionProfile, name: &str) -> Option<u32> {
     let rel = clean_name(name)?;
-    roots.iter().find_map(|r| {
-        let mut p = r.to_path_buf();
-        for c in download_dir(profile, &rel) {
-            p.push(c);
-        }
-        p.push(&rel);
-        std::fs::read(&p).or_else(|_| std::fs::read(r.join(&rel))).ok()
-    })
-    .map(|d| crate::assets::crc32::crc32(&d))
+    roots
+        .iter()
+        .find_map(|r| {
+            let mut p = r.to_path_buf();
+            for c in download_dir(profile, &rel) {
+                p.push(c);
+            }
+            p.push(&rel);
+            std::fs::read(&p)
+                .or_else(|_| std::fs::read(r.join(&rel)))
+                .ok()
+        })
+        .map(|d| crate::assets::crc32::crc32(&d))
 }
 
 /// Is this the name of an image the client draws (`.png`, `.gif`, `.mng`,
@@ -389,7 +415,13 @@ impl DownloadStore {
     /// `save_to_disk` is the real clients' `saveimages` setting (on unless
     /// a user turns it off).
     pub fn new(resolver: AssetResolver, save_to_disk: bool) -> Self {
-        Self { resolver, save_to_disk, memory: HashMap::new(), cache_meta: None, settings_copy: false }
+        Self {
+            resolver,
+            save_to_disk,
+            memory: HashMap::new(),
+            cache_meta: None,
+            settings_copy: false,
+        }
     }
 
     pub fn resolver(&self) -> &AssetResolver {
@@ -404,7 +436,12 @@ impl DownloadStore {
     }
 
     /// As [`set_cache`](Self::set_cache), with the Seihai folder's cache too.
-    pub fn set_caches(&mut self, game_dir: Option<PathBuf>, dir: Option<PathBuf>, meta: Option<String>) {
+    pub fn set_caches(
+        &mut self,
+        game_dir: Option<PathBuf>,
+        dir: Option<PathBuf>,
+        meta: Option<String>,
+    ) {
         self.resolver.set_game_cache(game_dir);
         self.resolver.set_cache(dir);
         self.cache_meta = meta;
@@ -437,7 +474,9 @@ impl DownloadStore {
             (Layer::Builtin, r.builtin_root()),
         ] {
             let Some(root) = root else { continue };
-            if let Some(p) = find_in_root(root, r, &rel, name).filter(|p| layer != Layer::Builtin || r.builtin_levels() || !is_level_name(p)) {
+            if let Some(p) = find_in_root(root, r, &rel, name)
+                .filter(|p| layer != Layer::Builtin || r.builtin_levels() || !is_level_name(p))
+            {
                 return Some((p, layer));
             }
         }
@@ -490,25 +529,44 @@ impl DownloadStore {
     /// When saving is off, everything except a level file stays in memory.
     /// Level files always go to disk: Seihai loads levels from files.
     pub fn store(&mut self, name: &str, data: &[u8], mod_time: Option<u32>) -> io::Result<Stored> {
-        let rel = clean_name(name).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "unsafe file name"))?;
+        let rel = clean_name(name)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "unsafe file name"))?;
         if data.is_empty() {
             return Ok(Stored::Ignored);
         }
-        let ext = rel.rfind('.').map(|i| rel[i..].to_ascii_lowercase()).unwrap_or_default();
+        let ext = rel
+            .rfind('.')
+            .map(|i| rel[i..].to_ascii_lowercase())
+            .unwrap_or_default();
         let is_level = matches!(ext.as_str(), ".nw" | ".graal" | ".zelda" | ".gmap");
-        self.memory.insert(key(name), MemoryFile { data: data.to_vec(), mod_time });
+        self.memory.insert(
+            key(name),
+            MemoryFile {
+                data: data.to_vec(),
+                mod_time,
+            },
+        );
         if !self.save_to_disk && !is_level {
             return Ok(Stored::Memory);
         }
         let Some(dl) = self.resolver.download_root().cloned() else {
-            return Err(io::Error::new(io::ErrorKind::PermissionDenied, "no download folder (only the read-only built-in set)"));
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "no download folder (only the read-only built-in set)",
+            ));
         };
         // With both caches, the download goes to the Seihai folder's. The
         // settings' cache is written only when the user named it (a copy),
         // or when the Seihai folder cannot be written (instead).
-        let second = self.resolver.cache_root().filter(|c| c.root != dl.root).cloned();
+        let second = self
+            .resolver
+            .cache_root()
+            .filter(|c| c.root != dl.root)
+            .cloned();
         let first = self.write_into(&dl, &rel, name, data, mod_time);
-        let Some(second) = second else { return first.map(Stored::Disk) };
+        let Some(second) = second else {
+            return first.map(Stored::Disk);
+        };
         match first {
             Ok(t) => {
                 if self.settings_copy {
@@ -530,7 +588,14 @@ impl DownloadStore {
 
     /// Write one download into the cache (or download) folder `dl`: in place
     /// if that folder already has the file, else by [`download_dir`].
-    fn write_into(&self, dl: &AssetRoot, rel: &str, name: &str, data: &[u8], mod_time: Option<u32>) -> io::Result<PathBuf> {
+    fn write_into(
+        &self,
+        dl: &AssetRoot,
+        rel: &str,
+        name: &str,
+        data: &[u8],
+        mod_time: Option<u32>,
+    ) -> io::Result<PathBuf> {
         let in_place = find_in_root(dl, &self.resolver, rel, name);
         let target = match in_place {
             Some(p) => p,
@@ -546,13 +611,19 @@ impl DownloadStore {
         // The built-in set is never a target, whatever the name.
         if let Some(b) = self.resolver.builtin_root() {
             if target.starts_with(&b.root) {
-                return Err(io::Error::new(io::ErrorKind::PermissionDenied, "the built-in assets are read-only"));
+                return Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "the built-in assets are read-only",
+                ));
             }
         }
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
         }
-        if let (Some(meta), true) = (&self.cache_meta, self.resolver.cache_roots().any(|c| c.root == dl.root)) {
+        if let (Some(meta), true) = (
+            &self.cache_meta,
+            self.resolver.cache_roots().any(|c| c.root == dl.root),
+        ) {
             let m = dl.root.join("server.txt");
             if !m.exists() {
                 let _ = fs::write(m, meta);
@@ -572,7 +643,12 @@ impl DownloadStore {
 /// The copy of `rel` in one folder: the name as a path from the folder, then
 /// the folders its kind lives in (as the resolver searches them, restricted
 /// to this one folder).
-fn find_in_root(root: &AssetRoot, resolver: &AssetResolver, rel: &str, name: &str) -> Option<PathBuf> {
+fn find_in_root(
+    root: &AssetRoot,
+    resolver: &AssetResolver,
+    rel: &str,
+    name: &str,
+) -> Option<PathBuf> {
     if let Some(p) = lookup(&root.root, rel) {
         return Some(p);
     }
@@ -589,7 +665,10 @@ fn find_in_root(root: &AssetRoot, resolver: &AssetResolver, rel: &str, name: &st
         ".txt" => return lookup(&root.root.join("maps"), rel),
         _ => None,
     }?;
-    let same = found.file_name().and_then(|f| f.to_str()).is_some_and(|f| f.eq_ignore_ascii_case(&last));
+    let same = found
+        .file_name()
+        .and_then(|f| f.to_str())
+        .is_some_and(|f| f.eq_ignore_ascii_case(&last));
     same.then_some(found)
 }
 
@@ -619,12 +698,17 @@ pub struct FileSession {
 /// its clean folder has none of it (2.31 `gmap_cross` capture: `steps.wav`
 /// and `walk.gani` in the frame of the first step, `steps2.wav` with the
 /// second). `(step number, names)`.
-pub const FIRST_STEP_REQUESTS: &[(u32, &[&str])] = &[(1, &["steps.wav", "walk.gani"]), (2, &["steps2.wav"])];
+pub const FIRST_STEP_REQUESTS: &[(u32, &[&str])] =
+    &[(1, &["steps.wav", "walk.gani"]), (2, &["steps2.wav"])];
 
 impl FileSession {
     pub fn new(resolver: AssetResolver, save_to_disk: bool) -> Self {
         let requests = FileRequester::new(resolver.profile());
-        Self { requests, store: DownloadStore::new(resolver, save_to_disk), steps: 0 }
+        Self {
+            requests,
+            store: DownloadStore::new(resolver, save_to_disk),
+            steps: 0,
+        }
     }
 
     /// A new connection: the name lists and the failure memory start empty
@@ -646,10 +730,21 @@ impl FileSession {
     /// the built-in one. If the server has none the reply is
     /// `FILESENDFAILED` and the built-in file stays in use.
     pub fn need(&mut self, name: &str) -> Vec<Vec<u8>> {
-        let Some(clean) = clean_name(name) else { return Vec::new() };
+        let Some(clean) = clean_name(name) else {
+            return Vec::new();
+        };
         let local = self.store.local_mod_time(&clean);
-        let local = local.or_else(|| self.store.memory_file(&clean).map(|m| m.mod_time.unwrap_or(0)));
-        let msgs = self.requests.need(name, local).iter().map(FileRequest::message).collect();
+        let local = local.or_else(|| {
+            self.store
+                .memory_file(&clean)
+                .map(|m| m.mod_time.unwrap_or(0))
+        });
+        let msgs = self
+            .requests
+            .need(name, local)
+            .iter()
+            .map(FileRequest::message)
+            .collect();
         self.with_gani_updates(msgs)
     }
 
@@ -657,7 +752,14 @@ impl FileSession {
     /// (157, [`crate::protocol::lobby::with_gani_updates`]); other builds
     /// send the messages as they are.
     fn with_gani_updates(&self, msgs: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
-        if self.store.resolver().profile().protocol.lobby.is_some_and(|l| l.after_login.is_some()) {
+        if self
+            .store
+            .resolver()
+            .profile()
+            .protocol
+            .lobby
+            .is_some_and(|l| l.after_login.is_some())
+        {
             crate::protocol::lobby::with_gani_updates(msgs)
         } else {
             msgs
@@ -681,7 +783,10 @@ impl FileSession {
         let Some((_, names)) = FIRST_STEP_REQUESTS.iter().find(|(n, _)| *n == self.steps) else {
             return Vec::new();
         };
-        names.iter().flat_map(|name| self.need_missing(name)).collect()
+        names
+            .iter()
+            .flat_map(|name| self.need_missing(name))
+            .collect()
     }
 
     /// A GANI or a sound the client went to use and has **no copy of at
@@ -714,7 +819,11 @@ impl FileSession {
         let mut out = Processed::default();
         let mut next = Vec::new();
         for f in state.take_files() {
-            if self.store.store(&f.name, &f.data, f.mod_time).is_ok_and(|s| s != Stored::Ignored) {
+            if self
+                .store
+                .store(&f.name, &f.data, f.mod_time)
+                .is_ok_and(|s| s != Stored::Ignored)
+            {
                 out.written.push(f.name.clone());
             }
             next.extend(self.requests.done(&f.name));
@@ -775,18 +884,37 @@ mod tests {
         // goes out must keep the case the level or the server gave it (an
         // older GServer-v2 fails a name asked for in another case).
         let mut r = req(ClientVersion::V222);
-        for n in ["a.png", "b.png", "c.png", "d.png", "Block.PNG", "npcs/Sign.gif"] {
+        for n in [
+            "a.png",
+            "b.png",
+            "c.png",
+            "d.png",
+            "Block.PNG",
+            "npcs/Sign.gif",
+        ] {
             r.need(n, None);
         }
         assert_eq!(names(&r.done("a.png")), ["Block.PNG"]);
         assert_eq!(names(&r.done("B.PNG")), ["npcs/Sign.gif"]);
         assert_eq!(r.wanted(), ["c.png", "d.png", "Block.PNG", "npcs/Sign.gif"]);
         // The same for the UPDATEFILE list.
-        for (i, n) in ["u1.png", "u2.png", "u3.png", "u4.png", "Door_Open.GIF"].iter().enumerate() {
+        for (i, n) in ["u1.png", "u2.png", "u3.png", "u4.png", "Door_Open.GIF"]
+            .iter()
+            .enumerate()
+        {
             r.need(n, Some(10 + i as u32));
         }
-        assert_eq!(r.done("u1.png"), vec![FileRequest::Update { mod_time: 14, name: "Door_Open.GIF".into() }]);
-        assert_eq!(r.update_asked(), ["u2.png", "u3.png", "u4.png", "Door_Open.GIF"]);
+        assert_eq!(
+            r.done("u1.png"),
+            vec![FileRequest::Update {
+                mod_time: 14,
+                name: "Door_Open.GIF".into()
+            }]
+        );
+        assert_eq!(
+            r.update_asked(),
+            ["u2.png", "u3.png", "u4.png", "Door_Open.GIF"]
+        );
         // A reply in another case still settles the name.
         assert!(r.done("door_open.gif").is_empty());
         assert!(r.is_settled("DOOR_OPEN.GIF") && r.update_asked().len() == 3);
@@ -807,14 +935,29 @@ mod tests {
             sent.extend(r.need(n, None));
         }
         // Four wants are out. Updates count on their own.
-        for (i, n) in ["u1.png", "u2.png", "u3.png", "u4.png", "u5.png"].iter().enumerate() {
+        for (i, n) in ["u1.png", "u2.png", "u3.png", "u4.png", "u5.png"]
+            .iter()
+            .enumerate()
+        {
             sent.extend(r.need(n, Some(100 + i as u32)));
         }
-        let want: Vec<_> = sent.iter().filter(|s| matches!(s, FileRequest::Want(_))).collect();
-        let upd: Vec<_> = sent.iter().filter(|s| matches!(s, FileRequest::Update { .. })).collect();
+        let want: Vec<_> = sent
+            .iter()
+            .filter(|s| matches!(s, FileRequest::Want(_)))
+            .collect();
+        let upd: Vec<_> = sent
+            .iter()
+            .filter(|s| matches!(s, FileRequest::Update { .. }))
+            .collect();
         assert_eq!((want.len(), upd.len()), (4, 4));
         // The fifth update waits and keeps the mod time it was queued with.
-        assert_eq!(r.done("u1.png"), vec![FileRequest::Update { mod_time: 104, name: "u5.png".into() }]);
+        assert_eq!(
+            r.done("u1.png"),
+            vec![FileRequest::Update {
+                mod_time: 104,
+                name: "u5.png".into()
+            }]
+        );
         // A name that was answered is not asked about again.
         assert!(r.need("u1.png", Some(100)).is_empty());
         // Even if it is asked for again as a pending name.
@@ -847,7 +990,13 @@ mod tests {
         assert!(r141.need("x.gif", Some(9)).is_empty());
         assert_eq!(r141.need("y.gif", None).len(), 1);
         let mut r142 = req(ClientVersion::V142);
-        assert_eq!(r142.need("x.gif", Some(9)), vec![FileRequest::Update { mod_time: 9, name: "x.gif".into() }]);
+        assert_eq!(
+            r142.need("x.gif", Some(9)),
+            vec![FileRequest::Update {
+                mod_time: 9,
+                name: "x.gif".into()
+            }]
+        );
     }
 
     #[test]
@@ -860,12 +1009,21 @@ mod tests {
     #[test]
     fn messages_follow_the_captures() {
         // `PLI_WANTFILE`: id 23 + 0x20, the name.
-        assert_eq!(FileRequest::Want("walk.gani".into()).message(), b"7walk.gani\n");
+        assert_eq!(
+            FileRequest::Want("walk.gani".into()).message(),
+            b"7walk.gani\n"
+        );
         // `PLI_UPDATEFILE`: id 34 + 0x20, GINT5 time, the name. 1792835138 =
         // 0x6AFE_E2C2: five 7-bit groups, high first, each plus 0x20.
-        let m = FileRequest::Update { mod_time: 1_792_835_138, name: "body.png".into() }.message();
+        let m = FileRequest::Update {
+            mod_time: 1_792_835_138,
+            name: "body.png".into(),
+        }
+        .message();
         assert_eq!(m[0], 34 + 0x20);
-        let t = m[1..6].iter().fold(0u64, |a, &c| (a << 7) | u64::from(c - 0x20));
+        let t = m[1..6]
+            .iter()
+            .fold(0u64, |a, &c| (a << 7) | u64::from(c - 0x20));
         assert_eq!(t, 1_792_835_138);
         assert_eq!(&m[6..], b"body.png\n");
     }
@@ -880,11 +1038,23 @@ mod tests {
         // 1.33 to 1.41: one folder for everything.
         for v in [V133, V135, V139, V141] {
             assert_eq!(SaveLayout::of(v), SaveLayout::Flat);
-            for n in ["a.png", "body.png", "sword1.gif", "x.mng", "walk.gani", "b.wav", "worldmap.png"] {
+            for n in [
+                "a.png",
+                "body.png",
+                "sword1.gif",
+                "x.mng",
+                "walk.gani",
+                "b.wav",
+                "worldmap.png",
+            ] {
                 assert_eq!(dir(v, n), "levels/webgifs", "{v:?} {n}");
             }
         }
-        assert_eq!(dir(V139, "old.graal"), "levels", "Seihai's level departure holds");
+        assert_eq!(
+            dir(V139, "old.graal"),
+            "levels",
+            "Seihai's level departure holds"
+        );
         // 2.00 and 2.01: the folder list without hats.
         for v in [V200, V201] {
             assert_eq!(SaveLayout::of(v), SaveLayout::NoHats);
@@ -906,12 +1076,25 @@ mod tests {
     fn an_empty_stream_changes_nothing() {
         let root = tmp("empty");
         let mut s = store(ClientVersion::V222, &root, true);
-        assert_eq!(s.store("body.png", b"keep", Some(7)).unwrap(), Stored::Disk(root.join("levels/bodies/body.png")));
+        assert_eq!(
+            s.store("body.png", b"keep", Some(7)).unwrap(),
+            Stored::Disk(root.join("levels/bodies/body.png"))
+        );
         assert_eq!(s.store("body.png", b"", Some(9)).unwrap(), Stored::Ignored);
-        assert_eq!(fs::read(root.join("levels/bodies/body.png")).unwrap(), b"keep", "the old copy stays");
+        assert_eq!(
+            fs::read(root.join("levels/bodies/body.png")).unwrap(),
+            b"keep",
+            "the old copy stays"
+        );
         assert_eq!(s.store("new.png", b"", None).unwrap(), Stored::Ignored);
-        assert!(!root.join("levels/webgifs/new.png").exists(), "no empty file is created");
-        assert!(!s.has_any_copy("new.png"), "and nothing is remembered in memory");
+        assert!(
+            !root.join("levels/webgifs/new.png").exists(),
+            "no empty file is created"
+        );
+        assert!(
+            !s.has_any_copy("new.png"),
+            "and nothing is remembered in memory"
+        );
         let _ = fs::remove_dir_all(root);
     }
 
@@ -965,7 +1148,9 @@ mod tests {
     fn a_new_download_goes_to_its_folder_with_the_servers_time() {
         let root = tmp("new");
         let mut s = store(ClientVersion::V222, &root, true);
-        let got = s.store("sword1.png", b"PNGDATA", Some(1_700_000_000)).unwrap();
+        let got = s
+            .store("sword1.png", b"PNGDATA", Some(1_700_000_000))
+            .unwrap();
         let want = root.join("levels/swords/sword1.png");
         assert_eq!(got, Stored::Disk(want.clone()));
         assert_eq!(fs::read(&want).unwrap(), b"PNGDATA");
@@ -987,7 +1172,10 @@ mod tests {
         let got = s.store("body.png", b"new", Some(1_650_000_000)).unwrap();
         assert_eq!(got, Stored::Disk(root.join("body.png")));
         assert_eq!(fs::read(root.join("body.png")).unwrap(), b"new");
-        assert_eq!(fs::read(root.join("levels/bodies/body.png")).unwrap(), b"old");
+        assert_eq!(
+            fs::read(root.join("levels/bodies/body.png")).unwrap(),
+            b"old"
+        );
         fs::remove_dir_all(&root).ok();
     }
 
@@ -996,7 +1184,9 @@ mod tests {
         let root = tmp("205");
         let mut s = store(ClientVersion::V205, &root, true);
         let before = mod_time_of(&root).unwrap_or(0);
-        let Stored::Disk(p) = s.store("walk.gani", b"GANI", None).unwrap() else { panic!() };
+        let Stored::Disk(p) = s.store("walk.gani", b"GANI", None).unwrap() else {
+            panic!()
+        };
         assert_eq!(p, root.join("levels/ganis/walk.gani"));
         // No server time to set: the file is as new as the download.
         assert!(mod_time_of(&p).unwrap() >= before);
@@ -1011,7 +1201,9 @@ mod tests {
         assert!(!root.join("levels").exists());
         assert_eq!(s.read("HEAD0.png").unwrap(), b"H");
         assert_eq!(s.memory_file("head0.png").unwrap().mod_time, Some(5));
-        let Stored::Disk(p) = s.store("lv.nw", b"GLEVNW01\n", None).unwrap() else { panic!("level") };
+        let Stored::Disk(p) = s.store("lv.nw", b"GLEVNW01\n", None).unwrap() else {
+            panic!("level")
+        };
         assert_eq!(p, root.join("levels/lv.nw"));
         fs::remove_dir_all(&root).ok();
     }
@@ -1055,7 +1247,10 @@ mod tests {
         fs::create_dir_all(root.join("levels/swords")).unwrap();
         fs::write(root.join("levels/swords/sword1.png"), b"S").unwrap();
         set_mod_time(&root.join("levels/swords/sword1.png"), 1_792_835_138).unwrap();
-        let mut fs_ = FileSession::new(AssetResolver::new(AssetRoot::new(&root), ClientVersion::V222.profile()), true);
+        let mut fs_ = FileSession::new(
+            AssetResolver::new(AssetRoot::new(&root), ClientVersion::V222.profile()),
+            true,
+        );
         // Present: UPDATEFILE with the file's time. Missing: WANTFILE.
         let m = fs_.need("sword1.png");
         assert_eq!(m.len(), 1);
@@ -1077,7 +1272,10 @@ mod tests {
     #[test]
     fn a_new_connection_starts_the_lists_again() {
         let root = tmp("newconn");
-        let mut fs_ = FileSession::new(AssetResolver::new(AssetRoot::new(&root), ClientVersion::V222.profile()), true);
+        let mut fs_ = FileSession::new(
+            AssetResolver::new(AssetRoot::new(&root), ClientVersion::V222.profile()),
+            true,
+        );
         assert_eq!(fs_.need("nothere.png").len(), 1);
         assert!(fs_.need("nothere.png").is_empty());
         fs_.new_connection();
@@ -1088,7 +1286,10 @@ mod tests {
     #[test]
     fn session_saves_a_file_and_frees_the_next_waiting_request() {
         let root = tmp("session2");
-        let mut fs_ = FileSession::new(AssetResolver::new(AssetRoot::new(&root), ClientVersion::V222.profile()), true);
+        let mut fs_ = FileSession::new(
+            AssetResolver::new(AssetRoot::new(&root), ClientVersion::V222.profile()),
+            true,
+        );
         let mut sent = 0;
         for i in 0..6 {
             sent += fs_.need(&format!("img{i}.png")).len();
@@ -1096,7 +1297,8 @@ mod tests {
         assert_eq!(sent, 4);
         let mut st = SessionState::for_version(ClientVersion::V222);
         st.incoming_files.push(("img1.png".into(), b"P".to_vec()));
-        st.incoming_mod_times.insert("img1.png".into(), 1_600_000_000);
+        st.incoming_mod_times
+            .insert("img1.png".into(), 1_600_000_000);
         let p = fs_.process(&mut st);
         assert_eq!(p.written, ["img1.png"]);
         assert_eq!(p.send, vec![wantfile_message("img4.png")]);
@@ -1115,7 +1317,14 @@ mod tests {
         let b = tmp("gupd-b");
         assert_eq!(cached_crc32(&[&a, &b], p, "basepackage.gupd"), None);
         fs::create_dir_all(b.join("updatepackages")).unwrap();
-        fs::write(b.join("updatepackages").join("basepackage.gupd"), b"GRPKG001\n").unwrap();
-        assert_eq!(cached_crc32(&[&a, &b], p, "basepackage.gupd"), Some(0x15a8ea07));
+        fs::write(
+            b.join("updatepackages").join("basepackage.gupd"),
+            b"GRPKG001\n",
+        )
+        .unwrap();
+        assert_eq!(
+            cached_crc32(&[&a, &b], p, "basepackage.gupd"),
+            Some(0x15a8ea07)
+        );
     }
 }

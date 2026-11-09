@@ -4,23 +4,25 @@
 //! its GCHAR id (wire byte - 0x20). The level-entry set is handled;
 //! everything else is recorded as unhandled.
 
-use crate::gmap::{Gmap, GmapSession, LevelSlot};
 use super::extras::{
     parse_ghost_icon, parse_level_mod_time, parse_map_spec, parse_signature, parse_start_message,
     parse_text_list, signature_action, MapSpec, SignatureAction,
 };
-use super::levelcache::{same_level, CachedLevel, LevelCache};
 use super::layouts::{
-    parse_board_heights, parse_board_modify, parse_board_modify2, parse_flag, parse_npc_del2, parse_npc_id_rest,
-    parse_player_toggle, parse_player_warp2, parse_profile, parse_screenshot_name, parse_server_warp, parse_server_warp_lobby,
-    parse_shoot, parse_showimg_relay, BoardHeights, BoardModify2, PlayerWarp2, ProfileCard, ServerMode, ServerWarp,
+    parse_board_heights, parse_board_modify, parse_board_modify2, parse_flag, parse_npc_del2,
+    parse_npc_id_rest, parse_player_toggle, parse_player_warp2, parse_profile,
+    parse_screenshot_name, parse_server_warp, parse_server_warp_lobby, parse_shoot,
+    parse_showimg_relay, BoardHeights, BoardModify2, PlayerWarp2, ProfileCard, ServerMode,
+    ServerWarp,
 };
-use super::profile::{CombatRules, IdSet};
-use crate::combat::{self, IncomingHit};
-use super::props::parse_player_props_in;
+use super::levelcache::{same_level, CachedLevel, LevelCache};
 use super::npcprops::{parse_npc_props, NpcProps};
+use super::profile::{CombatRules, IdSet};
+use super::props::parse_player_props_in;
 use super::version::ClientVersion;
 use crate::chatlists::{BubbleTimer, ChatFilter, Identity};
+use crate::combat::{self, IncomingHit};
+use crate::gmap::{Gmap, GmapSession, LevelSlot};
 use std::collections::HashMap;
 
 /// An item the server put down or took away on the current level.
@@ -72,11 +74,9 @@ pub fn read_gint4(b: &[u8]) -> Option<u32> {
     if b.len() < 4 {
         return None;
     }
-    Some(
-        b[..4]
-            .iter()
-            .fold(0u32, |acc, &c| (acc << 7) | (c.wrapping_sub(0x20) as u32 & 0x7F)),
-    )
+    Some(b[..4].iter().fold(0u32, |acc, &c| {
+        (acc << 7) | (c.wrapping_sub(0x20) as u32 & 0x7F)
+    }))
 }
 
 /// A weapon from `PLO_NPCWEAPONADD`.
@@ -95,7 +95,11 @@ pub struct Weapon {
 pub fn parse_weapon_add(b: &[u8]) -> Option<Weapon> {
     let len = b.first()?.wrapping_sub(0x20) as usize;
     let name = latin1(b.get(1..1 + len)?);
-    let mut w = Weapon { name, image: None, script: None };
+    let mut w = Weapon {
+        name,
+        image: None,
+        script: None,
+    };
     let mut i = 1 + len;
     while let Some(&id) = b.get(i) {
         match id.wrapping_sub(0x20) {
@@ -274,11 +278,21 @@ impl OtherLooks {
     /// The player's animation is a swing ([`combat::is_swing_gani`]): the
     /// GANI (2.1+) or the name in the 2.05 bow slot.
     pub fn swing_gani(&self) -> bool {
-        [&self.gani, &self.bow_slot_gani].into_iter().flatten().any(|g| combat::is_swing_gani(g))
+        [&self.gani, &self.bow_slot_gani]
+            .into_iter()
+            .flatten()
+            .any(|g| combat::is_swing_gani(g))
     }
 
     fn update(&mut self, u: OtherLooks) {
-        for (old, new) in [(&mut self.sword, u.sword), (&mut self.shield, u.shield), (&mut self.head, u.head), (&mut self.body, u.body), (&mut self.gani, u.gani), (&mut self.bow_slot_gani, u.bow_slot_gani)] {
+        for (old, new) in [
+            (&mut self.sword, u.sword),
+            (&mut self.shield, u.shield),
+            (&mut self.head, u.head),
+            (&mut self.body, u.body),
+            (&mut self.gani, u.gani),
+            (&mut self.bow_slot_gani, u.bow_slot_gani),
+        ] {
             if new.is_some() {
                 *old = new;
             }
@@ -313,7 +327,11 @@ fn power_image(raw: &[u8], max_plain: u8, stem: &str) -> Option<String> {
 /// number of a default head under 100.
 fn head_image(raw: &[u8]) -> Option<String> {
     let v = usize::from(raw.first()?.wrapping_sub(0x20));
-    Some(if v >= 100 { latin1(raw.get(1..1 + (v - 100)).unwrap_or(&[])) } else { format!("head{v}.png") })
+    Some(if v >= 100 {
+        latin1(raw.get(1..1 + (v - 100)).unwrap_or(&[]))
+    } else {
+        format!("head{v}.png")
+    })
 }
 
 impl OtherPlayer {
@@ -361,12 +379,27 @@ pub struct ChatLine {
 /// are the sender's level's.
 #[derive(Debug, Clone, PartialEq)]
 pub enum LevelObject {
-    Bomb { sender: u16, bomb: crate::bombs::BombAdd },
-    BombDel { x: f32, y: f32 },
-    Explosion { sender: u16, explosion: crate::bombs::Explosion },
-    Arrow { sender: u16, arrow: crate::arrows::ArrowAdd },
+    Bomb {
+        sender: u16,
+        bomb: crate::bombs::BombAdd,
+    },
+    BombDel {
+        x: f32,
+        y: f32,
+    },
+    Explosion {
+        sender: u16,
+        explosion: crate::bombs::Explosion,
+    },
+    Arrow {
+        sender: u16,
+        arrow: crate::arrows::ArrowAdd,
+    },
     /// `PLO_BADDYPROPS` (2): the id, then props, for the level named.
-    BaddyProps { level: Option<String>, payload: Vec<u8> },
+    BaddyProps {
+        level: Option<String>,
+        payload: Vec<u8>,
+    },
     /// `PLO_BADDYHURT` (27), for the leader: id, dx, dy, power.
     BaddyHurt(Vec<u8>),
     /// A new level: the old level's baddies are gone.
@@ -735,7 +768,9 @@ impl SessionState {
             8 => {
                 // PLO_OTHERPLPROPS — parse position and store.
                 self.other_props.push((msg.id, msg.payload.clone()));
-                if let Some(u) = parse_other_player(&msg.payload, self.bow_prop10, self.other_prop_ids.as_ref()) {
+                if let Some(u) =
+                    parse_other_player(&msg.payload, self.bow_prop10, self.other_prop_ids.as_ref())
+                {
                     self.apply_other(u);
                 }
             }
@@ -744,7 +779,12 @@ impl SessionState {
                 // The props are merged by id: a later message with one prop
                 // (stock beta4 ends the level frame with `Z` alone) must not
                 // drop the head, colours, status and images of the first.
-                self.player_props = merge_player_props(&self.player_props, &msg.payload, self.bow_prop10, self.own_prop_ids.as_ref());
+                self.player_props = merge_player_props(
+                    &self.player_props,
+                    &msg.payload,
+                    self.bow_prop10,
+                    self.own_prop_ids.as_ref(),
+                );
                 self.apply_player_props(&msg.payload);
             }
             2 => {
@@ -752,12 +792,19 @@ impl SessionState {
                 if let Ok(s) = String::from_utf8(msg.payload.clone()) {
                     self.baddies.push(s);
                 }
-                let level = self.level_name.clone().or_else(|| self.current_level_name());
-                self.level_objects.push(LevelObject::BaddyProps { level, payload: msg.payload.clone() });
+                let level = self
+                    .level_name
+                    .clone()
+                    .or_else(|| self.current_level_name());
+                self.level_objects.push(LevelObject::BaddyProps {
+                    level,
+                    payload: msg.payload.clone(),
+                });
             }
             27 => {
                 // PLO_BADDYHURT: another player hit a baddy of the level we lead.
-                self.level_objects.push(LevelObject::BaddyHurt(msg.payload.clone()));
+                self.level_objects
+                    .push(LevelObject::BaddyHurt(msg.payload.clone()));
             }
             3 => {
                 // PLO_NPCPROPS
@@ -768,14 +815,24 @@ impl SessionState {
                     // The level the server is sending: on a gmap a neighbour's
                     // NPCs come between that neighbour's name and the gmap's,
                     // and belong to it, not to the player's level.
-                    let level = self.level_name.clone().or_else(|| self.current_level_name());
-                    let e = self.server_npcs.entry(id).or_insert_with(|| (level.clone(), NpcProps::default()));
+                    let level = self
+                        .level_name
+                        .clone()
+                        .or_else(|| self.current_level_name());
+                    let e = self
+                        .server_npcs
+                        .entry(id)
+                        .or_insert_with(|| (level.clone(), NpcProps::default()));
                     e.0 = level.clone();
                     e.1.merge(&p);
                     // Only the player's level takes updates as they come; a
                     // neighbour's records wait in `server_npcs` until it is entered.
                     let here = self.current_level_name();
-                    if level.as_deref().zip(here.as_deref()).is_none_or(|(a, b)| a.eq_ignore_ascii_case(b)) {
+                    if level
+                        .as_deref()
+                        .zip(here.as_deref())
+                        .is_none_or(|(a, b)| a.eq_ignore_ascii_case(b))
+                    {
                         self.npc_changes.push((id, p));
                     }
                 }
@@ -785,7 +842,8 @@ impl SessionState {
                 // the GS2 bytecode file (ending in the compiler's `\n`).
                 match read_gint3(&msg.payload) {
                     Some(id) if id > 0 && self.server_npcs.contains_key(&(id as u32)) => {
-                        self.npc_bytecode.insert(id as u32, msg.payload[3..].to_vec());
+                        self.npc_bytecode
+                            .insert(id as u32, msg.payload[3..].to_vec());
                     }
                     _ => self.npc_bytecode_dropped += 1,
                 }
@@ -890,7 +948,9 @@ impl SessionState {
                 if let Some((name, data, mod_time)) = parsed {
                     self.file_requests.push(format!("FILE:{name}"));
                     if let Some(t) = mod_time.filter(|&t| t != 0) {
-                        self.incoming_mod_times.entry(name.to_ascii_lowercase()).or_insert(t);
+                        self.incoming_mod_times
+                            .entry(name.to_ascii_lowercase())
+                            .or_insert(t);
                     }
                     match self.large_file {
                         Some((ref n, ref mut buf)) if n == &name => buf.extend_from_slice(&data),
@@ -933,9 +993,11 @@ impl SessionState {
                     );
                     // On a gmap every level's board is kept: the player's
                     // and the neighbours' are drawn side by side.
-                    if let (Some(g), Some(level), Some(b)) =
-                        (self.gmap.as_mut(), self.level_name.as_ref(), self.board.as_ref())
-                    {
+                    if let (Some(g), Some(level), Some(b)) = (
+                        self.gmap.as_mut(),
+                        self.level_name.as_ref(),
+                        self.board.as_ref(),
+                    ) {
                         g.boards.insert(level.to_ascii_lowercase(), b.clone());
                     }
                 }
@@ -991,7 +1053,10 @@ impl SessionState {
             }
             11 => {
                 // PLO_BOMBADD: GSHORT player, then the bomb.
-                if let (Some(sender), Some(bomb)) = (read_gshort(&msg.payload), msg.payload.get(2..).and_then(crate::bombs::parse_bomb_add)) {
+                if let (Some(sender), Some(bomb)) = (
+                    read_gshort(&msg.payload),
+                    msg.payload.get(2..).and_then(crate::bombs::parse_bomb_add),
+                ) {
                     self.level_objects.push(LevelObject::Bomb { sender, bomb });
                 }
             }
@@ -1003,14 +1068,24 @@ impl SessionState {
             }
             36 => {
                 // PLO_EXPLOSION: GSHORT player, then the explosion.
-                if let (Some(sender), Some(explosion)) = (read_gshort(&msg.payload), msg.payload.get(2..).and_then(crate::bombs::parse_explosion)) {
-                    self.level_objects.push(LevelObject::Explosion { sender, explosion });
+                if let (Some(sender), Some(explosion)) = (
+                    read_gshort(&msg.payload),
+                    msg.payload.get(2..).and_then(crate::bombs::parse_explosion),
+                ) {
+                    self.level_objects
+                        .push(LevelObject::Explosion { sender, explosion });
                 }
             }
             19 => {
                 // PLO_ARROWADD: GSHORT player, then the shot.
-                if let (Some(sender), Some(arrow)) = (read_gshort(&msg.payload), msg.payload.get(2..).and_then(crate::arrows::parse_arrow_add)) {
-                    self.level_objects.push(LevelObject::Arrow { sender, arrow });
+                if let (Some(sender), Some(arrow)) = (
+                    read_gshort(&msg.payload),
+                    msg.payload
+                        .get(2..)
+                        .and_then(crate::arrows::parse_arrow_add),
+                ) {
+                    self.level_objects
+                        .push(LevelObject::Arrow { sender, arrow });
                 }
             }
             10 => self.is_leader = true,
@@ -1026,7 +1101,9 @@ impl SessionState {
             }
             25 => self.signature = parse_signature(&msg.payload),
             39 => {
-                if let (Some(t), Some(level)) = (parse_level_mod_time(&msg.payload), &self.level_name) {
+                if let (Some(t), Some(level)) =
+                    (parse_level_mod_time(&msg.payload), &self.level_name)
+                {
                     self.level_mod_time = Some((level.clone(), t));
                 }
             }
@@ -1094,10 +1171,14 @@ impl SessionState {
                     // The client looks the sender up in its level and
                     // ignores a player it does not have.
                     let others = &self.others;
-                    self.player_images.retain(|id, _| others.iter().any(|o| o.id == *id));
+                    self.player_images
+                        .retain(|id, _| others.iter().any(|o| o.id == *id));
                     if self.showimg_records && self.others.iter().any(|o| o.id == r.0) {
                         let up = super::showimg::parse_showimg_update(&r.1);
-                        super::showimg::apply_showimg_update(self.player_images.entry(r.0).or_default(), &up);
+                        super::showimg::apply_showimg_update(
+                            self.player_images.entry(r.0).or_default(),
+                            &up,
+                        );
                     }
                     self.last_showimg = Some(r);
                 }
@@ -1113,7 +1194,11 @@ impl SessionState {
             176 => self.server_mode = Some(ServerMode::Kingdoms),
             177 => self.server_mode = Some(ServerMode::NewWorld),
             178 => {
-                let w = if self.lobby_warp_fields { parse_server_warp_lobby(&msg.payload) } else { parse_server_warp(&msg.payload) };
+                let w = if self.lobby_warp_fields {
+                    parse_server_warp_lobby(&msg.payload)
+                } else {
+                    parse_server_warp(&msg.payload)
+                };
                 if let Some(w) = w {
                     self.server_warp = Some(w);
                 }
@@ -1191,7 +1276,11 @@ impl SessionState {
                 self.signs.clear();
                 self.chests.clear();
                 self.restored = Restored::default();
-                if self.cached_request.take().is_some_and(|want| same_level(&want, &name)) {
+                if self
+                    .cached_request
+                    .take()
+                    .is_some_and(|want| same_level(&want, &name))
+                {
                     self.restore_from_cache(&name);
                 }
             }
@@ -1207,7 +1296,10 @@ impl SessionState {
             Some(name)
         };
         if let Some(target) = target {
-            let same = self.level_name.as_deref().is_some_and(|c| c.eq_ignore_ascii_case(&target));
+            let same = self
+                .level_name
+                .as_deref()
+                .is_some_and(|c| c.eq_ignore_ascii_case(&target));
             if !same {
                 if let Some(old) = self.level_name.take() {
                     g.slots.insert(
@@ -1221,7 +1313,10 @@ impl SessionState {
                         },
                     );
                 }
-                let slot = g.slots.remove(&target.to_ascii_lowercase()).unwrap_or_default();
+                let slot = g
+                    .slots
+                    .remove(&target.to_ascii_lowercase())
+                    .unwrap_or_default();
                 self.board = slot.board;
                 self.board_lines = slot.board_lines;
                 self.links = slot.links;
@@ -1236,7 +1331,9 @@ impl SessionState {
     /// Put the level being left into [`Self::level_cache`], when the server
     /// has sent its board and its mod time. Off a gmap only.
     fn keep_level_in_cache(&mut self) {
-        let (Some(old), Some((lv, t)), Some(board)) = (&self.level_name, &self.level_mod_time, &self.board) else {
+        let (Some(old), Some((lv, t)), Some(board)) =
+            (&self.level_name, &self.level_mod_time, &self.board)
+        else {
             return;
         };
         if !same_level(old, lv) {
@@ -1265,7 +1362,11 @@ impl SessionState {
         self.links = c.links;
         self.signs = c.signs;
         self.level_mod_time = Some((name.to_string(), c.mod_time));
-        self.restored = Restored { board_lines: true, links: true, signs: true };
+        self.restored = Restored {
+            board_lines: true,
+            links: true,
+            signs: true,
+        };
         self.cache_restores += 1;
     }
 
@@ -1274,7 +1375,12 @@ impl SessionState {
     /// gmap (a gmap keeps its own per-level slots and asks with
     /// `PLI_ADJACENTLEVEL`). `None` means ask with `PLI_LEVELWARP`.
     pub fn cached_mod_time(&self, dest: &str) -> Option<u32> {
-        if self.gmap.is_some() || self.level_name.as_deref().is_some_and(|c| same_level(c, dest)) {
+        if self.gmap.is_some()
+            || self
+                .level_name
+                .as_deref()
+                .is_some_and(|c| same_level(c, dest))
+        {
             return None;
         }
         self.level_cache.mod_time(dest)
@@ -1351,7 +1457,9 @@ impl SessionState {
     fn apply_board_modify2(&mut self, m: &BoardModify2) {
         let cell = (i32::from(m.map_x), i32::from(m.map_y));
         let level = match &self.gmap {
-            Some(g) => g.level_at(cell).or_else(|| (cell == g.cell).then(|| g.current_level()).flatten()),
+            Some(g) => g
+                .level_at(cell)
+                .or_else(|| (cell == g.cell).then(|| g.current_level()).flatten()),
             None => (cell == (0, 0)).then(|| self.level_name.clone()).flatten(),
         };
         let Some(level) = level else {
@@ -1382,11 +1490,19 @@ impl SessionState {
     /// is the player's level), and queue it for whoever draws the levels.
     fn apply_board_block(&mut self, level: &str, m: &BoardModify2) {
         let key = level.to_ascii_lowercase();
-        let is_live = self.level_name.as_deref().map(str::to_ascii_lowercase).as_deref() == Some(key.as_str());
+        let is_live = self
+            .level_name
+            .as_deref()
+            .map(str::to_ascii_lowercase)
+            .as_deref()
+            == Some(key.as_str());
         if let Some(g) = self.gmap.as_mut() {
             // The level object exists on the real client before its board
             // arrives: start from an empty board.
-            let board = g.boards.entry(key.clone()).or_insert_with(|| vec![0; 64 * 64]);
+            let board = g
+                .boards
+                .entry(key.clone())
+                .or_insert_with(|| vec![0; 64 * 64]);
             m.apply_to(board);
         }
         if is_live {
@@ -1415,7 +1531,12 @@ impl SessionState {
 
     /// Add a line to the chat history.
     pub fn push_chat(&mut self, kind: ChatKind, from: String, text: String) {
-        self.chat_log.push(ChatLine { kind, from, text, born_ms: self.chat_clock_ms });
+        self.chat_log.push(ChatLine {
+            kind,
+            from,
+            text,
+            born_ms: self.chat_clock_ms,
+        });
         if self.chat_log.len() > CHAT_HISTORY {
             let extra = self.chat_log.len() - CHAT_HISTORY;
             self.chat_log.drain(..extra);
@@ -1437,14 +1558,21 @@ impl SessionState {
 
     /// Whether the filter hides player `id`.
     pub fn hides(&self, id: u16) -> bool {
-        !self.filter.is_empty() && self.identities.get(&id).is_some_and(|w| self.filter.hides(w))
+        !self.filter.is_empty()
+            && self
+                .identities
+                .get(&id)
+                .is_some_and(|w| self.filter.hides(w))
     }
 
     /// What is known of the player with this account name or nickname,
     /// among the players seen so far: (id, identity).
     pub fn find_identity(&self, name: &str) -> Option<(u16, &Identity)> {
         // Prefer a player who is here now.
-        let here = self.others.iter().filter_map(|o| self.identities.get(&o.id).map(|w| (o.id, w)));
+        let here = self
+            .others
+            .iter()
+            .filter_map(|o| self.identities.get(&o.id).map(|w| (o.id, w)));
         let all = self.identities.iter().map(|(id, w)| (*id, w));
         here.chain(all).find(|(_, w)| w.is_named(name))
     }
@@ -1534,13 +1662,21 @@ impl SessionState {
         if let Some(c) = u.carry {
             o.carry = c;
         }
-        let moved = u.x.is_some() || u.y.is_some() || u.dir.is_some() || u.sprite.is_some() || u.looks.gani.is_some() || u.looks.bow_slot_gani.is_some();
+        let moved = u.x.is_some()
+            || u.y.is_some()
+            || u.dir.is_some()
+            || u.sprite.is_some()
+            || u.looks.gani.is_some()
+            || u.looks.bow_slot_gani.is_some();
         o.looks.update(std::mem::take(&mut u.looks));
         // A 2.05 swing is a swing sprite in the update. A 2.1+ client sends
         // GANI `sword` once and then only what changes, so any update of
         // its place or animation while that GANI is on is judged again.
         let gani_swing = moved && o.looks.swing_gani();
-        let sprite_swing = u.sprite.zip(self.combat).is_some_and(|(sp, r)| combat::is_swing_sprite(&r, sp));
+        let sprite_swing = u
+            .sprite
+            .zip(self.combat)
+            .is_some_and(|(sp, r)| combat::is_swing_sprite(&r, sp));
         let swing = self.combat.is_some() && (sprite_swing || gani_swing);
         if swing {
             self.swings.push(u.id);
@@ -1575,7 +1711,9 @@ impl SessionState {
                 // CURCHAT, which it does when its own bubble ends
                 // ([`BubbleTimer::start_floor`]).
                 if text.is_empty() {
-                    if o.chat.as_deref().is_some_and(|c| !c.is_empty()) && o.chat_timer.left_ms() > 0 {
+                    if o.chat.as_deref().is_some_and(|c| !c.is_empty())
+                        && o.chat_timer.left_ms() > 0
+                    {
                         o.chat_timer.release();
                     } else {
                         o.chat = None;
@@ -1624,9 +1762,15 @@ impl SessionState {
                 (32, Some(v)) => self.own_alignment = Some(v),
                 (0, _) => self.nickname = Some(latin1(prop.raw.get(1..).unwrap_or(&[]))),
                 (11, _) => self.own_head = head_image(&prop.raw),
-                (35, _) => self.own_body = Some(latin1(prop.raw.get(1..).unwrap_or(&[]))).filter(|b| !b.is_empty()),
+                (35, _) => {
+                    self.own_body =
+                        Some(latin1(prop.raw.get(1..).unwrap_or(&[]))).filter(|b| !b.is_empty())
+                }
                 (13, _) => self.own_colors = crate::looks::colors_from_prop(&prop.raw),
-                (37..=41, _) => self.own_attrs[usize::from(prop.id - 37)] = Some(latin1(prop.raw.get(1..).unwrap_or(&[]))),
+                (37..=41, _) => {
+                    self.own_attrs[usize::from(prop.id - 37)] =
+                        Some(latin1(prop.raw.get(1..).unwrap_or(&[])))
+                }
                 _ => {}
             }
         }
@@ -1643,7 +1787,11 @@ impl SessionState {
                 }
             }
             let mod_time = self.incoming_mod_times.remove(&name.to_ascii_lowercase());
-            out.push(IncomingFile { name, data, mod_time });
+            out.push(IncomingFile {
+                name,
+                data,
+                mod_time,
+            });
         }
         out
     }
@@ -1707,9 +1855,16 @@ struct OtherUpdate {
 }
 
 /// Parse one `PLO_OTHERPLPROPS` payload: `GSHORT id` + prop stream.
-fn parse_other_player(payload: &[u8], bow_prop10: bool, accepted: Option<&IdSet>) -> Option<OtherUpdate> {
+fn parse_other_player(
+    payload: &[u8],
+    bow_prop10: bool,
+    accepted: Option<&IdSet>,
+) -> Option<OtherUpdate> {
     let id = read_gshort(payload)?;
-    let mut u = OtherUpdate { id, ..Default::default() };
+    let mut u = OtherUpdate {
+        id,
+        ..Default::default()
+    };
     let text = |raw: &[u8]| latin1(raw.get(1..).unwrap_or(&[]));
     for prop in parse_player_props_in(&payload[2..], bow_prop10, accepted) {
         match prop.id {
@@ -1732,15 +1887,22 @@ fn parse_other_player(payload: &[u8], bow_prop10: bool, accepted: Option<&IdSet>
             // A 2.x server's GANI string in the bow slot
             // (`props::bow_slot_holds_gani`) names it the same way.
             10 => {
-                u.looks.bow_slot_gani =
-                    (super::props::bow_slot_holds_gani(&prop.raw) || prop.gchar().is_some_and(|v| v >= 10)).then(|| text(&prop.raw))
+                u.looks.bow_slot_gani = (super::props::bow_slot_holds_gani(&prop.raw)
+                    || prop.gchar().is_some_and(|v| v >= 10))
+                .then(|| text(&prop.raw))
             }
             11 => u.looks.head = head_image(&prop.raw),
             35 => u.looks.body = Some(text(&prop.raw)).filter(|b| !b.is_empty()),
             13 => u.looks.colors = crate::looks::colors_from_prop(&prop.raw),
             37..=41 => u.looks.attrs[usize::from(prop.id - 37)] = Some(text(&prop.raw)),
             18 => u.status = prop.gchar(),
-            19 => u.carry = prop.raw.first().map(|&b| crate::throwing::carry_sprite_from_wire(crate::throwing::carry_code_from_byte(b))),
+            19 => {
+                u.carry = prop.raw.first().map(|&b| {
+                    crate::throwing::carry_sprite_from_wire(crate::throwing::carry_code_from_byte(
+                        b,
+                    ))
+                })
+            }
             32 => u.ap = prop.gchar(),
             43 => u.cell_x = prop.gchar().map(i32::from),
             44 => u.cell_y = prop.gchar().map(i32::from),
@@ -1852,11 +2014,9 @@ pub(super) fn read_gint5(b: &[u8]) -> Option<u64> {
     if b.len() < 5 {
         return None;
     }
-    Some(
-        b[..5]
-            .iter()
-            .fold(0u64, |acc, &c| (acc << 7) | (c.wrapping_sub(0x20) as u64 & 0x7F)),
-    )
+    Some(b[..5].iter().fold(0u64, |acc, &c| {
+        (acc << 7) | (c.wrapping_sub(0x20) as u64 & 0x7F)
+    }))
 }
 
 /// Parse a `PLO_FILE` payload (the bytes after the id).
@@ -1864,8 +2024,16 @@ pub(super) fn read_gint5(b: &[u8]) -> Option<u64> {
 /// - 2.1+: `GINT5 modtime` + `GCHAR name_len` + name + data + `\n`
 /// - before 2.1 (2.05): `GCHAR name_len` + name + data, with no `\n`
 fn parse_file_packet(payload: &[u8], has_modtime: bool) -> Option<(String, Vec<u8>, Option<u32>)> {
-    let mod_time = if has_modtime { read_gint5(payload).map(|t| t.min(u64::from(u32::MAX)) as u32) } else { None };
-    let p = if has_modtime { payload.get(5..)? } else { payload };
+    let mod_time = if has_modtime {
+        read_gint5(payload).map(|t| t.min(u64::from(u32::MAX)) as u32)
+    } else {
+        None
+    };
+    let p = if has_modtime {
+        payload.get(5..)?
+    } else {
+        payload
+    };
     let (&len, rest) = p.split_first()?;
     let name_len = len.wrapping_sub(0x20) as usize;
     if rest.len() < name_len {
@@ -1894,13 +2062,19 @@ fn parse_file_packet(payload: &[u8], has_modtime: bool) -> Option<(String, Vec<u
 /// Only the props this build reads are kept from `old` (the parse stops at
 /// the first id it does not know). When `new` does not parse to its end, it
 /// replaces `old` whole, as before.
-pub fn merge_player_props(old: &[u8], new: &[u8], bow_prop10: bool, accepted: Option<&IdSet>) -> Vec<u8> {
+pub fn merge_player_props(
+    old: &[u8],
+    new: &[u8],
+    bow_prop10: bool,
+    accepted: Option<&IdSet>,
+) -> Vec<u8> {
     let new_props = parse_player_props_in(new, bow_prop10, accepted);
     if new_props.iter().map(|p| 1 + p.raw.len()).sum::<usize>() != new.len() {
         return new.to_vec();
     }
     let old_props = parse_player_props_in(old, bow_prop10, accepted);
-    let mut merged: std::collections::BTreeMap<u8, Vec<u8>> = old_props.into_iter().map(|p| (p.id, p.raw)).collect();
+    let mut merged: std::collections::BTreeMap<u8, Vec<u8>> =
+        old_props.into_iter().map(|p| (p.id, p.raw)).collect();
     merged.extend(new_props.into_iter().map(|p| (p.id, p.raw)));
     let mut out = Vec::new();
     for (id, raw) in merged {
@@ -1943,11 +2117,28 @@ mod tests {
         let want = |s: &str| Some(s.to_string());
         assert_eq!(
             u.looks,
-            OtherLooks { sword: want("sabre.png"), shield: want("shield2.png"), head: want("hat.png"), body: want("red.png"), gani: want("walk"), bow_slot_gani: None, colors: None, attrs: Default::default() }
+            OtherLooks {
+                sword: want("sabre.png"),
+                shield: want("shield2.png"),
+                head: want("hat.png"),
+                body: want("red.png"),
+                gani: want("walk"),
+                bow_slot_gani: None,
+                colors: None,
+                attrs: Default::default()
+            }
         );
         // Plain powers name the default pictures; 0 is none.
-        let u = parse_other_player(&[0x20, 0x22, g(8), g(2), g(9), g(0), g(11), g(4)], false, None).unwrap();
-        assert_eq!((u.looks.sword, u.looks.shield, u.looks.head), (want("sword2.png"), want(""), want("head4.png")));
+        let u = parse_other_player(
+            &[0x20, 0x22, g(8), g(2), g(9), g(0), g(11), g(4)],
+            false,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            (u.looks.sword, u.looks.shield, u.looks.head),
+            (want("sword2.png"), want(""), want("head4.png"))
+        );
         // A later update without the props keeps them.
         let mut st = SessionState::default();
         st.apply_other(parse_other_player(&p, false, None).unwrap());
@@ -1976,7 +2167,11 @@ mod tests {
     fn raw_file_205(name: &str, data: &[u8]) -> Vec<u8> {
         let n = 1 + 1 + name.len() + data.len();
         let mut out = vec![100 + 0x20];
-        out.extend([((n >> 14) & 0x7F) as u8 + 0x20, ((n >> 7) & 0x7F) as u8 + 0x20, (n & 0x7F) as u8 + 0x20]);
+        out.extend([
+            ((n >> 14) & 0x7F) as u8 + 0x20,
+            ((n >> 7) & 0x7F) as u8 + 0x20,
+            (n & 0x7F) as u8 + 0x20,
+        ]);
         out.push(b'\n');
         out.push(102 + 0x20);
         out.push(name.len() as u8 + 0x20);
@@ -2004,7 +2199,10 @@ mod tests {
 
         let mut state = SessionState::default();
         state.apply_body(&body);
-        assert_eq!(state.incoming_files, vec![("new1.nw".to_string(), data.to_vec())]);
+        assert_eq!(
+            state.incoming_files,
+            vec![("new1.nw".to_string(), data.to_vec())]
+        );
         assert_eq!(state.level_name.as_deref(), Some("new1.nw"));
     }
 
@@ -2020,7 +2218,13 @@ mod tests {
         file.extend_from_slice(&data);
         file.push(b'\n');
         let n = file.len();
-        let mut body = vec![100 + 0x20, ((n >> 14) as u8) + 0x20, ((n >> 7) & 0x7F) as u8 + 0x20, (n & 0x7F) as u8 + 0x20, b'\n'];
+        let mut body = vec![
+            100 + 0x20,
+            ((n >> 14) as u8) + 0x20,
+            ((n >> 7) & 0x7F) as u8 + 0x20,
+            (n & 0x7F) as u8 + 0x20,
+            b'\n',
+        ];
         body.extend_from_slice(&file);
         body.extend_from_slice(b"&a\n");
 
@@ -2044,13 +2248,26 @@ mod tests {
         file.extend_from_slice(name.as_bytes());
         file.extend_from_slice(b"xyz\n");
         let n = file.len();
-        let mut body = vec![100 + 0x20, 0x20, (n >> 7) as u8 + 0x20, (n & 0x7F) as u8 + 0x20, b'\n'];
+        let mut body = vec![
+            100 + 0x20,
+            0x20,
+            (n >> 7) as u8 + 0x20,
+            (n & 0x7F) as u8 + 0x20,
+            b'\n',
+        ];
         body.extend_from_slice(&file);
         let mut st = SessionState::for_version(ClientVersion::V222);
         st.apply_body(&body);
         let got = st.take_files();
         assert_eq!(got.len(), 1);
-        assert_eq!((got[0].name.as_str(), got[0].data.as_slice(), got[0].mod_time), (name, &b"xyz"[..], Some(16643)));
+        assert_eq!(
+            (
+                got[0].name.as_str(),
+                got[0].data.as_slice(),
+                got[0].mod_time
+            ),
+            (name, &b"xyz"[..], Some(16643))
+        );
         assert!(st.take_files().is_empty());
     }
 
@@ -2065,11 +2282,20 @@ mod tests {
         file.extend_from_slice(b"GLEVNW01\n");
         file.push(b'\n');
         let n = file.len();
-        let mut body = vec![100 + 0x20, 0x20, (n >> 7) as u8 + 0x20, (n & 0x7F) as u8 + 0x20, b'\n'];
+        let mut body = vec![
+            100 + 0x20,
+            0x20,
+            (n >> 7) as u8 + 0x20,
+            (n & 0x7F) as u8 + 0x20,
+            b'\n',
+        ];
         body.extend_from_slice(&file);
         let mut st = SessionState::default();
         st.apply_body(&body);
-        assert_eq!(st.incoming_files, vec![(name.to_string(), b"GLEVNW01\n".to_vec())]);
+        assert_eq!(
+            st.incoming_files,
+            vec![(name.to_string(), b"GLEVNW01\n".to_vec())]
+        );
     }
 
     /// The first 120 bytes of a `PLO_FILE` payload (after the id) that the
@@ -2080,7 +2306,13 @@ mod tests {
 
     fn raw_file(payload: &[u8]) -> Vec<u8> {
         let n = 1 + payload.len();
-        let mut out = vec![100 + 0x20, ((n >> 14) & 0x7F) as u8 + 0x20, ((n >> 7) & 0x7F) as u8 + 0x20, (n & 0x7F) as u8 + 0x20, b'\n'];
+        let mut out = vec![
+            100 + 0x20,
+            ((n >> 14) & 0x7F) as u8 + 0x20,
+            ((n >> 7) & 0x7F) as u8 + 0x20,
+            (n & 0x7F) as u8 + 0x20,
+            b'\n',
+        ];
         out.push(102 + 0x20);
         out.extend_from_slice(payload);
         out
@@ -2122,7 +2354,10 @@ mod tests {
         let mut gani = vec![b' ' + 9];
         gani.extend_from_slice(b"idle.ganiGANI0001\r\n");
         st.apply_body(&raw_file(&gani));
-        assert_eq!(st.incoming_files[1], ("idle.gani".to_string(), b"GANI0001\r\n".to_vec()));
+        assert_eq!(
+            st.incoming_files[1],
+            ("idle.gani".to_string(), b"GANI0001\r\n".to_vec())
+        );
     }
 
     #[test]
@@ -2133,7 +2368,10 @@ mod tests {
         body.extend_from_slice(b"ebig.nw\n");
         let mut state = SessionState::default();
         state.apply_body(&body);
-        assert_eq!(state.incoming_files, vec![("big.nw".to_string(), b"one,two".to_vec())]);
+        assert_eq!(
+            state.incoming_files,
+            vec![("big.nw".to_string(), b"one,two".to_vec())]
+        );
     }
 
     #[test]
@@ -2190,7 +2428,13 @@ mod tests {
         }
         body.push(b'\n');
         let gint5: Vec<u8> = t.map_or(Vec::new(), |t| {
-            msg(39, &[28, 21, 14, 7, 0].iter().map(|s| ((t >> s) as u8 & 0x7F) + 0x20).collect::<Vec<u8>>())
+            msg(
+                39,
+                &[28, 21, 14, 7, 0]
+                    .iter()
+                    .map(|s| ((t >> s) as u8 & 0x7F) + 0x20)
+                    .collect::<Vec<u8>>(),
+            )
         });
         [
             msg(6, name.as_bytes()),
@@ -2207,7 +2451,12 @@ mod tests {
     /// the name and the closing messages, no 14, no board, no mod time, no
     /// links, no signs (lab, 2.31).
     fn cached_answer(name: &str) -> Vec<u8> {
-        [msg(6, name.as_bytes()), msg(174, &[0x20]), msg(156, name.as_bytes())].concat()
+        [
+            msg(6, name.as_bytes()),
+            msg(174, &[0x20]),
+            msg(156, name.as_bytes()),
+        ]
+        .concat()
     }
 
     /// A level the player left is cached with its mod time; a cached link's
@@ -2218,11 +2467,18 @@ mod tests {
         st.apply_body(&full_answer("a.nw", 1_000, 0, "b.nw 0 0 2 2 1 1", "sign a"));
         assert!(st.cached_mod_time("b.nw").is_none(), "nothing cached yet");
         st.apply_body(&full_answer("b.nw", 2_000, 3, "a.nw 0 0 2 2 1 1", "sign b"));
-        assert_eq!(st.level_cache.len(), 1, "a was kept when the player left it");
+        assert_eq!(
+            st.level_cache.len(),
+            1,
+            "a was kept when the player left it"
+        );
         assert_eq!(st.cached_mod_time("a.nw"), Some(1_000));
         assert_eq!(st.cached_mod_time("A.NW"), Some(1_000));
         assert_eq!(st.cached_mod_time("a"), Some(1_000));
-        assert!(st.cached_mod_time("b.nw").is_none(), "the level the player is in is not asked for");
+        assert!(
+            st.cached_mod_time("b.nw").is_none(),
+            "the level the player is in is not asked for"
+        );
         // Link back to a with the copy.
         st.expect_cached_level("a.nw");
         st.apply_body(&cached_answer("a.nw"));
@@ -2258,10 +2514,22 @@ mod tests {
     #[test]
     fn full_answer_to_a_cached_link_replaces_the_copy() {
         let mut st = SessionState::for_version(ClientVersion::V231);
-        st.apply_body(&full_answer("a.nw", 1_000, 0, "old 0 0 2 2 1 1", "old sign"));
+        st.apply_body(&full_answer(
+            "a.nw",
+            1_000,
+            0,
+            "old 0 0 2 2 1 1",
+            "old sign",
+        ));
         st.apply_body(&full_answer("b.nw", 2_000, 3, "x", "y"));
         st.expect_cached_level("a.nw");
-        st.apply_body(&full_answer("a.nw", 1_500, 7, "new 0 0 2 2 1 1", "new sign"));
+        st.apply_body(&full_answer(
+            "a.nw",
+            1_500,
+            7,
+            "new 0 0 2 2 1 1",
+            "new sign",
+        ));
         assert_eq!(st.links, vec!["new 0 0 2 2 1 1".to_string()]);
         assert_eq!(st.signs, vec![b"new sign".to_vec()]);
         assert_eq!(st.level_mod_time, Some(("a.nw".to_string(), 1_500)));
@@ -2333,7 +2601,10 @@ mod tests {
         let mut state = SessionState::default();
         // PLO_FLAGSET (28) with and without a value.
         state.apply_body(b"<gr.fileerror=none\n<quest1\n");
-        assert_eq!(state.flags.get("gr.fileerror").map(String::as_str), Some("none"));
+        assert_eq!(
+            state.flags.get("gr.fileerror").map(String::as_str),
+            Some("none")
+        );
         assert_eq!(state.flags.get("quest1").map(String::as_str), Some(""));
         // PLO_NPCWEAPONADD (33): name, NPCPROP_IMAGE, NPCPROP_SCRIPT.
         let mut add = vec![b'A', 0x20 + 3];
@@ -2346,7 +2617,11 @@ mod tests {
         state.apply_body(&add);
         assert_eq!(
             state.weapons,
-            vec![Weapon { name: "Bow".into(), image: Some("bow.png".into()), script: Some("//".into()) }]
+            vec![Weapon {
+                name: "Bow".into(),
+                image: Some("bow.png".into()),
+                script: Some("//".into())
+            }]
         );
         // PLO_DEFAULTWEAPON (43) and PLO_NEWWORLDTIME (42).
         state.apply_body(b"K!\nK!\n");
@@ -2375,12 +2650,27 @@ mod tests {
     fn throwcarried_21_throws_what_that_player_held_and_empties_their_hands() {
         let mut st = SessionState::default();
         // Player 200 at (30, 12) facing east, holding the bush.
-        st.apply_body(&other(200, &[15 + 0x20, 60 + 0x20, 16 + 0x20, 24 + 0x20, 17 + 0x20, 3 + 0x20, 19 + 0x20, 1 + 0x20]));
+        st.apply_body(&other(
+            200,
+            &[
+                15 + 0x20,
+                60 + 0x20,
+                16 + 0x20,
+                24 + 0x20,
+                17 + 0x20,
+                3 + 0x20,
+                19 + 0x20,
+                1 + 0x20,
+            ],
+        ));
         assert_eq!(st.others[0].carry, Some(261));
         st.apply_body(&[&[21 + 0x20][..], &gs(200), b"\n"].concat());
         assert_eq!(st.throws.len(), 1);
         let t = &st.throws[0];
-        assert_eq!((t.id, t.carry, t.x, t.y, t.dir), (200, Some(261), 30.0, 12.0, 3));
+        assert_eq!(
+            (t.id, t.carry, t.x, t.y, t.dir),
+            (200, Some(261), 30.0, 12.0, 3)
+        );
         assert_eq!(st.others[0].carry, None, "the thrower's hands are empty");
         // A player the client does not know throws nothing.
         st.apply_body(&[&[21 + 0x20][..], &gs(9), b"\n"].concat());
@@ -2393,20 +2683,73 @@ mod tests {
         // the lab bomb as relayed: player 200, then `6e 3c 29 57`
         st.apply_body(&[&[11 + 0x20][..], &gs(200), &[0x6e, 0x3c, 0x29, 0x57], b"\n"].concat());
         st.apply_body(&[&[12 + 0x20][..], &[0x6e, 0x3c], b"\n"].concat());
-        st.apply_body(&[&[36 + 0x20][..], &gs(200), &[0x22, 0x40, 0x40, 0x20 + 8 + 3], b"\n"].concat());
-        st.apply_body(&[&[19 + 0x20][..], &gs(200), &[0x60, 0x40, 0x20 + 8 + 2, 0x20 + 109, 0x21 + 3], b"\n"].concat());
+        st.apply_body(
+            &[
+                &[36 + 0x20][..],
+                &gs(200),
+                &[0x22, 0x40, 0x40, 0x20 + 8 + 3],
+                b"\n",
+            ]
+            .concat(),
+        );
+        st.apply_body(
+            &[
+                &[19 + 0x20][..],
+                &gs(200),
+                &[0x60, 0x40, 0x20 + 8 + 2, 0x20 + 109, 0x21 + 3],
+                b"\n",
+            ]
+            .concat(),
+        );
         // too short: dropped
-        st.apply_body(&[&[19 + 0x20][..], &gs(200), &[0x60, 0x40, 0x22, 0x20 + 109], b"\n"].concat());
+        st.apply_body(
+            &[
+                &[19 + 0x20][..],
+                &gs(200),
+                &[0x60, 0x40, 0x22, 0x20 + 109],
+                b"\n",
+            ]
+            .concat(),
+        );
         assert!(st.unhandled.is_empty(), "{:?}", st.unhandled);
         use crate::arrows::ArrowAdd;
         use crate::bombs::{BombAdd, Explosion};
         assert_eq!(
             st.level_objects,
             vec![
-                LevelObject::Bomb { sender: 200, bomb: BombAdd { x: 39.0, y: 14.0, power: 1, fuse: 55, owned: true } },
+                LevelObject::Bomb {
+                    sender: 200,
+                    bomb: BombAdd {
+                        x: 39.0,
+                        y: 14.0,
+                        power: 1,
+                        fuse: 55,
+                        owned: true
+                    }
+                },
                 LevelObject::BombDel { x: 39.0, y: 14.0 },
-                LevelObject::Explosion { sender: 200, explosion: Explosion { radius: 2, x: 16.0, y: 16.0, power: 3, owned: true } },
-                LevelObject::Arrow { sender: 200, arrow: ArrowAdd { x: 32.0, y: 16.0, dir: 2, replaces: false, owned: true, sprite: 109, kind: 3 } },
+                LevelObject::Explosion {
+                    sender: 200,
+                    explosion: Explosion {
+                        radius: 2,
+                        x: 16.0,
+                        y: 16.0,
+                        power: 3,
+                        owned: true
+                    }
+                },
+                LevelObject::Arrow {
+                    sender: 200,
+                    arrow: ArrowAdd {
+                        x: 32.0,
+                        y: 16.0,
+                        dir: 2,
+                        replaces: false,
+                        owned: true,
+                        sprite: 109,
+                        kind: 3
+                    }
+                },
             ]
         );
     }
@@ -2415,7 +2758,22 @@ mod tests {
     fn other_player_updates_merge() {
         let mut st = SessionState::default();
         // Nick "bob" (prop 0), x 30 (15 = 60), y 12 (16 = 24), dir 3.
-        let first = other(200, &[0x20, 0x23, b'b', b'o', b'b', 15 + 0x20, 60 + 0x20, 16 + 0x20, 24 + 0x20, 17 + 0x20, 3 + 0x20]);
+        let first = other(
+            200,
+            &[
+                0x20,
+                0x23,
+                b'b',
+                b'o',
+                b'b',
+                15 + 0x20,
+                60 + 0x20,
+                16 + 0x20,
+                24 + 0x20,
+                17 + 0x20,
+                3 + 0x20,
+            ],
+        );
         st.apply_body(&first);
         // Later: only the chat bubble (prop 12).
         st.apply_body(&other(200, &[12 + 0x20, 0x22, b'h', b'i']));
@@ -2423,7 +2781,12 @@ mod tests {
         assert_eq!((o.id, o.x, o.y, o.dir), (200, 30.0, 12.0, 3));
         assert_eq!(o.nick.as_deref(), Some("bob"));
         assert_eq!(o.chat.as_deref(), Some("hi"));
-        assert_eq!(st.chat_log.last().map(|l| (l.from.as_str(), l.text.as_str())), Some(("bob", "hi")));
+        assert_eq!(
+            st.chat_log
+                .last()
+                .map(|l| (l.from.as_str(), l.text.as_str())),
+            Some(("bob", "hi"))
+        );
 
         // PCONNECTED (51) with no value: gone.
         st.apply_body(&other(200, &[51 + 0x20]));
@@ -2441,10 +2804,24 @@ mod tests {
     fn own_hearts_status_and_ap() {
         let mut st = SessionState::default();
         // MAXPOWER 3, CURPOWER 5 (2.5 hearts), STATUS 0x14, ALIGNMENT 50.
-        let props = [1 + 0x20, 3 + 0x20, 2 + 0x20, 5 + 0x20, 18 + 0x20, 0x14 + 0x20, 32 + 0x20, 50 + 0x20];
+        let props = [
+            1 + 0x20,
+            3 + 0x20,
+            2 + 0x20,
+            5 + 0x20,
+            18 + 0x20,
+            0x14 + 0x20,
+            32 + 0x20,
+            50 + 0x20,
+        ];
         st.apply_body(&[&[9 + 0x20][..], &props, b"\n"].concat());
         assert_eq!(
-            (st.own_max_power, st.own_cur_power, st.own_status, st.own_alignment),
+            (
+                st.own_max_power,
+                st.own_cur_power,
+                st.own_status,
+                st.own_alignment
+            ),
             (Some(3), Some(5), Some(0x14), Some(50))
         );
         // GLOVEPOWER (6).
@@ -2455,7 +2832,10 @@ mod tests {
         // its BOMBADD and 4 with its ARROWADD (lab, 2026-10-30).
         st.apply_body(b")#  !\n");
         st.apply_body(&[9 + 0x20, 4 + 0x20, 7 + 0x20, 5 + 0x20, 15 + 0x20, b'\n']);
-        assert_eq!((st.own_rupees, st.own_bombs, st.own_darts), (Some(1), Some(15), Some(7)));
+        assert_eq!(
+            (st.own_rupees, st.own_bombs, st.own_darts),
+            (Some(1), Some(15), Some(7))
+        );
     }
 
     #[test]
@@ -2507,9 +2887,20 @@ mod tests {
         let mut st = SessionState::default();
         st.apply_body(&other(5, &[0x20, 0x21, b'z']));
         st.apply_body(&[&[13 + 0x20][..], &gs(5), b"%hello\n"].concat());
-        st.apply_body(&[&[37 + 0x20][..], &gs(5), b"\"\",\"Private message:\",\"psst, \"\"x\"\"\"\n"].concat());
+        st.apply_body(
+            &[
+                &[37 + 0x20][..],
+                &gs(5),
+                b"\"\",\"Private message:\",\"psst, \"\"x\"\"\"\n",
+            ]
+            .concat(),
+        );
         st.apply_body(b"CServer message:\xa7Shutting down\n");
-        let got: Vec<_> = st.chat_log.iter().map(|l| (l.kind, l.from.as_str(), l.text.as_str())).collect();
+        let got: Vec<_> = st
+            .chat_log
+            .iter()
+            .map(|l| (l.kind, l.from.as_str(), l.text.as_str()))
+            .collect();
         assert_eq!(
             got,
             vec![
@@ -2536,11 +2927,24 @@ mod tests {
     }
 
     fn toall(from: u16, text: &str) -> Vec<u8> {
-        [&[13 + 0x20][..], &gs(from), &[0x20 + text.len() as u8], text.as_bytes(), b"\n"].concat()
+        [
+            &[13 + 0x20][..],
+            &gs(from),
+            &[0x20 + text.len() as u8],
+            text.as_bytes(),
+            b"\n",
+        ]
+        .concat()
     }
 
     fn pm(from: u16, text: &str) -> Vec<u8> {
-        [&[37 + 0x20][..], &gs(from), format!("\"\",\"{text}\"").as_bytes(), b"\n"].concat()
+        [
+            &[37 + 0x20][..],
+            &gs(from),
+            format!("\"\",\"{text}\"").as_bytes(),
+            b"\n",
+        ]
+        .concat()
     }
 
     fn ignoring(names: &[&str], muted: &[&str]) -> crate::chatlists::ChatFilter {
@@ -2578,7 +2982,11 @@ mod tests {
         st.apply_body(&toall(6, "party"));
         st.apply_body(&pm(5, "psst"));
         st.apply_body(&pm(6, "hey"));
-        let got: Vec<_> = st.chat_log.iter().map(|l| (l.kind, l.from.as_str(), l.text.as_str())).collect();
+        let got: Vec<_> = st
+            .chat_log
+            .iter()
+            .map(|l| (l.kind, l.from.as_str(), l.text.as_str()))
+            .collect();
         assert_eq!(
             got,
             vec![
@@ -2623,7 +3031,11 @@ mod tests {
         assert_eq!(st.others[0].chat, None);
         st.apply_body(&say(7, "BBBB"));
         st.apply_body(&toall(7, "CCCC"));
-        assert_eq!(st.chat_log.len(), 1, "only the first line, from before the mute");
+        assert_eq!(
+            st.chat_log.len(),
+            1,
+            "only the first line, from before the mute"
+        );
         // Unmuted: back.
         st.set_filter(ignoring(&[], &[]));
         st.apply_body(&say(7, "DDDD"));
@@ -2638,7 +3050,10 @@ mod tests {
         st.apply_body(&say(5, "hi"));
         assert_eq!(st.others[0].chat, None);
         // Once the account arrives and differs, the account decides.
-        st.apply_body(&other(5, &[34 + 0x20, 0x20 + 5, b'o', b't', b'h', b'e', b'r']));
+        st.apply_body(&other(
+            5,
+            &[34 + 0x20, 0x20 + 5, b'o', b't', b'h', b'e', b'r'],
+        ));
         st.apply_body(&say(5, "hi again"));
         assert_eq!(st.others[0].chat.as_deref(), Some("hi again"));
     }
@@ -2764,7 +3179,10 @@ mod tests {
         }
         // LEVELMODTIME: GINT5 1_781_284_436.
         let t: u64 = 1_781_284_436;
-        let g5: Vec<u8> = (0..5).rev().map(|i| (((t >> (7 * i)) & 0x7F) as u8) + 0x20).collect();
+        let g5: Vec<u8> = (0..5)
+            .rev()
+            .map(|i| (((t >> (7 * i)) & 0x7F) as u8) + 0x20)
+            .collect();
         body.extend(msg(39, &g5));
         st.apply_body(&body);
 
@@ -2772,15 +3190,30 @@ mod tests {
         assert!(st.ignored.is_empty(), "{:?}", st.ignored);
         assert_eq!(st.signature, Some(73));
         assert!(st.has_npc_server && st.is_leader && !st.ghost_icon);
-        assert_eq!(st.bigmap.as_ref().map(|m| m.png.as_str()), Some("bigmap.png"));
-        assert_eq!(st.minimap.as_ref().map(|m| m.txt.as_str()), Some("minimap.txt"));
+        assert_eq!(
+            st.bigmap.as_ref().map(|m| m.png.as_str()),
+            Some("bigmap.png")
+        );
+        assert_eq!(
+            st.minimap.as_ref().map(|m| m.txt.as_str()),
+            Some("minimap.txt")
+        );
         assert_eq!(st.active_level.as_deref(), Some("start.nw"));
-        assert_eq!(st.rpg_window, vec!["Welcome to X.", "Credits, with a comma."]);
-        assert_eq!(st.start_message.as_deref(), Some("<html><body>hi</body></html>"));
+        assert_eq!(
+            st.rpg_window,
+            vec!["Welcome to X.", "Credits, with a comma."]
+        );
+        assert_eq!(
+            st.start_message.as_deref(),
+            Some("<html><body>hi</body></html>")
+        );
         assert_eq!(st.staff_guilds, vec!["Server", "Manager", "GP"]);
         assert_eq!(st.status_list, vec!["Online", "Away", "DND"]);
         assert_eq!(st.process_list_requests, 1);
-        assert_eq!(st.level_mod_time, Some(("start.nw".to_string(), 1_781_284_436)));
+        assert_eq!(
+            st.level_mod_time,
+            Some(("start.nw".to_string(), 1_781_284_436))
+        );
     }
 
     /// Ghost icon on, and the map specs are ignored by a version without
@@ -2801,12 +3234,22 @@ mod tests {
     /// bad payload must leave the state as it was.
     #[test]
     fn no_message_panics() {
-        let payloads: [&[u8]; 6] = [b"", b" ", b"\xff", b"\x00\x00\x00", b"\"unterminated,", &[0x7f; 40]];
+        let payloads: [&[u8]; 6] = [
+            b"",
+            b" ",
+            b"\xff",
+            b"\x00\x00\x00",
+            b"\"unterminated,",
+            &[0x7f; 40],
+        ];
         for v in ClientVersion::all_versions() {
             for id in 0..=255u8 {
                 for p in payloads {
                     let mut st = SessionState::for_version(*v);
-                    st.apply(&Message { id, payload: p.to_vec() });
+                    st.apply(&Message {
+                        id,
+                        payload: p.to_vec(),
+                    });
                 }
             }
         }
@@ -2820,11 +3263,17 @@ mod tests {
     #[test]
     fn other_player_props_per_version() {
         let mut st = SessionState::for_version(ClientVersion::V205);
-        st.apply_body(&other(7, &[15 + 0x20, 0x20 + 20, 1 + 0x20, 0x23, 16 + 0x20, 0x20 + 8]));
+        st.apply_body(&other(
+            7,
+            &[15 + 0x20, 0x20 + 20, 1 + 0x20, 0x23, 16 + 0x20, 0x20 + 8],
+        ));
         assert_eq!(st.others[0].x, 10.0);
         assert_eq!(st.others[0].y, 0.0);
         let mut all = SessionState::default();
-        all.apply_body(&other(7, &[15 + 0x20, 0x20 + 20, 1 + 0x20, 0x23, 16 + 0x20, 0x20 + 8]));
+        all.apply_body(&other(
+            7,
+            &[15 + 0x20, 0x20 + 20, 1 + 0x20, 0x23, 16 + 0x20, 0x20 + 8],
+        ));
         assert_eq!(all.others[0].y, 4.0);
     }
 
@@ -2843,9 +3292,18 @@ mod tests {
         st.apply_body(&msg(6, b"gm_nw.nw"));
         let mut body = Vec::new();
         // 49: x 30.5, y 12, z, gmap cell (1,0), then a gmap name.
-        body.extend(msg(49, &[&[gc(61), gc(24), gc(50), gc(1), gc(0)][..], b"gm2x2.gmap"].concat()));
-        body.extend(msg(75, &[&[gc(4)][..], b"acct", &[gc(5)], b"hello"].concat()));
-        body.extend(msg(150, &[&[gc(4)][..], b"l.nw", &[gc(0), gc(0), gc(9)]].concat()));
+        body.extend(msg(
+            49,
+            &[&[gc(61), gc(24), gc(50), gc(1), gc(0)][..], b"gm2x2.gmap"].concat(),
+        ));
+        body.extend(msg(
+            75,
+            &[&[gc(4)][..], b"acct", &[gc(5)], b"hello"].concat(),
+        ));
+        body.extend(msg(
+            150,
+            &[&[gc(4)][..], b"l.nw", &[gc(0), gc(0), gc(9)]].concat(),
+        ));
         body.extend(msg(151, b""));
         body.extend(msg(153, b"sign text"));
         body.extend(msg(154, b""));
@@ -2860,8 +3318,14 @@ mod tests {
         body.extend(msg(181, &[gc(0), gc(8), gc(1)]));
         body.extend(msg(183, b"proc.exe"));
         body.extend(msg(184, b"shot.png"));
-        body.extend(msg(185, &[gc(0), gc(0), gc(0), gc(0), gc(0), gc(0), gc(50), gc(64)]));
-        body.extend(msg(186, &[gc(0), gc(0), gc(1), gc(2), gc(1), gc(1), gc(0), gc(7)]));
+        body.extend(msg(
+            185,
+            &[gc(0), gc(0), gc(0), gc(0), gc(0), gc(0), gc(50), gc(64)],
+        ));
+        body.extend(msg(
+            186,
+            &[gc(0), gc(0), gc(1), gc(2), gc(1), gc(1), gc(0), gc(7)],
+        ));
         st.apply_body(&body);
         assert!(st.unhandled.is_empty(), "{:?}", st.unhandled);
         assert!(st.ignored.is_empty(), "{:?}", st.ignored);
@@ -2870,10 +3334,19 @@ mod tests {
         // A gmap name is not a level: the level stays the one 6 named.
         assert_eq!(st.level_name.as_deref(), Some("gm_nw.nw"));
         assert_eq!((st.player_x, st.player_y), (Some(30.5), Some(12.0)));
-        assert_eq!(st.player_warp2.as_ref().map(|w| (w.gmap_x, w.gmap_y)), Some((1, 0)));
+        assert_eq!(
+            st.player_warp2.as_ref().map(|w| (w.gmap_x, w.gmap_y)),
+            Some((1, 0))
+        );
         let p = st.profile.as_ref().unwrap();
-        assert_eq!((p.account.as_str(), p.lines.as_slice()), ("acct", &["hello".to_string()][..]));
-        assert_eq!((st.last_npc_del.clone(), st.npc_dels, st.hide_npcs), (Some(("l.nw".to_string(), 9)), 1, 1));
+        assert_eq!(
+            (p.account.as_str(), p.lines.as_slice()),
+            ("acct", &["hello".to_string()][..])
+        );
+        assert_eq!(
+            (st.last_npc_del.clone(), st.npc_dels, st.hide_npcs),
+            (Some(("l.nw".to_string(), 9)), 1, 1)
+        );
         assert_eq!(st.say2.as_deref(), Some("sign text"));
         assert!(st.frozen);
         assert_eq!((st.npc_moves, st.npc_showimgs, st.shoots), (1, 1, 1));
@@ -2881,14 +3354,32 @@ mod tests {
         assert!(st.ghost_mode);
         assert_eq!(st.ghost_text.as_deref(), Some("ghost"));
         assert_eq!(st.server_mode, Some(ServerMode::Kingdoms));
-        assert_eq!(st.server_warp.as_ref().map(|w| w.host.as_str()), Some("host"));
+        assert_eq!(
+            st.server_warp.as_ref().map(|w| w.host.as_str()),
+            Some("host")
+        );
         assert_eq!(st.player_toggle, Some((8, true)));
         assert_eq!(st.process_running_requests, 1);
         assert_eq!(st.screenshot_requests, vec!["shot.png"]);
-        assert_eq!(st.board_heights.as_ref().map(|h| h.cells.clone()), Some(vec![0.5]));
-        assert_eq!(st.board_modify2.as_ref().map(|m| m.tiles.clone()), Some(vec![7]));
+        assert_eq!(
+            st.board_heights.as_ref().map(|h| h.cells.clone()),
+            Some(vec![0.5])
+        );
+        assert_eq!(
+            st.board_modify2.as_ref().map(|m| m.tiles.clone()),
+            Some(vec![7])
+        );
         // Unfreeze, and a plain level name in 49 enters that level.
-        st.apply_body(&[msg(155, b""), msg(49, &[&[gc(2), gc(4), gc(50), gc(0), gc(0)][..], b"b.nw"].concat())].concat());
+        st.apply_body(
+            &[
+                msg(155, b""),
+                msg(
+                    49,
+                    &[&[gc(2), gc(4), gc(50), gc(0), gc(0)][..], b"b.nw"].concat(),
+                ),
+            ]
+            .concat(),
+        );
         assert!(!st.frozen);
         assert_eq!(st.level_name.as_deref(), Some("b.nw"));
         assert_eq!(st.gmap_name, None);
@@ -2903,9 +3394,21 @@ mod tests {
         for id in [186u8, 189, 84] {
             assert!(!handled(ClientVersion::V217, id), "2.17 id {id}");
         }
-        assert!(handled(ClientVersion::V222, 186) && !handled(ClientVersion::V222, 189) && !handled(ClientVersion::V222, 84));
-        assert!(handled(ClientVersion::V231, 189) && handled(ClientVersion::V231, 84) && handled(ClientVersion::V231, 186));
-        assert!(handled(ClientVersion::V217, 44) && handled(ClientVersion::V222, 44) && !handled(ClientVersion::V231, 44));
+        assert!(
+            handled(ClientVersion::V222, 186)
+                && !handled(ClientVersion::V222, 189)
+                && !handled(ClientVersion::V222, 84)
+        );
+        assert!(
+            handled(ClientVersion::V231, 189)
+                && handled(ClientVersion::V231, 84)
+                && handled(ClientVersion::V231, 186)
+        );
+        assert!(
+            handled(ClientVersion::V217, 44)
+                && handled(ClientVersion::V222, 44)
+                && !handled(ClientVersion::V231, 44)
+        );
         // 2.05 has none of 169 to 189.
         for id in 169..=189u8 {
             assert!(!handled(ClientVersion::V205, id), "2.05 id {id}");
@@ -2932,9 +3435,16 @@ mod tests {
         st.apply_body(&msg(184, b"shot.jpg"));
         st.apply_body(&msg(165, &[gc(0), gc(0), gc(0), b'm'])); // id 0
         assert!(st.player_warp2.is_none() && st.profile.is_none() && st.last_npc_del.is_none());
-        assert!(st.server_warp.is_none() && st.player_toggle.is_none() && st.screenshot_requests.is_empty());
+        assert!(
+            st.server_warp.is_none()
+                && st.player_toggle.is_none()
+                && st.screenshot_requests.is_empty()
+        );
         assert!(st.board_heights.is_none() && st.board_modify2.is_none());
-        assert_eq!((st.npc_moves, st.npc_showimgs, st.shoots, st.npc_dels), (0, 0, 0, 0));
+        assert_eq!(
+            (st.npc_moves, st.npc_showimgs, st.shoots, st.npc_dels),
+            (0, 0, 0, 0)
+        );
         assert!(st.unhandled.is_empty());
     }
 
@@ -2942,7 +3452,10 @@ mod tests {
     /// does not know is ignored; a player who leaves takes them along.
     #[test]
     fn showimg_relay_updates_the_images_of_known_players() {
-        let mut st = SessionState { showimg_records: true, ..Default::default() };
+        let mut st = SessionState {
+            showimg_records: true,
+            ..Default::default()
+        };
         let relay = |id: u8, text: &[u8]| {
             let mut p = vec![gc(0), gc(id)];
             p.extend_from_slice(text);
@@ -2991,7 +3504,11 @@ mod tests {
         for v in [ClientVersion::V222, ClientVersion::V231] {
             let mut st = SessionState::for_version(v);
             st.apply_body(&msg(32, &[gc(0), gc(2), gc(9)]));
-            assert_eq!((st.showimg_relays, st.last_showimg.clone()), (1, Some((2, vec![gc(9)]))), "{v:?}");
+            assert_eq!(
+                (st.showimg_relays, st.last_showimg.clone()),
+                (1, Some((2, vec![gc(9)]))),
+                "{v:?}"
+            );
             st.apply_body(&msg(32, &[gc(0), gc(3)]));
             assert_eq!(st.last_showimg, Some((3, vec![])));
             st.apply_body(&msg(32, &[gc(9)]));
@@ -3010,7 +3527,10 @@ mod tests {
         assert!(st.server_warp.is_none());
         st.apply_body(&msg(178, b"labtwo,labtwo,127.0.0.2,14803"));
         let w = st.server_warp.take().unwrap();
-        assert_eq!((w.name.as_str(), w.host.as_str(), w.port.as_str()), ("labtwo", "127.0.0.2", "14803"));
+        assert_eq!(
+            (w.name.as_str(), w.host.as_str(), w.port.as_str()),
+            ("labtwo", "127.0.0.2", "14803")
+        );
         assert_eq!(w.address().as_deref(), Some("127.0.0.2:14803"));
         assert!(st.server_warp.is_none());
     }
@@ -3025,12 +3545,24 @@ mod tests {
     fn lab_warp_bytes_for_the_lobby_builds() {
         let frame = [&[178 + 0x20][..], b"0,Lab Server,127.0.0.1,14900", b"\n"].concat();
         assert_eq!(frame[0], 0xD2);
-        for v in ClientVersion::all_versions().iter().copied().filter(|v| v.profile().protocol.lobby.is_some()) {
+        for v in ClientVersion::all_versions()
+            .iter()
+            .copied()
+            .filter(|v| v.profile().protocol.lobby.is_some())
+        {
             let mut st = SessionState::for_version(v);
             st.apply_body(&frame);
-            let w = st.server_warp.take().unwrap_or_else(|| panic!("{}: no warp", v.label()));
+            let w = st
+                .server_warp
+                .take()
+                .unwrap_or_else(|| panic!("{}: no warp", v.label()));
             assert_eq!(w.display_name(), "Lab Server", "{}", v.label());
-            assert_eq!(w.address().as_deref(), Some("127.0.0.1:14900"), "{}", v.label());
+            assert_eq!(
+                w.address().as_deref(),
+                Some("127.0.0.1:14900"),
+                "{}",
+                v.label()
+            );
         }
         let mut st = SessionState::for_version(ClientVersion::V231);
         st.apply_body(&frame);
@@ -3047,7 +3579,10 @@ mod tests {
         st.apply_body(&msg(25, b"!"));
         assert_eq!(st.signature_action(), Some(SignatureAction::Quit));
         st.apply_body(&msg(25, b" "));
-        assert_eq!(st.signature_action(), Some(SignatureAction::QuitUnlessLoopback));
+        assert_eq!(
+            st.signature_action(),
+            Some(SignatureAction::QuitUnlessLoopback)
+        );
     }
 
     fn id_set(s: &str) -> IdSet {
@@ -3086,16 +3621,25 @@ mod tests {
         let mut plo_rows = 0;
         for line in include_str!("decomp_plo_handled.tsv").lines().skip(1) {
             let c: Vec<&str> = line.split('\t').collect();
-            let Some(v) = table_version(c[0]) else { continue };
+            let Some(v) = table_version(c[0]) else {
+                continue;
+            };
             let want = id_set(c[3]);
-            assert_eq!(want.len(), c[2].parse::<usize>().unwrap(), "{}: count column", c[0]);
+            assert_eq!(
+                want.len(),
+                c[2].parse::<usize>().unwrap(),
+                "{}: count column",
+                c[0]
+            );
             assert_eq!(v.profile().protocol.plo, want, "plo {}", c[0]);
             plo_rows += 1;
         }
         let mut pli_rows = 0;
         for line in include_str!("decomp_pli_sent.tsv").lines().skip(1) {
             let c: Vec<&str> = line.split('\t').collect();
-            let Some(v) = table_version(c[0]) else { continue };
+            let Some(v) = table_version(c[0]) else {
+                continue;
+            };
             assert_eq!(v.profile().protocol.pli, id_set(c[1]), "pli {}", c[0]);
             pli_rows += 1;
         }
@@ -3106,7 +3650,12 @@ mod tests {
             let c: Vec<&str> = line.split('\t').collect();
             if c[0].starts_with("2.1 test") {
                 let want = id_set(c[3]);
-                assert_eq!(ClientVersion::V210.profile().protocol.plo.and(want), want, "{}", c[0]);
+                assert_eq!(
+                    ClientVersion::V210.profile().protocol.plo.and(want),
+                    want,
+                    "{}",
+                    c[0]
+                );
             }
         }
     }
@@ -3125,7 +3674,10 @@ mod tests {
             for id in 0..=255u8 {
                 for p in &payloads {
                     let mut st = SessionState::for_version(*v);
-                    st.apply(&Message { id, payload: p.clone() });
+                    st.apply(&Message {
+                        id,
+                        payload: p.clone(),
+                    });
                     // And through the splitter, with a raw-data prefix.
                     st.apply_body(&[&[id.wrapping_add(0x20)][..], p, b"\n"].concat());
                 }
@@ -3155,13 +3707,28 @@ mod tests {
     const GRID: &str = "GRMAP001\nWIDTH 2\nHEIGHT 2\nLEVELNAMES\n\"gm_nw.nw\",\"gm_ne.nw\",\n\"gm_sw.nw\",\"gm_se.nw\",\nLEVELNAMESEND\n";
 
     fn warp49(cell: (u8, u8), name: &str) -> Vec<u8> {
-        msg(49, &[&[gc(116), gc(61), gc(50), gc(cell.0), gc(cell.1)][..], name.as_bytes()].concat())
+        msg(
+            49,
+            &[
+                &[gc(116), gc(61), gc(50), gc(cell.0), gc(cell.1)][..],
+                name.as_bytes(),
+            ]
+            .concat(),
+        )
     }
 
     /// The 2.22 lab login order: 49 names the gmap, 6 names the level, 6
     /// names the gmap again.
     fn gmap_login(st: &mut SessionState) {
-        st.apply_body(&[warp49((0, 0), "gm2x2.gmap"), msg(6, b"gm_nw.nw"), raw_board(1), msg(6, b"gm2x2.gmap")].concat());
+        st.apply_body(
+            &[
+                warp49((0, 0), "gm2x2.gmap"),
+                msg(6, b"gm_nw.nw"),
+                raw_board(1),
+                msg(6, b"gm2x2.gmap"),
+            ]
+            .concat(),
+        );
     }
 
     fn grid() -> Gmap {
@@ -3182,11 +3749,20 @@ mod tests {
         let npc = |id| npc_props_message(id, &[(NPCPROP_X, PropValue::Byte(60))]);
         st.apply_body(&[msg(6, b"gm_se.nw"), npc(302), msg(6, b"gm2x2.gmap")].concat());
         assert!(st.npc_changes.is_empty(), "not the player's level");
-        assert_eq!(st.server_npcs.get(&302).and_then(|e| e.0.as_deref()), Some("gm_se.nw"));
+        assert_eq!(
+            st.server_npcs.get(&302).and_then(|e| e.0.as_deref()),
+            Some("gm_se.nw")
+        );
         // The player's own level still takes its updates.
         st.apply_body(&npc(300));
-        assert_eq!(st.npc_changes.iter().map(|c| c.0).collect::<Vec<_>>(), [300]);
-        assert_eq!(st.server_npcs.get(&300).and_then(|e| e.0.as_deref()), Some("gm_nw.nw"));
+        assert_eq!(
+            st.npc_changes.iter().map(|c| c.0).collect::<Vec<_>>(),
+            [300]
+        );
+        assert_eq!(
+            st.server_npcs.get(&300).and_then(|e| e.0.as_deref()),
+            Some("gm_nw.nw")
+        );
     }
 
     #[test]
@@ -3213,7 +3789,13 @@ mod tests {
         st.apply_body(&msg(1, b"gm_ne.nw 0 0 1 1 5 5"));
         // The server answers a PLI 35 for gm_ne: name, board, link, gmap.
         st.apply_body(
-            &[msg(6, b"gm_ne.nw"), raw_board(2), msg(1, b"other.nw 1 1 2 2 3 3"), msg(6, b"gm2x2.gmap")].concat(),
+            &[
+                msg(6, b"gm_ne.nw"),
+                raw_board(2),
+                msg(1, b"other.nw 1 1 2 2 3 3"),
+                msg(6, b"gm2x2.gmap"),
+            ]
+            .concat(),
         );
         // The player's level is current again, with its own link and board.
         assert_eq!(st.level_name.as_deref(), Some("gm_nw.nw"));
@@ -3235,7 +3817,15 @@ mod tests {
         st.apply_body(&[msg(6, b"gm_ne.nw"), raw_board(2), msg(6, b"gm2x2.gmap")].concat());
         st.set_gmap_cell((1, 0));
         assert_eq!(st.current_level_name().as_deref(), Some("gm_ne.nw"));
-        st.apply_body(&[msg(6, b"gm_ne.nw"), msg(39, &[gc(0); 5]), msg(0, b"BOARD 0 0 1 0 AA"), msg(6, b"gm2x2.gmap")].concat());
+        st.apply_body(
+            &[
+                msg(6, b"gm_ne.nw"),
+                msg(39, &[gc(0); 5]),
+                msg(0, b"BOARD 0 0 1 0 AA"),
+                msg(6, b"gm2x2.gmap"),
+            ]
+            .concat(),
+        );
         assert_eq!(st.level_name.as_deref(), Some("gm_ne.nw"));
         assert_eq!(st.board_lines.len(), 1);
         // Going back restores the first level's own board.
@@ -3256,14 +3846,28 @@ mod tests {
     fn revisit_answer_without_mod_time_restores_the_parked_level() {
         let mut st = SessionState::for_version(ClientVersion::V231);
         st.apply_body(
-            &[warp49((0, 0), "gm2x2.gmap"), msg(6, b"gm_nw.nw"), msg(39, &[gc(0), gc(0), gc(0), gc(1), gc(2)]), raw_board(1)]
-                .concat(),
+            &[
+                warp49((0, 0), "gm2x2.gmap"),
+                msg(6, b"gm_nw.nw"),
+                msg(39, &[gc(0), gc(0), gc(0), gc(1), gc(2)]),
+                raw_board(1),
+            ]
+            .concat(),
         );
         st.apply_body(&[msg(1, b"lv_a.nw 0 0 1 64 60 30"), msg(6, b"gm2x2.gmap")].concat());
         st.set_gmap_grid(grid());
         // East, first visit: the answer carries the mod time and the board.
         st.set_gmap_cell((1, 0));
-        st.apply_body(&[msg(6, b"gm_ne.nw"), msg(39, &[gc(0); 5]), raw_board(2), msg(0, b""), msg(6, b"gm2x2.gmap")].concat());
+        st.apply_body(
+            &[
+                msg(6, b"gm_ne.nw"),
+                msg(39, &[gc(0); 5]),
+                raw_board(2),
+                msg(0, b""),
+                msg(6, b"gm2x2.gmap"),
+            ]
+            .concat(),
+        );
         assert_eq!(st.board.as_ref().map(|b| b[0]), Some(2));
         assert!(st.links.is_empty(), "the first level's link stays with it");
         // Back west into the level the client holds: the gmap never asks
@@ -3293,7 +3897,8 @@ mod tests {
     fn gmap_file_from_the_server_gives_the_grid() {
         let mut st = SessionState::for_version(ClientVersion::V222);
         gmap_login(&mut st);
-        st.incoming_files.push(("gm2x2.gmap".into(), GRID.as_bytes().to_vec()));
+        st.incoming_files
+            .push(("gm2x2.gmap".into(), GRID.as_bytes().to_vec()));
         st.incoming_files.push(("other.png".into(), vec![1, 2, 3]));
         let dir = std::env::temp_dir().join(format!("seihai-gmap-{}", std::process::id()));
         let written = st.flush_files(&dir);
@@ -3324,7 +3929,11 @@ mod tests {
         }
         st.apply_body(&msg(186, &p));
         let ne = st.board_of("gm_ne.nw").unwrap();
-        assert_eq!(&ne[64 + 60..64 + 64], &[2, 2, 10, 11], "columns 62 and 63 only");
+        assert_eq!(
+            &ne[64 + 60..64 + 64],
+            &[2, 2, 10, 11],
+            "columns 62 and 63 only"
+        );
         assert_eq!(ne[2 * 64 + 62], 2, "no wrap onto the next row");
         // The player's own level is untouched, and so is its live board.
         assert_eq!(st.board_of("gm_nw.nw").unwrap()[64 + 62], 1);
@@ -3362,7 +3971,11 @@ mod tests {
         st.apply_body(&msg(186, &p));
         assert_eq!(st.board_mods_dropped, 1);
         assert!(st.take_board_mods().is_empty());
-        assert_eq!(st.board_modify2.as_ref().map(|m| m.map_x), Some(5), "still recorded");
+        assert_eq!(
+            st.board_modify2.as_ref().map(|m| m.map_x),
+            Some(5),
+            "still recorded"
+        );
     }
 
     /// `PLO_BOARDMODIFY` (7) has no cell: it goes to the player's level.
@@ -3474,7 +4087,11 @@ mod tests {
             let (r, sent) = run(v, &mut sess, &mut st, Some(&mut el), None);
             let r = r.expect("sent");
             assert_eq!(sent, vec![vec![warp_to_c(0)]]);
-            assert_eq!(r.arrival, Some((12.0, 3.0)), "GServer-v2 sends no PLO_PLAYERWARP for a plain level");
+            assert_eq!(
+                r.arrival,
+                Some((12.0, 3.0)),
+                "GServer-v2 sends no PLO_PLAYERWARP for a plain level"
+            );
             assert_eq!(sess.warp_pending.as_deref(), Some("c.nw"));
             // The server's answer loads the new level; 46 is owed once.
             st.apply_body(&full_answer("c.nw", 2_000, 5, "", ""));
@@ -3579,10 +4196,21 @@ mod tests {
     /// sends it: `PLO_RAWDATA` with the length, then id 131, GINT3 npc id
     /// and the bytecode, whose last byte is the compiler's `\n`.
     fn npc_bytecode(id: u32, code: &[u8]) -> Vec<u8> {
-        let mut m = vec![131 + 0x20, gc((id >> 14) as u8 & 0x7F), gc((id >> 7) as u8 & 0x7F), gc(id as u8 & 0x7F)];
+        let mut m = vec![
+            131 + 0x20,
+            gc((id >> 14) as u8 & 0x7F),
+            gc((id >> 7) as u8 & 0x7F),
+            gc(id as u8 & 0x7F),
+        ];
         m.extend_from_slice(code);
         let n = m.len();
-        let mut out = vec![100 + 0x20, gc((n >> 14) as u8 & 0x7F), gc((n >> 7) as u8 & 0x7F), gc(n as u8 & 0x7F), b'\n'];
+        let mut out = vec![
+            100 + 0x20,
+            gc((n >> 14) as u8 & 0x7F),
+            gc((n >> 7) as u8 & 0x7F),
+            gc(n as u8 & 0x7F),
+            b'\n',
+        ];
         out.extend(m);
         out
     }
@@ -3592,7 +4220,13 @@ mod tests {
         use crate::protocol::npcprops::{npc_props_message, PropValue, NPCPROP_X};
         // Any bytes: the dispatcher keeps them as sent, `\n` and all.
         let code = b"\0\0\0\x01\0\0\0\x04\0\0\0\0\n\x8a\n";
-        let body = [msg(6, b"lab3x.nw"), npc_props_message(5, &[(NPCPROP_X, PropValue::Byte(60))]), npc_bytecode(5, code), npc_bytecode(9, code)].concat();
+        let body = [
+            msg(6, b"lab3x.nw"),
+            npc_props_message(5, &[(NPCPROP_X, PropValue::Byte(60))]),
+            npc_bytecode(5, code),
+            npc_bytecode(9, code),
+        ]
+        .concat();
         let mut st = SessionState::for_version(ClientVersion::V3153);
         st.apply_body(&body);
         assert_eq!(st.npc_bytecode.get(&5).map(Vec::as_slice), Some(&code[..]));

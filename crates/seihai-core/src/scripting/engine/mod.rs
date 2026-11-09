@@ -8,8 +8,8 @@
 pub mod ast;
 pub mod compile;
 pub mod host;
-pub mod lexer;
 pub mod interp;
+pub mod lexer;
 pub mod parser;
 pub mod value;
 pub mod vocab;
@@ -18,8 +18,8 @@ pub mod world;
 #[cfg(test)]
 mod tests;
 
-pub use value::Val;
 pub use ast::Script;
 pub use parser::parse;
+pub use value::Val;
 pub use vocab::Era;
 pub use world::Effect;

@@ -36,7 +36,10 @@ pub fn default_cache_root() -> PathBuf {
 /// The Seihai folder: the folder the program file is in, or `None` when
 /// that cannot be found.
 pub fn seihai_dir() -> Option<PathBuf> {
-    std::env::current_exe().ok()?.parent().map(Path::to_path_buf)
+    std::env::current_exe()
+        .ok()?
+        .parent()
+        .map(Path::to_path_buf)
 }
 
 /// The cache of the server at `addr` in the Seihai folder `dir`:
@@ -155,7 +158,10 @@ pub fn cache_dir_for(root: &Path, addr: &str, name: Option<&str>) -> Option<Path
 pub fn meta_text(addr: &str, name: Option<&str>) -> String {
     let (host, port) = split_addr(addr).unwrap_or_else(|| (addr.to_string(), 0));
     let mut s = format!("host={host}\nport={port}\n");
-    if let Some(n) = name.map(str::trim).filter(|n| !n.is_empty() && !n.contains(['\n', '\r'])) {
+    if let Some(n) = name
+        .map(str::trim)
+        .filter(|n| !n.is_empty() && !n.contains(['\n', '\r']))
+    {
         s.push_str(&format!("name={n}\n"));
     }
     s
@@ -166,15 +172,22 @@ mod tests {
     #[test]
     fn game_cache_is_named_by_host_and_port() {
         let d = std::path::Path::new("/s");
-        assert_eq!(super::game_cache_dir_for(d, "Play.Example.ORG:14900"), Some(d.join("_cache/play.example.org_14900")));
-        assert_eq!(super::game_cache_dir_for(d, "[::1]:14802"), Some(d.join("_cache/__1_14802")));
+        assert_eq!(
+            super::game_cache_dir_for(d, "Play.Example.ORG:14900"),
+            Some(d.join("_cache/play.example.org_14900"))
+        );
+        assert_eq!(
+            super::game_cache_dir_for(d, "[::1]:14802"),
+            Some(d.join("_cache/__1_14802"))
+        );
         assert_eq!(super::game_cache_dir_for(d, "nohost"), None);
     }
 
     use super::*;
 
     fn tmp(tag: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("seihai-servercache-{tag}-{}", std::process::id()));
+        let d =
+            std::env::temp_dir().join(format!("seihai-servercache-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
         fs::create_dir_all(&d).unwrap();
         d
@@ -182,7 +195,10 @@ mod tests {
 
     #[test]
     fn addresses_split_into_host_and_port() {
-        assert_eq!(split_addr("play.example.org:14900"), Some(("play.example.org".into(), 14900)));
+        assert_eq!(
+            split_addr("play.example.org:14900"),
+            Some(("play.example.org".into(), 14900))
+        );
         assert_eq!(split_addr("[::1]:14900"), Some(("::1".into(), 14900)));
         assert_eq!(split_addr(" 10.0.0.2:1 "), Some(("10.0.0.2".into(), 1)));
         for bad in ["", "host", "host:", "host:99999", ":14900", "host:abc"] {
@@ -192,7 +208,10 @@ mod tests {
 
     #[test]
     fn keys_are_file_safe() {
-        assert_eq!(server_key("Play.Example.ORG", 14900), "play.example.org_14900");
+        assert_eq!(
+            server_key("Play.Example.ORG", 14900),
+            "play.example.org_14900"
+        );
         assert_eq!(server_key("::1", 14900), "__1_14900");
         assert_eq!(server_key("a/b c", 1), "a_b_c_1");
         assert_eq!(server_key("..", 1), "_._1");
@@ -204,8 +223,14 @@ mod tests {
     #[test]
     fn names_are_appended_when_known() {
         assert_eq!(folder_name("h.org", 14900, None), "h.org_14900");
-        assert_eq!(folder_name("h.org", 14900, Some("Maloria")), "h.org_14900~Maloria");
-        assert_eq!(folder_name("h.org", 14900, Some("  P  Elven Lands: 2.0 / test ")), "h.org_14900~P-Elven-Lands-2-0-test");
+        assert_eq!(
+            folder_name("h.org", 14900, Some("Maloria")),
+            "h.org_14900~Maloria"
+        );
+        assert_eq!(
+            folder_name("h.org", 14900, Some("  P  Elven Lands: 2.0 / test ")),
+            "h.org_14900~P-Elven-Lands-2-0-test"
+        );
         assert_eq!(folder_name("h.org", 14900, Some("???")), "h.org_14900");
         assert_eq!(folder_name("h.org", 14900, Some("")), "h.org_14900");
         let long = "x".repeat(80);
@@ -232,18 +257,33 @@ mod tests {
         fs::create_dir_all(&p).unwrap();
         // Same server later, name unknown or changed: same folder.
         assert_eq!(cache_dir_for(&root, "h.org:14900", None).unwrap(), p);
-        assert_eq!(cache_dir_for(&root, "H.org:14900", Some("Renamed")).unwrap(), p);
+        assert_eq!(
+            cache_dir_for(&root, "H.org:14900", Some("Renamed")).unwrap(),
+            p
+        );
         // Another port or host: another folder.
-        assert_eq!(cache_dir_for(&root, "h.org:14901", None).unwrap(), root.join("h.org_14901"));
-        assert_eq!(cache_dir_for(&root, "other.org:14900", None).unwrap(), root.join("other.org_14900"));
+        assert_eq!(
+            cache_dir_for(&root, "h.org:14901", None).unwrap(),
+            root.join("h.org_14901")
+        );
+        assert_eq!(
+            cache_dir_for(&root, "other.org:14900", None).unwrap(),
+            root.join("other.org_14900")
+        );
         assert_eq!(cache_dir_for(&root, "no-port", None), None);
         let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
     fn server_txt_holds_host_port_and_name() {
-        assert_eq!(meta_text("h.org:14900", Some("Maloria")), "host=h.org\nport=14900\nname=Maloria\n");
+        assert_eq!(
+            meta_text("h.org:14900", Some("Maloria")),
+            "host=h.org\nport=14900\nname=Maloria\n"
+        );
         assert_eq!(meta_text("h.org:14900", None), "host=h.org\nport=14900\n");
-        assert_eq!(meta_text("h.org:14900", Some("a\nb")), "host=h.org\nport=14900\n");
+        assert_eq!(
+            meta_text("h.org:14900", Some("a\nb")),
+            "host=h.org\nport=14900\n"
+        );
     }
 }

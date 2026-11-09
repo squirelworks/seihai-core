@@ -54,14 +54,29 @@ pub const PULL_TRIGGER: [(f32, f32); 4] = [(1.5, 0.0), (-0.5, 2.0), (1.5, 4.0), 
 /// One tile in each facing.
 pub const DIR_STEP: [(i32, i32); 4] = [(0, -1), (-1, 0), (0, 1), (1, 0)];
 /// Per facing: the two cells, from a pushed block's top-left, it moves into.
-pub const PUSH_DEST: [[(i32, i32); 2]; 4] = [[(0, -1), (1, -1)], [(-1, 0), (-1, 1)], [(0, 2), (1, 2)], [(2, 0), (2, 1)]];
+pub const PUSH_DEST: [[(i32, i32); 2]; 4] = [
+    [(0, -1), (1, -1)],
+    [(-1, 0), (-1, 1)],
+    [(0, 2), (1, 2)],
+    [(2, 0), (2, 1)],
+];
 /// Per facing: the two cells, from a pulled block's top-left, that must be
 /// free behind the player (the player steps back one tile).
-pub const PULL_DEST: [[(i32, i32); 2]; 4] = [[(0, 4), (1, 4)], [(4, 0), (4, 1)], [(0, -3), (1, -3)], [(-3, 0), (-3, 1)]];
+pub const PULL_DEST: [[(i32, i32); 2]; 4] = [
+    [(0, 4), (1, 4)],
+    [(4, 0), (4, 1)],
+    [(0, -3), (1, -3)],
+    [(-3, 0), (-3, 1)],
+];
 
 /// Per facing: the two cells, from the grab cell, that must be free behind
 /// the player before an NPC is pulled.
-pub const NPC_PULL_BEHIND: [[(i32, i32); 2]; 4] = [[(0, 3), (1, 3)], [(3, 0), (3, 1)], [(0, -3), (1, -3)], [(-3, 0), (-3, 1)]];
+pub const NPC_PULL_BEHIND: [[(i32, i32); 2]; 4] = [
+    [(0, 3), (1, 3)],
+    [(3, 0), (3, 1)],
+    [(0, -3), (1, -3)],
+    [(-3, 0), (-3, 1)],
+];
 
 /// Ticks a jump lasts.
 pub const JUMP_TICKS: u8 = 8;
@@ -177,7 +192,11 @@ fn npc_size_px(n: &Npc) -> (f32, f32) {
 /// into going `d` (0 up, 1 left, 2 down, 3 right): one per tile, starting
 /// at its left or top.
 fn npc_edge(d: usize, x: f32, y: f32, w: f32, h: f32) -> Vec<(f32, f32)> {
-    let along = |from: f32, len: f32| (0..).map(move |i| from + i as f32).take_while(move |&t| t < from + len);
+    let along = |from: f32, len: f32| {
+        (0..)
+            .map(move |i| from + i as f32)
+            .take_while(move |&t| t < from + len)
+    };
     match d {
         0 => along(x, w).map(|t| (t, y - 1.0)).collect(),
         1 => along(y, h).map(|t| (x - 1.0, t)).collect(),
@@ -234,7 +253,13 @@ impl OfflineSession {
     /// Count one walk step in facing `dir` and act on the count: the ledge
     /// test and the push. Returns the position to go on from (a push moves
     /// the player one tile), or `None` when a jump started.
-    pub(crate) fn count_step(&mut self, dir: u8, res: StepResult, x: f64, y: f64) -> Option<(f64, f64)> {
+    pub(crate) fn count_step(
+        &mut self,
+        dir: u8,
+        res: StepResult,
+        x: f64,
+        y: f64,
+    ) -> Option<(f64, f64)> {
         let (mut x, mut y) = (x, y);
         match res {
             StepResult::Free => {
@@ -253,11 +278,17 @@ impl OfflineSession {
                         (x, y) = (f64::from(nx), f64::from(ny));
                     }
                 }
-                self.pushpull.blocked_steps = if nudged { 0 } else { self.pushpull.blocked_steps + 1 };
+                self.pushpull.blocked_steps = if nudged {
+                    0
+                } else {
+                    self.pushpull.blocked_steps + 1
+                };
                 if self.pushpull.blocked_steps >= BLOCKED_WRAP {
                     self.pushpull.blocked_steps = LEDGE_TEST_AT;
                 }
-                if self.pushpull.blocked_steps == LEDGE_TEST_AT && self.ledge_ahead(dir, x as f32, y as f32) {
+                if self.pushpull.blocked_steps == LEDGE_TEST_AT
+                    && self.ledge_ahead(dir, x as f32, y as f32)
+                {
                     self.start_jump(dir, x as f32, y as f32);
                     return None;
                 }
@@ -268,25 +299,32 @@ impl OfflineSession {
 
     /// The push pose is on: 18 or more blocked steps in a row.
     pub fn push_pose(&self) -> bool {
-        self.pushpull.pushing && self.pushpull.blocked_steps > PUSH_POSE_AFTER && self.pushpull.jump.is_none()
+        self.pushpull.pushing
+            && self.pushpull.blocked_steps > PUSH_POSE_AFTER
+            && self.pushpull.jump.is_none()
     }
 
     /// Ticks the push pose has been on: 0 on the 18th blocked step, back to
     /// 0 each time the count wraps from 38 to 18.
     pub fn push_tick(&self) -> Option<usize> {
-        self.push_pose().then(|| (self.pushpull.blocked_steps - PUSH_POSE_AFTER - 1) as usize)
+        self.push_pose()
+            .then(|| (self.pushpull.blocked_steps - PUSH_POSE_AFTER - 1) as usize)
     }
 
     /// The ledge test: the probe tile is a ledge for this facing, and the
     /// landing point is free.
     fn ledge_ahead(&self, dir: u8, x: f32, y: f32) -> bool {
         let d = usize::from(dir & 3);
-        let (Some(level), Some(tables)) = (&self.current_level, &self.object_tables) else { return false };
+        let (Some(level), Some(tables)) = (&self.current_level, &self.object_tables) else {
+            return false;
+        };
         let (px, py) = (x + LEDGE_PROBE[d].0, y + LEDGE_PROBE[d].1);
         if !(0.0..64.0).contains(&px) || !(0.0..64.0).contains(&py) {
             return false;
         }
-        let Some(id) = level.tile_id_at(tile_of(px), tile_of(py)) else { return false };
+        let Some(id) = level.tile_id_at(tile_of(px), tile_of(py)) else {
+            return false;
+        };
         if !tables.ledges[d].contains(&id) {
             return false;
         }
@@ -300,15 +338,26 @@ impl OfflineSession {
         self.pushpull.blocked_steps = 0;
         self.pushpull.pull_shown = false;
         self.pushpull.grab_shown = false;
-        self.pushpull.jump = Some(Jump { dir, x0: x, y0: y, shown: 0 });
-        self.sound_events.push(SoundEvent { file: "jump.wav".into(), x: x + 1.5, y: y + 2.0 });
+        self.pushpull.jump = Some(Jump {
+            dir,
+            x0: x,
+            y0: y,
+            shown: 0,
+        });
+        self.sound_events.push(SoundEvent {
+            file: "jump.wav".into(),
+            x: x + 1.5,
+            y: y + 2.0,
+        });
         // 2.05 shows the first step of the flight in the tick the jump starts.
         self.jump_step();
     }
 
     /// One tick of the flight. Ends the jump after the last one.
     fn jump_step(&mut self) {
-        let Some(mut j) = self.pushpull.jump else { return };
+        let Some(mut j) = self.pushpull.jump else {
+            return;
+        };
         let i = usize::from(j.shown.min(JUMP_TICKS - 1));
         let (x, y) = match j.dir {
             DIR_NORTH => (j.x0, j.y0 - JUMP_UP[i]),
@@ -330,7 +379,9 @@ impl OfflineSession {
     /// The jump is over: on a gmap the landing may be in the next cell.
     fn land(&mut self) {
         if let Some(w) = &self.gmap {
-            if let crate::gmap::Resolved::Crossed(c) = w.map.resolve(w.cell, (self.player_x, self.player_y)) {
+            if let crate::gmap::Resolved::Crossed(c) =
+                w.map.resolve(w.cell, (self.player_x, self.player_y))
+            {
                 self.cross_to(c);
             }
         }
@@ -352,11 +403,22 @@ impl OfflineSession {
         if !(0..64).contains(&tx) || !(0..64).contains(&ty) {
             return None;
         }
-        self.pushpull.triggers.push(Trigger { action: "pushed", x: px, y: py, dir });
-        let block = self.object_tables.as_ref().and_then(|t| t.blocks.first().copied());
+        self.pushpull.triggers.push(Trigger {
+            action: "pushed",
+            x: px,
+            y: py,
+            dir,
+        });
+        let block = self
+            .object_tables
+            .as_ref()
+            .and_then(|t| t.blocks.first().copied());
         let at = block.and_then(|b| self.block_origin(&b, tx, ty));
         if let Some((ax, ay)) = at {
-            if PUSH_DEST[d].iter().any(|&(dx, dy)| self.block_way_shut(ax + dx, ay + dy)) {
+            if PUSH_DEST[d]
+                .iter()
+                .any(|&(dx, dy)| self.block_way_shut(ax + dx, ay + dy))
+            {
                 return None;
             }
             self.move_block(ax, ay, DIR_STEP[d]);
@@ -365,7 +427,11 @@ impl OfflineSession {
         }
         let (sx, sy) = DIR_STEP[d];
         let (nx, ny) = (x + sx as f32, y + sy as f32);
-        self.sound_events.push(SoundEvent { file: "stonemove.wav".into(), x: nx + 1.5, y: ny + 2.0 });
+        self.sound_events.push(SoundEvent {
+            file: "stonemove.wav".into(),
+            x: nx + 1.5,
+            y: ny + 2.0,
+        });
         Some((nx, ny))
     }
 
@@ -374,7 +440,12 @@ impl OfflineSession {
     fn movable_npc_at(&self, px: f32, py: f32, pull: bool) -> Option<usize> {
         self.current_level.as_ref()?.npcs.iter().position(|n| {
             let (x, y, w, h) = npc_hit_box(n);
-            n.visible && (if pull { n.pullable } else { n.pushable }) && px >= x && px < x + w && py >= y && py < y + h
+            n.visible
+                && (if pull { n.pullable } else { n.pushable })
+                && px >= x
+                && px < x + w
+                && py >= y
+                && py < y + h
         })
     }
 
@@ -385,7 +456,14 @@ impl OfflineSession {
         self.current_level.as_ref().is_some_and(|l| {
             l.npcs.iter().enumerate().any(|(i, n)| {
                 let (x, y, w, h) = npc_hit_box(n);
-                Some(i) != except && n.visible && n.blocks && (n.pushable || n.pullable) && px >= x && px < x + w && py >= y && py < y + h
+                Some(i) != except
+                    && n.visible
+                    && n.blocks
+                    && (n.pushable || n.pullable)
+                    && px >= x
+                    && px < x + w
+                    && py >= y
+                    && py < y + h
             })
         })
     }
@@ -396,8 +474,12 @@ impl OfflineSession {
     /// it when pulling) and the player with it. True if it moved; the
     /// player's own move is the caller's.
     fn move_npc(&mut self, d: usize, px: f32, py: f32, pull: bool) -> bool {
-        let Some(i) = self.movable_npc_at(px, py, pull) else { return false };
-        let Some(n) = self.current_level.as_ref().map(|l| &l.npcs[i]) else { return false };
+        let Some(i) = self.movable_npc_at(px, py, pull) else {
+            return false;
+        };
+        let Some(n) = self.current_level.as_ref().map(|l| &l.npcs[i]) else {
+            return false;
+        };
         let (w, h) = npc_move_size(n);
         let way = if pull { (d + 2) % 4 } else { d };
         let edge = npc_edge(way, n.x, n.y, w, h);
@@ -405,11 +487,18 @@ impl OfflineSession {
             return false;
         }
         let (sx, sy) = DIR_STEP[way];
-        let Some(n) = self.current_level.as_mut().map(|l| &mut l.npcs[i]) else { return false };
+        let Some(n) = self.current_level.as_mut().map(|l| &mut l.npcs[i]) else {
+            return false;
+        };
         n.x += sx as f32;
         n.y += sy as f32;
         let (x, y) = (n.x, n.y);
-        self.pushpull.npc_moves.push(NpcMoved { index: i, x, y, event: if pull { "waspulled" } else { "waspushed" } });
+        self.pushpull.npc_moves.push(NpcMoved {
+            index: i,
+            x,
+            y,
+            event: if pull { "waspulled" } else { "waspushed" },
+        });
         true
     }
 
@@ -434,12 +523,23 @@ impl OfflineSession {
             return false;
         }
         let (qx, qy) = (x + PULL_TRIGGER[d].0, y + PULL_TRIGGER[d].1);
-        self.pushpull.triggers.push(Trigger { action: "pulled", x: qx, y: qy, dir: opposite(dir) });
-        let block = self.object_tables.as_ref().and_then(|t| t.blocks.get(1).copied());
+        self.pushpull.triggers.push(Trigger {
+            action: "pulled",
+            x: qx,
+            y: qy,
+            dir: opposite(dir),
+        });
+        let block = self
+            .object_tables
+            .as_ref()
+            .and_then(|t| t.blocks.get(1).copied());
         let at = block.and_then(|b| self.block_origin(&b, tx, ty));
         let (sx, sy) = DIR_STEP[d];
         if let Some((ax, ay)) = at {
-            if PULL_DEST[d].iter().any(|&(dx, dy)| self.block_way_shut(ax + dx, ay + dy)) {
+            if PULL_DEST[d]
+                .iter()
+                .any(|&(dx, dy)| self.block_way_shut(ax + dx, ay + dy))
+            {
                 return false;
             }
             self.move_block(ax, ay, (-sx, -sy));
@@ -447,7 +547,9 @@ impl OfflineSession {
             // An NPC: the two cells behind the player, from the grab cell,
             // must be free first.
             if self.movable_npc_at(gx, gy, true).is_none()
-                || NPC_PULL_BEHIND[d].iter().any(|&(dx, dy)| self.block_way_shut(tx + dx, ty + dy))
+                || NPC_PULL_BEHIND[d]
+                    .iter()
+                    .any(|&(dx, dy)| self.block_way_shut(tx + dx, ty + dy))
                 || !self.move_npc(d, gx, gy, true)
             {
                 return false;
@@ -459,7 +561,11 @@ impl OfflineSession {
         self.refresh_water();
         // 2.05 picks `lift.wav` or `lift2.wav` by a player flag that was not
         // traced; the first is the one played here.
-        self.sound_events.push(SoundEvent { file: "lift.wav".into(), x: self.player_x + 1.5, y: self.player_y + 2.0 });
+        self.sound_events.push(SoundEvent {
+            file: "lift.wav".into(),
+            x: self.player_x + 1.5,
+            y: self.player_y + 2.0,
+        });
         true
     }
 
@@ -488,7 +594,9 @@ impl OfflineSession {
         match (&self.current_level, &self.tiletypes) {
             (Some(level), Some(types)) => {
                 level.kind_at(types, cx as f32, cy as f32) == TileKind::Water
-                    || level.tile_id_at(cx, cy).is_some_and(|id| types.is_chair(id))
+                    || level
+                        .tile_id_at(cx, cy)
+                        .is_some_and(|id| types.is_chair(id))
             }
             _ => false,
         }
@@ -499,7 +607,9 @@ impl OfflineSession {
     /// block is written one cell along. The 4 x 4 area around the old spot
     /// is what changed.
     fn move_block(&mut self, ax: i32, ay: i32, (sx, sy): (i32, i32)) {
-        let Some(level) = self.current_level.as_mut() else { return };
+        let Some(level) = self.current_level.as_mut() else {
+            return;
+        };
         let mut saved = [[0u16; 2]; 2];
         for (c, col) in saved.iter_mut().enumerate() {
             for (r, cell) in col.iter_mut().enumerate() {
@@ -521,9 +631,14 @@ impl OfflineSession {
             return false;
         }
         let d = usize::from(self.player_dir & 3);
-        let (gx, gy) = (self.player_x + GRAB_POINT[d].0, self.player_y + GRAB_POINT[d].1);
+        let (gx, gy) = (
+            self.player_x + GRAB_POINT[d].0,
+            self.player_y + GRAB_POINT[d].1,
+        );
         let wall = match (&self.current_level, &self.tiletypes) {
-            (Some(level), Some(types)) => self.kind_at_point(level, types, gx, gy) == TileKind::Blocking,
+            (Some(level), Some(types)) => {
+                self.kind_at_point(level, types, gx, gy) == TileKind::Blocking
+            }
             _ => false,
         } || self.npc_blocks_at(gx, gy, None);
         if wall {
@@ -540,7 +655,10 @@ impl OfflineSession {
     /// (NewMain 1.41) keeps showing the grab pose until the next action.
     pub fn release_grab(&mut self) -> bool {
         let released = self.pushpull.grab.take().is_some();
-        if released && !self.pushpull.pull_shown && self.mannerisms.pull_release == crate::protocol::PullRelease::BackToGrab {
+        if released
+            && !self.pushpull.pull_shown
+            && self.mannerisms.pull_release == crate::protocol::PullRelease::BackToGrab
+        {
             self.pushpull.grab_shown = true;
         }
         released
@@ -568,7 +686,9 @@ impl OfflineSession {
     /// An arrow key while grabbing: the arrow away from the wall starts the
     /// pull. Nothing moves and the facing stays.
     pub(crate) fn grab_arrow(&mut self, dx: f32, dy: f32) {
-        let Some(g) = self.pushpull.grab.as_mut() else { return };
+        let Some(g) = self.pushpull.grab.as_mut() else {
+            return;
+        };
         let away = match opposite(self.player_dir & 3) {
             DIR_NORTH => dy < 0.0,
             DIR_WEST => dx < 0.0,
@@ -595,7 +715,11 @@ impl OfflineSession {
     /// position).
     pub fn tick_pushpull(&mut self, ms: u64) -> bool {
         // A swing, a hit or a lift sets its own gani: the stale pull is gone.
-        if self.combat.swing_frame().is_some() || self.combat.is_hurt() || self.carried.is_some() || self.life.is_dead() {
+        if self.combat.swing_frame().is_some()
+            || self.combat.is_hurt()
+            || self.carried.is_some()
+            || self.life.is_dead()
+        {
             self.pushpull.pull_shown = false;
             self.pushpull.grab_shown = false;
         }
@@ -629,14 +753,23 @@ impl OfflineSession {
     /// As [`Self::pushpull_sprite_s`]; with `stepped` false the push and
     /// pull poses keep their first frame's number.
     pub fn pushpull_sprite_s_stepped(&self, stepped: bool) -> Option<u8> {
-        let frame = |g: &Option<crate::assets::Gani>, t: usize| if stepped { g.as_ref().map_or(0, |g| g.frame_at_tick(t, true)) } else { 0 };
+        let frame = |g: &Option<crate::assets::Gani>, t: usize| {
+            if stepped {
+                g.as_ref().map_or(0, |g| g.frame_at_tick(t, true))
+            } else {
+                0
+            }
+        };
         if self.pushpull.pull_pose() {
-            return Some(PULL_SPRITE_S[frame(&self.poses.pull, self.pushpull.pull_ticks as usize).min(2)]);
+            return Some(
+                PULL_SPRITE_S[frame(&self.poses.pull, self.pushpull.pull_ticks as usize).min(2)],
+            );
         }
         if self.pushpull.grab.is_some() || self.pushpull.grab_shown {
             return Some(GRAB_SPRITE_S);
         }
-        self.push_tick().map(|t| PUSH_SPRITE_S[frame(&self.poses.push, t).min(4)])
+        self.push_tick()
+            .map(|t| PUSH_SPRITE_S[frame(&self.poses.push, t).min(4)])
     }
 
     /// The NPCs pushes and pulls moved since the last call.
@@ -728,7 +861,12 @@ mod tests {
         s.current_level = Some(Level::from_board(&tiles));
         s.tiletypes = Some(types());
         s.object_tables = ObjectTables::parse(&arrays());
-        assert!(s.object_tables.as_ref().is_some_and(|t| t.blocks.len() == 2), "the test arrays parse");
+        assert!(
+            s.object_tables
+                .as_ref()
+                .is_some_and(|t| t.blocks.len() == 2),
+            "the test arrays parse"
+        );
         s
     }
 
@@ -772,13 +910,18 @@ mod tests {
         assert!(s.jumping(), "the 18th blocked step jumps");
         // The first step of the flight is shown at once.
         assert_eq!((s.player_x, s.player_y), (20.5, 12.5));
-        assert!(s.take_sound_events().iter().any(|e| e.file == "jump.wav" && e.x == 22.0 && e.y == 16.0));
+        assert!(s
+            .take_sound_events()
+            .iter()
+            .any(|e| e.file == "jump.wav" && e.x == 22.0 && e.y == 16.0));
         // Arrow keys do nothing in the air.
         assert!(s.try_move(0.5, 0.0).is_none());
-        let ys: Vec<f32> = (0..7).map(|_| {
-            s.tick_pushpull(50);
-            s.player_y
-        }).collect();
+        let ys: Vec<f32> = (0..7)
+            .map(|_| {
+                s.tick_pushpull(50);
+                s.player_y
+            })
+            .collect();
         assert_eq!(ys, vec![11.3, 10.2, 9.5, 9.0, 8.8, 8.8, 9.0]);
         assert!(!s.jumping(), "landed after 8 ticks");
         assert!(s.try_move(0.0, -0.5).is_some(), "walking again");
@@ -822,7 +965,9 @@ mod tests {
         let mut s = session(|_, y| if y == 14 { WALL } else { FLOOR });
         // The stock push.gani: five steps of WAIT 3 (4 ticks), looping.
         let step = "1 0 0\n1 0 0\n1 0 0\n1 0 0\nWAIT 3\n\n";
-        s.poses.push = Some(crate::assets::Gani::parse(&format!("LOOP\nANI\n{}ANIEND\n", step.repeat(5))).unwrap());
+        s.poses.push = Some(
+            crate::assets::Gani::parse(&format!("LOOP\nANI\n{}ANIEND\n", step.repeat(5))).unwrap(),
+        );
         s.player_x = 20.5;
         s.player_y = 14.0;
         let mut seen = Vec::new();
@@ -832,7 +977,9 @@ mod tests {
         }
         use crate::pose::PoseKind::{Push, Walk};
         // Steps 1..17 run in place (no walk gani here: the idle fallback).
-        assert!(seen[..17].iter().all(|p| p.map_or(true, |p| p.0 != Push && p.0 != Walk)));
+        assert!(seen[..17]
+            .iter()
+            .all(|p| p.map_or(true, |p| p.0 != Push && p.0 != Walk)));
         let push: Vec<usize> = seen[17..].iter().map(|p| p.unwrap().1).collect();
         assert_eq!(&push[..9], [0, 0, 0, 0, 1, 1, 1, 1, 2]);
         assert_eq!(push[20], 0, "the count wraps from 38 to 18: frame 0 again");
@@ -844,7 +991,9 @@ mod tests {
     fn a_gani_client_sends_one_push_sprite_while_it_pushes() {
         let mut s = session(|_, y| if y == 14 { WALL } else { FLOOR });
         let step = "1 0 0\n1 0 0\n1 0 0\n1 0 0\nWAIT 3\n\n";
-        s.poses.push = Some(crate::assets::Gani::parse(&format!("LOOP\nANI\n{}ANIEND\n", step.repeat(5))).unwrap());
+        s.poses.push = Some(
+            crate::assets::Gani::parse(&format!("LOOP\nANI\n{}ANIEND\n", step.repeat(5))).unwrap(),
+        );
         s.player_x = 20.5;
         s.player_y = 14.0;
         let mut gani = Vec::new();
@@ -856,7 +1005,11 @@ mod tests {
         }
         gani.dedup();
         stepped.dedup();
-        assert_eq!(gani, [DIR_NORTH, DIR_NORTH + 4 * PUSH_SPRITE_S[0]], "walk, then the push sprite once");
+        assert_eq!(
+            gani,
+            [DIR_NORTH, DIR_NORTH + 4 * PUSH_SPRITE_S[0]],
+            "walk, then the push sprite once"
+        );
         assert!(stepped.len() > 2, "the 2.05 numbers step with the frame");
     }
 
@@ -888,14 +1041,29 @@ mod tests {
         }
         assert_eq!(tile(&s, 20, 10), PUSH_BLOCK[0][0], "not yet");
         s.try_move(0.0, -0.5);
-        assert_eq!(tile(&s, 20, 9), PUSH_BLOCK[0][0], "the block went up a tile");
+        assert_eq!(
+            tile(&s, 20, 9),
+            PUSH_BLOCK[0][0],
+            "the block went up a tile"
+        );
         assert_eq!(tile(&s, 21, 10), PUSH_BLOCK[1][1]);
-        assert_eq!(tile(&s, 20, 11), FLOOR2, "the vacated row takes the tile from two ahead");
+        assert_eq!(
+            tile(&s, 20, 11),
+            FLOOR2,
+            "the vacated row takes the tile from two ahead"
+        );
         assert_eq!(s.player_y, 10.0, "the player follows one tile");
-        assert!(s.take_sound_events().iter().any(|e| e.file == "stonemove.wav"));
+        assert!(s
+            .take_sound_events()
+            .iter()
+            .any(|e| e.file == "stonemove.wav"));
         let c = s.take_board_changes();
         assert_eq!(c.len(), 1);
-        assert_eq!((c[0].x, c[0].y, c[0].width, c[0].height), (19, 9, 4, 4), "the 4 x 4 around the old spot");
+        assert_eq!(
+            (c[0].x, c[0].y, c[0].width, c[0].height),
+            (19, 9, 4, 4),
+            "the 4 x 4 around the old spot"
+        );
         assert_eq!(c[0].tiles[1], PUSH_BLOCK[0][0], "the new tiles, row by row");
         let t = s.take_triggers();
         assert_eq!(t.len(), 1);
@@ -907,7 +1075,10 @@ mod tests {
         for blocker in [WALL, WATER] {
             let mut s = session(|_, _| FLOOR);
             put(&mut s, 20, 10, PUSH_BLOCK);
-            s.current_level.as_mut().unwrap().set_tile_id(21, 9, blocker);
+            s.current_level
+                .as_mut()
+                .unwrap()
+                .set_tile_id(21, 9, blocker);
             s.player_x = 19.5;
             s.player_y = 11.0;
             for _ in 0..40 {
@@ -915,7 +1086,10 @@ mod tests {
             }
             assert_eq!(tile(&s, 20, 10), PUSH_BLOCK[0][0]);
             assert_eq!(s.player_y, 11.0);
-            assert!(!s.take_triggers().is_empty(), "the push still fires `pushed`");
+            assert!(
+                !s.take_triggers().is_empty(),
+                "the push still fires `pushed`"
+            );
         }
     }
 
@@ -944,7 +1118,11 @@ mod tests {
         for _ in 0..36 {
             s.tick_pushpull(50);
             s.try_move(0.0, 0.5);
-            pulls += s.take_triggers().iter().filter(|t| t.action == "pulled").count();
+            pulls += s
+                .take_triggers()
+                .iter()
+                .filter(|t| t.action == "pulled")
+                .count();
         }
         assert_eq!(pulls, 2, "one pull try every 18 ticks");
         assert_eq!((s.player_x, s.player_y), (19.5, 10.0), "nothing moved");
@@ -960,7 +1138,10 @@ mod tests {
         s.tick_pushpull(100);
         assert_eq!(s.pushpull.pull_ticks, t + 2);
         assert!(s.pushpull.pull_pose());
-        assert_eq!(s.pushpull_sprite_s().map(|v| PULL_SPRITE_S.contains(&v)), Some(true));
+        assert_eq!(
+            s.pushpull_sprite_s().map(|v| PULL_SPRITE_S.contains(&v)),
+            Some(true)
+        );
         assert!(s.try_move(0.0, 0.5).is_some(), "walks again");
         assert!(!s.pushpull.pull_pose());
         assert_eq!(s.pushpull_sprite_s(), None);
@@ -997,8 +1178,16 @@ mod tests {
         }
         assert_eq!(s.pushpull.grab.unwrap().count, PULL_AT);
         s.try_move(0.0, 0.5);
-        assert_eq!(tile(&s, 20, 9), PULL_BLOCK[0][0], "the block came down a tile");
-        assert_eq!(tile(&s, 20, 8), FLOOR, "its old top row takes the tile from two behind");
+        assert_eq!(
+            tile(&s, 20, 9),
+            PULL_BLOCK[0][0],
+            "the block came down a tile"
+        );
+        assert_eq!(
+            tile(&s, 20, 8),
+            FLOOR,
+            "its old top row takes the tile from two behind"
+        );
         assert_eq!(s.player_y, 10.0, "the player stepped back");
         let t = s.take_triggers();
         assert_eq!((t[0].action, t[0].dir), ("pulled", DIR_SOUTH));
@@ -1027,14 +1216,33 @@ mod tests {
         for _ in 0..28 {
             s.try_move(0.0, -0.5);
         }
-        assert_eq!(npc_pos(&s), (20.0, 10.0), "it blocks, and has not moved yet");
+        assert_eq!(
+            npc_pos(&s),
+            (20.0, 10.0),
+            "it blocks, and has not moved yet"
+        );
         assert_eq!(s.player_y, 11.0);
         s.try_move(0.0, -0.5);
         assert_eq!(npc_pos(&s), (20.0, 9.0), "one tile up");
         assert_eq!(s.player_y, 10.0, "the player follows");
-        assert_eq!(s.take_npc_moves(), vec![NpcMoved { index: 0, x: 20.0, y: 9.0, event: "waspushed" }]);
-        assert_eq!(s.take_triggers()[0].action, "pushed", "actionpushed comes first");
-        assert!(s.take_sound_events().iter().any(|e| e.file == "stonemove.wav"));
+        assert_eq!(
+            s.take_npc_moves(),
+            vec![NpcMoved {
+                index: 0,
+                x: 20.0,
+                y: 9.0,
+                event: "waspushed"
+            }]
+        );
+        assert_eq!(
+            s.take_triggers()[0].action,
+            "pushed",
+            "actionpushed comes first"
+        );
+        assert!(s
+            .take_sound_events()
+            .iter()
+            .any(|e| e.file == "stonemove.wav"));
     }
 
     #[test]
@@ -1058,7 +1266,11 @@ mod tests {
         for _ in 0..29 {
             s.try_move(0.0, -0.5);
         }
-        assert_eq!(npc_pos(&s), (20.0, 10.0), "canbepulled only: a push does not move it");
+        assert_eq!(
+            npc_pos(&s),
+            (20.0, 10.0),
+            "canbepulled only: a push does not move it"
+        );
     }
 
     #[test]
@@ -1076,7 +1288,15 @@ mod tests {
         s.try_move(0.0, 0.5);
         assert_eq!(npc_pos(&s), (20.0, 9.0), "one tile towards the player");
         assert_eq!(s.player_y, 10.0, "the player stepped back");
-        assert_eq!(s.take_npc_moves(), vec![NpcMoved { index: 0, x: 20.0, y: 9.0, event: "waspulled" }]);
+        assert_eq!(
+            s.take_npc_moves(),
+            vec![NpcMoved {
+                index: 0,
+                x: 20.0,
+                y: 9.0,
+                event: "waspulled"
+            }]
+        );
     }
 
     /// `new3.nw` with the ledge and block lists of the 2.22 install's
@@ -1087,10 +1307,21 @@ mod tests {
         let mut s = OfflineSession::new();
         s.current_level = Some(Level::load(path).expect("new3.nw loads"));
         let mut t = ObjectTables::default();
-        t.ledges = [vec![190, 191, 4045, 4046], vec![212, 228, 563, 579, 4028, 4044], vec![185, 186, 4061, 4062], vec![273, 289, 4031, 4047]];
+        t.ledges = [
+            vec![190, 191, 4045, 4046],
+            vec![212, 228, 563, 579, 4028, 4044],
+            vec![185, 186, 4061, 4062],
+            vec![273, 289, 4031, 4047],
+        ];
         t.blocks = vec![PUSH_BLOCK, PULL_BLOCK];
         let mut types = TileTypes::from_types([0; 4096]);
-        for id in t.ledges.iter().flatten().copied().chain(t.blocks.iter().flatten().flatten().copied()) {
+        for id in t
+            .ledges
+            .iter()
+            .flatten()
+            .copied()
+            .chain(t.blocks.iter().flatten().flatten().copied())
+        {
             types.types[usize::from(id)] = 22;
         }
         s.object_tables = Some(t);

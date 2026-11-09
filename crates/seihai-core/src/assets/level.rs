@@ -158,7 +158,10 @@ pub struct ImageEffect {
 
 impl Default for ImageEffect {
     fn default() -> Self {
-        ImageEffect { color: [1.0; 4], zoom: 1.0 }
+        ImageEffect {
+            color: [1.0; 4],
+            zoom: 1.0,
+        }
     }
 }
 
@@ -173,14 +176,39 @@ impl ImageEffect {
 impl Npc {
     /// An NPC with only its image, position and script.
     pub fn new(image: String, x: f32, y: f32, script: String) -> Npc {
-        Npc { image, x, y, script, visible: true, image_part: None, ani: None, ani_frame: 0, ani_ms: 0, images: Vec::new(),
-            head: None, body: None, shield: None, props: std::collections::HashMap::new(), blocks: true, pushable: false, pullable: false, shape: None, layer: DrawLayer::Player, effect: ImageEffect::default(), server_id: None,
-            message: String::new(), dir: 2, ani_calls: 0 }
+        Npc {
+            image,
+            x,
+            y,
+            script,
+            visible: true,
+            image_part: None,
+            ani: None,
+            ani_frame: 0,
+            ani_ms: 0,
+            images: Vec::new(),
+            head: None,
+            body: None,
+            shield: None,
+            props: std::collections::HashMap::new(),
+            blocks: true,
+            pushable: false,
+            pullable: false,
+            shape: None,
+            layer: DrawLayer::Player,
+            effect: ImageEffect::default(),
+            server_id: None,
+            message: String::new(),
+            dir: 2,
+            ani_calls: 0,
+        }
     }
 
     /// Every image file the NPC draws now: its own and its `showimg` ones.
     pub fn image_names(&self) -> impl Iterator<Item = &str> {
-        std::iter::once(self.image.as_str()).chain(self.images.iter().map(|i| i.file.as_str())).filter(|n| !n.is_empty())
+        std::iter::once(self.image.as_str())
+            .chain(self.images.iter().map(|i| i.file.as_str()))
+            .filter(|n| !n.is_empty())
     }
 }
 
@@ -294,7 +322,11 @@ fn parse_arr_node(data: &[u8], off: &mut usize, depth: u32) -> Option<ArrNode> {
     let (kind, n) = (h >> 16, (h & 0xFFFF) as usize);
     if kind == 0 {
         let end = off.checked_add(n.checked_mul(4)?)?;
-        let ints = data.get(*off..end)?.chunks_exact(4).map(|c| u32::from_be_bytes(c.try_into().unwrap())).collect();
+        let ints = data
+            .get(*off..end)?
+            .chunks_exact(4)
+            .map(|c| u32::from_be_bytes(c.try_into().unwrap()))
+            .collect();
         *off = end;
         Some(ArrNode::Ints(ints))
     } else {
@@ -307,7 +339,9 @@ fn parse_arr_node(data: &[u8], off: &mut usize, depth: u32) -> Option<ArrNode> {
 }
 
 fn leaps_from(node: Option<&ArrNode>) -> Vec<Vec<Vec<u32>>> {
-    let Some(ArrNode::List(kinds)) = node else { return Vec::new() };
+    let Some(ArrNode::List(kinds)) = node else {
+        return Vec::new();
+    };
     kinds
         .iter()
         .map(|k| match k {
@@ -325,8 +359,19 @@ fn leaps_from(node: Option<&ArrNode>) -> Vec<Vec<Vec<u32>>> {
 
 /// A list of int lists (arrays 20, 22, 23).
 fn lists_from(node: Option<&ArrNode>) -> Vec<Vec<u32>> {
-    let Some(ArrNode::List(items)) = node else { return Vec::new() };
-    items.iter().map(|i| if let ArrNode::Ints(v) = i { v.clone() } else { Vec::new() }).collect()
+    let Some(ArrNode::List(items)) = node else {
+        return Vec::new();
+    };
+    items
+        .iter()
+        .map(|i| {
+            if let ArrNode::Ints(v) = i {
+                v.clone()
+            } else {
+                Vec::new()
+            }
+        })
+        .collect()
 }
 
 fn ledges_from(node: Option<&ArrNode>) -> [Vec<u16>; 4] {
@@ -334,7 +379,11 @@ fn ledges_from(node: Option<&ArrNode>) -> [Vec<u16>; 4] {
     if let Some(ArrNode::List(dirs)) = node {
         for (d, list) in dirs.iter().take(4).enumerate() {
             if let ArrNode::Ints(v) = list {
-                out[d] = v.iter().filter(|&&id| id < 4096).map(|&id| id as u16).collect();
+                out[d] = v
+                    .iter()
+                    .filter(|&&id| id < 4096)
+                    .map(|&id| id as u16)
+                    .collect();
             }
         }
     }
@@ -342,7 +391,9 @@ fn ledges_from(node: Option<&ArrNode>) -> [Vec<u16>; 4] {
 }
 
 fn objects_from(node: Option<&ArrNode>) -> Vec<Object2x2> {
-    let Some(ArrNode::List(items)) = node else { return Vec::new() };
+    let Some(ArrNode::List(items)) = node else {
+        return Vec::new();
+    };
     items
         .iter()
         .filter_map(|it| {
@@ -352,7 +403,9 @@ fn objects_from(node: Option<&ArrNode>) -> Vec<Object2x2> {
                 return None;
             }
             for (c, col) in cols.iter().enumerate() {
-                let ArrNode::Ints(rows) = col else { return None };
+                let ArrNode::Ints(rows) = col else {
+                    return None;
+                };
                 if rows.len() != 2 {
                     return None;
                 }
@@ -483,7 +536,10 @@ pub struct TileTypes {
 impl TileTypes {
     /// A table with these type bytes and no extra bed tops.
     pub fn from_types(types: [u8; 4096]) -> Self {
-        TileTypes { types, bed_tops: Vec::new() }
+        TileTypes {
+            types,
+            bed_tops: Vec::new(),
+        }
     }
 
     /// Load a text tiledefs file.
@@ -588,7 +644,9 @@ impl TileTypes {
         let mut off = 0usize;
         while arrays.len() < 7 && off + 4 <= data.len() {
             let count = u32::from_be_bytes(data[off..off + 4].try_into().unwrap()) as usize;
-            let end = off.saturating_add(4).saturating_add(count.saturating_mul(4));
+            let end = off
+                .saturating_add(4)
+                .saturating_add(count.saturating_mul(4));
             if end > data.len() || (!arrays.is_empty() && count > 4096) {
                 if arrays.is_empty() {
                     return Err(format!("arrays.dat truncated: need {count} ints"));
@@ -609,11 +667,17 @@ impl TileTypes {
                 types[id] = 0;
             }
         }
-        let lava: std::collections::HashSet<usize> =
-            arrays.get(3).map(|a| a.iter().copied().collect()).unwrap_or_default();
+        let lava: std::collections::HashSet<usize> = arrays
+            .get(3)
+            .map(|a| a.iter().copied().collect())
+            .unwrap_or_default();
         if let Some(liquid) = arrays.get(1) {
             for &id in liquid.iter().filter(|&&id| id < 4096) {
-                types[id] = if lava.contains(&id) { TYPE_LAVA } else { TYPE_WATER };
+                types[id] = if lava.contains(&id) {
+                    TYPE_LAVA
+                } else {
+                    TYPE_WATER
+                };
             }
         }
         if let Some(through) = arrays.get(2) {
@@ -627,7 +691,12 @@ impl TileTypes {
         // of a bed. They keep walking behaviour and only get the type byte of
         // the scripting language's tile-type list.
         for (index, kind) in [(4, TYPE_CHAIR), (5, TYPE_BED_TOP), (6, TYPE_BED_BOTTOM)] {
-            for &id in arrays.get(index).into_iter().flatten().filter(|&&id| id < 4096) {
+            for &id in arrays
+                .get(index)
+                .into_iter()
+                .flatten()
+                .filter(|&&id| id < 4096)
+            {
                 if types[id] == 0 {
                     types[id] = kind;
                 }
@@ -638,7 +707,13 @@ impl TileTypes {
                 types[id] = TYPE_LAVA_FLOOR;
             }
         }
-        let mut bed_tops: Vec<u16> = arrays.get(5).into_iter().flatten().filter(|&&id| id < 4096).map(|&id| id as u16).collect();
+        let mut bed_tops: Vec<u16> = arrays
+            .get(5)
+            .into_iter()
+            .flatten()
+            .filter(|&&id| id < 4096)
+            .map(|&id| id as u16)
+            .collect();
         bed_tops.sort_unstable();
         bed_tops.dedup();
         Ok(TileTypes { types, bed_tops })
@@ -726,13 +801,24 @@ mod tiletypes_tests {
         let t = TileTypes::parse_arrays(&data).unwrap();
         assert!(t.is_chair(8));
         assert_eq!(t.kind(8), TileKind::Open, "a bench is walkable");
-        assert!(!t.is_chair(40) && t.is_wall(40), "a wall in the chair list stays a wall");
+        assert!(
+            !t.is_chair(40) && t.is_wall(40),
+            "a wall in the chair list stays a wall"
+        );
         assert!(!t.is_chair(0) && !t.is_chair(9));
-        assert_eq!([9, 10, 41].map(|id| t.raw(id)), [Some(TYPE_BED_TOP), Some(TYPE_BED_BOTTOM), Some(TYPE_HARD_WALL)]);
+        assert_eq!(
+            [9, 10, 41].map(|id| t.raw(id)),
+            [
+                Some(TYPE_BED_TOP),
+                Some(TYPE_BED_BOTTOM),
+                Some(TYPE_HARD_WALL)
+            ]
+        );
         assert_eq!(t.kind(9), TileKind::Open, "a bed is walkable");
         // A bed top that is not passable (as in the 2.22 file) stays a wall
         // and is still a bed top.
-        let t = TileTypes::parse_arrays(&arrays_blob(&[&[0], &[], &[], &[], &[], &[9], &[10]])).unwrap();
+        let t = TileTypes::parse_arrays(&arrays_blob(&[&[0], &[], &[], &[], &[], &[9], &[10]]))
+            .unwrap();
         assert!(t.is_wall(9) && t.is_bed_top(9));
         assert!(!t.is_bed_top(10) && !t.is_bed_top(0));
         // A text table marks wall bed tops with a `bedtop:` line.
@@ -757,9 +843,19 @@ mod tiletypes_tests {
         assert_eq!(t.kind(398), TileKind::Open);
         assert_eq!(t.kind(461), TileKind::Water);
         assert_eq!(t.kind(2882), TileKind::Lava);
-        assert_eq!((t.kind(2958), t.raw(2958)), (TileKind::Open, Some(TYPE_LAVA_FLOOR)));
-        assert_eq!(t.kind(3644), TileKind::Blocking, "deep water is in no list: a wall");
-        assert_eq!([398, 461, 2882, 2958, 3644].map(|id| t.is_lava(id)), [false, false, true, true, false]);
+        assert_eq!(
+            (t.kind(2958), t.raw(2958)),
+            (TileKind::Open, Some(TYPE_LAVA_FLOOR))
+        );
+        assert_eq!(
+            t.kind(3644),
+            TileKind::Blocking,
+            "deep water is in no list: a wall"
+        );
+        assert_eq!(
+            [398, 461, 2882, 2958, 3644].map(|id| t.is_lava(id)),
+            [false, false, true, true, false]
+        );
     }
 
     #[test]
@@ -783,7 +879,10 @@ mod tiletypes_tests {
         // passable: 0, 5; throw-through: 5 (passable) and 6, 7 (walls)
         let data = arrays_blob(&[&[0, 5], &[], &[5, 6, 7]]);
         let t = TileTypes::parse_arrays(&data).unwrap();
-        assert_eq!([5, 6, 7, 8].map(|id| t.raw(id)), [Some(0), Some(20), Some(20), Some(TYPE_HARD_WALL)]);
+        assert_eq!(
+            [5, 6, 7, 8].map(|id| t.raw(id)),
+            [Some(0), Some(20), Some(20), Some(TYPE_HARD_WALL)]
+        );
         assert!(t.is_wall(6), "a throw-through tile still blocks walking");
     }
 
@@ -869,7 +968,6 @@ mod tiletypes_tests {
     }
 }
 
-
 use crate::protocol::layouts::BoardModify2;
 use crate::protocol::BoardModify;
 
@@ -892,8 +990,17 @@ impl Level {
     pub fn npc_scripts_dump(&self) -> String {
         let mut out = String::new();
         for (i, n) in self.npcs.iter().enumerate() {
-            let image = if n.image.is_empty() { "-" } else { n.image.as_str() };
-            out.push_str(&format!("//// npc {i}: {image} at {},{} ({} lines)\n", n.x, n.y, n.script.lines().count()));
+            let image = if n.image.is_empty() {
+                "-"
+            } else {
+                n.image.as_str()
+            };
+            out.push_str(&format!(
+                "//// npc {i}: {image} at {},{} ({} lines)\n",
+                n.x,
+                n.y,
+                n.script.lines().count()
+            ));
             out.push_str(&n.script);
             if !n.script.ends_with('\n') {
                 out.push('\n');
@@ -931,8 +1038,11 @@ impl Level {
     /// Add the server's `PLO_LEVELLINK` lines (`dest x y w h newx newy`).
     /// Lines that do not parse are skipped.
     pub fn add_server_links(&mut self, lines: &[String]) {
-        self.links
-            .extend(lines.iter().filter_map(|l| parse_link(&format!("LINK {l}"))));
+        self.links.extend(
+            lines
+                .iter()
+                .filter_map(|l| parse_link(&format!("LINK {l}"))),
+        );
     }
 
     /// Add the server's `PLO_LEVELCHEST` records: `opened, x, y` and, for a
@@ -949,15 +1059,27 @@ impl Level {
             }
             // The client reads any non-zero first byte as "opened".
             let opened = b[0].wrapping_sub(0x20) != 0;
-            let (x, y) = (b[1].wrapping_sub(0x20) as i32, b[2].wrapping_sub(0x20) as i32);
+            let (x, y) = (
+                b[1].wrapping_sub(0x20) as i32,
+                b[2].wrapping_sub(0x20) as i32,
+            );
             let (item, sign_index) = match b[..] {
                 [_, _, _, i, s, ..] if !opened => (
-                    CHEST_ITEMS.get(i.wrapping_sub(0x20) as usize).map(|s| s.to_string()).unwrap_or_default(),
+                    CHEST_ITEMS
+                        .get(i.wrapping_sub(0x20) as usize)
+                        .map(|s| s.to_string())
+                        .unwrap_or_default(),
                     s.wrapping_sub(0x20) as i32,
                 ),
                 _ => (String::new(), -1),
             };
-            self.chests.push(Chest { x, y, item, sign_index, opened });
+            self.chests.push(Chest {
+                x,
+                y,
+                item,
+                sign_index,
+                opened,
+            });
         }
     }
 
@@ -985,7 +1107,8 @@ impl Level {
             let text = String::from_utf8_lossy(data);
             return Self::parse(&text);
         }
-        if data.len() >= 8 && (data[0..8].starts_with(b"GR-V1") || data[0..8].starts_with(b"Z3-V1")) {
+        if data.len() >= 8 && (data[0..8].starts_with(b"GR-V1") || data[0..8].starts_with(b"Z3-V1"))
+        {
             return Self::parse_binary(data);
         }
         Err("unrecognised level header".into())
@@ -1229,7 +1352,10 @@ impl Level {
 
             // Remove any existing layer-0 run that overlaps this row segment
             self.boards.retain(|b| {
-                !(b.layer == 0 && b.y == y && b.x < m.x as i32 + m.width as i32 && b.x + b.width > m.x as i32)
+                !(b.layer == 0
+                    && b.y == y
+                    && b.x < m.x as i32 + m.width as i32
+                    && b.x + b.width > m.x as i32)
             });
 
             // Insert a new run for the modified segment
@@ -1267,13 +1393,17 @@ impl Level {
     /// links, signs and chests stay).
     pub fn set_layer0_board(&mut self, board: &[u16]) {
         self.boards.retain(|r| r.layer != 0);
-        let rows = board.chunks(64).take(64).enumerate().map(|(y, row)| BoardRun {
-            x: 0,
-            y: y as i32,
-            width: row.len() as i32,
-            layer: 0,
-            tiles: row.iter().map(|&t| tile_code(t)).collect(),
-        });
+        let rows = board
+            .chunks(64)
+            .take(64)
+            .enumerate()
+            .map(|(y, row)| BoardRun {
+                x: 0,
+                y: y as i32,
+                width: row.len() as i32,
+                layer: 0,
+                tiles: row.iter().map(|&t| tile_code(t)).collect(),
+            });
         let mut runs: Vec<BoardRun> = rows.collect();
         runs.append(&mut self.boards);
         self.boards = runs;
@@ -1307,12 +1437,18 @@ impl Level {
     /// first one wins, as it does in [`Self::tile_at`].
     pub fn tile_ids(&self) -> Vec<u16> {
         let mut board = vec![0u16; 64 * 64];
-        for run in self.boards.iter().rev().filter(|r| r.layer == 0 && (0..64).contains(&r.y)) {
+        for run in self
+            .boards
+            .iter()
+            .rev()
+            .filter(|r| r.layer == 0 && (0..64).contains(&r.y))
+        {
             for i in 0..run.width.max(0) {
                 let x = run.x + i;
                 if (0..64).contains(&x) {
                     // A run shorter than its width still covers the rest, as nothing.
-                    board[run.y as usize * 64 + x as usize] = run.tiles.get(i as usize).map_or(0, |t| tile_id(*t));
+                    board[run.y as usize * 64 + x as usize] =
+                        run.tiles.get(i as usize).map_or(0, |t| tile_id(*t));
                 }
             }
         }
@@ -1362,7 +1498,13 @@ impl Level {
     /// The client looks for the tile under the point in each entry (entry
     /// by entry, column by column, row by row), then checks the whole 2 x 2
     /// around it; the first full match wins.
-    pub fn find_object(&self, table: &[Object2x2], max_types: usize, px: i32, py: i32) -> Option<(usize, i32, i32)> {
+    pub fn find_object(
+        &self,
+        table: &[Object2x2],
+        max_types: usize,
+        px: i32,
+        py: i32,
+    ) -> Option<(usize, i32, i32)> {
         if !(0..64).contains(&px) || !(0..64).contains(&py) {
             return None;
         }
@@ -1377,7 +1519,9 @@ impl Level {
                     let all = (0..2).all(|i| {
                         (0..2).all(|j| {
                             let (x, y) = (ax + i as i32, ay + j as i32);
-                            (0..64).contains(&x) && (0..64).contains(&y) && self.tile_id_at(x, y) == Some(obj[i][j])
+                            (0..64).contains(&x)
+                                && (0..64).contains(&y)
+                                && self.tile_id_at(x, y) == Some(obj[i][j])
                         })
                     });
                     if all {
@@ -1459,7 +1603,11 @@ fn parse_npc(lines: &[String]) -> Option<Npc> {
     if lines.len() < 2 {
         return None;
     }
-    let end = if lines[lines.len() - 1].trim() == "NPCEND" { lines.len() - 1 } else { lines.len() };
+    let end = if lines[lines.len() - 1].trim() == "NPCEND" {
+        lines.len() - 1
+    } else {
+        lines.len()
+    };
     let script = lines[1..end]
         .iter()
         .map(|s| s.as_str())
@@ -1471,9 +1619,31 @@ fn parse_npc(lines: &[String]) -> Option<Npc> {
 
 /// Names of the chest item indexes 0 to 24 (`LevelItemType`).
 pub const CHEST_ITEMS: [&str; 25] = [
-    "greenrupee", "bluerupee", "redrupee", "bombs", "darts", "heart", "glove1", "bow", "bomb", "shield", "sword",
-    "fullheart", "superbomb", "battleaxe", "goldensword", "mirrorshield", "glove2", "lizardshield", "lizardsword",
-    "goldrupee", "fireball", "fireblast", "nukeshot", "joltbomb", "spinattack",
+    "greenrupee",
+    "bluerupee",
+    "redrupee",
+    "bombs",
+    "darts",
+    "heart",
+    "glove1",
+    "bow",
+    "bomb",
+    "shield",
+    "sword",
+    "fullheart",
+    "superbomb",
+    "battleaxe",
+    "goldensword",
+    "mirrorshield",
+    "glove2",
+    "lizardshield",
+    "lizardsword",
+    "goldrupee",
+    "fireball",
+    "fireblast",
+    "nukeshot",
+    "joltbomb",
+    "spinattack",
 ];
 
 /// A 64×64 board of tile ids as layer-0 row runs, one full row each. Tile 0
@@ -1484,7 +1654,13 @@ pub(crate) fn board_runs(tiles: &[u16]) -> Vec<BoardRun> {
         .chunks(64)
         .take(64)
         .enumerate()
-        .map(|(y, row)| BoardRun { x: 0, y: y as i32, width: row.len() as i32, layer: 0, tiles: row.iter().map(|&t| tile_code(t)).collect() })
+        .map(|(y, row)| BoardRun {
+            x: 0,
+            y: y as i32,
+            width: row.len() as i32,
+            layer: 0,
+            tiles: row.iter().map(|&t| tile_code(t)).collect(),
+        })
         .collect()
 }
 
@@ -1542,17 +1718,45 @@ impl GraalLayout {
         let floor = level.layer0_board();
         let distinct: std::collections::BTreeSet<u16> = floor.iter().copied().collect();
         let mut out = String::new();
-        out.push_str(&format!("magic {}  code bits {}  file {} bytes\n", self.magic, self.code_bits, self.file_len));
+        out.push_str(&format!(
+            "magic {}  code bits {}  file {} bytes\n",
+            self.magic, self.code_bits, self.file_len
+        ));
         out.push_str(&format!(
             "board: {} tiles from {} codes ({} single runs, {} double runs, longest run {}), ends at byte {}\n",
             self.tiles_decoded, self.codes, self.single_runs, self.double_runs, self.max_run, self.board_end
         ));
-        out.push_str(&format!("board: {} distinct tile ids, highest {}\n", distinct.len(), self.max_tile));
-        out.push_str(&format!("links   {}: {} lines, {} read\n", span(self.links), self.link_lines, level.links.len()));
-        out.push_str(&format!("baddies {}: {} records\n", span(self.baddies), self.baddy_records));
-        out.push_str(&format!("npcs    {}: {} records\n", span(self.npcs), self.npc_records));
-        out.push_str(&format!("chests  {}: {} records\n", span(self.chests), self.chest_records));
-        out.push_str(&format!("signs   {}: {} records\n", span(self.signs), self.sign_records));
+        out.push_str(&format!(
+            "board: {} distinct tile ids, highest {}\n",
+            distinct.len(),
+            self.max_tile
+        ));
+        out.push_str(&format!(
+            "links   {}: {} lines, {} read\n",
+            span(self.links),
+            self.link_lines,
+            level.links.len()
+        ));
+        out.push_str(&format!(
+            "baddies {}: {} records\n",
+            span(self.baddies),
+            self.baddy_records
+        ));
+        out.push_str(&format!(
+            "npcs    {}: {} records\n",
+            span(self.npcs),
+            self.npc_records
+        ));
+        out.push_str(&format!(
+            "chests  {}: {} records\n",
+            span(self.chests),
+            self.chest_records
+        ));
+        out.push_str(&format!(
+            "signs   {}: {} records\n",
+            span(self.signs),
+            self.sign_records
+        ));
         out.push_str(&format!("unread tail: {} bytes\n", self.unread_tail));
         out
     }
@@ -1594,7 +1798,13 @@ impl<'a> Sections<'a> {
 /// `HEIGHTS` block. Layout from Graal_analysis `formats/level-binary.md`
 /// and `level-binary-client.md` (2.05, 2.31). A section that is cut short
 /// leaves what was read; nothing here fails the whole level.
-fn parse_binary_sections(magic: &[u8], tail: &[u8], level: &mut Level, layout: &mut GraalLayout, base: usize) {
+fn parse_binary_sections(
+    magic: &[u8],
+    tail: &[u8],
+    level: &mut Level,
+    layout: &mut GraalLayout,
+    base: usize,
+) {
     let graal = magic.starts_with(b"GR-V1");
     // GR-V1.00 and later have NPCs; GR-V1.01 and later have chests; Z3-V1
     // has neither, and its baddies have a verse line from Z3-V1.04.
@@ -1783,7 +1993,10 @@ fn link_coord(s: &str, keep: &str) -> (Option<f32>, f32) {
         // the Drive set use -1, and so do 151 of 338 `Z3-V1` links).
         return (if n < 0.0 { None } else { Some(n) }, 0.0);
     }
-    if s.len() >= keep.len() && s.is_char_boundary(keep.len()) && s[..keep.len()].eq_ignore_ascii_case(keep) {
+    if s.len() >= keep.len()
+        && s.is_char_boundary(keep.len())
+        && s[..keep.len()].eq_ignore_ascii_case(keep)
+    {
         let rest = &s[keep.len()..];
         if rest.starts_with(['+', '-']) {
             if let Ok(off) = rest.parse::<f32>() {
@@ -1813,7 +2026,11 @@ fn parse_sign(lines: &[String]) -> Option<Sign> {
     if body.last().is_some_and(|l| l.trim() == "SIGNEND") {
         body = &body[..body.len() - 1];
     }
-    let text = body.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n");
+    let text = body
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
     Some(Sign { x, y, text })
 }
 
@@ -1838,7 +2055,11 @@ fn parse_baddy(lines: &[String]) -> Option<Baddy> {
     if body.last().is_some_and(|l| l.trim() == "BADDYEND") {
         body = &body[..body.len() - 1];
     }
-    let verses = body.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n");
+    let verses = body
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
     Some(Baddy { x, y, kind, verses })
 }
 
@@ -1897,9 +2118,11 @@ pub fn decode_sign_text(payload: &[u8]) -> String {
             i += 1;
             continue;
         }
-        let glyph = SIGN_GLYPHS
-            .iter()
-            .find(|(seq, _)| seq.iter().enumerate().all(|(k, &v)| codes.get(i + k) == Some(&(v as i32))));
+        let glyph = SIGN_GLYPHS.iter().find(|(seq, _)| {
+            seq.iter()
+                .enumerate()
+                .all(|(k, &v)| codes.get(i + k) == Some(&(v as i32)))
+        });
         if let Some((seq, tag)) = glyph {
             raw.push_str(tag);
             i += seq.len();
@@ -1955,11 +2178,18 @@ mod tests {
     /// cache file) parses instead of panicking on `lines[1..0]`.
     #[test]
     fn a_level_cut_after_a_header_parses() {
-        for tail in ["BADDY 10 10 0", "SIGN 10 10", "BADDY 10 10 0\n", "SIGN 10 10\n"] {
+        for tail in [
+            "BADDY 10 10 0",
+            "SIGN 10 10",
+            "BADDY 10 10 0\n",
+            "SIGN 10 10\n",
+        ] {
             let text = format!("GLEVNW01\n{tail}");
             assert!(Level::parse(&text).is_ok(), "{tail:?}");
         }
-        let l = Level::parse("GLEVNW01\nBADDY 10 10 3\nhi\n\n\nBADDYEND\nSIGN 1 2\nline\nSIGNEND\n").unwrap();
+        let l =
+            Level::parse("GLEVNW01\nBADDY 10 10 3\nhi\n\n\nBADDYEND\nSIGN 1 2\nline\nSIGNEND\n")
+                .unwrap();
         assert_eq!(l.baddies[0].verses, "hi\n\n");
         assert_eq!(l.signs[0].text, "line");
     }
@@ -1968,24 +2198,42 @@ mod tests {
     #[test]
     fn tile_ids_match_tile_id_at_with_overlapping_runs() {
         let mut l = Level::from_board(&(0..4096).map(|i| (i % 4096) as u16).collect::<Vec<_>>());
-        let run = |x: i32, y: i32, width: i32, layer: i32, ids: &[u16]| BoardRun { x, y, width, layer, tiles: ids.iter().map(|&t| tile_code(t)).collect() };
+        let run = |x: i32, y: i32, width: i32, layer: i32, ids: &[u16]| BoardRun {
+            x,
+            y,
+            width,
+            layer,
+            tiles: ids.iter().map(|&t| tile_code(t)).collect(),
+        };
         // Runs put first win where they overlap; one runs off the board's
         // left and right, one is shorter than its width, one is off the
         // board, one is on another layer.
-        l.boards.insert(0, run(-2, 3, 5, 0, &[100, 101, 102, 103, 104]));
-        l.boards.insert(0, run(60, 3, 8, 0, &[200, 201, 202, 203, 204, 205, 206, 207]));
+        l.boards
+            .insert(0, run(-2, 3, 5, 0, &[100, 101, 102, 103, 104]));
+        l.boards.insert(
+            0,
+            run(60, 3, 8, 0, &[200, 201, 202, 203, 204, 205, 206, 207]),
+        );
         l.boards.insert(0, run(10, 5, 4, 0, &[300]));
         l.boards.insert(0, run(1, 70, 3, 0, &[400, 401, 402]));
         l.boards.insert(0, run(0, 0, 3, 1, &[500, 501, 502]));
         l.boards.push(run(0, 3, 64, 0, &[600; 64]));
         let ids = l.tile_ids();
         for i in 0..4096 {
-            assert_eq!(ids[i], l.tile_id_at(i as i32 % 64, i as i32 / 64).unwrap_or(0), "tile {i}");
+            assert_eq!(
+                ids[i],
+                l.tile_id_at(i as i32 % 64, i as i32 / 64).unwrap_or(0),
+                "tile {i}"
+            );
         }
         assert_eq!(ids[3 * 64], 102);
         assert_eq!(&ids[5 * 64 + 10..5 * 64 + 14], &[300, 0, 0, 0]);
         // A level with no board reads as all 0.
-        assert!(Level::parse("GLEVNW01\n").unwrap().tile_ids().iter().all(|&t| t == 0));
+        assert!(Level::parse("GLEVNW01\n")
+            .unwrap()
+            .tile_ids()
+            .iter()
+            .all(|&t| t == 0));
     }
 
     #[test]
@@ -2000,11 +2248,33 @@ mod tests {
         let beta4 = vec![0x20u8, 0x3e, 0x44, 0x20, 0xff];
         board.add_server_chests(&[opened, closed, b"!".to_vec(), beta4]);
         assert_eq!(board.chests.len(), 3);
-        assert_eq!((board.chests[2].x, board.chests[2].y, board.chests[2].item.as_str()), (30, 36, "greenrupee"));
+        assert_eq!(
+            (
+                board.chests[2].x,
+                board.chests[2].y,
+                board.chests[2].item.as_str()
+            ),
+            (30, 36, "greenrupee")
+        );
         assert!(!board.chests[2].opened);
-        assert_eq!((board.chests[0].x, board.chests[0].y, board.chests[0].item.as_str()), (23, 19, ""));
+        assert_eq!(
+            (
+                board.chests[0].x,
+                board.chests[0].y,
+                board.chests[0].item.as_str()
+            ),
+            (23, 19, "")
+        );
         assert!(board.chests[0].opened && !board.chests[1].opened);
-        assert_eq!((board.chests[1].x, board.chests[1].y, board.chests[1].item.as_str(), board.chests[1].sign_index), (5, 6, "greenrupee", 2));
+        assert_eq!(
+            (
+                board.chests[1].x,
+                board.chests[1].y,
+                board.chests[1].item.as_str(),
+                board.chests[1].sign_index
+            ),
+            (5, 6, "greenrupee", 2)
+        );
         // A sign: x 7, y 8, text "AB" (alphabet codes 0, 1).
         let sign = vec![0x20u8 + 7, 0x20 + 8, 0x20, 0x21];
         // The beta4 lab gserver's record for `SIGN 30 22` with the text
@@ -2012,9 +2282,20 @@ mod tests {
         let beta4 = vec![0x3eu8, 0x36, 0x27, 0x3e, 0x45, 0x45, 0x48, 0x80];
         board.add_server_signs(&[sign, beta4]);
         assert_eq!(board.signs.len(), 2);
-        assert_eq!((board.signs[0].x, board.signs[0].y, board.signs[0].text.as_str()), (7, 8, "AB"));
+        assert_eq!(
+            (
+                board.signs[0].x,
+                board.signs[0].y,
+                board.signs[0].text.as_str()
+            ),
+            (7, 8, "AB")
+        );
         assert_eq!((board.signs[1].x, board.signs[1].y), (30, 22));
-        assert!(board.signs[1].text.starts_with("Hello"), "{:?}", board.signs[1].text);
+        assert!(
+            board.signs[1].text.starts_with("Hello"),
+            "{:?}",
+            board.signs[1].text
+        );
     }
 
     #[test]
@@ -2062,7 +2343,10 @@ CHEST 8 8 greenrupee 0
         assert_eq!(lvl.npcs[0].x, 10.0);
         assert_eq!(lvl.links.len(), 1);
         assert_eq!(lvl.links[0].dest, "town");
-        assert_eq!((lvl.links[0].new_x, lvl.links[0].new_y), (Some(30.0), Some(1.0)));
+        assert_eq!(
+            (lvl.links[0].new_x, lvl.links[0].new_y),
+            (Some(30.0), Some(1.0))
+        );
         assert_eq!(lvl.signs.len(), 1);
         assert_eq!(lvl.signs[0].text, "Hello");
         assert_eq!(lvl.baddies.len(), 1);
@@ -2096,7 +2380,10 @@ CHEST 8 8 greenrupee 0
         let lvl = Level::parse("GLEVNW01\nNPC a.png 1 2\nsetimg x;").unwrap();
         assert_eq!(lvl.npcs[0].script, "setimg x;");
         // Bad header numbers: skipped.
-        assert!(Level::parse("GLEVNW01\nNPC a.png x y\nNPCEND\n").unwrap().npcs.is_empty());
+        assert!(Level::parse("GLEVNW01\nNPC a.png x y\nNPCEND\n")
+            .unwrap()
+            .npcs
+            .is_empty());
     }
 
     #[test]
@@ -2141,7 +2428,13 @@ CHEST 8 8 greenrupee 0
     fn tiletypes_wall_water() {
         let mut text = String::from("# comment\n");
         for i in 0..4096 {
-            let v = if i == 10 { 11 } else if i >= 100 { 20 } else { 0 };
+            let v = if i == 10 {
+                11
+            } else if i >= 100 {
+                20
+            } else {
+                0
+            };
             text.push_str(&format!("{v},"));
             if (i + 1) % 128 == 0 {
                 text.push('\n');
@@ -2159,7 +2452,13 @@ CHEST 8 8 greenrupee 0
         board[0] = 7;
         board[64 * 63 + 63] = 4095;
         let mut level = Level::from_board(&board);
-        level.boards.push(BoardRun { x: 0, y: 0, width: 1, layer: 1, tiles: vec![tile_code(9)] });
+        level.boards.push(BoardRun {
+            x: 0,
+            y: 0,
+            width: 1,
+            layer: 1,
+            tiles: vec![tile_code(9)],
+        });
         assert_eq!(level.layer0_board(), board);
         board[5] = 12;
         level.set_layer0_board(&board);
@@ -2171,7 +2470,16 @@ CHEST 8 8 greenrupee 0
     #[test]
     fn board_modify2_clips_at_column_63_on_a_level() {
         let mut level = Level::from_board(&vec![1u16; 64 * 64]);
-        let m = BoardModify2 { map_x: 0, map_y: 0, x: 62, y: 3, width: 4, height: 2, tiles: vec![9; 8], trailer: vec![] };
+        let m = BoardModify2 {
+            map_x: 0,
+            map_y: 0,
+            x: 62,
+            y: 3,
+            width: 4,
+            height: 2,
+            tiles: vec![9; 8],
+            trailer: vec![],
+        };
         assert_eq!(level.apply_board_modify2(&m), 4);
         assert_eq!(level.tile_id_at(61, 3), Some(1));
         assert_eq!(level.tile_id_at(62, 3), Some(9));
@@ -2195,9 +2503,16 @@ CHEST 8 8 greenrupee 0
                 codes.push(flag | n as u32);
                 codes.push(tiles[i] as u32);
                 i += n;
-            } else if i + 3 < tiles.len() && tiles[i] == tiles[i + 2] && tiles[i + 1] == tiles[i + 3] {
+            } else if i + 3 < tiles.len()
+                && tiles[i] == tiles[i + 2]
+                && tiles[i + 1] == tiles[i + 3]
+            {
                 let mut n = 1;
-                while i + 2 * n + 1 < tiles.len() && tiles[i + 2 * n] == tiles[i] && tiles[i + 2 * n + 1] == tiles[i + 1] && n < 64 {
+                while i + 2 * n + 1 < tiles.len()
+                    && tiles[i + 2 * n] == tiles[i]
+                    && tiles[i + 2 * n + 1] == tiles[i + 1]
+                    && n < 64
+                {
                     n += 1;
                 }
                 codes.push(flag | 0x100 | n as u32);
@@ -2230,7 +2545,13 @@ CHEST 8 8 greenrupee 0
         for (i, v) in t.iter_mut().enumerate() {
             *v = match i % 64 {
                 0..=9 => 2,
-                10..=19 => if i % 2 == 0 { 7 } else { 9 },
+                10..=19 => {
+                    if i % 2 == 0 {
+                        7
+                    } else {
+                        9
+                    }
+                }
                 20..=21 => 1500,
                 _ => (i % 5) as u16 * 3,
             };
@@ -2302,24 +2623,53 @@ CHEST 8 8 greenrupee 0
         let d = binary_level(b"GR-V1.03", 13, &tail);
         let l = Level::parse_binary(&d).unwrap();
         assert_eq!(l.links.len(), 2);
-        assert_eq!((l.links[0].dest.as_str(), l.links[0].x, l.links[0].y, l.links[0].width, l.links[0].height), ("house 1.graal", 3, 4, 2, 1));
-        assert_eq!((l.links[0].new_x, l.links[0].new_y), (Some(10.0), Some(11.0)));
+        assert_eq!(
+            (
+                l.links[0].dest.as_str(),
+                l.links[0].x,
+                l.links[0].y,
+                l.links[0].width,
+                l.links[0].height
+            ),
+            ("house 1.graal", 3, 4, 2, 1)
+        );
+        assert_eq!(
+            (l.links[0].new_x, l.links[0].new_y),
+            (Some(10.0), Some(11.0))
+        );
         assert_eq!((l.links[1].new_x, l.links[1].new_y), (Some(62.0), None));
         assert_eq!(l.baddies.len(), 2);
-        assert_eq!((l.baddies[0].x, l.baddies[0].y, l.baddies[0].kind.as_str()), (5.0, 6.0, "2"));
+        assert_eq!(
+            (l.baddies[0].x, l.baddies[0].y, l.baddies[0].kind.as_str()),
+            (5.0, 6.0, "2")
+        );
         assert_eq!(l.baddies[0].verses, "saw you\nouch\ngrr");
         assert_eq!((l.baddies[1].x, l.baddies[1].y), (10.0, 7.0));
         assert_eq!(l.npcs.len(), 2);
-        assert_eq!((l.npcs[0].image.as_str(), l.npcs[0].x, l.npcs[0].y), ("door.png", 30.0, 28.0));
+        assert_eq!(
+            (l.npcs[0].image.as_str(), l.npcs[0].x, l.npcs[0].y),
+            ("door.png", 30.0, 28.0)
+        );
         assert_eq!(l.npcs[0].script, "if (playerenters) {\n  say hi;\n}");
         assert_eq!(l.npcs[1].image, "");
         assert_eq!((l.npcs[1].x, l.npcs[1].y), (1.0, 2.0));
         assert_eq!(l.chests.len(), 2);
-        assert_eq!((l.chests[0].x, l.chests[0].y, l.chests[0].item.as_str(), l.chests[0].sign_index), (7, 8, "bluerupee", 0));
+        assert_eq!(
+            (
+                l.chests[0].x,
+                l.chests[0].y,
+                l.chests[0].item.as_str(),
+                l.chests[0].sign_index
+            ),
+            (7, 8, "bluerupee", 0)
+        );
         // An item index with no name stays a number.
         assert_eq!(l.chests[1].item, "99");
         assert_eq!(l.signs.len(), 1);
-        assert_eq!((l.signs[0].x, l.signs[0].y, l.signs[0].text.as_str()), (12, 13, "a"));
+        assert_eq!(
+            (l.signs[0].x, l.signs[0].y, l.signs[0].text.as_str()),
+            (12, 13, "a")
+        );
         // The board is untouched by the tail.
         assert_eq!(board_of(&l), sample_board());
     }
@@ -2373,15 +2723,21 @@ CHEST 8 8 greenrupee 0
         let dir = std::env::temp_dir().join(format!("seihai-graal-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let p = dir.join("t.graal");
-        std::fs::write(&p, binary_level(b"GR-V1.03", 13, b"a.graal 0 0 1 1 5 5\n#\n")).unwrap();
+        std::fs::write(
+            &p,
+            binary_level(b"GR-V1.03", 13, b"a.graal 0 0 1 1 5 5\n#\n"),
+        )
+        .unwrap();
         let l = Level::load(&p).unwrap();
         assert_eq!(l.links.len(), 1);
         std::fs::remove_dir_all(&dir).ok();
     }
 
-
     fn unhex(h: &str) -> Vec<u8> {
-        (0..h.len()).step_by(2).map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap()).collect()
+        (0..h.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap())
+            .collect()
     }
 
     /// Sign records from real GR-V1.03 levels (Graal_analysis
@@ -2391,7 +2747,10 @@ CHEST 8 8 greenrupee 0
     fn sign_text_uses_the_packed_alphabet() {
         let hex = "314848464c6f762a6555576680273e3a4542474079314848466f6d762a655557668032443a4d3e79493a4b446d762a655557668032493a4b706d762a6555576680213a4b793a473d794c4e494545524c70";
         let t = decode_sign_text(&unhex(hex));
-        assert_eq!(t, "Rooms#l\nHealing Room#l#u\nSkate park#u\nSpar#r#u\nBar and supllys#r");
+        assert_eq!(
+            t,
+            "Rooms#l\nHealing Room#l#u\nSkate park#u\nSpar#r#u\nBar and supllys#r"
+        );
         let t = decode_sign_text(&unhex("363e453c48463e79334879363a4d3e4b36484b453d61"));
         assert_eq!(t, "Welcome To WaterWorld.");
         // Punctuation and the apostrophe sit in the table's upper half.
@@ -2403,7 +2762,10 @@ CHEST 8 8 greenrupee 0
         // A sign record is x+32, y+32, then the text.
         let mut rec = vec![32 + 12, 32 + 13];
         rec.extend(unhex("3641424c4d453e7932414849"));
-        assert_eq!(decode_sign_record(&rec), Some((12, 13, "Whistle Shop".to_string())));
+        assert_eq!(
+            decode_sign_record(&rec),
+            Some((12, 13, "Whistle Shop".to_string()))
+        );
     }
 
     /// A GR-V1.03 file shaped like the two real ones: one link with a
@@ -2422,20 +2784,51 @@ CHEST 8 8 greenrupee 0
         tail.extend_from_slice(b"#\n");
         let d = binary_level(b"GR-V1.03", 13, &tail);
         let (l, lay) = Level::parse_binary_with_layout(&d).unwrap();
-        assert_eq!((lay.magic.as_str(), lay.code_bits, lay.tiles_decoded, lay.max_tile), ("GR-V1.03", 13, 4096, 4095));
+        assert_eq!(
+            (
+                lay.magic.as_str(),
+                lay.code_bits,
+                lay.tiles_decoded,
+                lay.max_tile
+            ),
+            ("GR-V1.03", 13, 4096, 4095)
+        );
         assert_eq!(lay.file_len, d.len());
         let b = lay.board_end;
         assert_eq!(lay.links, (b, b + 33));
         assert_eq!(lay.baddies, (b + 33, b + 37));
-        assert_eq!((lay.link_lines, lay.baddy_records, lay.npc_records, lay.chest_records, lay.sign_records), (1, 0, 2, 1, 0));
+        assert_eq!(
+            (
+                lay.link_lines,
+                lay.baddy_records,
+                lay.npc_records,
+                lay.chest_records,
+                lay.sign_records
+            ),
+            (1, 0, 2, 1, 0)
+        );
         assert_eq!(lay.chests.1, d.len());
         assert_eq!((lay.signs, lay.unread_tail), ((d.len(), d.len()), 0));
-        assert_eq!((l.links[0].new_x, l.links[0].new_y), (Some(24.5), Some(35.0)));
+        assert_eq!(
+            (l.links[0].new_x, l.links[0].new_y),
+            (Some(24.5), Some(35.0))
+        );
         assert_eq!(l.npcs.len(), 2);
-        assert_eq!((l.npcs[0].image.as_str(), l.npcs[0].x, l.npcs[0].y), ("lamp.gif", 34.0, 25.0));
+        assert_eq!(
+            (l.npcs[0].image.as_str(), l.npcs[0].x, l.npcs[0].y),
+            ("lamp.gif", 34.0, 25.0)
+        );
         assert_eq!(l.npcs[0].script, "if (playerenters) {\n  show;\n}");
         assert_eq!(l.npcs[1].image, "");
-        assert_eq!((l.chests[0].x, l.chests[0].y, l.chests[0].item.as_str(), l.chests[0].sign_index), (54, 9, "redrupee", -1));
+        assert_eq!(
+            (
+                l.chests[0].x,
+                l.chests[0].y,
+                l.chests[0].item.as_str(),
+                l.chests[0].sign_index
+            ),
+            (54, 9, "redrupee", -1)
+        );
         assert!(l.signs.is_empty());
         assert!(lay.summary(&l).contains("npcs"));
     }
@@ -2475,38 +2868,119 @@ CHEST 8 8 greenrupee 0
             let t = |x: i32, y: i32| l.tile_id_at(x, y).unwrap();
             match crc32(&data) {
                 0x6271_1327 => {
-                    assert_eq!((lay.magic.as_str(), lay.code_bits, lay.file_len), ("GR-V1.03", 13, 8289));
-                    assert_eq!((lay.codes, lay.single_runs, lay.double_runs, lay.max_run), (333, 71, 17, 64));
-                    assert_eq!((lay.board_end, lay.links, lay.baddies, lay.npcs, lay.chests), (550, (550, 583), (583, 587), (587, 8287), (8287, 8289)));
-                    assert_eq!((l.links.len(), l.baddies.len(), l.npcs.len(), l.chests.len(), l.signs.len()), (1, 0, 8, 0, 0));
-                    assert_eq!((lay.max_tile, l.layer0_board().iter().filter(|&&v| v == 632).count()), (1899, 3704));
+                    assert_eq!(
+                        (lay.magic.as_str(), lay.code_bits, lay.file_len),
+                        ("GR-V1.03", 13, 8289)
+                    );
+                    assert_eq!(
+                        (lay.codes, lay.single_runs, lay.double_runs, lay.max_run),
+                        (333, 71, 17, 64)
+                    );
+                    assert_eq!(
+                        (lay.board_end, lay.links, lay.baddies, lay.npcs, lay.chests),
+                        (550, (550, 583), (583, 587), (587, 8287), (8287, 8289))
+                    );
+                    assert_eq!(
+                        (
+                            l.links.len(),
+                            l.baddies.len(),
+                            l.npcs.len(),
+                            l.chests.len(),
+                            l.signs.len()
+                        ),
+                        (1, 0, 8, 0, 0)
+                    );
+                    assert_eq!(
+                        (
+                            lay.max_tile,
+                            l.layer0_board().iter().filter(|&&v| v == 632).count()
+                        ),
+                        (1899, 3704)
+                    );
                     // The link is the door: two tiles of the same id, and
                     // the arrival is a half tile.
                     let k = &l.links[0];
-                    assert_eq!((k.x, k.y, k.width, k.height, k.new_x, k.new_y), (31, 26, 2, 1, Some(24.5), Some(35.0)));
-                    assert_eq!((t(0, 0), t(31, 26), t(32, 26), t(63, 63)), (632, 541, 541, 632));
+                    assert_eq!(
+                        (k.x, k.y, k.width, k.height, k.new_x, k.new_y),
+                        (31, 26, 2, 1, Some(24.5), Some(35.0))
+                    );
+                    assert_eq!(
+                        (t(0, 0), t(31, 26), t(32, 26), t(63, 63)),
+                        (632, 541, 541, 632)
+                    );
                     let at: Vec<(f32, f32)> = l.npcs.iter().map(|n| (n.x, n.y)).collect();
                     assert_eq!(at[0], (34.0, 25.0));
                     assert_eq!(at[7], (36.0, 30.0));
-                    assert!(l.npcs.iter().all(|n| n.image.ends_with(".gif") && !n.script.is_empty()));
-                    assert_eq!(l.npcs.iter().map(|n| n.script.matches('\n').count()).sum::<usize>(), 280);
+                    assert!(l
+                        .npcs
+                        .iter()
+                        .all(|n| n.image.ends_with(".gif") && !n.script.is_empty()));
+                    assert_eq!(
+                        l.npcs
+                            .iter()
+                            .map(|n| n.script.matches('\n').count())
+                            .sum::<usize>(),
+                        280
+                    );
                 }
                 0xa489_f475 => {
-                    assert_eq!((lay.magic.as_str(), lay.code_bits, lay.file_len), ("GR-V1.03", 13, 8611));
-                    assert_eq!((lay.codes, lay.single_runs, lay.double_runs, lay.max_run), (990, 144, 38, 64));
-                    assert_eq!((lay.board_end, lay.links, lay.baddies, lay.npcs, lay.chests), (1617, (1617, 1650), (1650, 1654), (1654, 8604), (8604, 8611)));
-                    assert_eq!((l.links.len(), l.baddies.len(), l.npcs.len(), l.chests.len(), l.signs.len()), (1, 0, 3, 1, 0));
+                    assert_eq!(
+                        (lay.magic.as_str(), lay.code_bits, lay.file_len),
+                        ("GR-V1.03", 13, 8611)
+                    );
+                    assert_eq!(
+                        (lay.codes, lay.single_runs, lay.double_runs, lay.max_run),
+                        (990, 144, 38, 64)
+                    );
+                    assert_eq!(
+                        (lay.board_end, lay.links, lay.baddies, lay.npcs, lay.chests),
+                        (1617, (1617, 1650), (1650, 1654), (1654, 8604), (8604, 8611))
+                    );
+                    assert_eq!(
+                        (
+                            l.links.len(),
+                            l.baddies.len(),
+                            l.npcs.len(),
+                            l.chests.len(),
+                            l.signs.len()
+                        ),
+                        (1, 0, 3, 1, 0)
+                    );
                     // 2135 is above 2047: only a 13-bit code can carry it.
-                    assert_eq!((lay.max_tile, l.layer0_board().iter().filter(|&&v| v == 632).count()), (2135, 2660));
+                    assert_eq!(
+                        (
+                            lay.max_tile,
+                            l.layer0_board().iter().filter(|&&v| v == 632).count()
+                        ),
+                        (2135, 2660)
+                    );
                     let k = &l.links[0];
-                    assert_eq!((k.x, k.y, k.width, k.height, k.new_x, k.new_y), (14, 28, 2, 1, Some(21.5), Some(28.0)));
+                    assert_eq!(
+                        (k.x, k.y, k.width, k.height, k.new_x, k.new_y),
+                        (14, 28, 2, 1, Some(21.5), Some(28.0))
+                    );
                     let c = &l.chests[0];
-                    assert_eq!((c.x, c.y, c.item.as_str(), c.sign_index), (54, 9, "redrupee", -1));
+                    assert_eq!(
+                        (c.x, c.y, c.item.as_str(), c.sign_index),
+                        (54, 9, "redrupee", -1)
+                    );
                     // The chest sits on its own tile.
                     assert_eq!((t(54, 9), t(13, 33), t(0, 0)), (2089, 2118, 632));
-                    assert_eq!(l.npcs.iter().map(|n| (n.x, n.y)).collect::<Vec<_>>(), vec![(13.0, 33.0), (53.0, 46.0), (31.0, 49.0)]);
-                    assert!(l.npcs.iter().all(|n| n.image.is_empty() && n.script.starts_with("// Graal v1.3 NPC")));
-                    assert_eq!(l.npcs.iter().map(|n| n.script.matches('\n').count()).sum::<usize>(), 372);
+                    assert_eq!(
+                        l.npcs.iter().map(|n| (n.x, n.y)).collect::<Vec<_>>(),
+                        vec![(13.0, 33.0), (53.0, 46.0), (31.0, 49.0)]
+                    );
+                    assert!(l
+                        .npcs
+                        .iter()
+                        .all(|n| n.image.is_empty() && n.script.starts_with("// Graal v1.3 NPC")));
+                    assert_eq!(
+                        l.npcs
+                            .iter()
+                            .map(|n| n.script.matches('\n').count())
+                            .sum::<usize>(),
+                        372
+                    );
                 }
                 other => eprintln!("{path:?}: crc {other:08x}, generic checks only"),
             }
@@ -2525,12 +2999,20 @@ CHEST 8 8 greenrupee 0
             panic!("set SEIHAI_PLAYERWORLD to a folder tree with .graal files");
         };
         fn walk(d: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
-            let mut es: Vec<_> = std::fs::read_dir(d).unwrap().filter_map(Result::ok).map(|e| e.path()).collect();
+            let mut es: Vec<_> = std::fs::read_dir(d)
+                .unwrap()
+                .filter_map(Result::ok)
+                .map(|e| e.path())
+                .collect();
             es.sort();
             for p in es {
                 if p.is_dir() {
                     walk(&p, out);
-                } else if p.extension().and_then(|x| x.to_str()).is_some_and(|x| x.eq_ignore_ascii_case("graal")) {
+                } else if p
+                    .extension()
+                    .and_then(|x| x.to_str())
+                    .is_some_and(|x| x.eq_ignore_ascii_case("graal"))
+                {
                     out.push(p);
                 }
             }
@@ -2545,13 +3027,25 @@ CHEST 8 8 greenrupee 0
             let data = std::fs::read(p).unwrap();
             let crc = crc32(&data);
             if data.len() < 8 || !(data.starts_with(b"GR-V1") || data.starts_with(b"Z3-V1")) {
-                let kind = if data.len() < 8 { "short" } else if data.starts_with(b"GLEVNW01") { "text-level" } else { "other-magic" };
+                let kind = if data.len() < 8 {
+                    "short"
+                } else if data.starts_with(b"GLEVNW01") {
+                    "text-level"
+                } else {
+                    "other-magic"
+                };
                 *by_flag.entry(kind.into()).or_default() += 1;
-                tsv.push_str(&format!("{crc:08x}\t{}\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t{kind}\n", data.len()));
+                tsv.push_str(&format!(
+                    "{crc:08x}\t{}\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t{kind}\n",
+                    data.len()
+                ));
                 continue;
             }
             // The public entry point agrees with the layout parser.
-            assert!(Level::load(p).is_ok(), "Level::load failed for crc {crc:08x}");
+            assert!(
+                Level::load(p).is_ok(),
+                "Level::load failed for crc {crc:08x}"
+            );
             match Level::parse_binary_with_layout(&data) {
                 Err(e) => {
                     *by_flag.entry("error".into()).or_default() += 1;
@@ -2599,7 +3093,10 @@ CHEST 8 8 greenrupee 0
                 }
             }
         }
-        eprintln!("graal files {}, parsed {ok}, clean {clean}; flags {by_flag:?}", files.len());
+        eprintln!(
+            "graal files {}, parsed {ok}, clean {clean}; flags {by_flag:?}",
+            files.len()
+        );
         if let Some(out) = std::env::var_os("SEIHAI_CORPUS_TSV") {
             std::fs::write(out, tsv).unwrap();
         }
@@ -2608,7 +3105,10 @@ CHEST 8 8 greenrupee 0
         // The owner's player world (3141 `.graal` names): 27 are empty and
         // one is a text level under a `.graal` name; the rest are GR-V1.03.
         if files.len() == 3141 {
-            assert_eq!((ok, by_flag.get("short"), by_flag.get("text-level")), (3113, Some(&27), Some(&1)));
+            assert_eq!(
+                (ok, by_flag.get("short"), by_flag.get("text-level")),
+                (3113, Some(&27), Some(&1))
+            );
             // links, baddies, NPCs, chests, signs over all files
             assert_eq!(sums, [9355, 902, 14857, 375, 2381]);
             // 1998 files hold a tile id of 2048 or more: 13-bit codes.
@@ -2626,7 +3126,11 @@ CHEST 8 8 greenrupee 0
         d.extend_from_slice(&[0xFF, 0xFF, 0xFF, b'\n', b'#', b'\n', b'#', b'\n']);
         let (l, lay) = Level::parse_binary_with_layout(&d).unwrap();
         assert_eq!((l.links.len(), lay.link_lines), (5, 5));
-        let v: Vec<_> = l.links.iter().map(|k| (k.new_x, k.new_y, k.x_offset, k.y_offset)).collect();
+        let v: Vec<_> = l
+            .links
+            .iter()
+            .map(|k| (k.new_x, k.new_y, k.x_offset, k.y_offset))
+            .collect();
         assert_eq!(v[0], (None, None, 0.0, 10.0));
         assert_eq!(v[1], (None, Some(53.0), 15.0, 0.0));
         assert_eq!(v[2], (None, Some(61.5), -1.5, 0.0));
@@ -2647,9 +3151,13 @@ CHEST 8 8 greenrupee 0
         tail.extend_from_slice(&[0xFF, 0xFF, 0xFF, b'\n']);
         tail.extend_from_slice(&[32 + 3, 32 + 4]);
         tail.extend_from_slice(b"x.gif#show;\n#\n#\n");
-        let (l, lay) = Level::parse_binary_with_layout(&binary_level(b"GR-V1.03", 13, &tail)).unwrap();
+        let (l, lay) =
+            Level::parse_binary_with_layout(&binary_level(b"GR-V1.03", 13, &tail)).unwrap();
         assert_eq!((lay.baddy_records, lay.npc_records), (2, 1));
-        assert_eq!((l.baddies[1].x, l.baddies[1].y, l.baddies[1].kind.as_str()), (0.0, 62.0, "6"));
+        assert_eq!(
+            (l.baddies[1].x, l.baddies[1].y, l.baddies[1].kind.as_str()),
+            (0.0, 62.0, "6")
+        );
         assert_eq!(l.npcs[0].image, "x.gif");
     }
 }

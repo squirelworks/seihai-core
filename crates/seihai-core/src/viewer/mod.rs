@@ -59,7 +59,13 @@ pub fn load(data: &[u8], version: Option<ClientVersion>, mask: bool) -> Result<L
                 None => (None, "not in the trace header".to_string()),
             },
         };
-        return Ok(Loaded { trace, account: None, kind: InputKind::TraceTsv, version: v, version_note: note });
+        return Ok(Loaded {
+            trace,
+            account: None,
+            kind: InputKind::TraceTsv,
+            version: v,
+            version_note: note,
+        });
     }
     let packets = read_pcap(data)?;
     let conns = reassemble(&packets);
@@ -71,7 +77,13 @@ pub fn load(data: &[u8], version: Option<ClientVersion>, mask: bool) -> Result<L
     o.mask = mask;
     o.keep_raw = true;
     let (trace, account) = decode_conns_ex(&conns, &o);
-    Ok(Loaded { trace, account, kind: InputKind::Pcap, version: Some(v), version_note: note })
+    Ok(Loaded {
+        trace,
+        account,
+        kind: InputKind::Pcap,
+        version: Some(v),
+        version_note: note,
+    })
 }
 
 /// Pick the version whose login token the capture carries. Every version is
@@ -79,8 +91,13 @@ pub fn load(data: &[u8], version: Option<ClientVersion>, mask: bool) -> Result<L
 /// listserver token matches a listserver hello) and with the fewest bad
 /// frames wins. If several tie, the first in chain order is used and the
 /// others are named.
-pub fn detect_version(conns: &[crate::difftest::pcap::TcpConn]) -> Result<(ClientVersion, String), String> {
-    if conns.iter().all(|c| c.c2s.bytes.is_empty() && c.s2c.bytes.is_empty()) {
+pub fn detect_version(
+    conns: &[crate::difftest::pcap::TcpConn],
+) -> Result<(ClientVersion, String), String> {
+    if conns
+        .iter()
+        .all(|c| c.c2s.bytes.is_empty() && c.s2c.bytes.is_empty())
+    {
         return Err("cannot detect the version: the capture holds no TCP data".to_string());
     }
     let mut scored: Vec<(i64, ClientVersion)> = Vec::new();
@@ -107,7 +124,10 @@ pub fn detect_version(conns: &[crate::difftest::pcap::TcpConn]) -> Result<(Clien
         if score == 0 {
             continue;
         }
-        let bad: i64 = trace.meta("bad_frames").and_then(|b| b.parse().ok()).unwrap_or(0);
+        let bad: i64 = trace
+            .meta("bad_frames")
+            .and_then(|b| b.parse().ok())
+            .unwrap_or(0);
         scored.push((score - bad, v));
     }
     let best = scored.iter().map(|s| s.0).max().ok_or_else(|| {
@@ -117,7 +137,10 @@ pub fn detect_version(conns: &[crate::difftest::pcap::TcpConn]) -> Result<(Clien
     let first = tied[0];
     let note = if tied.len() > 1 {
         let others: Vec<&str> = tied[1..].iter().map(|v| v.label()).collect();
-        format!("auto-detected from the login token; also matches {}", others.join(", "))
+        format!(
+            "auto-detected from the login token; also matches {}",
+            others.join(", ")
+        )
     } else {
         "auto-detected from the login token".to_string()
     };
@@ -170,15 +193,30 @@ pub struct Range {
 impl Range {
     /// `N`, `A..B`, `A..` or `..B`.
     pub fn parse(s: &str) -> Result<Range, String> {
-        let num = |t: &str| t.trim().parse::<i64>().map_err(|_| format!("bad number `{t}` in range `{s}`"));
+        let num = |t: &str| {
+            t.trim()
+                .parse::<i64>()
+                .map_err(|_| format!("bad number `{t}` in range `{s}`"))
+        };
         match s.split_once("..") {
             None => {
                 let n = num(s)?;
-                Ok(Range { lo: Some(n), hi: Some(n) })
+                Ok(Range {
+                    lo: Some(n),
+                    hi: Some(n),
+                })
             }
             Some((a, b)) => Ok(Range {
-                lo: if a.trim().is_empty() { None } else { Some(num(a)?) },
-                hi: if b.trim().is_empty() { None } else { Some(num(b)?) },
+                lo: if a.trim().is_empty() {
+                    None
+                } else {
+                    Some(num(a)?)
+                },
+                hi: if b.trim().is_empty() {
+                    None
+                } else {
+                    Some(num(b)?)
+                },
             }),
         }
     }
@@ -262,11 +300,15 @@ pub struct View {
 
 /// Does the capture contain a login frame?
 pub fn has_login(t: &Trace) -> bool {
-    t.events.iter().any(|e| e.id == ID_LOGIN || (e.dir == Dir::C2S && e.name == "LS_SERVERLIST"))
+    t.events
+        .iter()
+        .any(|e| e.id == ID_LOGIN || (e.dir == Dir::C2S && e.name == "LS_SERVERLIST"))
 }
 
 fn generic_only(fields: &[(String, String)]) -> bool {
-    fields.iter().all(|(k, _)| matches!(k.as_str(), "hex" | "crc" | "len" | "unparsed_tail"))
+    fields
+        .iter()
+        .all(|(k, _)| matches!(k.as_str(), "hex" | "crc" | "len" | "unparsed_tail"))
 }
 
 pub struct ViewOptions {
@@ -308,15 +350,23 @@ fn make_row(e: &Event, loaded: &Loaded, tables: &Tables, opts: &ViewOptions) -> 
     } else {
         Vec::new()
     };
-    let layout = if layout_rows.is_empty() { None } else { Some(layout_line(&layout_rows)) };
+    let layout = if layout_rows.is_empty() {
+        None
+    } else {
+        Some(layout_line(&layout_rows))
+    };
     let mut fields = e.fields.clone();
     let mut unknown = Vec::new();
     let mut source = Source::Decoder;
     let undecoded = numbered && generic_only(&e.fields);
     if undecoded {
         source = Source::Raw;
-        if !layout_rows.is_empty() && (!e.raw.is_empty() || layout_rows.iter().all(|r| r.enc == tables::Enc::None)) {
-            if let Some(rd) = fields::read_layout(&layout_rows, &e.raw, opts.mask, loaded.account.as_deref()) {
+        if !layout_rows.is_empty()
+            && (!e.raw.is_empty() || layout_rows.iter().all(|r| r.enc == tables::Enc::None))
+        {
+            if let Some(rd) =
+                fields::read_layout(&layout_rows, &e.raw, opts.mask, loaded.account.as_deref())
+            {
                 fields = rd.fields;
                 unknown = rd.unknown;
                 source = Source::Table;
@@ -327,7 +377,11 @@ fn make_row(e: &Event, loaded: &Loaded, tables: &Tables, opts: &ViewOptions) -> 
         // call partial or unknown.
         for r in &layout_rows {
             if r.status != tables::Status::Known {
-                unknown.push(format!("`{}` is {} in the table", r.field, r.status.label()));
+                unknown.push(format!(
+                    "`{}` is {} in the table",
+                    r.field,
+                    r.status.label()
+                ));
             }
         }
     }
@@ -337,7 +391,9 @@ fn make_row(e: &Event, loaded: &Loaded, tables: &Tables, opts: &ViewOptions) -> 
     // Raw bytes: undecoded messages, or all with --raw. Never a login frame.
     let show_raw = numbered
         && !e.raw.is_empty()
-        && (opts.raw_all || source == Source::Raw || (source == Source::Table && !unknown.is_empty()));
+        && (opts.raw_all
+            || source == Source::Raw
+            || (source == Source::Table && !unknown.is_empty()));
     let raw = if show_raw { e.raw.clone() } else { Vec::new() };
     if show_raw {
         // The dump says what `hex=` said.
@@ -346,7 +402,14 @@ fn make_row(e: &Event, loaded: &Loaded, tables: &Tables, opts: &ViewOptions) -> 
     if e.id == ID_BADFRAME {
         unknown.push("frame did not decode".into());
     }
-    Row { event: e.clone(), fields, source, layout, unknown, raw }
+    Row {
+        event: e.clone(),
+        fields,
+        source,
+        layout,
+        unknown,
+        raw,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -379,7 +442,10 @@ fn id_name(tables: &Tables, dir: Dir, id: u32) -> String {
         Dir::C2S => pli_name(id),
         Dir::S2C => plo_name(id),
     };
-    built.map(str::to_string).or_else(|| tables.name_of(dir, id).map(str::to_string)).unwrap_or_else(|| format!("{}_{id}", if dir == Dir::C2S { "PLI" } else { "PLO" }))
+    built
+        .map(str::to_string)
+        .or_else(|| tables.name_of(dir, id).map(str::to_string))
+        .unwrap_or_else(|| format!("{}_{id}", if dir == Dir::C2S { "PLI" } else { "PLO" }))
 }
 
 fn handled(v: ClientVersion, dir: Dir, id: u32) -> bool {
@@ -400,15 +466,27 @@ pub fn layout_report(tables: &Tables, dir: Dir, id: u32) -> LayoutReport {
     let mut prev: Option<bool> = None;
     for &v in versions {
         let h = handled(v, dir, id);
-        let rows: Vec<LayoutRow> = tables.rows_for(dir, id, Some(v)).into_iter().cloned().collect();
+        let rows: Vec<LayoutRow> = tables
+            .rows_for(dir, id, Some(v))
+            .into_iter()
+            .cloned()
+            .collect();
         match runs.last_mut() {
             Some(last) if last.handled == h && last.rows == rows => last.to = v.label(),
-            _ => runs.push(Run { from: v.label(), to: v.label(), handled: h, rows }),
+            _ => runs.push(Run {
+                from: v.label(),
+                to: v.label(),
+                handled: h,
+                rows,
+            }),
         }
         match (prev, h) {
             (Some(false), true) => changes.push(format!("added in {}", v.label())),
             (Some(true), false) => changes.push(format!("dropped in {}", v.label())),
-            (None, true) => changes.push(format!("handled from {} (first build in the chain)", v.label())),
+            (None, true) => changes.push(format!(
+                "handled from {} (first build in the chain)",
+                v.label()
+            )),
             _ => {}
         }
         prev = Some(h);
@@ -417,10 +495,19 @@ pub fn layout_report(tables: &Tables, dir: Dir, id: u32) -> LayoutReport {
     let chain = tables
         .chain
         .iter()
-        .filter(|c| c.area == "protocol" && c.field.starts_with(area) && detail_names_id(&c.detail, id))
+        .filter(|c| {
+            c.area == "protocol" && c.field.starts_with(area) && detail_names_id(&c.detail, id)
+        })
         .cloned()
         .collect();
-    LayoutReport { dir, id, name: id_name(tables, dir, id), runs, changes, chain }
+    LayoutReport {
+        dir,
+        id,
+        name: id_name(tables, dir, id),
+        runs,
+        changes,
+        chain,
+    }
 }
 
 /// Does a chain detail like `+43 DEFAULTWEAPON, -25 UNKNOWN25 (32 -> 33 ids)`
@@ -428,8 +515,13 @@ pub fn layout_report(tables: &Tables, dir: Dir, id: u32) -> LayoutReport {
 fn detail_names_id(detail: &str, id: u32) -> bool {
     detail.split(',').any(|t| {
         let t = t.trim();
-        let Some(rest) = t.strip_prefix('+').or_else(|| t.strip_prefix('-')) else { return false };
-        rest.split(|c: char| !c.is_ascii_digit()).next().and_then(|n| n.parse::<u32>().ok()) == Some(id)
+        let Some(rest) = t.strip_prefix('+').or_else(|| t.strip_prefix('-')) else {
+            return false;
+        };
+        rest.split(|c: char| !c.is_ascii_digit())
+            .next()
+            .and_then(|n| n.parse::<u32>().ok())
+            == Some(id)
     })
 }
 
@@ -445,7 +537,9 @@ pub fn resolve_layout_target(tables: &Tables, what: &str, dir: Option<Dir>) -> V
         Ok(id) => {
             for d in dirs {
                 let in_table = tables.rows.iter().any(|r| r.dir == d && r.id == id);
-                let in_profile = ClientVersion::all_versions().iter().any(|&v| handled(v, d, id));
+                let in_profile = ClientVersion::all_versions()
+                    .iter()
+                    .any(|&v| handled(v, d, id));
                 if in_table || in_profile {
                     out.push((d, id));
                 }
@@ -453,7 +547,11 @@ pub fn resolve_layout_target(tables: &Tables, what: &str, dir: Option<Dir>) -> V
         }
         Err(_) => {
             let sel = what.trim().to_ascii_uppercase();
-            let sel = sel.strip_prefix("PLI_").or_else(|| sel.strip_prefix("PLO_")).unwrap_or(&sel).to_string();
+            let sel = sel
+                .strip_prefix("PLI_")
+                .or_else(|| sel.strip_prefix("PLO_"))
+                .unwrap_or(&sel)
+                .to_string();
             for d in dirs {
                 for id in 0..=255u32 {
                     if id_name(tables, d, id).eq_ignore_ascii_case(&sel) {
@@ -461,7 +559,12 @@ pub fn resolve_layout_target(tables: &Tables, what: &str, dir: Option<Dir>) -> V
                     }
                 }
                 for (dd, id) in tables.ids() {
-                    if dd == d && tables.name_of(dd, id).is_some_and(|n| n.eq_ignore_ascii_case(&sel)) && !out.contains(&(dd, id)) {
+                    if dd == d
+                        && tables
+                            .name_of(dd, id)
+                            .is_some_and(|n| n.eq_ignore_ascii_case(&sel))
+                        && !out.contains(&(dd, id))
+                    {
                         out.push((dd, id));
                     }
                 }
@@ -504,8 +607,11 @@ pub fn write_private(path: &std::path::Path, text: &str) -> Result<(), String> {
         use std::os::unix::fs::OpenOptionsExt;
         o.mode(0o600);
     }
-    let mut f = o.open(path).map_err(|e| format!("cannot write {}: {e}", path.display()))?;
-    f.write_all(text.as_bytes()).map_err(|e| format!("cannot write {}: {e}", path.display()))
+    let mut f = o
+        .open(path)
+        .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
+    f.write_all(text.as_bytes())
+        .map_err(|e| format!("cannot write {}: {e}", path.display()))
 }
 
 #[cfg(test)]

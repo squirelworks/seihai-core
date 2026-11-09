@@ -156,7 +156,10 @@ impl ClientVersion {
     /// The build can send `PLI_ENTERLEVEL` (46): its profile's send set has
     /// the id (2.3 and 2.31 only). Read from `pli`, not from the version.
     pub fn sends_enter_level(self) -> bool {
-        self.profile().protocol.pli.contains(crate::net::PLI_ENTERLEVEL)
+        self.profile()
+            .protocol
+            .pli
+            .contains(crate::net::PLI_ENTERLEVEL)
     }
 
     /// The build asks for a level it already holds with `PLI_LEVELWARPMOD`
@@ -191,7 +194,10 @@ impl ClientVersion {
     pub fn listserver(self) -> Listserver {
         let ls = self.list_version().profile().protocol.listserver;
         ls.unwrap_or(
-            Listserver::new(ListKind::Legacy, PortStatus::Assumed, None, None).shape(super::profile::LoginShape::NewmainOnly, super::profile::ShapeBasis::Inferred),
+            Listserver::new(ListKind::Legacy, PortStatus::Assumed, None, None).shape(
+                super::profile::LoginShape::NewmainOnly,
+                super::profile::ShapeBasis::Inferred,
+            ),
         )
     }
 
@@ -214,7 +220,10 @@ impl ClientVersion {
 
     pub fn listserver_token(self) -> &'static str {
         let p = self.profile();
-        p.protocol.listserver.and_then(|l| l.token).unwrap_or(p.token)
+        p.protocol
+            .listserver
+            .and_then(|l| l.token)
+            .unwrap_or(p.token)
     }
 
     /// A listserver address as given on the command line: `host:port` is
@@ -245,7 +254,9 @@ impl ClientVersion {
 
     /// The version with this GUI label.
     pub fn from_label(label: &str) -> Option<ClientVersion> {
-        super::profile::by_label(label).map(|p| p.version).or_else(|| Self::from_alias(label))
+        super::profile::by_label(label)
+            .map(|p| p.version)
+            .or_else(|| Self::from_alias(label))
     }
 
     /// Other names a version is known by. `1.41r1` is what GServer's
@@ -262,7 +273,8 @@ impl ClientVersion {
     /// [`OfflineBuild::plays_as`](super::offline_builds::OfflineBuild) of an
     /// offline-only build (which is never played online).
     pub fn from_label_or_offline(label: &str) -> Option<ClientVersion> {
-        Self::from_label(label).or_else(|| super::offline_builds::by_label(label).map(|b| b.plays_as))
+        Self::from_label(label)
+            .or_else(|| super::offline_builds::by_label(label).map(|b| b.plays_as))
     }
 
     /// The five versions tested most from Mae. `--check-assets` with no
@@ -304,10 +316,22 @@ impl ClientVersion {
     /// and `server-notes/public-allowed-versions.md`.
     pub fn reborn_versions() -> &'static [ClientVersion] {
         &[
-            Self::V128B2, Self::V13T, Self::V131,
-            Self::V139, Self::V141, Self::V205, Self::V217, Self::V222, Self::V231,
-            Self::V304, Self::V404R2, Self::V420R8,
-            Self::V500R7, Self::V512, Self::V531R4, Self::V603R7,
+            Self::V128B2,
+            Self::V13T,
+            Self::V131,
+            Self::V139,
+            Self::V141,
+            Self::V205,
+            Self::V217,
+            Self::V222,
+            Self::V231,
+            Self::V304,
+            Self::V404R2,
+            Self::V420R8,
+            Self::V500R7,
+            Self::V512,
+            Self::V531R4,
+            Self::V603R7,
         ]
     }
 
@@ -319,14 +343,51 @@ impl ClientVersion {
     /// All versions with a profile, oldest first.
     pub fn all_versions() -> &'static [ClientVersion] {
         &[
-            Self::V121, Self::V128B2, Self::V13T, Self::V131, Self::V132,
-            Self::V133, Self::V134, Self::V135, Self::V136, Self::V137, Self::V138, Self::V139,
-            Self::V141, Self::V142, Self::V200, Self::V201, Self::V202, Self::V202R2, Self::V203,
-            Self::V204, Self::V205, Self::V210,
-            Self::V212, Self::V213, Self::V214, Self::V215, Self::V216, Self::V217, Self::V222,
-            Self::V230, Self::V231, Self::V304, Self::V3153,
-            Self::V404R2, Self::V420R6, Self::V420R8,
-            Self::V500R7, Self::V512, Self::V524R4, Self::V530R3, Self::V531R4, Self::V600R2, Self::V6015, Self::V6034, Self::V603R7,
+            Self::V121,
+            Self::V128B2,
+            Self::V13T,
+            Self::V131,
+            Self::V132,
+            Self::V133,
+            Self::V134,
+            Self::V135,
+            Self::V136,
+            Self::V137,
+            Self::V138,
+            Self::V139,
+            Self::V141,
+            Self::V142,
+            Self::V200,
+            Self::V201,
+            Self::V202,
+            Self::V202R2,
+            Self::V203,
+            Self::V204,
+            Self::V205,
+            Self::V210,
+            Self::V212,
+            Self::V213,
+            Self::V214,
+            Self::V215,
+            Self::V216,
+            Self::V217,
+            Self::V222,
+            Self::V230,
+            Self::V231,
+            Self::V304,
+            Self::V3153,
+            Self::V404R2,
+            Self::V420R6,
+            Self::V420R8,
+            Self::V500R7,
+            Self::V512,
+            Self::V524R4,
+            Self::V530R3,
+            Self::V531R4,
+            Self::V600R2,
+            Self::V6015,
+            Self::V6034,
+            Self::V603R7,
             Self::V603R7Linux,
         ]
     }
@@ -345,9 +406,15 @@ mod tests {
     /// `1.41r1` (GServer's name for the 1.41 binary) picks the 1.41 row.
     #[test]
     fn alias_labels() {
-        assert_eq!(ClientVersion::from_label("1.41r1"), Some(ClientVersion::V141));
+        assert_eq!(
+            ClientVersion::from_label("1.41r1"),
+            Some(ClientVersion::V141)
+        );
         assert_eq!(ClientVersion::from_label("1.41"), Some(ClientVersion::V141));
-        assert_eq!(ClientVersion::from_label("6.03r7 Linux"), Some(ClientVersion::V603R7Linux));
+        assert_eq!(
+            ClientVersion::from_label("6.03r7 Linux"),
+            Some(ClientVersion::V603R7Linux)
+        );
         assert_eq!(ClientVersion::V603R7Linux.token(), "G3D0511C");
     }
 
@@ -381,9 +448,24 @@ mod tests {
         let listed = ClientVersion::reborn_versions();
         let mut tokens = std::collections::HashSet::new();
         for &v in listed {
-            assert!(GS2LIB_TOKENS.contains(&v.token()), "{}: {} not in gs2lib", v.label(), v.token());
-            assert_eq!(v.profile().basis, crate::protocol::Basis::Binary, "{} is inferred", v.label());
-            assert!(tokens.insert(v.token()), "{}: token {} listed twice", v.label(), v.token());
+            assert!(
+                GS2LIB_TOKENS.contains(&v.token()),
+                "{}: {} not in gs2lib",
+                v.label(),
+                v.token()
+            );
+            assert_eq!(
+                v.profile().basis,
+                crate::protocol::Basis::Binary,
+                "{} is inferred",
+                v.label()
+            );
+            assert!(
+                tokens.insert(v.token()),
+                "{}: token {} listed twice",
+                v.label(),
+                v.token()
+            );
         }
     }
 
@@ -407,13 +489,51 @@ mod tests {
     #[test]
     fn minor_builds_stay_behind_all_versions() {
         use ClientVersion::*;
-        for v in [V121, V132, V138, V142, V200, V204, V210, V216, V230, V3153, V420R6, V524R4, V530R3, V600R2, V6015, V6034, V603R7Linux] {
+        for v in [
+            V121,
+            V132,
+            V138,
+            V142,
+            V200,
+            V204,
+            V210,
+            V216,
+            V230,
+            V3153,
+            V420R6,
+            V524R4,
+            V530R3,
+            V600R2,
+            V6015,
+            V6034,
+            V603R7Linux,
+        ] {
             assert!(!v.listed_by_default(), "{}", v.label());
         }
-        let labels: Vec<&str> = ClientVersion::reborn_versions().iter().map(|v| v.label()).collect();
+        let labels: Vec<&str> = ClientVersion::reborn_versions()
+            .iter()
+            .map(|v| v.label())
+            .collect();
         assert_eq!(
             labels,
-            ["1.28 beta 2", "1.3 test", "1.31", "1.39", "1.41", "2.05", "2.17", "2.22", "2.31", "3.04", "4.04r2", "4.20r8", "5.00r7", "5.12", "5.31r4", "6.03r7"]
+            [
+                "1.28 beta 2",
+                "1.3 test",
+                "1.31",
+                "1.39",
+                "1.41",
+                "2.05",
+                "2.17",
+                "2.22",
+                "2.31",
+                "3.04",
+                "4.04r2",
+                "4.20r8",
+                "5.00r7",
+                "5.12",
+                "5.31r4",
+                "6.03r7"
+            ]
         );
     }
 

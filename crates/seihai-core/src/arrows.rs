@@ -113,7 +113,17 @@ pub enum Step {
 impl Arrow {
     pub fn new(x: f32, y: f32, dir: u8) -> Arrow {
         let (dx, dy) = [(0.0, -1.0), (-1.0, 0.0), (0.0, 1.0), (1.0, 0.0)][usize::from(dir & 3)];
-        Arrow { x, y, dx, dy, sprite: ARROW_SPRITE + u16::from(dir & 3), reflect: -1, kind: 0, harmless: false, owner: None }
+        Arrow {
+            x,
+            y,
+            dx,
+            dy,
+            sprite: ARROW_SPRITE + u16::from(dir & 3),
+            reflect: -1,
+            kind: 0,
+            harmless: false,
+            owner: None,
+        }
     }
 
     /// The way it flies: 0 up, 1 left, 2 down, 3 right.
@@ -188,7 +198,12 @@ impl Arrow {
     /// 1): the middle of its `w` x `h` pixel box less one tile. `None` for
     /// an arrow or a fireball.
     pub fn blast_at(&self, w: i32, h: i32) -> Option<(f32, f32)> {
-        (self.kind >= 2).then(|| (self.x + w as f32 / 64.0 - 1.0, self.y + h as f32 / 64.0 - 1.0))
+        (self.kind >= 2).then(|| {
+            (
+                self.x + w as f32 / 64.0 - 1.0,
+                self.y + h as f32 / 64.0 - 1.0,
+            )
+        })
     }
 
     /// It hit an NPC: back the way it came for [`REFLECT_TICKS`].
@@ -201,10 +216,25 @@ impl Arrow {
 
 /// `PLI_ARROWADD` (9): `GCHAR x*2`, `GCHAR y*2`, `GCHAR dir` (plus 8 for a
 /// weapon's arrow), `GCHAR sprite`, `GCHAR power + 1`, then the newline.
-pub fn arrow_add_message(x: f32, y: f32, dir: u8, from_weapon: bool, sprite: u16, power: u8) -> Vec<u8> {
+pub fn arrow_add_message(
+    x: f32,
+    y: f32,
+    dir: u8,
+    from_weapon: bool,
+    sprite: u16,
+    power: u8,
+) -> Vec<u8> {
     let g = |v: i32| (v.clamp(0, 223) as u8) + 0x20;
     let flags = i32::from(dir & 3) + if from_weapon { 8 } else { 0 };
-    vec![9 + 0x20, g((x * 2.0).round() as i32), g((y * 2.0).round() as i32), g(flags), g(i32::from(sprite)), g(i32::from(power) + 1), b'\n']
+    vec![
+        9 + 0x20,
+        g((x * 2.0).round() as i32),
+        g((y * 2.0).round() as i32),
+        g(flags),
+        g(i32::from(sprite)),
+        g(i32::from(power) + 1),
+        b'\n',
+    ]
 }
 
 /// `PLO_ARROWADD` (19) after the sender's id.
@@ -270,7 +300,18 @@ mod tests {
 
     #[test]
     fn the_message_layout() {
-        assert_eq!(arrow_add_message(30.5, 29.0, 2, true, 109, 0), vec![9 + 0x20, 61 + 0x20, 58 + 0x20, 10 + 0x20, 109 + 0x20, 0x21, b'\n']);
+        assert_eq!(
+            arrow_add_message(30.5, 29.0, 2, true, 109, 0),
+            vec![
+                9 + 0x20,
+                61 + 0x20,
+                58 + 0x20,
+                10 + 0x20,
+                109 + 0x20,
+                0x21,
+                b'\n'
+            ]
+        );
     }
 
     #[test]
@@ -285,28 +326,62 @@ mod tests {
     fn a_received_shot_reads_like_our_own_message() {
         let m = arrow_add_message(30.5, 29.0, 2, true, 109, 0);
         let a = parse_arrow_add(&m[1..6]).unwrap();
-        assert_eq!(a, ArrowAdd { x: 30.5, y: 29.0, dir: 2, replaces: false, owned: true, sprite: 109, kind: 0 });
+        assert_eq!(
+            a,
+            ArrowAdd {
+                x: 30.5,
+                y: 29.0,
+                dir: 2,
+                replaces: false,
+                owned: true,
+                sprite: 109,
+                kind: 0
+            }
+        );
         assert_eq!(parse_arrow_add(&m[1..5]), None);
         let fire = parse_arrow_add(&[0x60, 0x60, 0x20 + 4 + 3, 0x20 + 110, 0x21 + 1]).unwrap();
-        assert_eq!((fire.dir, fire.replaces, fire.owned, fire.kind), (3, true, false, 1));
+        assert_eq!(
+            (fire.dir, fire.replaces, fire.owned, fire.kind),
+            (3, true, false, 1)
+        );
     }
 
     #[test]
     fn the_shot_box_overlaps_the_players_body() {
         // a 16 x 16 pixel sprite is half a tile each way
-        let at = |x, y| Arrow { x, y, ..Arrow::new(0.0, 0.0, 3) };
+        let at = |x, y| Arrow {
+            x,
+            y,
+            ..Arrow::new(0.0, 0.0, 3)
+        };
         let (px, py) = (30.0, 30.0);
         assert!(at(30.5, 31.0).hits_player(16, 16, px, py));
-        assert!(!at(30.0, 31.0).hits_player(16, 16, px, py), "x + 0.5 == px + 0.5 is out");
+        assert!(
+            !at(30.0, 31.0).hits_player(16, 16, px, py),
+            "x + 0.5 == px + 0.5 is out"
+        );
         assert!(at(32.4, 32.9).hits_player(16, 16, px, py));
-        assert!(!at(32.5, 31.0).hits_player(16, 16, px, py), "x == px + 2.5 is out");
-        assert!(!at(31.0, 33.0).hits_player(16, 16, px, py), "y == py + 3 is out");
-        assert!(!at(31.0, 30.5).hits_player(16, 16, px, py), "y + h == py + 1 is out");
+        assert!(
+            !at(32.5, 31.0).hits_player(16, 16, px, py),
+            "x == px + 2.5 is out"
+        );
+        assert!(
+            !at(31.0, 33.0).hits_player(16, 16, px, py),
+            "y == py + 3 is out"
+        );
+        assert!(
+            !at(31.0, 30.5).hits_player(16, 16, px, py),
+            "y + h == py + 1 is out"
+        );
     }
 
     #[test]
     fn harmless_and_returning_shots_do_not_hit() {
-        let mut a = Arrow { x: 31.0, y: 31.0, ..Arrow::new(0.0, 0.0, 3) };
+        let mut a = Arrow {
+            x: 31.0,
+            y: 31.0,
+            ..Arrow::new(0.0, 0.0, 3)
+        };
         a.harmless = true;
         assert!(!a.hits_player(16, 16, 30.0, 30.0));
         a.harmless = false;
@@ -319,14 +394,28 @@ mod tests {
         let add = parse_arrow_add(&[0x60, 0x60, 0x20 + 8, 0x20 + 107, 0x21]).unwrap();
         assert_eq!(Arrow::received(&add, Some(4), false).owner, Some(4));
         assert!(Arrow::received(&add, Some(4), true).harmless);
-        let unowned = ArrowAdd { owned: false, ..add };
+        let unowned = ArrowAdd {
+            owned: false,
+            ..add
+        };
         assert_eq!(Arrow::received(&unowned, Some(4), false).owner, None);
     }
 
     #[test]
     fn damage_and_blast_by_type() {
-        let k = |kind| Arrow { kind, ..Arrow::new(10.0, 10.0, 0) };
-        assert_eq!((k(0).damage_half(), k(1).damage_half(), k(2).damage_half(), k(3).damage_half()), (1, 2, 1, 2));
+        let k = |kind| Arrow {
+            kind,
+            ..Arrow::new(10.0, 10.0, 0)
+        };
+        assert_eq!(
+            (
+                k(0).damage_half(),
+                k(1).damage_half(),
+                k(2).damage_half(),
+                k(3).damage_half()
+            ),
+            (1, 2, 1, 2)
+        );
         assert_eq!(k(0).blast_at(16, 16), None);
         assert_eq!(k(1).blast_at(16, 16), None);
         assert_eq!(k(2).blast_at(16, 16), Some((9.25, 9.25)));

@@ -35,17 +35,24 @@ pub struct SessionScripts {
     pub rpg_messages: Vec<String>,
 }
 
-
 /// Where the player's cell starts in gmap coordinates (tiles); `(0, 0)` off
 /// a gmap.
 fn gmap_origin(s: &OfflineSession) -> (f64, f64) {
     let side = crate::gmap::CELL_TILES as f64;
-    s.gmap.as_ref().map_or((0.0, 0.0), |w| (w.cell.0 as f64 * side, w.cell.1 as f64 * side))
+    s.gmap.as_ref().map_or((0.0, 0.0), |w| {
+        (w.cell.0 as f64 * side, w.cell.1 as f64 * side)
+    })
 }
 
 impl SessionScripts {
     pub fn new(version: ClientVersion) -> Self {
-        SessionScripts { world: ScriptWorld::new(Era::for_version(version)), was_reading: false, unhandled: Vec::new(), images_changed: false, rpg_messages: Vec::new() }
+        SessionScripts {
+            world: ScriptWorld::new(Era::for_version(version)),
+            was_reading: false,
+            unhandled: Vec::new(),
+            images_changed: false,
+            rpg_messages: Vec::new(),
+        }
     }
 
     /// Replace the level's scripts with those of `session`'s current
@@ -84,7 +91,8 @@ impl SessionScripts {
         let resumed = session.gmap.is_some() && self.world.unpark_level(level_name);
         if let (false, Some(level)) = (resumed, &session.current_level) {
             for (i, n) in level.npcs.iter().enumerate() {
-                let mut spec = ObjSpec::npc(&n.image, n.x as f64, n.y as f64, &n.script).with_tag(i);
+                let mut spec =
+                    ObjSpec::npc(&n.image, n.x as f64, n.y as f64, &n.script).with_tag(i);
                 spec.kind = ObjKind::Npc;
                 let id = self.world.add(spec);
                 if let Some(o) = self.world.obj_mut(id) {
@@ -92,14 +100,27 @@ impl SessionScripts {
                 }
             }
         }
-        let kinds: Option<Vec<crate::assets::TileKind>> = session.current_level.as_ref().zip(session.tiletypes.as_ref()).map(|(l, t)| {
-            (0..64 * 64).map(|i| l.kind_at(t, (i % 64) as f32 + 0.5, (i / 64) as f32 + 0.5)).collect()
-        });
+        let kinds: Option<Vec<crate::assets::TileKind>> = session
+            .current_level
+            .as_ref()
+            .zip(session.tiletypes.as_ref())
+            .map(|(l, t)| {
+                (0..64 * 64)
+                    .map(|i| l.kind_at(t, (i % 64) as f32 + 0.5, (i / 64) as f32 + 0.5))
+                    .collect()
+            });
         use crate::assets::TileKind::{Blocking, Lava, Water};
-        self.world.core.walls = kinds.as_ref().map(|k| k.iter().map(|&k| k == Blocking).collect());
-        self.world.core.water = kinds.map(|k| k.into_iter().map(|k| k == Water || k == Lava).collect());
+        self.world.core.walls = kinds
+            .as_ref()
+            .map(|k| k.iter().map(|&k| k == Blocking).collect());
+        self.world.core.water =
+            kinds.map(|k| k.into_iter().map(|k| k == Water || k == Lava).collect());
         // The map for `onmapx` / `onmapy`: the gmap the player is on, else the big map.
-        self.world.core.map = session.gmap.as_ref().map(|g| g.map.clone()).or_else(|| session.big_map.clone());
+        self.world.core.map = session
+            .gmap
+            .as_ref()
+            .map(|g| g.map.clone())
+            .or_else(|| session.big_map.clone());
         self.sync_player(session);
         self.world.start_all();
         self.world.broadcast("playerenters");
@@ -109,8 +130,14 @@ impl SessionScripts {
     /// Make the world's weapon objects match the weapons the server sent.
     /// New ones run `created`.
     pub fn sync_weapons(&mut self, session: &mut OfflineSession, weapons: &[WeaponScript]) {
-        let have: Vec<String> =
-            self.world.ids().into_iter().filter_map(|i| self.world.obj(i)).filter(|o| o.kind == ObjKind::Weapon).map(|o| o.name.clone()).collect();
+        let have: Vec<String> = self
+            .world
+            .ids()
+            .into_iter()
+            .filter_map(|i| self.world.obj(i))
+            .filter(|o| o.kind == ObjKind::Weapon)
+            .map(|o| o.name.clone())
+            .collect();
         for name in &have {
             if !weapons.iter().any(|w| w.name == name) {
                 self.world.remove_weapon(name);
@@ -175,7 +202,10 @@ impl SessionScripts {
     /// NPCs just touched. Returns how many fired.
     pub fn touch(&mut self, session: &mut OfflineSession) -> usize {
         self.sync_player(session);
-        let n = self.world.touch((session.player_x + FOOT_DX) as f64, (session.player_y + FOOT_DY) as f64);
+        let n = self.world.touch(
+            (session.player_x + FOOT_DX) as f64,
+            (session.player_y + FOOT_DY) as f64,
+        );
         self.apply(session);
         n
     }
@@ -198,9 +228,12 @@ impl SessionScripts {
     /// trigger action): `actionpushed` or `actionpulled` on the NPC there,
     /// with the direction as the parameter. True if an NPC was there.
     pub fn trigger(&mut self, session: &mut OfflineSession, t: &crate::offline::Trigger) -> bool {
-        let Some(id) = self.world.npc_at(f64::from(t.x), f64::from(t.y)) else { return false };
+        let Some(id) = self.world.npc_at(f64::from(t.x), f64::from(t.y)) else {
+            return false;
+        };
         self.sync_player(session);
-        self.world.fire(id, &format!("action{}", t.action), &[t.dir.to_string()]);
+        self.world
+            .fire(id, &format!("action{}", t.action), &[t.dir.to_string()]);
         self.apply(session);
         true
     }
@@ -208,7 +241,11 @@ impl SessionScripts {
     /// A push or a pull moved a level NPC: its script object follows, and
     /// gets `waspushed` / `waspulled`.
     pub fn npc_moved(&mut self, session: &mut OfflineSession, m: &crate::offline::NpcMoved) {
-        let id = self.world.ids().into_iter().find(|&id| self.world.obj(id).is_some_and(|o| o.kind == ObjKind::Npc && o.tag == m.index));
+        let id = self.world.ids().into_iter().find(|&id| {
+            self.world
+                .obj(id)
+                .is_some_and(|o| o.kind == ObjKind::Npc && o.tag == m.index)
+        });
         let Some(id) = id else { return };
         if let Some(o) = self.world.obj_mut(id) {
             o.x = f64::from(m.x);
@@ -222,7 +259,13 @@ impl SessionScripts {
     /// Level NPC `index` arrived after the level's scripts started (a
     /// server NPC online): it runs `created`, then `playerenters`.
     pub fn add_npc(&mut self, session: &mut OfflineSession, index: usize) {
-        let Some(n) = session.current_level.as_ref().and_then(|l| l.npcs.get(index)) else { return };
+        let Some(n) = session
+            .current_level
+            .as_ref()
+            .and_then(|l| l.npcs.get(index))
+        else {
+            return;
+        };
         let mut spec = ObjSpec::npc(&n.image, n.x as f64, n.y as f64, &n.script).with_tag(index);
         spec.kind = ObjKind::Npc;
         let visible = n.visible;
@@ -239,7 +282,11 @@ impl SessionScripts {
     /// The server moved level NPC `index` (another player pushed it): the
     /// script sees the new `x` and `y`. No event runs.
     pub fn set_npc_pos(&mut self, index: usize, x: f32, y: f32) {
-        let id = self.world.ids().into_iter().find(|&id| self.world.obj(id).is_some_and(|o| o.kind == ObjKind::Npc && o.tag == index));
+        let id = self.world.ids().into_iter().find(|&id| {
+            self.world
+                .obj(id)
+                .is_some_and(|o| o.kind == ObjKind::Npc && o.tag == index)
+        });
         if let Some(o) = id.and_then(|id| self.world.obj_mut(id)) {
             o.x = f64::from(x);
             o.y = f64::from(y);
@@ -253,14 +300,24 @@ impl SessionScripts {
     /// 2gta's wide `tulepathcheck.png` exit at the top of
     /// `onlinestartlocal.nw` (an NPC at 29,0 that runs `setlevel2` on
     /// touch) could not be touched from y 0, where the feet are at 2.75.
-    pub fn size_npcs(&mut self, session: &OfflineSession, image_size: impl Fn(&str) -> Option<(u32, u32)>) {
-        let Some(level) = session.current_level.as_ref() else { return };
+    pub fn size_npcs(
+        &mut self,
+        session: &OfflineSession,
+        image_size: impl Fn(&str) -> Option<(u32, u32)>,
+    ) {
+        let Some(level) = session.current_level.as_ref() else {
+            return;
+        };
         for id in self.world.ids() {
-            let Some(o) = self.world.obj_mut(id) else { continue };
+            let Some(o) = self.world.obj_mut(id) else {
+                continue;
+            };
             if o.kind != ObjKind::Npc {
                 continue;
             }
-            let Some(n) = level.npcs.get(o.tag) else { continue };
+            let Some(n) = level.npcs.get(o.tag) else {
+                continue;
+            };
             if n.shape.is_some() {
                 continue;
             }
@@ -318,7 +375,10 @@ impl SessionScripts {
         self.apply(session);
         // The answer goes out as the typed line, not a second time.
         session.chat_out = None;
-        session.props.remove("#c").unwrap_or_else(|| text.to_string())
+        session
+            .props
+            .remove("#c")
+            .unwrap_or_else(|| text.to_string())
     }
 
     /// Apply the world's pending effects to the session. What the session
@@ -349,7 +409,11 @@ impl SessionScripts {
                     }
                 }
                 Effect::SaySign { index } => {
-                    let text = s.current_level.as_ref().and_then(|l| usize::try_from(index).ok().and_then(|i| l.signs.get(i))).map(|g| g.text.clone());
+                    let text = s
+                        .current_level
+                        .as_ref()
+                        .and_then(|l| usize::try_from(index).ok().and_then(|i| l.signs.get(i)))
+                        .map(|g| g.text.clone());
                     if let (Some(t), true) = (text, s.reading.is_none()) {
                         s.reading = Some(t);
                     }
@@ -372,7 +436,8 @@ impl SessionScripts {
                             set_ani(n, &file);
                         } else {
                             n.image = file;
-                            n.image_part = part.map(|(x, y, w, h)| (x as i32, y as i32, w as i32, h as i32));
+                            n.image_part =
+                                part.map(|(x, y, w, h)| (x as i32, y as i32, w as i32, h as i32));
                             n.ani = None;
                         }
                     }
@@ -384,7 +449,11 @@ impl SessionScripts {
                     }
                 }
                 // `setani name,params` is the same for an NPC that is not a character.
-                Effect::Command { obj, ref name, ref args } if name == "setani" => {
+                Effect::Command {
+                    obj,
+                    ref name,
+                    ref args,
+                } if name == "setani" => {
                     let a = args.first().map(|v| v.text()).unwrap_or_default();
                     if let Some(n) = self.level_npc(s, obj) {
                         set_ani(n, &a);
@@ -404,7 +473,11 @@ impl SessionScripts {
                 // file and place, its part is cleared and its height goes back to
                 // one over the NPC (over the player for a weapon); its colour and
                 // zoom stay.
-                Effect::Command { obj, ref name, ref args } if name == "showimg" => {
+                Effect::Command {
+                    obj,
+                    ref name,
+                    ref args,
+                } if name == "showimg" => {
                     self.images_changed = true;
                     let num = |i: usize| args.get(i).map_or(0.0, |v| v.num());
                     if let Some((images, owner)) = self.images_of(s, obj) {
@@ -418,7 +491,12 @@ impl SessionScripts {
                             height: owner + 1,
                         };
                         match images.iter_mut().find(|i| i.index == img.index) {
-                            Some(old) => *old = crate::assets::NpcImage { effect: old.effect, ..img },
+                            Some(old) => {
+                                *old = crate::assets::NpcImage {
+                                    effect: old.effect,
+                                    ..img
+                                }
+                            }
                             None => {
                                 images.push(img);
                                 images.sort_by_key(|i| i.index);
@@ -427,10 +505,19 @@ impl SessionScripts {
                     }
                 }
                 // `changeimgpart index,x,y,w,h`: the part of image `index` that shows.
-                Effect::Command { obj, ref name, ref args } if name == "changeimgpart" => {
+                Effect::Command {
+                    obj,
+                    ref name,
+                    ref args,
+                } if name == "changeimgpart" => {
                     let num = |i: usize| args.get(i).map_or(0.0, |v| v.num());
                     let index = num(0) as i64;
-                    let part = (num(1).clamp(0.0, 16000.0) as i32, num(2).clamp(0.0, 16000.0) as i32, num(3).clamp(0.0, 220.0) as i32, num(4).clamp(0.0, 220.0) as i32);
+                    let part = (
+                        num(1).clamp(0.0, 16000.0) as i32,
+                        num(2).clamp(0.0, 16000.0) as i32,
+                        num(3).clamp(0.0, 220.0) as i32,
+                        num(4).clamp(0.0, 220.0) as i32,
+                    );
                     if let Some((images, _)) = self.images_of(s, obj) {
                         if let Some(i) = images.iter_mut().find(|i| i.index == index) {
                             i.part = Some(part);
@@ -439,7 +526,11 @@ impl SessionScripts {
                 }
                 // `changeimgvis index,vis`: the image's height against its NPC
                 // (`documentation/npc-draw-order.md`).
-                Effect::Command { obj, ref name, ref args } if name == "changeimgvis" => {
+                Effect::Command {
+                    obj,
+                    ref name,
+                    ref args,
+                } if name == "changeimgvis" => {
                     let num = |i: usize| args.get(i).map_or(0.0, |v| v.num()).round() as i64;
                     if let Some((images, owner)) = self.images_of(s, obj) {
                         if let Some(h) = crate::assets::image_vis_height(num(1), owner) {
@@ -450,7 +541,11 @@ impl SessionScripts {
                     }
                 }
                 // `hideimg index`: image `index` is deleted.
-                Effect::Command { obj, ref name, ref args } if name == "hideimg" => {
+                Effect::Command {
+                    obj,
+                    ref name,
+                    ref args,
+                } if name == "hideimg" => {
                     self.images_changed = true;
                     let index = args.first().map_or(0.0, |v| v.num()) as i64;
                     if let Some((images, _)) = self.images_of(s, obj) {
@@ -471,7 +566,10 @@ impl SessionScripts {
                     }
                 }
                 Effect::SetLevel { level, x, y } => {
-                    let (px, py) = (x.map_or(s.player_x, |v| v as f32), y.map_or(s.player_y, |v| v as f32));
+                    let (px, py) = (
+                        x.map_or(s.player_x, |v| v as f32),
+                        y.map_or(s.player_y, |v| v as f32),
+                    );
                     s.pending_link = Some((level, px, py));
                 }
                 Effect::Hurt { half_hearts } => {
@@ -481,7 +579,9 @@ impl SessionScripts {
                     }
                     let per_half = 100.0 / s.max_hearts.max(1) as f64;
                     let before = s.player_health;
-                    s.player_health = (s.player_health as f64 - half_hearts * per_half).round().clamp(0.0, 100.0) as i32;
+                    s.player_health = (s.player_health as f64 - half_hearts * per_half)
+                        .round()
+                        .clamp(0.0, 100.0) as i32;
                     // A script that would kill: log it, and leave one point
                     // so movement is not locked while the cause is found.
                     if s.player_health == 0 && before > 0 {
@@ -500,14 +600,17 @@ impl SessionScripts {
                     "playershieldpower" => s.shield_power = value.clamp(0.0, 255.0) as u8,
                     "selectedweapon" => s.weapon_select = Some(value as usize),
                     "playerhearts" | "playerhp" => {
-                        s.player_health = (value * 2.0 / s.max_hearts.max(1) as f64 * 100.0).round().clamp(0.0, 100.0) as i32;
+                        s.player_health = (value * 2.0 / s.max_hearts.max(1) as f64 * 100.0)
+                            .round()
+                            .clamp(0.0, 100.0) as i32;
                     }
                     _ => {}
                 },
                 Effect::SetFlag { name, value } => {
                     let value = value.unwrap_or_default();
                     let was_set = s.flags.get(&name) == Some(&true);
-                    let changed = !was_set || s.strings.get(&name).map_or("", String::as_str) != value;
+                    let changed =
+                        !was_set || s.strings.get(&name).map_or("", String::as_str) != value;
                     s.flags.insert(name.clone(), true);
                     if value.is_empty() {
                         s.strings.remove(&name);
@@ -551,8 +654,12 @@ impl SessionScripts {
                                 _ => false,
                             }
                         }
-                        c if c.len() == 3 && c.starts_with("#P") && (b'1'..=b'5').contains(&c.as_bytes()[2]) => {
-                            s.looks.attrs[usize::from(c.as_bytes()[2] - b'1')] = Some(v.to_string());
+                        c if c.len() == 3
+                            && c.starts_with("#P")
+                            && (b'1'..=b'5').contains(&c.as_bytes()[2]) =>
+                        {
+                            s.looks.attrs[usize::from(c.as_bytes()[2] - b'1')] =
+                                Some(v.to_string());
                             true
                         }
                         _ => false,
@@ -565,18 +672,41 @@ impl SessionScripts {
                 }
                 // `noplayerkilling`: other players' hits do nothing in this level.
                 Effect::Command { ref name, .. } if name == "noplayerkilling" => s.no_pk = true,
-                Effect::Command { obj, ref name, ref args } if name == "putbomb" => {
+                Effect::Command {
+                    obj,
+                    ref name,
+                    ref args,
+                } if name == "putbomb" => {
                     let n = |i: usize| args.get(i).map_or(0.0, |v| v.num());
-                    let from_weapon = self.world.obj(obj).is_some_and(|o| o.kind == ObjKind::Weapon);
-                    s.put_bomb(n(0).clamp(0.0, 7.0) as u8, n(1) as f32, n(2) as f32, from_weapon);
+                    let from_weapon = self
+                        .world
+                        .obj(obj)
+                        .is_some_and(|o| o.kind == ObjKind::Weapon);
+                    s.put_bomb(
+                        n(0).clamp(0.0, 7.0) as u8,
+                        n(1) as f32,
+                        n(2) as f32,
+                        from_weapon,
+                    );
                 }
-                Effect::Command { obj, ref name, ref args } if name == "shootarrow" => {
+                Effect::Command {
+                    obj,
+                    ref name,
+                    ref args,
+                } if name == "shootarrow" => {
                     let dir = args.first().map_or(0.0, |v| v.num()).rem_euclid(4.0) as u8;
                     match self.world.obj(obj) {
                         // A weapon shoots from the player.
                         Some(o) if o.kind == ObjKind::Weapon => {
                             let (x, y) = (s.player_x, s.player_y);
-                            s.shoot_arrow(x, y, crate::arrows::SHOOTER_W, crate::arrows::SHOOTER_H, dir, true);
+                            s.shoot_arrow(
+                                x,
+                                y,
+                                crate::arrows::SHOOTER_W,
+                                crate::arrows::SHOOTER_H,
+                                dir,
+                                true,
+                            );
                         }
                         Some(o) => {
                             let (x, y, w, h) = o.rect();
@@ -586,13 +716,17 @@ impl SessionScripts {
                     }
                 }
                 // `setsword power`: the player's sword strength.
-                Effect::Command { ref name, ref args, .. } if name == "setsword" => {
+                Effect::Command {
+                    ref name, ref args, ..
+                } if name == "setsword" => {
                     if let Some(p) = args.get(1).map(|v| v.num()) {
                         s.sword_power = p.clamp(0.0, 255.0) as u8;
                     }
                 }
                 // `toweapons name`: the player gains that weapon.
-                Effect::Command { ref name, ref args, .. } if name == "toweapons" => {
+                Effect::Command {
+                    ref name, ref args, ..
+                } if name == "toweapons" => {
                     if let Some(n) = args.first().map(|v| v.text()) {
                         if !n.is_empty() && !s.weapons.iter().any(|w| w.eq_ignore_ascii_case(&n)) {
                             s.weapons.push(n);
@@ -601,17 +735,28 @@ impl SessionScripts {
                 }
                 // The player's looks (`documentation/appearance.md`). In 2.05
                 // these change the player whichever object runs them.
-                Effect::Command { ref name, ref args, .. } if name == "sethead" || name == "setbody" => {
+                Effect::Command {
+                    ref name, ref args, ..
+                } if name == "sethead" || name == "setbody" => {
                     let pic = args.first().map(|v| v.text()).unwrap_or_default();
                     let pic = pic.trim();
                     if !pic.is_empty() {
-                        let slot = if name == "sethead" { &mut s.looks.head } else { &mut s.looks.body };
+                        let slot = if name == "sethead" {
+                            &mut s.looks.head
+                        } else {
+                            &mut s.looks.body
+                        };
                         *slot = Some(pic.to_string());
                         s.looks_changed = true;
                     }
                 }
-                Effect::Command { ref name, ref args, .. } if crate::looks::color_slot(name).is_some() => {
-                    if let (Some(slot), Some(c)) = (crate::looks::color_slot(name), args.first().map(|v| v.num())) {
+                Effect::Command {
+                    ref name, ref args, ..
+                } if crate::looks::color_slot(name).is_some() => {
+                    if let (Some(slot), Some(c)) = (
+                        crate::looks::color_slot(name),
+                        args.first().map(|v| v.num()),
+                    ) {
                         let c = c.round();
                         if (0.0..20.0).contains(&c) {
                             s.looks.colors[slot] = c as u8;
@@ -630,14 +775,19 @@ impl SessionScripts {
                                 n.message = value.clone();
                                 n.props.insert(code, value);
                             }
-                            _ => { n.props.insert(code, value); }
+                            _ => {
+                                n.props.insert(code, value);
+                            }
                         }
                     }
                 }
                 // `canbepushed` and `canbepulled` (and their `cannot` forms):
                 // whether a push or a pull moves the NPC.
                 Effect::Command { obj, ref name, .. }
-                    if matches!(name.as_str(), "canbepushed" | "cannotbepushed" | "canbepulled" | "cannotbepulled") =>
+                    if matches!(
+                        name.as_str(),
+                        "canbepushed" | "cannotbepushed" | "canbepulled" | "cannotbepulled"
+                    ) =>
                 {
                     if let Some(n) = self.level_npc(s, obj) {
                         match name.as_str() {
@@ -656,7 +806,10 @@ impl SessionScripts {
                 }
                 // The drawing height (see `documentation/npc-draw-order.md`).
                 Effect::Command { obj, ref name, .. }
-                    if matches!(name.as_str(), "drawunderplayer" | "drawoverplayer" | "drawaslight") =>
+                    if matches!(
+                        name.as_str(),
+                        "drawunderplayer" | "drawoverplayer" | "drawaslight"
+                    ) =>
                 {
                     let layer = match name.as_str() {
                         "drawunderplayer" => crate::assets::DrawLayer::Under,
@@ -669,15 +822,23 @@ impl SessionScripts {
                 }
                 // `blockagain` and `blockagainlocal` undo `dontblock` and put the
                 // NPC back with the players, whatever its drawing height was.
-                Effect::Command { obj, ref name, .. } if name == "blockagain" || name == "blockagainlocal" => {
+                Effect::Command { obj, ref name, .. }
+                    if name == "blockagain" || name == "blockagainlocal" =>
+                {
                     if let Some(n) = self.level_npc(s, obj) {
                         n.blocks = true;
                         n.layer = crate::assets::DrawLayer::Player;
                     }
                 }
                 // Colour and zoom effects (see `documentation/visual-effects.md`).
-                Effect::Command { obj, ref name, ref args }
-                    if matches!(name.as_str(), "setcoloreffect" | "setzoomeffect" | "changeimgcolors" | "changeimgzoom") =>
+                Effect::Command {
+                    obj,
+                    ref name,
+                    ref args,
+                } if matches!(
+                    name.as_str(),
+                    "setcoloreffect" | "setzoomeffect" | "changeimgcolors" | "changeimgzoom"
+                ) =>
                 {
                     let num = |i: usize| args.get(i).map_or(0.0, |v| v.num()) as f32;
                     let set = |e: &mut crate::assets::ImageEffect, from: usize, color: bool| {
@@ -702,7 +863,9 @@ impl SessionScripts {
                 // `freezeplayer time` and `hideplayer time`: the player cannot
                 // move, or is not drawn, for `time` seconds. A second call
                 // sets the time left anew.
-                Effect::Command { ref name, ref args, .. } if name == "freezeplayer" || name == "hideplayer" => {
+                Effect::Command {
+                    ref name, ref args, ..
+                } if name == "freezeplayer" || name == "hideplayer" => {
                     let secs = args.first().map_or(0.0, |v| v.num()).max(0.0);
                     let ms = (secs * 1000.0).round() as u64;
                     if name == "freezeplayer" {
@@ -713,23 +876,31 @@ impl SessionScripts {
                 }
                 // `setfocus x,y` and `resetfocus` (2.1+ only; the engine
                 // drops them for 2.05): where the view is centred.
-                Effect::Command { ref name, ref args, .. } if name == "setfocus" => {
+                Effect::Command {
+                    ref name, ref args, ..
+                } if name == "setfocus" => {
                     let num = |i: usize| args.get(i).map_or(0.0, |v| v.num()) as f32;
                     s.view_focus = Some((num(0), num(1)));
                 }
                 Effect::Command { ref name, .. } if name == "resetfocus" => s.view_focus = None,
                 // `showstats bits`: which parts of the status bar show.
-                Effect::Command { ref name, ref args, .. } if name == "showstats" => {
+                Effect::Command {
+                    ref name, ref args, ..
+                } if name == "showstats" => {
                     let bits = args.first().map_or(0.0, |v| v.num());
                     s.stats = Some(bits.max(0.0).min(f64::from(u16::MAX)) as u16);
                 }
                 // `enablefeatures bits`: which client keys work (bit 1: M).
-                Effect::Command { ref name, ref args, .. } if name == "enablefeatures" => {
+                Effect::Command {
+                    ref name, ref args, ..
+                } if name == "enablefeatures" => {
                     let bits = args.first().map_or(0.0, |v| v.num());
                     s.features = Some(bits.max(0.0).min(f64::from(u32::MAX)) as u32);
                 }
                 // `seteffect r,g,b,a`: the whole map is shaded with that colour.
-                Effect::Command { ref name, ref args, .. } if name == "seteffect" => {
+                Effect::Command {
+                    ref name, ref args, ..
+                } if name == "seteffect" => {
                     let num = |i: usize| args.get(i).map_or(0.0, |v| v.num()) as f32;
                     s.screen_effect = [num(0), num(1), num(2), num(3)];
                 }
@@ -737,8 +908,14 @@ impl SessionScripts {
                 // (applied at once, 2.05), and x, y: where a player whose level
                 // is not on the map is drawn, in levels (GServer's
                 // `serveroptions.txt` notes for the same four fields).
-                Effect::Command { ref name, ref args, .. } if name == "setmap" => {
-                    let file = |i: usize| args.get(i).map(|v| v.text().trim().to_string()).unwrap_or_default();
+                Effect::Command {
+                    ref name, ref args, ..
+                } if name == "setmap" => {
+                    let file = |i: usize| {
+                        args.get(i)
+                            .map(|v| v.text().trim().to_string())
+                            .unwrap_or_default()
+                    };
                     let num = |i: usize| args.get(i).map_or(0.0, |v| v.num()) as f32;
                     let (image, txt) = (file(0), file(1));
                     if !image.is_empty() && !txt.is_empty() {
@@ -754,21 +931,37 @@ impl SessionScripts {
                 // Visual commands. Recognized so they do not fill the log;
                 // drawing them is still open.
                 Effect::Command { ref name, .. }
-                    if matches!(name.as_str(),
-                        "showtext" | "hideimgs" | "setbackpal"
-                        | "replaceani" | "addtiledef" | "addtiledef2"
-                        | "removetiledefs" | "setchargender" | "enabledefmovement"
-                        | "timereverywhere"
+                    if matches!(
+                        name.as_str(),
+                        "showtext"
+                            | "hideimgs"
+                            | "setbackpal"
+                            | "replaceani"
+                            | "addtiledef"
+                            | "addtiledef2"
+                            | "removetiledefs"
+                            | "setchargender"
+                            | "enabledefmovement"
+                            | "timereverywhere"
                     ) => {}
                 // `play`, `playlooped`, `play2`: queued with the GANI cues. 2.05
                 // places the sound at the NPC's centre; a weapon has no place of
                 // its own, so its sound is at the player (centre pan).
-                Effect::Play { obj, file, looped, at } => {
+                Effect::Play {
+                    obj,
+                    file,
+                    looped,
+                    at,
+                } => {
                     let (x, y) = match at {
                         Some((x, y)) => (x as f32, y as f32),
                         None => self.sound_point(s, obj),
                     };
-                    let file = if looped { format!("+{}", file.trim()) } else { file };
+                    let file = if looped {
+                        format!("+{}", file.trim())
+                    } else {
+                        file
+                    };
                     s.sound_events.push(crate::sound::SoundEvent { file, x, y });
                 }
                 Effect::StopSound { file } => s.sound_stops.push(file),
@@ -785,8 +978,13 @@ impl SessionScripts {
     /// image is assumed. Only x sets the pan, at 150 units a tile, so a
     /// wrong guess moves it little.
     fn sound_point(&self, s: &mut OfflineSession, obj: usize) -> (f32, f32) {
-        let listener = (s.player_x + crate::assets::LISTENER_DX, s.player_y + crate::assets::LISTENER_DY);
-        let Some(n) = self.level_npc(s, obj) else { return listener };
+        let listener = (
+            s.player_x + crate::assets::LISTENER_DX,
+            s.player_y + crate::assets::LISTENER_DY,
+        );
+        let Some(n) = self.level_npc(s, obj) else {
+            return listener;
+        };
         let (w, h) = match (n.image_part, n.shape) {
             (Some((_, _, w, h)), _) => (w as f32 / 16.0, h as f32 / 16.0),
             (None, Some((w, h))) => (w / 16.0, h / 16.0),
@@ -795,7 +993,11 @@ impl SessionScripts {
         (n.x + w / 2.0, n.y + h / 2.0)
     }
 
-    fn level_npc<'s>(&self, s: &'s mut OfflineSession, obj: usize) -> Option<&'s mut crate::assets::Npc> {
+    fn level_npc<'s>(
+        &self,
+        s: &'s mut OfflineSession,
+        obj: usize,
+    ) -> Option<&'s mut crate::assets::Npc> {
         let o = self.world.obj(obj)?;
         if o.kind != ObjKind::Npc {
             return None;
@@ -807,11 +1009,23 @@ impl SessionScripts {
     /// level NPC's own images, or for a weapon the player's, at the
     /// player's height ("weapon NPCs act as the player": Graal_analysis
     /// `npc-library/gs1-command-reference-205.md`).
-    fn images_of<'s>(&self, s: &'s mut OfflineSession, obj: usize) -> Option<(&'s mut Vec<crate::assets::NpcImage>, i32)> {
+    fn images_of<'s>(
+        &self,
+        s: &'s mut OfflineSession,
+        obj: usize,
+    ) -> Option<(&'s mut Vec<crate::assets::NpcImage>, i32)> {
         let o = self.world.obj(obj)?;
         match o.kind {
-            ObjKind::Npc => s.current_level.as_mut()?.npcs.get_mut(o.tag).map(|n| (&mut n.images, n.layer.height())),
-            ObjKind::Weapon => Some((&mut s.player_images, crate::assets::DrawLayer::Player.height())),
+            ObjKind::Npc => s
+                .current_level
+                .as_mut()?
+                .npcs
+                .get_mut(o.tag)
+                .map(|n| (&mut n.images, n.layer.height())),
+            ObjKind::Weapon => Some((
+                &mut s.player_images,
+                crate::assets::DrawLayer::Player.height(),
+            )),
         }
     }
 }
@@ -858,12 +1072,21 @@ mod tests {
         let mut sc = SessionScripts::new(ClientVersion::V205);
         assert!(s.script_map.is_none());
         sc.load_level(&mut s, "tutorial_b-4.graal");
-        assert_eq!(s.script_map, Some(("tutorialmap.png".to_string(), "tutorialmap.txt".to_string(), 1.5, 3.8)));
+        assert_eq!(
+            s.script_map,
+            Some((
+                "tutorialmap.png".to_string(),
+                "tutorialmap.txt".to_string(),
+                1.5,
+                3.8
+            ))
+        );
     }
 
     #[test]
     fn enablefeatures_without_bit_1_turns_the_map_key_off() {
-        let mut s = session("GLEVNW01\nNPC - 1 1\nif (playerenters) { enablefeatures 126; }\nNPCEND\n");
+        let mut s =
+            session("GLEVNW01\nNPC - 1 1\nif (playerenters) { enablefeatures 126; }\nNPCEND\n");
         let mut sc = SessionScripts::new(ClientVersion::V222);
         sc.load_level(&mut s, "nomap.nw");
         assert_eq!(s.features, Some(0x7e));
@@ -894,10 +1117,18 @@ mod tests {
         sc.load_level(&mut s, "push.nw");
         let n = &s.current_level.as_ref().unwrap().npcs[0];
         assert!(n.pushable && !n.pullable);
-        let m = crate::offline::NpcMoved { index: 0, x: 20.0, y: 9.0, event: "waspushed" };
+        let m = crate::offline::NpcMoved {
+            index: 0,
+            x: 20.0,
+            y: 9.0,
+            event: "waspushed",
+        };
         sc.npc_moved(&mut s, &m);
         assert_eq!(s.last_message.as_deref(), Some("moved"));
-        let id = sc.world.npc_at(21.0, 9.5).expect("the script object moved with it");
+        let id = sc
+            .world
+            .npc_at(21.0, 9.5)
+            .expect("the script object moved with it");
         assert_eq!(sc.world.obj(id).map(|o| o.y), Some(9.0));
     }
 
@@ -914,14 +1145,19 @@ mod tests {
         s.player_x = 30.0 - FOOT_DX + 0.5;
         s.player_y = 30.0 - FOOT_DY + 0.5;
         sc.touch(&mut s);
-        assert_eq!(s.player_health, before, "the touch script's hurt 2 did nothing");
+        assert_eq!(
+            s.player_health, before,
+            "the touch script's hurt 2 did nothing"
+        );
     }
 
     #[test]
     fn playerdies_reaches_the_scripts() {
         let mut s = OfflineSession::new();
-        s.current_level =
-            Some(Level::parse("GLEVNW01\nNPC - 1 1\nif (playerdies) { message gone; }\nNPCEND\n").unwrap());
+        s.current_level = Some(
+            Level::parse("GLEVNW01\nNPC - 1 1\nif (playerdies) { message gone; }\nNPCEND\n")
+                .unwrap(),
+        );
         let mut sc = SessionScripts::new(ClientVersion::V205);
         sc.load_level(&mut s, "x.nw");
         assert!(s.last_message.is_none());
@@ -1005,15 +1241,32 @@ mod tests {
         s.bombs = 5;
         let mut sc = SessionScripts::new(ClientVersion::V205);
         let script = crate::bombs::builtin_script(8).unwrap();
-        sc.sync_weapons(&mut s, &[WeaponScript { name: "Bomb", image: "wbomb1.png", script: &script }]);
+        sc.sync_weapons(
+            &mut s,
+            &[WeaponScript {
+                name: "Bomb",
+                image: "wbomb1.png",
+                script: &script,
+            }],
+        );
         sc.sync_player(&s);
         sc.world.weapon_fired("Bomb");
         sc.apply(&mut s);
         assert_eq!(s.bombs, 4);
         assert_eq!(s.placed_bombs.len(), 1);
-        assert_eq!((s.placed_bombs[0].x, s.placed_bombs[0].y, s.placed_bombs[0].power), (30.5, 32.5, 1));
+        assert_eq!(
+            (
+                s.placed_bombs[0].x,
+                s.placed_bombs[0].y,
+                s.placed_bombs[0].power
+            ),
+            (30.5, 32.5, 1)
+        );
         // a weapon's bomb: power 1 + 8, the fuse 55
-        assert_eq!(s.take_bomb_sends(), vec![vec![0x24, 61 + 0x20, 65 + 0x20, 0x29, 0x57, b'\n']]);
+        assert_eq!(
+            s.take_bomb_sends(),
+            vec![vec![0x24, 61 + 0x20, 65 + 0x20, 0x29, 0x57, b'\n']]
+        );
         // no bombs, no bomb
         s.bombs = 0;
         sc.sync_player(&s);
@@ -1036,7 +1289,14 @@ mod tests {
         s.darts = 5;
         let mut sc = SessionScripts::new(ClientVersion::V205);
         let script = crate::arrows::builtin_script(7).unwrap();
-        sc.sync_weapons(&mut s, &[WeaponScript { name: "Bow", image: "wbowi1.png", script }]);
+        sc.sync_weapons(
+            &mut s,
+            &[WeaponScript {
+                name: "Bow",
+                image: "wbowi1.png",
+                script,
+            }],
+        );
         sc.sync_player(&s);
         sc.world.weapon_fired("Bow");
         sc.apply(&mut s);
@@ -1064,7 +1324,14 @@ mod tests {
     fn a_level_change_replaces_npc_scripts_but_keeps_weapons() {
         let mut s = session("GLEVNW01\nNPC - 1 1\nif (created) { message first; }\nNPCEND\n");
         let mut sc = SessionScripts::new(ClientVersion::V205);
-        sc.sync_weapons(&mut s, &[WeaponScript { name: "Bow", image: "bow.png", script: "if (weaponfired) { message pew; }" }]);
+        sc.sync_weapons(
+            &mut s,
+            &[WeaponScript {
+                name: "Bow",
+                image: "bow.png",
+                script: "if (weaponfired) { message pew; }",
+            }],
+        );
         sc.load_level(&mut s, "a.nw");
         assert_eq!(sc.world.ids().len(), 2);
         s.current_level = Some(Level::parse("GLEVNW01\n").unwrap());
@@ -1085,7 +1352,14 @@ mod tests {
         s.player_x = 30.0;
         s.player_y = 30.5;
         let mut sc = SessionScripts::new(ClientVersion::V222);
-        sc.sync_weapons(&mut s, &[WeaponScript { name: "-gr_movement", image: "", script: GR }]);
+        sc.sync_weapons(
+            &mut s,
+            &[WeaponScript {
+                name: "-gr_movement",
+                image: "",
+                script: GR,
+            }],
+        );
         sc.load_level(&mut s, "a.nw");
         let sent = |s: &mut OfflineSession| std::mem::take(&mut s.flags_out);
         let set = |n: &str, v: &str| (n.to_string(), Some(v.to_string()));
@@ -1105,19 +1379,44 @@ mod tests {
         const GR: &str = "if (playerenters || timeout) {\n  if (!gr.off) {\n    if (!gr.x.off) setstring gr.x,#v(int((playerx+0.25)*2)/2);\n    if (!gr.y.off) setstring gr.y,#v(int((playery+0.25)*2)/2);\n  }\n  timeout=0.05;\n}\n";
         let grid = "GRMAP001\nWIDTH 3\nHEIGHT 3\nLEVELNAMES\n\"a.nw\",\"b.nw\",\"c.nw\",\n\"d.nw\",\"e.nw\",\"f.nw\",\n\"g.nw\",\"h.nw\",\"i.nw\",\nLEVELNAMESEND\n";
         let mut s = session("GLEVNW01\n");
-        s.enter_gmap("g.gmap".into(), crate::gmap::Gmap::parse(grid).unwrap(), (2, 1));
+        s.enter_gmap(
+            "g.gmap".into(),
+            crate::gmap::Gmap::parse(grid).unwrap(),
+            (2, 1),
+        );
         s.player_x = 0.5;
         s.player_y = 60.5;
         let mut sc = SessionScripts::new(ClientVersion::V222);
-        sc.sync_weapons(&mut s, &[WeaponScript { name: "-gr_movement", image: "", script: GR }]);
+        sc.sync_weapons(
+            &mut s,
+            &[WeaponScript {
+                name: "-gr_movement",
+                image: "",
+                script: GR,
+            }],
+        );
         sc.load_level(&mut s, "f.nw");
         let set = |n: &str, v: &str| (n.to_string(), Some(v.to_string()));
-        assert_eq!(std::mem::take(&mut s.flags_out), [set("gr.x", "128.5"), set("gr.y", "124.5")]);
+        assert_eq!(
+            std::mem::take(&mut s.flags_out),
+            [set("gr.x", "128.5"), set("gr.y", "124.5")]
+        );
 
         let mut s = session("GLEVNW01\n");
-        s.enter_gmap("g.gmap".into(), crate::gmap::Gmap::parse(grid).unwrap(), (2, 1));
+        s.enter_gmap(
+            "g.gmap".into(),
+            crate::gmap::Gmap::parse(grid).unwrap(),
+            (2, 1),
+        );
         let mut sc = SessionScripts::new(ClientVersion::V222);
-        sc.sync_weapons(&mut s, &[WeaponScript { name: "Mover", image: "", script: "if (created) { playerx = 130; playery = 70; }" }]);
+        sc.sync_weapons(
+            &mut s,
+            &[WeaponScript {
+                name: "Mover",
+                image: "",
+                script: "if (created) { playerx = 130; playery = 70; }",
+            }],
+        );
         assert_eq!((s.player_x, s.player_y), (2.0, 6.0));
     }
 
@@ -1126,7 +1425,11 @@ mod tests {
         let mut s = session("GLEVNW01\nNPC - 1 1\nif (created) { set local.a; set b; unset b; setstring c,x; }\nNPCEND\n");
         let mut sc = SessionScripts::new(ClientVersion::V205);
         sc.load_level(&mut s, "a.nw");
-        let names: Vec<_> = s.flags_out.iter().map(|(n, v)| (n.as_str(), v.as_deref())).collect();
+        let names: Vec<_> = s
+            .flags_out
+            .iter()
+            .map(|(n, v)| (n.as_str(), v.as_deref()))
+            .collect();
         assert_eq!(names, [("b", Some("")), ("b", None), ("c", Some("x"))]);
     }
 
@@ -1134,12 +1437,23 @@ mod tests {
     fn weapon_sync_adds_removes_and_runs_created_once() {
         let mut s = session("GLEVNW01\n");
         let mut sc = SessionScripts::new(ClientVersion::V205);
-        let bow = WeaponScript { name: "Bow", image: "", script: "if (created) { set bowready; }" };
+        let bow = WeaponScript {
+            name: "Bow",
+            image: "",
+            script: "if (created) { set bowready; }",
+        };
         sc.sync_weapons(&mut s, &[bow]);
         assert_eq!(s.flags.get("bowready"), Some(&true));
         s.flags.insert("bowready".into(), false);
         sc.world.core.flags.clear();
-        sc.sync_weapons(&mut s, &[WeaponScript { name: "Bow", image: "", script: "if (created) { set bowready; }" }]);
+        sc.sync_weapons(
+            &mut s,
+            &[WeaponScript {
+                name: "Bow",
+                image: "",
+                script: "if (created) { set bowready; }",
+            }],
+        );
         assert_eq!(s.flags.get("bowready"), Some(&false)); // not run again
         sc.sync_weapons(&mut s, &[]);
         assert!(sc.world.ids().is_empty());
@@ -1150,10 +1464,20 @@ mod tests {
         let mut s = session("GLEVNW01\nNPC - 1 1\nif (created) { triggeraction 1,1,x,; sendtoserver hi; }\nNPCEND\n");
         let mut sc = SessionScripts::new(ClientVersion::V205);
         sc.load_level(&mut s, "a.nw");
-        assert!(sc.unhandled.iter().any(|e| matches!(e, Effect::TriggerAction { .. })));
+        assert!(sc
+            .unhandled
+            .iter()
+            .any(|e| matches!(e, Effect::TriggerAction { .. })));
         // 2.05 has no sendtoserver: it was gated out and only logged.
-        assert!(!sc.unhandled.iter().any(|e| matches!(e, Effect::SendToServer { .. })));
-        assert!(sc.world.take_log().iter().any(|l| l.contains("sendtoserver")));
+        assert!(!sc
+            .unhandled
+            .iter()
+            .any(|e| matches!(e, Effect::SendToServer { .. })));
+        assert!(sc
+            .world
+            .take_log()
+            .iter()
+            .any(|l| l.contains("sendtoserver")));
     }
 
     /// Lab 2026-10-30: walking back into a gmap level still loaded as a
@@ -1162,21 +1486,33 @@ mod tests {
     /// no longer loaded starts afresh, and off the gmap nothing is kept.
     #[test]
     fn re_entering_a_loaded_gmap_level_resumes_its_scripts() {
-        const NPC: &str = "GLEVNW01\nNPC - 30 30\nif (created) { showcharacter; setcharani idle,; }\nNPCEND\n";
+        const NPC: &str =
+            "GLEVNW01\nNPC - 30 30\nif (created) { showcharacter; setcharani idle,; }\nNPCEND\n";
         let grid = "GRMAP001\nWIDTH 2\nHEIGHT 1\nLEVELNAMES\n\"a.nw\",\"b.nw\",\nLEVELNAMESEND\n";
         let mut s = session(NPC);
-        s.enter_gmap("g.gmap".into(), crate::gmap::Gmap::parse(grid).unwrap(), (0, 0));
+        s.enter_gmap(
+            "g.gmap".into(),
+            crate::gmap::Gmap::parse(grid).unwrap(),
+            (0, 0),
+        );
         let mut sc = SessionScripts::new(ClientVersion::V222);
         sc.load_level(&mut s, "a.nw");
         let calls = |s: &OfflineSession| s.current_level.as_ref().unwrap().npcs[0].ani_calls;
         assert_eq!(calls(&s), 1);
         // East into b.nw; a.nw stays as the neighbour.
-        let a = s.current_level.replace(Level::parse("GLEVNW01\n").unwrap()).unwrap();
+        let a = s
+            .current_level
+            .replace(Level::parse("GLEVNW01\n").unwrap())
+            .unwrap();
         let w = s.gmap.as_mut().unwrap();
         w.levels.insert((0, 0), a);
         w.cell = (1, 0);
         sc.load_level(&mut s, "b.nw");
-        assert!(sc.world.ids().iter().all(|&i| sc.world.obj(i).unwrap().kind != ObjKind::Npc));
+        assert!(sc
+            .world
+            .ids()
+            .iter()
+            .all(|&i| sc.world.obj(i).unwrap().kind != ObjKind::Npc));
         // And back west.
         let a = s.gmap.as_mut().unwrap().levels.remove(&(0, 0)).unwrap();
         let b = s.current_level.replace(a).unwrap();
@@ -1185,7 +1521,14 @@ mod tests {
         w.cell = (0, 0);
         sc.load_level(&mut s, "a.nw");
         assert_eq!(calls(&s), 1, "created did not run again");
-        assert_eq!(sc.world.ids().iter().filter(|&&i| sc.world.obj(i).unwrap().kind == ObjKind::Npc).count(), 1);
+        assert_eq!(
+            sc.world
+                .ids()
+                .iter()
+                .filter(|&&i| sc.world.obj(i).unwrap().kind == ObjKind::Npc)
+                .count(),
+            1
+        );
 
         // Off the gmap: the level is new again.
         s.leave_gmap();
@@ -1195,7 +1538,9 @@ mod tests {
 
     #[test]
     fn onwall_uses_the_levels_collision_table() {
-        let tiles: Vec<u16> = (0..64 * 64).map(|i| if i % 64 == 10 { 1 } else { 0 }).collect();
+        let tiles: Vec<u16> = (0..64 * 64)
+            .map(|i| if i % 64 == 10 { 1 } else { 0 })
+            .collect();
         let mut s = OfflineSession::new();
         s.current_level = Some(Level::from_board(&tiles));
         let mut types = crate::assets::TileTypes::from_types([0; 4096]);
@@ -1204,10 +1549,21 @@ mod tests {
         let mut sc = SessionScripts::new(ClientVersion::V205);
         sc.load_level(&mut s, "a.nw");
         let mut w = sc.world;
-        let id = w.add(ObjSpec::npc("a.png", 0.0, 0.0, "if (created) { this.a = onwall(10.5, 3); this.b = onwall(11.5, 3); }"));
+        let id = w.add(ObjSpec::npc(
+            "a.png",
+            0.0,
+            0.0,
+            "if (created) { this.a = onwall(10.5, 3); this.b = onwall(11.5, 3); }",
+        ));
         w.fire(id, "created", &[]);
-        assert_eq!(w.obj(id).unwrap().vars["this.a"], crate::scripting::engine::Val::Num(1.0));
-        assert_eq!(w.obj(id).unwrap().vars["this.b"], crate::scripting::engine::Val::Num(0.0));
+        assert_eq!(
+            w.obj(id).unwrap().vars["this.a"],
+            crate::scripting::engine::Val::Num(1.0)
+        );
+        assert_eq!(
+            w.obj(id).unwrap().vars["this.b"],
+            crate::scripting::engine::Val::Num(0.0)
+        );
     }
 
     #[test]
@@ -1359,7 +1715,13 @@ mod tests {
         // Skin 18, coat red (4); a belt past the list is left alone.
         assert_eq!(s.looks.colors, [18, 4, 18, 5, 18]);
         assert!(s.looks_changed);
-        assert!(sc.unhandled.iter().all(|e| !format!("{e:?}").contains("set")), "{:?}", sc.unhandled);
+        assert!(
+            sc.unhandled
+                .iter()
+                .all(|e| !format!("{e:?}").contains("set")),
+            "{:?}",
+            sc.unhandled
+        );
     }
 
     const PROPS: &str = "GLEVNW01\n\
@@ -1376,7 +1738,10 @@ mod tests {
         assert_eq!(s.looks.attrs[0].as_deref(), Some("hat3.png"));
         assert_eq!(s.looks.body.as_deref(), Some("body2.png"));
         assert_eq!(s.looks.head.as_deref(), Some("head5.png"));
-        assert_eq!(s.looks.colors[1], crate::looks::color_by_name("blue").unwrap());
+        assert_eq!(
+            s.looks.colors[1],
+            crate::looks::color_by_name("blue").unwrap()
+        );
         assert_eq!(s.looks.colors[4], 7);
         assert!(s.looks_changed);
     }
@@ -1387,8 +1752,21 @@ mod tests {
         let mut sc = SessionScripts::new(ClientVersion::V205);
         sc.load_level(&mut s, "a.nw");
         // No image size known: a 32-pixel image, so one tile in.
-        assert_eq!(s.take_sound_events(), vec![crate::sound::SoundEvent { file: "wolf.wav".into(), x: 11.0, y: 21.0 }]);
-        assert!(!sc.unhandled.iter().any(|e| matches!(e, Effect::Play { .. })), "{:?}", sc.unhandled);
+        assert_eq!(
+            s.take_sound_events(),
+            vec![crate::sound::SoundEvent {
+                file: "wolf.wav".into(),
+                x: 11.0,
+                y: 21.0
+            }]
+        );
+        assert!(
+            !sc.unhandled
+                .iter()
+                .any(|e| matches!(e, Effect::Play { .. })),
+            "{:?}",
+            sc.unhandled
+        );
     }
 
     #[test]
@@ -1397,8 +1775,22 @@ mod tests {
         let mut sc = SessionScripts::new(ClientVersion::V205);
         sc.load_level(&mut s, "a.nw");
         let ev = s.take_sound_events();
-        assert!(ev.contains(&crate::sound::SoundEvent { file: "a.wav".into(), x: 12.0, y: 20.5 }), "{ev:?}");
-        assert!(ev.contains(&crate::sound::SoundEvent { file: "b.wav".into(), x: 4.5, y: 5.5 }), "{ev:?}");
+        assert!(
+            ev.contains(&crate::sound::SoundEvent {
+                file: "a.wav".into(),
+                x: 12.0,
+                y: 20.5
+            }),
+            "{ev:?}"
+        );
+        assert!(
+            ev.contains(&crate::sound::SoundEvent {
+                file: "b.wav".into(),
+                x: 4.5,
+                y: 5.5
+            }),
+            "{ev:?}"
+        );
     }
 
     #[test]
@@ -1415,25 +1807,58 @@ mod tests {
 
     #[test]
     fn play2_names_its_place_and_a_weapon_plays_at_the_player() {
-        let mut s = session("GLEVNW01\nNPC - 0 0\nif (created) { play2 bell.wav,30,40,1; }\nNPCEND\n");
+        let mut s =
+            session("GLEVNW01\nNPC - 0 0\nif (created) { play2 bell.wav,30,40,1; }\nNPCEND\n");
         let mut sc = SessionScripts::new(ClientVersion::V222);
         sc.load_level(&mut s, "a.nw");
-        assert_eq!(s.take_sound_events(), vec![crate::sound::SoundEvent { file: "bell.wav".into(), x: 30.0, y: 40.0 }]);
+        assert_eq!(
+            s.take_sound_events(),
+            vec![crate::sound::SoundEvent {
+                file: "bell.wav".into(),
+                x: 30.0,
+                y: 40.0
+            }]
+        );
         s.player_x = 7.0;
         s.player_y = 9.0;
-        sc.sync_weapons(&mut s, &[WeaponScript { name: "Bow", image: "", script: "if (weaponfired) { play arrow.wav; }" }]);
+        sc.sync_weapons(
+            &mut s,
+            &[WeaponScript {
+                name: "Bow",
+                image: "",
+                script: "if (weaponfired) { play arrow.wav; }",
+            }],
+        );
         sc.world.weapon_fired("Bow");
         sc.apply(&mut s);
         let ev = s.take_sound_events();
-        assert_eq!(ev, vec![crate::sound::SoundEvent { file: "arrow.wav".into(), x: 8.5, y: 11.0 }]);
+        assert_eq!(
+            ev,
+            vec![crate::sound::SoundEvent {
+                file: "arrow.wav".into(),
+                x: 8.5,
+                y: 11.0
+            }]
+        );
     }
 
     #[test]
     fn a_script_setting_selectedweapon_asks_the_front_end_to_select() {
         let mut s = session("GLEVNW01\n");
         let mut sc = SessionScripts::new(ClientVersion::V222);
-        sc.world.core.player.weapons = vec![("Bow".into(), String::new()), ("-System3".into(), String::new()), ("Lamp".into(), String::new())];
-        sc.sync_weapons(&mut s, &[WeaponScript { name: "-System3", image: "", script: "if (created) { selectedweapon = 1; }" }]);
+        sc.world.core.player.weapons = vec![
+            ("Bow".into(), String::new()),
+            ("-System3".into(), String::new()),
+            ("Lamp".into(), String::new()),
+        ];
+        sc.sync_weapons(
+            &mut s,
+            &[WeaponScript {
+                name: "-System3",
+                image: "",
+                script: "if (created) { selectedweapon = 1; }",
+            }],
+        );
         assert_eq!(s.weapon_select, Some(2));
     }
 }

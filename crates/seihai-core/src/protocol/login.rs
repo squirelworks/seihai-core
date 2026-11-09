@@ -21,8 +21,8 @@
 
 use super::dispatch::{latin1, Weapon};
 use super::props::parse_player_props_in;
-use crate::offline::server_status_base;
 use super::{IdSet, SessionState};
+use crate::offline::server_status_base;
 use std::time::{Duration, Instant};
 
 /// `PLI_PLAYERPROPS`.
@@ -82,10 +82,24 @@ pub const LOGIN_217: LoginInfo = LoginInfo {
     bundle_login: true,
     frame_after_level: Some(Duration::from_millis(96)),
 };
-pub const LOGIN_222: LoginInfo =
-    LoginInfo { os_props: Some(OS_WINDOWS), idle_gani: true, status_icons: true, full: true, first_frame_files: &[], bundle_login: false, frame_after_level: None };
-pub const LOGIN_231: LoginInfo =
-    LoginInfo { os_props: Some(OS_WINDOWS), idle_gani: false, status_icons: true, full: true, first_frame_files: &[], bundle_login: false, frame_after_level: None };
+pub const LOGIN_222: LoginInfo = LoginInfo {
+    os_props: Some(OS_WINDOWS),
+    idle_gani: true,
+    status_icons: true,
+    full: true,
+    first_frame_files: &[],
+    bundle_login: false,
+    frame_after_level: None,
+};
+pub const LOGIN_231: LoginInfo = LoginInfo {
+    os_props: Some(OS_WINDOWS),
+    idle_gani: false,
+    status_icons: true,
+    full: true,
+    first_frame_files: &[],
+    bundle_login: false,
+    frame_after_level: None,
+};
 /// The real 3.04 Linux build (lab, 2026-10-30, `documentation/login-burst.md`).
 pub const LOGIN_304: LoginInfo = LoginInfo {
     os_props: Some(("linux", 1250)),
@@ -100,7 +114,10 @@ pub const LOGIN_304: LoginInfo = LoginInfo {
 /// its binary writes (Graal_analysis `version-profiles/3.04-3.153.toml`). The
 /// code page and the rest of the frame are 3.04's; the notes have no 3.153
 /// value for them.
-pub const LOGIN_3153: LoginInfo = LoginInfo { os_props: Some(("mac", 1250)), ..LOGIN_304 };
+pub const LOGIN_3153: LoginInfo = LoginInfo {
+    os_props: Some(("mac", 1250)),
+    ..LOGIN_304
+};
 
 /// What the Windows clients put in `OSTYPE` and `TEXTCODEPAGE`. Seihai has
 /// no value of its own to report, so the Windows builds send the one
@@ -110,7 +127,11 @@ const OS_WINDOWS: (&str, u32) = ("wind", 1252);
 pub const LANGUAGE: &str = "English";
 
 fn gstring(out: &mut Vec<u8>, text: &str) {
-    let b: Vec<u8> = text.chars().map(|c| if (c as u32) < 0x100 { c as u8 } else { b'?' }).take(223).collect();
+    let b: Vec<u8> = text
+        .chars()
+        .map(|c| if (c as u32) < 0x100 { c as u8 } else { b'?' })
+        .take(223)
+        .collect();
     out.push(b.len() as u8 + 0x20);
     out.extend(b);
 }
@@ -119,7 +140,10 @@ fn gstring(out: &mut Vec<u8>, text: &str) {
 /// check order: `SWORDPOWER` (8), `SHIELDPOWER` (9), `HEADGIF` (11), then
 /// `BODYIMG` (35). A prop whose value has no image gives nothing.
 pub fn wear_images(own_props: &[u8], accepted: Option<&IdSet>) -> Vec<String> {
-    worn_images(own_props, accepted).into_iter().flatten().collect()
+    worn_images(own_props, accepted)
+        .into_iter()
+        .flatten()
+        .collect()
 }
 
 /// The head image of the own props, if the head prop names one.
@@ -145,7 +169,11 @@ fn worn_images(own_props: &[u8], accepted: Option<&IdSet>) -> [Option<String>; 4
                 if r.first().map_or(false, |b| b.wrapping_sub(0x20) > limit) {
                     let n = r.get(1).map_or(0, |b| b.wrapping_sub(0x20) as usize);
                     let v = name(r.get(2..2 + n));
-                    if p.id == 8 { sword = v } else { shield = v }
+                    if p.id == 8 {
+                        sword = v
+                    } else {
+                        shield = v
+                    }
                 }
             }
             // length + 100, then the image
@@ -174,7 +202,13 @@ pub fn weapon_images(weapons: &[Weapon]) -> Vec<String> {
         .iter()
         .filter_map(|w| w.image.clone())
         .filter(|s| !s.is_empty())
-        .map(|s| if s.contains('.') { s } else { format!("{s}.gif") })
+        .map(|s| {
+            if s.contains('.') {
+                s
+            } else {
+                format!("{s}.gif")
+            }
+        })
         .collect()
 }
 
@@ -238,7 +272,12 @@ pub fn process_list_message(names: &[&str]) -> Vec<u8> {
 /// no head or colours. A real client also sends `UDPPORT` (31) between
 /// `STATUS` and `ADDITFLAGS`; Seihai binds no UDP socket, so it leaves the
 /// prop out.
-pub fn login_props_message(info: &LoginInfo, own_props: &[u8], account: &str, accepted: Option<&IdSet>) -> Vec<u8> {
+pub fn login_props_message(
+    info: &LoginInfo,
+    own_props: &[u8],
+    account: &str,
+    accepted: Option<&IdSet>,
+) -> Vec<u8> {
     let props = parse_player_props_in(own_props, false, accepted);
     let raw_of = |id: u8| props.iter().find(|p| p.id == id).map(|p| p.raw.clone());
     let mut m = vec![PLI_PLAYERPROPS + 0x20];
@@ -263,7 +302,11 @@ pub fn login_props_message(info: &LoginInfo, own_props: &[u8], account: &str, ac
         m.push(75 + 0x20);
         gstring(&mut m, os);
         m.push(76 + 0x20);
-        m.extend([((v >> 14) & 0x7F) as u8 + 0x20, ((v >> 7) & 0x7F) as u8 + 0x20, (v & 0x7F) as u8 + 0x20]);
+        m.extend([
+            ((v >> 14) & 0x7F) as u8 + 0x20,
+            ((v >> 7) & 0x7F) as u8 + 0x20,
+            (v & 0x7F) as u8 + 0x20,
+        ]);
     }
     m.push(b'\n');
     m
@@ -285,7 +328,12 @@ pub fn login_props_message(info: &LoginInfo, own_props: &[u8], account: &str, ac
 ///
 /// The real clients also send `UDPPORT` (31) before `ADDITFLAGS`; as in
 /// [`login_props_message`], Seihai binds no UDP socket and leaves it out.
-pub fn classic_login_props_message(version: super::ClientVersion, own_props: &[u8], account: &str, accepted: Option<&IdSet>) -> Vec<u8> {
+pub fn classic_login_props_message(
+    version: super::ClientVersion,
+    own_props: &[u8],
+    account: &str,
+    accepted: Option<&IdSet>,
+) -> Vec<u8> {
     let props = parse_player_props_in(own_props, false, accepted);
     let raw_of = |id: u8| props.iter().find(|p| p.id == id).map(|p| p.raw.as_slice());
     let mut m = vec![PLI_PLAYERPROPS + 0x20];
@@ -304,7 +352,10 @@ pub fn classic_login_props_message(version: super::ClientVersion, own_props: &[u
     }
     if classic_sends_status(version) {
         if let Some(&b) = raw_of(18).and_then(|r| r.first()) {
-            m.extend([18 + 0x20, (b.saturating_sub(0x20) & CLASSIC_STATUS_KEPT) + 0x20]);
+            m.extend([
+                18 + 0x20,
+                (b.saturating_sub(0x20) & CLASSIC_STATUS_KEPT) + 0x20,
+            ]);
         }
     }
     // ADDITFLAGS came in with 1.32, the first build whose props reach 33.
@@ -332,7 +383,9 @@ pub const CLASSIC_STATUS_KEPT: u8 = 16 | 64;
 /// Builds before 1.34 send `c(0)` for a named head (lab, 2026-10-30: the
 /// real 1.33 sent `c(0)` and the real 1.34 to 1.39 sent `head3.png`).
 fn classic_head(version: super::ClientVersion, raw: &[u8]) -> Vec<u8> {
-    let Some(&first) = raw.first() else { return vec![0x20] };
+    let Some(&first) = raw.first() else {
+        return vec![0x20];
+    };
     let n = first.saturating_sub(0x20);
     if n < 100 {
         return vec![first];
@@ -344,8 +397,14 @@ fn classic_head(version: super::ClientVersion, raw: &[u8]) -> Vec<u8> {
     }
     let name = raw.get(1..).unwrap_or_default();
     let lower = name.to_ascii_lowercase();
-    let num = lower.strip_prefix(b"head").and_then(|r| r.strip_suffix(b".gif")).filter(|d| !d.is_empty() && d.iter().all(u8::is_ascii_digit));
-    match num.and_then(|d| std::str::from_utf8(d).ok()?.parse::<u8>().ok()).filter(|&v| v < 100) {
+    let num = lower
+        .strip_prefix(b"head")
+        .and_then(|r| r.strip_suffix(b".gif"))
+        .filter(|d| !d.is_empty() && d.iter().all(u8::is_ascii_digit));
+    match num
+        .and_then(|d| std::str::from_utf8(d).ok()?.parse::<u8>().ok())
+        .filter(|&v| v < 100)
+    {
         Some(v) => vec![v + 0x20],
         None => raw.to_vec(),
     }
@@ -382,8 +441,14 @@ impl LoginBurst {
     pub fn for_version(version: super::ClientVersion) -> Option<Self> {
         let p = version.profile();
         let info = p.protocol.login?;
-        let can = p.protocol.pli.contains(PLI_PLAYERPROPS) && (!info.full || p.protocol.pli.contains(PLI_PROCESSLIST));
-        can.then_some(Self { info, sent: false, idle_owed: info.idle_gani, level_at: None })
+        let can = p.protocol.pli.contains(PLI_PLAYERPROPS)
+            && (!info.full || p.protocol.pli.contains(PLI_PROCESSLIST));
+        can.then_some(Self {
+            info,
+            sent: false,
+            idle_owed: info.idle_gani,
+            level_at: None,
+        })
     }
 
     pub fn info(&self) -> LoginInfo {
@@ -408,7 +473,10 @@ impl LoginBurst {
     /// [`LoginInfo::frame_after_level`]).
     fn late_at(&self, now: Instant) -> bool {
         let after = self.info.frame_after_level.unwrap_or(FRAME_AFTER_LEVEL);
-        self.info.full && self.level_at.is_some_and(|t| now.saturating_duration_since(t) >= after)
+        self.info.full
+            && self
+                .level_at
+                .is_some_and(|t| now.saturating_duration_since(t) >= after)
     }
 
     /// [`Self::due`], or the frame is late at `now` ([`FRAME_AFTER_LEVEL`]).
@@ -420,7 +488,12 @@ impl LoginBurst {
     /// which has no handler for 182, sent its frame once the first board
     /// was in (lab, 2026-10-30).
     pub fn due(&self, state: &SessionState) -> bool {
-        !self.sent && if self.info.full { state.process_list_requests > 0 } else { state.board.is_some() }
+        !self.sent
+            && if self.info.full {
+                state.process_list_requests > 0
+            } else {
+                state.board.is_some()
+            }
     }
 
     /// Build the frame's messages (once). `check` turns an image name into
@@ -476,7 +549,11 @@ impl LoginBurst {
                 .filter(|n| !names.contains(n))
                 .collect::<Vec<_>>(),
         );
-        let icons: Vec<String> = if self.info.status_icons { state.status_list.iter().map(|s| status_icon(s)).collect() } else { Vec::new() };
+        let icons: Vec<String> = if self.info.status_icons {
+            state.status_list.iter().map(|s| status_icon(s)).collect()
+        } else {
+            Vec::new()
+        };
         // 2.x asks the icons with the other files; the real 3.04 asked them
         // after the flags.
         if self.info.full {
@@ -495,7 +572,12 @@ impl LoginBurst {
         if self.info.full {
             out.push(process_list_message(&["seihai"]));
         }
-        out.push(login_props_message(&self.info, &state.player_props, account, state.own_prop_ids.as_ref()));
+        out.push(login_props_message(
+            &self.info,
+            &state.player_props,
+            account,
+            state.own_prop_ids.as_ref(),
+        ));
         out
     }
 
@@ -514,11 +596,20 @@ impl LoginBurst {
         enter_level: impl FnOnce() -> Vec<Vec<u8>>,
         flags: impl FnOnce() -> Vec<Vec<u8>>,
     ) -> Vec<Vec<u8>> {
-        let icons: Vec<String> = if self.info.status_icons { state.status_list.iter().map(|s| status_icon(s)).collect() } else { Vec::new() };
-        let [sword, shield, _head, body] = worn_images(&state.player_props, state.own_prop_ids.as_ref());
+        let icons: Vec<String> = if self.info.status_icons {
+            state.status_list.iter().map(|s| status_icon(s)).collect()
+        } else {
+            Vec::new()
+        };
+        let [sword, shield, _head, body] =
+            worn_images(&state.player_props, state.own_prop_ids.as_ref());
         let mut images: Vec<String> = [sword, shield, body].into_iter().flatten().collect();
         images.extend(weapon_images(&state.weapons));
-        for n in state.default_weapons.iter().filter_map(|&id| default_weapon_image(id)) {
+        for n in state
+            .default_weapons
+            .iter()
+            .filter_map(|&id| default_weapon_image(id))
+        {
             if !images.iter().any(|i| i == n) {
                 images.push(n.to_string());
             }
@@ -528,7 +619,12 @@ impl LoginBurst {
         }
         out.extend(enter_level());
         out.extend(flags());
-        out.push(login_props_message(&self.info, &state.player_props, account, state.own_prop_ids.as_ref()));
+        out.push(login_props_message(
+            &self.info,
+            &state.player_props,
+            account,
+            state.own_prop_ids.as_ref(),
+        ));
         for n in &images {
             out.extend(check(n));
         }
@@ -560,7 +656,10 @@ mod tests {
 
     #[test]
     fn wear_images_come_in_prop_order() {
-        assert_eq!(wear_images(&own_props(), None), ["sword1.png", "shield1.png", "head0.png", "body.png"]);
+        assert_eq!(
+            wear_images(&own_props(), None),
+            ["sword1.png", "shield1.png", "head0.png", "body.png"]
+        );
     }
 
     #[test]
@@ -611,7 +710,12 @@ mod tests {
     fn login_props_clear_the_dead_and_paused_bits() {
         let mut st = SessionState::for_version(super::super::ClientVersion::V222);
         st.apply_body(&[9 + 0x20, 18 + 0x20, 0x20 + 29, b'\n']);
-        let m = login_props_message(&LOGIN_222, &st.player_props, "acct", st.own_prop_ids.as_ref());
+        let m = login_props_message(
+            &LOGIN_222,
+            &st.player_props,
+            "acct",
+            st.own_prop_ids.as_ref(),
+        );
         let props = parse_player_props_in(&m[1..m.len() - 1], false, None);
         let status = props.iter().find(|p| p.id == 18).map(|p| p.raw.clone());
         assert_eq!(status.as_deref(), Some(&[0x20 + 20][..]));
@@ -624,7 +728,20 @@ mod tests {
         p.extend(b"stubnick");
         p.extend([1 + 0x20, 3 + 0x20, 2 + 0x20, 6 + 0x20, 11 + 0x20]);
         p.extend(head);
-        p.extend([13 + 0x20, 0x22, 0x20, 0x2a, 0x24, 0x32, 18 + 0x20, status + 0x20, 15 + 0x20, 60 + 0x20, 16 + 0x20, 60 + 0x20]);
+        p.extend([
+            13 + 0x20,
+            0x22,
+            0x20,
+            0x2a,
+            0x24,
+            0x32,
+            18 + 0x20,
+            status + 0x20,
+            15 + 0x20,
+            60 + 0x20,
+            16 + 0x20,
+            60 + 0x20,
+        ]);
         p
     }
 
@@ -642,33 +759,114 @@ mod tests {
         use crate::protocol::ClientVersion::{V133, V134, V135, V136, V137, V138, V139};
         let real = |hex: &str| {
             let mut v = vec![PLI_PLAYERPROPS + 0x20];
-            v.extend((0..hex.len()).step_by(2).map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap()));
+            v.extend(
+                (0..hex.len())
+                    .step_by(2)
+                    .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap()),
+            );
             v.extend([33 + 0x20, 0x20, b'\n']);
             v
         };
         let cases: &[(crate::protocol::ClientVersion, Vec<u8>, u8, &str)] = &[
-            (V139, image_head(b"head3.png"), 20, "2028737475626e69636b2b8d68656164332e706e672d22202a24323230"),
-            (V133, image_head(b"head3.png"), 20, "2028737475626e69636b2b202d22202a24323230"),
-            (V139, image_head(b"head1.gif"), 0, "2028737475626e69636b2b212d22202a24323220"),
-            (V133, image_head(b"head1.gif"), 0, "2028737475626e69636b2b202d22202a24323220"),
-            (V139, image_head(b"head1.gif"), 4, "2028737475626e69636b2b212d22202a24323220"),
-            (V139, image_head(b"head1.gif"), 64, "2028737475626e69636b2b212d22202a24323260"),
-            (V139, image_head(b"head3.png"), 0, "2028737475626e69636b2b8d68656164332e706e672d22202a24323220"),
-            (V133, vec![5 + 0x20], 16, "2028737475626e69636b2b252d22202a24323230"),
-            (V139, vec![5 + 0x20], 16, "2028737475626e69636b2b252d22202a24323230"),
-            (V134, image_head(b"head3.png"), 20, "2028737475626e69636b2b8d68656164332e706e672d22202a24323230"),
-            (V135, image_head(b"head3.png"), 20, "2028737475626e69636b2b8d68656164332e706e672d22202a24323230"),
-            (V136, image_head(b"head3.png"), 20, "2028737475626e69636b2b8d68656164332e706e672d22202a24323230"),
-            (V137, image_head(b"head3.png"), 20, "2028737475626e69636b2b8d68656164332e706e672d22202a24323230"),
-            (V138, image_head(b"head3.png"), 20, "2028737475626e69636b2b8d68656164332e706e672d22202a24323230"),
+            (
+                V139,
+                image_head(b"head3.png"),
+                20,
+                "2028737475626e69636b2b8d68656164332e706e672d22202a24323230",
+            ),
+            (
+                V133,
+                image_head(b"head3.png"),
+                20,
+                "2028737475626e69636b2b202d22202a24323230",
+            ),
+            (
+                V139,
+                image_head(b"head1.gif"),
+                0,
+                "2028737475626e69636b2b212d22202a24323220",
+            ),
+            (
+                V133,
+                image_head(b"head1.gif"),
+                0,
+                "2028737475626e69636b2b202d22202a24323220",
+            ),
+            (
+                V139,
+                image_head(b"head1.gif"),
+                4,
+                "2028737475626e69636b2b212d22202a24323220",
+            ),
+            (
+                V139,
+                image_head(b"head1.gif"),
+                64,
+                "2028737475626e69636b2b212d22202a24323260",
+            ),
+            (
+                V139,
+                image_head(b"head3.png"),
+                0,
+                "2028737475626e69636b2b8d68656164332e706e672d22202a24323220",
+            ),
+            (
+                V133,
+                vec![5 + 0x20],
+                16,
+                "2028737475626e69636b2b252d22202a24323230",
+            ),
+            (
+                V139,
+                vec![5 + 0x20],
+                16,
+                "2028737475626e69636b2b252d22202a24323230",
+            ),
+            (
+                V134,
+                image_head(b"head3.png"),
+                20,
+                "2028737475626e69636b2b8d68656164332e706e672d22202a24323230",
+            ),
+            (
+                V135,
+                image_head(b"head3.png"),
+                20,
+                "2028737475626e69636b2b8d68656164332e706e672d22202a24323230",
+            ),
+            (
+                V136,
+                image_head(b"head3.png"),
+                20,
+                "2028737475626e69636b2b8d68656164332e706e672d22202a24323230",
+            ),
+            (
+                V137,
+                image_head(b"head3.png"),
+                20,
+                "2028737475626e69636b2b8d68656164332e706e672d22202a24323230",
+            ),
+            (
+                V138,
+                image_head(b"head3.png"),
+                20,
+                "2028737475626e69636b2b8d68656164332e706e672d22202a24323230",
+            ),
         ];
         for (v, head, status, hex) in cases {
             let ids = v.profile().props.own.clone();
-            let m = classic_login_props_message(*v, &classic_server_props(head, *status), "acct", Some(&ids));
+            let m = classic_login_props_message(
+                *v,
+                &classic_server_props(head, *status),
+                "acct",
+                Some(&ids),
+            );
             assert_eq!(m, real(hex), "{} status {status}", v.label());
         }
         assert!(sends_classic_login_props(V133) && sends_classic_login_props(V139));
-        assert!(!sends_classic_login_props(crate::protocol::ClientVersion::V141));
+        assert!(!sends_classic_login_props(
+            crate::protocol::ClientVersion::V141
+        ));
     }
 
     /// The real 1.28 beta 2, 1.3 test, 1.31 and 1.32 against the gen-2
@@ -678,12 +876,27 @@ mod tests {
     #[test]
     fn classic_login_props_match_the_real_1_28_to_1_32() {
         use crate::protocol::ClientVersion::{V128B2, V131, V132, V13T};
-        let hex = |h: &str| -> Vec<u8> { (0..h.len()).step_by(2).map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap()).collect() };
+        let hex = |h: &str| -> Vec<u8> {
+            (0..h.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap())
+                .collect()
+        };
         let base = "2028737475626e69636b2b202d22202a2432";
-        let cases = [(V128B2, base.to_string()), (V13T, base.to_string()), (V131, format!("{base}3230")), (V132, format!("{base}32304120"))];
+        let cases = [
+            (V128B2, base.to_string()),
+            (V13T, base.to_string()),
+            (V131, format!("{base}3230")),
+            (V132, format!("{base}32304120")),
+        ];
         for (v, want) in cases {
             let ids = v.profile().props.own.clone();
-            let m = classic_login_props_message(v, &classic_server_props(&image_head(b"head3.png"), 20), "acct", Some(&ids));
+            let m = classic_login_props_message(
+                v,
+                &classic_server_props(&image_head(b"head3.png"), 20),
+                "acct",
+                Some(&ids),
+            );
             let mut w = vec![PLI_PLAYERPROPS + 0x20];
             w.extend(hex(&want));
             w.push(b'\n');
@@ -703,7 +916,10 @@ mod tests {
     #[test]
     fn login_props_are_read_by_the_prop_parser() {
         let m = login_props_message(&LOGIN_231, &own_props(), "acct", None);
-        let ids: Vec<u8> = parse_player_props_in(&m[1..m.len() - 1], false, None).iter().map(|p| p.id).collect();
+        let ids: Vec<u8> = parse_player_props_in(&m[1..m.len() - 1], false, None)
+            .iter()
+            .map(|p| p.id)
+            .collect();
         assert_eq!(ids, [0, 11, 13, 18, 33, 52, 75, 76]);
     }
 
@@ -729,15 +945,39 @@ mod tests {
         let mut b = LoginBurst::for_version(v).unwrap();
         let mut st = SessionState::for_version(v);
         st.player_props = own_props();
-        st.weapons = vec![Weapon { name: "-gr_movement".into(), image: Some("-".into()), script: None }];
+        st.weapons = vec![Weapon {
+            name: "-gr_movement".into(),
+            image: Some("-".into()),
+            script: None,
+        }];
         st.default_weapons = vec![8, 7];
         st.status_list = vec!["Eating".into(), "No PMs".into()];
         st.process_list_requests = 1;
-        assert!(!b.due(&st), "3.04 does not wait for 182; it waits for the board");
+        assert!(
+            !b.due(&st),
+            "3.04 does not wait for 182; it waits for the board"
+        );
         st.board = Some(vec![0; 4096]);
-        let msgs = b.take(&st, "Lab304", Instant::now(), |n| vec![n.as_bytes().to_vec()], Vec::new, || vec![b"flag".to_vec()]);
+        let msgs = b.take(
+            &st,
+            "Lab304",
+            Instant::now(),
+            |n| vec![n.as_bytes().to_vec()],
+            Vec::new,
+            || vec![b"flag".to_vec()],
+        );
         let names: Vec<&[u8]> = msgs.iter().map(|m| m.as_slice()).collect();
-        assert_eq!(&names[..6], [&b"head0.png"[..], b"wbomb1.png", b"wbowi1.png", b"flag", b"plisticoneating.png", b"plisticonno pms.png"]);
+        assert_eq!(
+            &names[..6],
+            [
+                &b"head0.png"[..],
+                b"wbomb1.png",
+                b"wbowi1.png",
+                b"flag",
+                b"plisticoneating.png",
+                b"plisticonno pms.png"
+            ]
+        );
         let mut want = vec![0x22, 0x20, 0x26];
         want.extend(b"Lab304");
         want.extend([0x32, 0x20 + 20, 0x41, 0x20, 0x20 + 52, 0x20 + 7]);
@@ -754,9 +994,19 @@ mod tests {
     /// 3.153 writes `OSTYPE` `mac` (binary); the rest of its frame is 3.04's.
     #[test]
     fn the_3153_login_frame_is_304s_with_ostype_mac() {
-        let p = super::super::ClientVersion::V3153.profile().protocol.login.unwrap();
+        let p = super::super::ClientVersion::V3153
+            .profile()
+            .protocol
+            .login
+            .unwrap();
         assert_eq!(p.os_props, Some(("mac", 1250)));
-        assert_eq!(LoginInfo { os_props: LOGIN_304.os_props, ..p }, LOGIN_304);
+        assert_eq!(
+            LoginInfo {
+                os_props: LOGIN_304.os_props,
+                ..p
+            },
+            LOGIN_304
+        );
     }
 
     #[test]
@@ -766,10 +1016,17 @@ mod tests {
         st.default_weapons = vec![8, 7];
         st.process_list_requests = 1;
         let mut asked = Vec::new();
-        b.take(&st, "acct", Instant::now(), |n| {
-            asked.push(n.to_string());
-            vec![n.as_bytes().to_vec()]
-        }, Vec::new, Vec::new);
+        b.take(
+            &st,
+            "acct",
+            Instant::now(),
+            |n| {
+                asked.push(n.to_string());
+                vec![n.as_bytes().to_vec()]
+            },
+            Vec::new,
+            Vec::new,
+        );
         // wbowi1.png is already asked for by the Bow weapon: once only; a
         // server without the Bow weapon but with default id 7 gets it too.
         assert_eq!(asked.iter().filter(|n| *n == "wbowi1.png").count(), 1);
@@ -779,10 +1036,17 @@ mod tests {
         st.default_weapons = vec![8, 7];
         st.process_list_requests = 1;
         let mut asked = Vec::new();
-        b.take(&st, "acct", Instant::now(), |n| {
-            asked.push(n.to_string());
-            vec![n.as_bytes().to_vec()]
-        }, Vec::new, Vec::new);
+        b.take(
+            &st,
+            "acct",
+            Instant::now(),
+            |n| {
+                asked.push(n.to_string());
+                vec![n.as_bytes().to_vec()]
+            },
+            Vec::new,
+            Vec::new,
+        );
         assert!(asked.contains(&"wbowi1.png".to_string()));
     }
 
@@ -797,11 +1061,22 @@ mod tests {
         st.default_weapons = vec![8, 7];
         st.process_list_requests = 1;
         let mut asked = Vec::new();
-        b.take(&st, "acct", Instant::now(), |n| {
-            asked.push(n.to_string());
-            vec![n.as_bytes().to_vec()]
-        }, Vec::new, Vec::new);
-        let w: Vec<&str> = asked.iter().map(String::as_str).filter(|n| n.starts_with("wbo")).collect();
+        b.take(
+            &st,
+            "acct",
+            Instant::now(),
+            |n| {
+                asked.push(n.to_string());
+                vec![n.as_bytes().to_vec()]
+            },
+            Vec::new,
+            Vec::new,
+        );
+        let w: Vec<&str> = asked
+            .iter()
+            .map(String::as_str)
+            .filter(|n| n.starts_with("wbo"))
+            .collect();
         assert_eq!(w, ["wbomb1.png", "wbowi1.png"]);
     }
 
@@ -809,8 +1084,16 @@ mod tests {
         let mut st = SessionState::for_version(super::super::ClientVersion::V222);
         st.player_props = own_props();
         st.weapons = vec![
-            Weapon { name: "Bomb".into(), image: Some("wbomb1.png".into()), script: None },
-            Weapon { name: "Bow".into(), image: Some("wbowi1.png".into()), script: None },
+            Weapon {
+                name: "Bomb".into(),
+                image: Some("wbomb1.png".into()),
+                script: None,
+            },
+            Weapon {
+                name: "Bow".into(),
+                image: Some("wbowi1.png".into()),
+                script: None,
+            },
         ];
         st.status_list = vec!["Online".into(), "No PMs".into()];
         st
@@ -822,18 +1105,44 @@ mod tests {
         let mut st = burst_state();
         assert!(b.pending());
         assert!(!b.due(&st));
-        assert!(b.take(&st, "acct", Instant::now(), |_| vec![b"x".to_vec()], Vec::new, Vec::new).is_empty());
+        assert!(b
+            .take(
+                &st,
+                "acct",
+                Instant::now(),
+                |_| vec![b"x".to_vec()],
+                Vec::new,
+                Vec::new
+            )
+            .is_empty());
         st.process_list_requests = 1;
         assert!(b.due(&st));
         let mut asked = Vec::new();
-        let out = b.take(&st, "acct", Instant::now(), |n| {
-            asked.push(n.to_string());
-            vec![n.as_bytes().to_vec()]
-        }, || vec![b"enter".to_vec()], || vec![b"flag".to_vec()]);
+        let out = b.take(
+            &st,
+            "acct",
+            Instant::now(),
+            |n| {
+                asked.push(n.to_string());
+                vec![n.as_bytes().to_vec()]
+            },
+            || vec![b"enter".to_vec()],
+            || vec![b"flag".to_vec()],
+        );
         // idle.gani first (2.22), the images in order, then the icons, the login 46, the flags, the process list and the props
         assert_eq!(
             asked,
-            ["idle.gani", "sword1.png", "shield1.png", "head0.png", "body.png", "wbomb1.png", "wbowi1.png", "plisticononline.png", "plisticonno pms.png"]
+            [
+                "idle.gani",
+                "sword1.png",
+                "shield1.png",
+                "head0.png",
+                "body.png",
+                "wbomb1.png",
+                "wbowi1.png",
+                "plisticononline.png",
+                "plisticonno pms.png"
+            ]
         );
         assert_eq!(out.len(), asked.len() + 4);
         assert_eq!(out[asked.len()], b"enter");
@@ -842,7 +1151,16 @@ mod tests {
         assert_eq!(out[asked.len() + 3][0], PLI_PLAYERPROPS + 0x20);
         assert!(!b.pending(), "sent");
         assert!(!b.due(&st), "once");
-        assert!(b.take(&st, "acct", Instant::now(), |_| vec![b"x".to_vec()], Vec::new, Vec::new).is_empty());
+        assert!(b
+            .take(
+                &st,
+                "acct",
+                Instant::now(),
+                |_| vec![b"x".to_vec()],
+                Vec::new,
+                Vec::new
+            )
+            .is_empty());
     }
 
     /// No 182 (stock beta4): a 2.x frame goes 240 ms after the level, in the
@@ -859,15 +1177,66 @@ mod tests {
         b.note_level(t0);
         b.note_level(t0 + Duration::from_secs(1));
         assert!(!b.due_at(&st, t0 + Duration::from_millis(239)));
-        assert!(b.take(&st, "acct", t0 + Duration::from_millis(239), check, Vec::new, Vec::new).is_empty());
-        let out = b.take(&st, "acct", t0 + FRAME_AFTER_LEVEL, check, || vec![b"enter".to_vec()], Vec::new);
+        assert!(b
+            .take(
+                &st,
+                "acct",
+                t0 + Duration::from_millis(239),
+                check,
+                Vec::new,
+                Vec::new
+            )
+            .is_empty());
+        let out = b.take(
+            &st,
+            "acct",
+            t0 + FRAME_AFTER_LEVEL,
+            check,
+            || vec![b"enter".to_vec()],
+            Vec::new,
+        );
         let names: Vec<&[u8]> = out.iter().map(|m| m.as_slice()).collect();
-        assert_eq!(&names[..4], [&b"idle.gani"[..], b"plisticononline.png", b"plisticonno pms.png", b"enter"]);
+        assert_eq!(
+            &names[..4],
+            [
+                &b"idle.gani"[..],
+                b"plisticononline.png",
+                b"plisticonno pms.png",
+                b"enter"
+            ]
+        );
         assert_eq!(out[4][0], PLI_PLAYERPROPS + 0x20);
-        assert_eq!(&names[5..], [&b"sword1.png"[..], b"shield1.png", b"body.png", b"wbomb1.png", b"wbowi1.png"]);
-        assert!(!out.iter().any(|m| m.first() == Some(&(PLI_PROCESSLIST + 0x20))), "no process list");
-        assert!(!out.iter().any(|m| m == b"head0.png"), "the head is not checked");
-        assert!(b.take(&st, "acct", t0 + Duration::from_secs(9), check, Vec::new, Vec::new).is_empty(), "once");
+        assert_eq!(
+            &names[5..],
+            [
+                &b"sword1.png"[..],
+                b"shield1.png",
+                b"body.png",
+                b"wbomb1.png",
+                b"wbowi1.png"
+            ]
+        );
+        assert!(
+            !out.iter()
+                .any(|m| m.first() == Some(&(PLI_PROCESSLIST + 0x20))),
+            "no process list"
+        );
+        assert!(
+            !out.iter().any(|m| m == b"head0.png"),
+            "the head is not checked"
+        );
+        assert!(
+            b.take(
+                &st,
+                "acct",
+                t0 + Duration::from_secs(9),
+                check,
+                Vec::new,
+                Vec::new
+            )
+            .is_empty(),
+            "once"
+        );
 
         // A 182 first keeps the burst shape, with idle.gani at its head.
         let mut b = LoginBurst::for_version(super::super::ClientVersion::V222).unwrap();
@@ -880,7 +1249,14 @@ mod tests {
         // 2.31 does not check idle.gani.
         let mut b = LoginBurst::for_version(super::super::ClientVersion::V231).unwrap();
         b.note_level(t0);
-        let out = b.take(&st, "acct", t0 + FRAME_AFTER_LEVEL, check, Vec::new, Vec::new);
+        let out = b.take(
+            &st,
+            "acct",
+            t0 + FRAME_AFTER_LEVEL,
+            check,
+            Vec::new,
+            Vec::new,
+        );
         assert_eq!(out[0], b"plisticononline.png");
     }
 
@@ -890,20 +1266,43 @@ mod tests {
     #[test]
     fn a_later_z_only_props_message_keeps_the_login_props() {
         let hex = "2123222623202020242a25252621283f2a73776f7264312e706e67292b2b736869656c64312e706e672a2469646c652b8d68656164302e706e672d22202a24323122323435203620372039205c3a20405242287a313837613232324328626f64792e706e67444e927e452046204720482049204d524e204f205020512056205720582059205a205b205c205d205e205f2060206120622063206420652066206720682069206a206e27606f277070202072287a31383761323232";
-        let full: Vec<u8> = (0..hex.len()).step_by(2).map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap()).collect();
-        for v in [super::super::ClientVersion::V222, super::super::ClientVersion::V231] {
+        let full: Vec<u8> = (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect();
+        for v in [
+            super::super::ClientVersion::V222,
+            super::super::ClientVersion::V231,
+        ] {
             let mut st = SessionState::for_version(v);
             let mut body = vec![9 + 0x20];
             body.extend(&full);
             body.push(b'\n');
             body.extend([9 + 0x20, 0x4d, 0x52, b'\n']);
             st.apply_body(&body);
-            assert_eq!(wear_images(&st.player_props, st.own_prop_ids.as_ref()), ["sword1.png", "shield1.png", "head0.png", "body.png"], "{v:?}");
-            let m = login_props_message(&LOGIN_222, &st.player_props, "acct", st.own_prop_ids.as_ref());
+            assert_eq!(
+                wear_images(&st.player_props, st.own_prop_ids.as_ref()),
+                ["sword1.png", "shield1.png", "head0.png", "body.png"],
+                "{v:?}"
+            );
+            let m = login_props_message(
+                &LOGIN_222,
+                &st.player_props,
+                "acct",
+                st.own_prop_ids.as_ref(),
+            );
             let props = parse_player_props_in(&m[1..m.len() - 1], false, None);
             let raw = |id: u8| props.iter().find(|p| p.id == id).map(|p| p.raw.clone());
-            assert_eq!(raw(11).as_deref(), Some(&b"\x8dhead0.png"[..]), "{v:?} HEADGIF: as the server sent it");
-            assert_eq!(raw(13).as_deref(), Some(&[0x22, 0x20, 0x2a, 0x24, 0x32][..]), "{v:?} COLORS");
+            assert_eq!(
+                raw(11).as_deref(),
+                Some(&b"\x8dhead0.png"[..]),
+                "{v:?} HEADGIF: as the server sent it"
+            );
+            assert_eq!(
+                raw(13).as_deref(),
+                Some(&[0x22, 0x20, 0x2a, 0x24, 0x32][..]),
+                "{v:?} COLORS"
+            );
             assert_eq!(raw(18).as_deref(), Some(&[0x34][..]), "{v:?} STATUS");
         }
     }
@@ -919,16 +1318,39 @@ mod tests {
         let check = |n: &str| vec![n.as_bytes().to_vec()];
         b.note_level(t0);
         assert!(!b.due_at(&st, t0 + Duration::from_millis(95)));
-        let out = b.take(&st, "acct", t0 + Duration::from_millis(96), check, Vec::new, || vec![b"flag".to_vec()]);
+        let out = b.take(
+            &st,
+            "acct",
+            t0 + Duration::from_millis(96),
+            check,
+            Vec::new,
+            || vec![b"flag".to_vec()],
+        );
         let names: Vec<&[u8]> = out.iter().map(|m| m.as_slice()).collect();
-        assert_eq!(&names[..4], [&b"idle.gani"[..], b"plisticononline.png", b"plisticonno pms.png", b"flag"]);
+        assert_eq!(
+            &names[..4],
+            [
+                &b"idle.gani"[..],
+                b"plisticononline.png",
+                b"plisticonno pms.png",
+                b"flag"
+            ]
+        );
         assert_eq!(out[4][0], PLI_PLAYERPROPS + 0x20);
-        assert!(!out.iter().any(|m| m.first() == Some(&(PLI_PROCESSLIST + 0x20))), "no process list");
+        assert!(
+            !out.iter()
+                .any(|m| m.first() == Some(&(PLI_PROCESSLIST + 0x20))),
+            "no process list"
+        );
     }
 
     #[test]
     fn a_weapon_image_without_an_extension_gets_gif() {
-        let w = |n: &str, i: &str| Weapon { name: n.into(), image: Some(i.into()), script: None };
+        let w = |n: &str, i: &str| Weapon {
+            name: n.into(),
+            image: Some(i.into()),
+            script: None,
+        };
         let list = [w("a", "wbomb1.png"), w("b", "-"), w("c", "")];
         assert_eq!(weapon_images(&list), ["wbomb1.png", "-.gif"]);
     }

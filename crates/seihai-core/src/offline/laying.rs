@@ -43,7 +43,9 @@ use crate::sound::SoundEvent;
 
 /// The order A with S held goes through the items (2.05 rev 2; the full heart
 /// container is not in it).
-pub const LAY_ORDER: [u8; 24] = [0, 1, 2, 19, 3, 4, 5, 6, 16, 8, 12, 23, 7, 20, 21, 22, 9, 15, 17, 10, 13, 18, 14, 24];
+pub const LAY_ORDER: [u8; 24] = [
+    0, 1, 2, 19, 3, 4, 5, 6, 16, 8, 12, 23, 7, 20, 21, 22, 9, 15, 17, 10, 13, 18, 14, 24,
+];
 
 /// Where a laid item goes, from the player's sprite top-left, by facing
 /// (north, west, south, east): `(x + 0.5 + dx, y + 1 + dy)`.
@@ -99,8 +101,12 @@ impl OfflineSession {
     /// The next item the player can lay after `after` in [`LAY_ORDER`]
     /// (from the start with `None`), wrapping round to `after` itself.
     pub fn next_layable(&self, after: Option<u8>) -> Option<u8> {
-        let start = after.and_then(|a| LAY_ORDER.iter().position(|&i| i == a)).map_or(0, |p| p + 1);
-        (0..LAY_ORDER.len()).map(|k| LAY_ORDER[(start + k) % LAY_ORDER.len()]).find(|&i| self.lay_cost(i).is_some())
+        let start = after
+            .and_then(|a| LAY_ORDER.iter().position(|&i| i == a))
+            .map_or(0, |p| p + 1);
+        (0..LAY_ORDER.len())
+            .map(|k| LAY_ORDER[(start + k) % LAY_ORDER.len()])
+            .find(|&i| self.lay_cost(i).is_some())
     }
 
     /// A with S held, when A did nothing else: go into the lay mode with the
@@ -120,7 +126,9 @@ impl OfflineSession {
         {
             return false;
         }
-        let Some(item) = self.next_layable(None) else { return false };
+        let Some(item) = self.next_layable(None) else {
+            return false;
+        };
         self.laying = Some(item);
         self.walking = false;
         self.lay_sound(PICK_SOUND);
@@ -177,13 +185,19 @@ impl OfflineSession {
             return false;
         }
         match (&self.current_level, &self.tiletypes) {
-            (Some(level), Some(types)) => self.kind_at_point(level, types, fx, fy) != TileKind::Water,
+            (Some(level), Some(types)) => {
+                self.kind_at_point(level, types, fx, fy) != TileKind::Water
+            }
             _ => true,
         }
     }
 
     fn lay_sound(&mut self, file: &str) {
-        self.sound_events.push(SoundEvent { file: file.into(), x: self.player_x + 1.5, y: self.player_y + 2.0 });
+        self.sound_events.push(SoundEvent {
+            file: file.into(),
+            x: self.player_x + 1.5,
+            y: self.player_y + 2.0,
+        });
     }
 }
 
@@ -219,8 +233,14 @@ mod tests {
         s.rupees = 40;
         s.bombs = 5;
         assert_eq!(s.next_layable(None), Some(items::GREENRUPEE));
-        assert_eq!(s.next_layable(Some(items::GREENRUPEE)), Some(items::BLUERUPEE));
-        assert_eq!(s.next_layable(Some(items::BLUERUPEE)), Some(items::REDRUPEE));
+        assert_eq!(
+            s.next_layable(Some(items::GREENRUPEE)),
+            Some(items::BLUERUPEE)
+        );
+        assert_eq!(
+            s.next_layable(Some(items::BLUERUPEE)),
+            Some(items::REDRUPEE)
+        );
         // No gold rupee under 100: bombs next, then round to the start.
         assert_eq!(s.next_layable(Some(items::REDRUPEE)), Some(items::BOMBS));
         assert_eq!(s.next_layable(Some(items::BOMBS)), Some(items::GREENRUPEE));
@@ -259,15 +279,27 @@ mod tests {
         assert_eq!(s.laying, Some(items::GREENRUPEE));
         assert!(s.next_lay_item());
         assert_eq!(s.laying, Some(items::BLUERUPEE));
-        assert_eq!(s.sound_events.iter().filter(|e| e.file == PICK_SOUND).count(), 2);
+        assert_eq!(
+            s.sound_events
+                .iter()
+                .filter(|e| e.file == PICK_SOUND)
+                .count(),
+            2
+        );
 
         s.current_level = Some(crate::assets::Level::parse("GLEVNW01\n").unwrap());
         s.sound_events.clear();
         assert_eq!(s.lay_item(), Some(items::BLUERUPEE));
         assert_eq!(s.laying, None);
         assert_eq!(s.rupees, 2);
-        assert_eq!(s.floor_items, vec![FloorItem::new(items::BLUERUPEE, 30.5, 28.0)]);
-        assert_eq!(s.sound_events.last().map(|e| e.file.as_str()), Some(LAY_SOUND));
+        assert_eq!(
+            s.floor_items,
+            vec![FloorItem::new(items::BLUERUPEE, 30.5, 28.0)]
+        );
+        assert_eq!(
+            s.sound_events.last().map(|e| e.file.as_str()),
+            Some(LAY_SOUND)
+        );
     }
 
     #[test]
@@ -294,7 +326,10 @@ mod tests {
     fn carrying_does_not_start() {
         let mut s = session();
         s.rupees = 1;
-        s.carried = Some(crate::offline::Carried { kind: 0, tiles: [[0, 0], [0, 0]] });
+        s.carried = Some(crate::offline::Carried {
+            kind: 0,
+            tiles: [[0, 0], [0, 0]],
+        });
         assert!(!s.start_laying());
     }
 
@@ -312,7 +347,10 @@ mod tests {
         s.lay_item();
         assert_eq!(s.sword_power, 0);
         let msgs = s.take_item_messages(true);
-        assert_eq!(msgs, vec![items::item_add_message(items::GREENRUPEE, 30.5, 28.0)]);
+        assert_eq!(
+            msgs,
+            vec![items::item_add_message(items::GREENRUPEE, 30.5, 28.0)]
+        );
     }
 
     #[test]

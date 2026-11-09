@@ -34,7 +34,11 @@ impl World for Around<'_> {
         self.others.clone()
     }
     fn sound(&mut self, file: &str, x: f64, y: f64) {
-        self.sounds.push(SoundEvent { file: file.into(), x: x as f32, y: y as f32 });
+        self.sounds.push(SoundEvent {
+            file: file.into(),
+            x: x as f32,
+            y: y as f32,
+        });
     }
     fn shoot(&mut self, shot: Shot) {
         self.shots.push(shot);
@@ -73,23 +77,34 @@ impl OfflineSession {
         if !(0.0..64.0).contains(&x) || !(0.0..64.0).contains(&y) {
             return true;
         }
-        let Some(level) = &self.current_level else { return true };
+        let Some(level) = &self.current_level else {
+            return true;
+        };
         if let Some(types) = &self.tiletypes {
             if level.kind_at(types, x, y) == crate::assets::TileKind::Blocking {
                 return true;
             }
             if let Some(id) = level.tile_id_at(x as i32, y as i32) {
                 use crate::assets::{TYPE_BED_BOTTOM, TYPE_CHAIR, TYPE_WATER};
-                if matches!(types.types.get(usize::from(id)).copied(), Some(TYPE_WATER | TYPE_CHAIR | TYPE_BED_BOTTOM)) {
+                if matches!(
+                    types.types.get(usize::from(id)).copied(),
+                    Some(TYPE_WATER | TYPE_CHAIR | TYPE_BED_BOTTOM)
+                ) {
                     return true;
                 }
             }
         }
-        level.chests.iter().any(|c| x >= c.x as f32 && x < c.x as f32 + 2.0 && y >= c.y as f32 && y < c.y as f32 + 2.0)
+        level.chests.iter().any(|c| {
+            x >= c.x as f32 && x < c.x as f32 + 2.0 && y >= c.y as f32 && y < c.y as f32 + 2.0
+        })
     }
 
     fn player_seed(&self) -> (f64, f64, u8) {
-        (f64::from(self.player_x), f64::from(self.player_y), self.player_dir)
+        (
+            f64::from(self.player_x),
+            f64::from(self.player_y),
+            self.player_dir,
+        )
     }
 
     /// A new level: the baddies of the old one are gone. Offline, the new
@@ -104,10 +119,17 @@ impl OfflineSession {
         if role.online {
             return;
         }
-        let Some(level) = &self.current_level else { return };
+        let Some(level) = &self.current_level else {
+            return;
+        };
         let player = self.player_seed();
         let mut rng = self.item_rng;
-        let made: Vec<Baddy> = level.baddies.iter().enumerate().map(|(i, r)| Baddy::from_level((i + 1).min(255) as u8, r, player, &mut rng)).collect();
+        let made: Vec<Baddy> = level
+            .baddies
+            .iter()
+            .enumerate()
+            .map(|(i, r)| Baddy::from_level((i + 1).min(255) as u8, r, player, &mut rng))
+            .collect();
         self.item_rng = rng;
         self.baddies = made;
     }
@@ -120,7 +142,9 @@ impl OfflineSession {
 
     /// A `PLO_BADDYPROPS` (2): the id, then props.
     pub fn receive_baddy_props(&mut self, payload: &[u8]) {
-        let Some((&id, props)) = payload.split_first() else { return };
+        let Some((&id, props)) = payload.split_first() else {
+            return;
+        };
         let id = id.wrapping_sub(32);
         // The level the props are for is the one now loaded.
         self.baddy_serial = Some(self.level_serial);
@@ -153,7 +177,9 @@ impl OfflineSession {
     /// A `PLO_BADDYHURT` (27): another player hit one of our baddies (we
     /// lead the level).
     pub fn receive_baddy_hurt(&mut self, payload: &[u8]) {
-        let Some(h) = b::parse_hurt(payload) else { return };
+        let Some(h) = b::parse_hurt(payload) else {
+            return;
+        };
         let mut baddies = std::mem::take(&mut self.baddies);
         if let Some(bd) = baddies.iter_mut().find(|bd| bd.id == h.id) {
             let mut w = self.around(Vec::new());
@@ -165,8 +191,18 @@ impl OfflineSession {
     }
 
     fn around(&self, others: Vec<(u16, f64, f64)>) -> Around<'_> {
-        let player = (!self.life.is_dead() && !self.hidden && self.current_level.is_some()).then(|| self.player_seed()).map(|(x, y, _)| (x, y));
-        Around { s: self, rng: self.item_rng, player, others, sounds: Vec::new(), shots: Vec::new(), touches: Vec::new() }
+        let player = (!self.life.is_dead() && !self.hidden && self.current_level.is_some())
+            .then(|| self.player_seed())
+            .map(|(x, y, _)| (x, y));
+        Around {
+            s: self,
+            rng: self.item_rng,
+            player,
+            others,
+            sounds: Vec::new(),
+            shots: Vec::new(),
+            touches: Vec::new(),
+        }
     }
 
     /// Run the baddies for `ms`: the sword test on each 50 ms player tick
@@ -180,7 +216,10 @@ impl OfflineSession {
         if self.baddies.is_empty() {
             return false;
         }
-        let others: Vec<(u16, f64, f64)> = others.iter().map(|&(id, x, y)| (id, f64::from(x), f64::from(y))).collect();
+        let others: Vec<(u16, f64, f64)> = others
+            .iter()
+            .map(|&(id, x, y)| (id, f64::from(x), f64::from(y)))
+            .collect();
         self.baddy_clock_ms += ms;
         let mut changed = false;
         while self.baddy_clock_ms >= b::PLAYER_TICK_MS {
@@ -196,7 +235,9 @@ impl OfflineSession {
     }
 
     fn baddy_sword(&mut self, role: BaddyRole) {
-        let Some(ms) = self.combat.swing_elapsed_ms() else { return };
+        let Some(ms) = self.combat.swing_elapsed_ms() else {
+            return;
+        };
         if !(b::PLAYER_TICK_MS..4 * b::PLAYER_TICK_MS).contains(&ms) || self.sword_power == 0 {
             return;
         }
@@ -206,7 +247,9 @@ impl OfflineSession {
         let mut w = self.around(Vec::new());
         let mut sends = Vec::new();
         for bd in baddies.iter_mut() {
-            let Some(clash) = bd.sword_test(px, py, pdir) else { continue };
+            let Some(clash) = bd.sword_test(px, py, pdir) else {
+                continue;
+            };
             let (cx, cy) = bd.centre();
             let (dx, dy) = (px + 1.5 - cx, py + 2.0 - cy);
             bd.hurt(&mut w, clash, power, dx, dy, role.follows());
@@ -243,7 +286,13 @@ impl OfflineSession {
                 bd.sent = None;
             }
         }
-        let Around { rng, sounds, shots, touches, .. } = w;
+        let Around {
+            rng,
+            sounds,
+            shots,
+            touches,
+            ..
+        } = w;
         self.item_rng = rng;
         baddies.retain(|bd| !bd.removed);
         self.baddies = baddies;
@@ -253,7 +302,9 @@ impl OfflineSession {
             // Online the leader sends each shot as PLI_ARROWADD, as the real
             // 2.22 does (`lan-222d`: `87 79 20 8b 21`, an arrow facing north).
             if role.online && role.leader {
-                self.baddy_sends.push(crate::arrows::arrow_add_message(s.x as f32, s.y as f32, s.dir, false, s.sprite, s.kind));
+                self.baddy_sends.push(crate::arrows::arrow_add_message(
+                    s.x as f32, s.y as f32, s.dir, false, s.sprite, s.kind,
+                ));
             }
             let mut a = crate::arrows::Arrow::new(s.x as f32, s.y as f32, s.dir);
             a.sprite = s.sprite;
@@ -284,7 +335,9 @@ impl OfflineSession {
     pub(crate) fn throw_hits_baddy(&mut self, x: f32, y: f32, dir: u8, power: i32) -> bool {
         let role = self.baddy_role;
         let (x, y) = (f64::from(x), f64::from(y));
-        let Some(i) = self.baddies.iter().position(|bd| bd.object_test(x, y)) else { return false };
+        let Some(i) = self.baddies.iter().position(|bd| bd.object_test(x, y)) else {
+            return false;
+        };
         let mut baddies = std::mem::take(&mut self.baddies);
         let (dx, dy) = Baddy::object_push(dir);
         let mut w = self.around(Vec::new());
@@ -292,7 +345,8 @@ impl OfflineSession {
         let sounds = std::mem::take(&mut w.sounds);
         self.sound_events.extend(sounds);
         if role.follows() {
-            self.baddy_sends.push(b::hurt_message(baddies[i].id, dx, dy, power * 2));
+            self.baddy_sends
+                .push(b::hurt_message(baddies[i].id, dx, dy, power * 2));
             self.baddy_sends.push(b::follower_hurt_props(&baddies[i]));
         }
         self.baddies = baddies;
@@ -314,7 +368,8 @@ mod tests {
 
     fn session(baddy: &str) -> OfflineSession {
         let mut s = OfflineSession::new();
-        s.current_level = Some(Level::parse(&format!("GLEVNW01\nBADDY {baddy}\n\n\n\nBADDYEND\n")).unwrap());
+        s.current_level =
+            Some(Level::parse(&format!("GLEVNW01\nBADDY {baddy}\n\n\n\nBADDYEND\n")).unwrap());
         s.level_serial += 1;
         // A fixed seed: the walk turns are random.
         s.item_rng = crate::items::DelphiRandom::new(1);
@@ -364,7 +419,11 @@ mod tests {
                 s.tick_baddies(50, &[]);
             }
         }
-        assert!(s.baddies.is_empty() || s.baddies[0].power < 1, "power {}", s.baddies[0].power);
+        assert!(
+            s.baddies.is_empty() || s.baddies[0].power < 1,
+            "power {}",
+            s.baddies[0].power
+        );
         for _ in 0..100 {
             s.tick_baddies(50, &[]);
         }
@@ -386,10 +445,16 @@ mod tests {
                 seen.push((b.mode, b.counter, b.x, b.y));
             }
         }
-        let start = seen.iter().position(|v| v.0 == mode::HUNT).expect("never hunted");
+        let start = seen
+            .iter()
+            .position(|v| v.0 == mode::HUNT)
+            .expect("never hunted");
         assert_eq!(seen[start - 1].0, mode::LOOK);
         let counters: Vec<i32> = seen[start..start + 17].iter().map(|v| v.1).collect();
-        assert_eq!(counters, [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 0, 3, 2, 1, 0]);
+        assert_eq!(
+            counters,
+            [16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 0, 3, 2, 1, 0]
+        );
         for w in seen[start + 12..start + 17].windows(2) {
             let step = (w[1].2 - w[0].2).abs().max((w[1].3 - w[0].3).abs());
             assert!((0.2..=0.5).contains(&step), "step {step}");
@@ -417,9 +482,17 @@ mod tests {
         let profile = ClientVersion::V222.profile();
         s.life.set_rules(profile.life.death);
         s.combat.set_rules(profile.life.combat);
-        s.baddy_role = BaddyRole { online: true, leader: true };
-        (s.player_x, s.player_y, s.sword_power, s.player_dir) = (30.0, 30.0, 1, crate::offline::DIR_WEST);
-        s.receive_baddy_props(&[0x21, 0x21, 0x7c, 0x22, 0x7c, 0x23, 0x20, 0x24, 0x22, 0x2d, b'b', b'a', b'd', b'd', b'y', b'g', b'r', b'a', b'y', b'.', b'p', b'n', b'g', 0x25, 0x20, 0x26, 0x20, 0x27, 0x2a]);
+        s.baddy_role = BaddyRole {
+            online: true,
+            leader: true,
+        };
+        (s.player_x, s.player_y, s.sword_power, s.player_dir) =
+            (30.0, 30.0, 1, crate::offline::DIR_WEST);
+        s.receive_baddy_props(&[
+            0x21, 0x21, 0x7c, 0x22, 0x7c, 0x23, 0x20, 0x24, 0x22, 0x2d, b'b', b'a', b'd', b'd',
+            b'y', b'g', b'r', b'a', b'y', b'.', b'p', b'n', b'g', 0x25, 0x20, 0x26, 0x20, 0x27,
+            0x2a,
+        ]);
         s.tick_baddies(100, &[]);
         let mut sent: Vec<Vec<u8>> = Vec::new();
         for _ in 0..2 {
@@ -439,13 +512,24 @@ mod tests {
         assert!(s.baddies.is_empty());
         let has = |m: &Vec<u8>, pairs: &[u8]| pairs.chunks(2).all(|p| m.windows(2).any(|w| w == p));
         // The hurts: power 1 then 0 with the empty image, mode 3, counter 7.
-        let hurts: Vec<&Vec<u8>> = sent.iter().filter(|m| has(m, &[0x25, 0x23, 0x26, 0x27])).collect();
+        let hurts: Vec<&Vec<u8>> = sent
+            .iter()
+            .filter(|m| has(m, &[0x25, 0x23, 0x26, 0x27]))
+            .collect();
         assert_eq!(hurts.len(), 2, "{sent:?}");
         assert!(hurts[0].windows(3).any(|w| w == [0x24, 0x21, 0x20]));
         assert!(hurts[1].windows(3).any(|w| w == [0x24, 0x20, 0x20]));
-        assert!(hurts.iter().all(|m| m.windows(2).any(|w| w[0] == 0x21) && m.windows(2).any(|w| w[0] == 0x22)), "moved in the hurt think");
+        assert!(
+            hurts
+                .iter()
+                .all(|m| m.windows(2).any(|w| w[0] == 0x21) && m.windows(2).any(|w| w[0] == 0x22)),
+            "moved in the hurt think"
+        );
         // The death: mode 5 with counter 14, and the last message counter 0.
-        let die = sent.iter().position(|m| m[..] == [0x2f, 0x21, 0x25, 0x25, 0x26, 0x2e, b'\n']).expect("death message");
+        let die = sent
+            .iter()
+            .position(|m| m[..] == [0x2f, 0x21, 0x25, 0x25, 0x26, 0x2e, b'\n'])
+            .expect("death message");
         assert_eq!(sent.last().unwrap()[..], [0x2f, 0x21, 0x26, 0x20, b'\n']);
         assert_eq!(sent.len() - die, 15);
     }
@@ -456,12 +540,72 @@ mod tests {
     fn lan_222d_baddies() -> Vec<Vec<u8>> {
         type Row = (u8, u8, u8, u8, u8, &'static str, u8, u8, u8);
         let rows: [Row; 6] = [
-            (0x21, 0x69, 0x6c, 0x20, 0x22, "baddygray.png", 0x22, 0x28, 0x2f),
-            (0x22, 0x93, 0x60, 0x21, 0x23, "baddyblue.png", 0x22, 0x23, 0x2f),
-            (0x23, 0x91, 0x60, 0x22, 0x24, "baddyred.png", 0x22, 0x21, 0x2f),
-            (0x24, 0x97, 0x75, 0x23, 0x23, "baddyblue.png", 0x22, 0x27, 0x20),
-            (0x25, 0x20, 0x8e, 0x25, 0x21, "baddyhare.png", 0x27, 0x42, 0x2a),
-            (0x26, 0x93, 0x60, 0x27, 0x26, "baddygold.png", 0x22, 0x23, 0x2f),
+            (
+                0x21,
+                0x69,
+                0x6c,
+                0x20,
+                0x22,
+                "baddygray.png",
+                0x22,
+                0x28,
+                0x2f,
+            ),
+            (
+                0x22,
+                0x93,
+                0x60,
+                0x21,
+                0x23,
+                "baddyblue.png",
+                0x22,
+                0x23,
+                0x2f,
+            ),
+            (
+                0x23,
+                0x91,
+                0x60,
+                0x22,
+                0x24,
+                "baddyred.png",
+                0x22,
+                0x21,
+                0x2f,
+            ),
+            (
+                0x24,
+                0x97,
+                0x75,
+                0x23,
+                0x23,
+                "baddyblue.png",
+                0x22,
+                0x27,
+                0x20,
+            ),
+            (
+                0x25,
+                0x20,
+                0x8e,
+                0x25,
+                0x21,
+                "baddyhare.png",
+                0x27,
+                0x42,
+                0x2a,
+            ),
+            (
+                0x26,
+                0x93,
+                0x60,
+                0x27,
+                0x26,
+                "baddygold.png",
+                0x22,
+                0x23,
+                0x2f,
+            ),
         ];
         let text = |m: &mut Vec<u8>, t: &str| {
             m.push(t.len() as u8 + 32);
@@ -472,7 +616,11 @@ mod tests {
                 let mut m = vec![id, 0x21, x, 0x22, y, 0x23, kind, 0x24, power];
                 text(&mut m, image);
                 m.extend_from_slice(&[0x25, md, 0x26, counter, 0x27, dir]);
-                for (prop, verse) in [(0x28, "Halt, intruder!"), (0x29, "Ouch!"), (0x2a, "You got me...")] {
+                for (prop, verse) in [
+                    (0x28, "Halt, intruder!"),
+                    (0x29, "Ouch!"),
+                    (0x2a, "You got me..."),
+                ] {
                     m.push(prop);
                     text(&mut m, verse);
                 }
@@ -496,7 +644,10 @@ mod tests {
         let profile = ClientVersion::V222.profile();
         s.life.set_rules(profile.life.death);
         s.combat.set_rules(profile.life.combat);
-        s.baddy_role = BaddyRole { online: true, leader: true };
+        s.baddy_role = BaddyRole {
+            online: true,
+            leader: true,
+        };
         (s.player_x, s.player_y) = (5.0, 5.0);
         for m in lan_222d_baddies() {
             s.receive_baddy_props(&m);
@@ -509,7 +660,11 @@ mod tests {
             s.tick_baddies(50, &[]);
             // The shooting soldier's arrows go out too (PLI_ARROWADD, 9), as
             // in the capture; the rate is about the props.
-            let sent: Vec<Vec<u8>> = s.take_baddy_sends().into_iter().filter(|m| m[0] == 15 + 32).collect();
+            let sent: Vec<Vec<u8>> = s
+                .take_baddy_sends()
+                .into_iter()
+                .filter(|m| m[0] == 15 + 32)
+                .collect();
             if !sent.is_empty() {
                 batches.push(sent);
             }
@@ -540,7 +695,10 @@ mod tests {
         assert_eq!(b::props_message(1, &now, &now), None);
         let mut moved = now.clone();
         moved[1] = vec![0x6a];
-        assert_eq!(b::props_message(1, &now, &moved), Some(vec![15 + 32, 0x21, 0x21, 0x6a, b'\n']));
+        assert_eq!(
+            b::props_message(1, &now, &moved),
+            Some(vec![15 + 32, 0x21, 0x21, 0x6a, b'\n'])
+        );
     }
 
     /// A real 2.22 follower's sword hit (`lan-222hurt`): PLI_BADDYHURT
@@ -551,11 +709,19 @@ mod tests {
     fn a_follower_hit_matches_the_2_22_capture() {
         let mut s = OfflineSession::new();
         s.current_level = Some(Level::parse("GLEVNW01\n").unwrap());
-        s.baddy_role = BaddyRole { online: true, leader: false };
+        s.baddy_role = BaddyRole {
+            online: true,
+            leader: false,
+        };
         let profile = ClientVersion::V222.profile();
         s.combat.set_rules(profile.life.combat);
-        (s.player_x, s.player_y, s.sword_power, s.player_dir) = (42.0, 45.0, 1, crate::offline::DIR_EAST);
-        s.receive_baddy_props(&[0x21, 0x21, 0x7c, 0x22, 0x7c, 0x23, 0x20, 0x24, 0x22, 0x2d, b'b', b'a', b'd', b'd', b'y', b'g', b'r', b'a', b'y', b'.', b'p', b'n', b'g', 0x25, 0x20, 0x26, 0x20, 0x27, 0x2a]);
+        (s.player_x, s.player_y, s.sword_power, s.player_dir) =
+            (42.0, 45.0, 1, crate::offline::DIR_EAST);
+        s.receive_baddy_props(&[
+            0x21, 0x21, 0x7c, 0x22, 0x7c, 0x23, 0x20, 0x24, 0x22, 0x2d, b'b', b'a', b'd', b'd',
+            b'y', b'g', b'r', b'a', b'y', b'.', b'p', b'n', b'g', 0x25, 0x20, 0x26, 0x20, 0x27,
+            0x2a,
+        ]);
         assert!(s.start_swing());
         let mut sent = Vec::new();
         for _ in 0..6 {
@@ -563,7 +729,13 @@ mod tests {
             s.tick_baddies(50, &[]);
             sent.extend(s.take_baddy_sends());
         }
-        assert_eq!(sent, [vec![16 + 32, 0x21, 0x28, 0x60, 0x21, b'\n'], vec![15 + 32, 0x21, 0x24, 0x21, 0x20, 0x25, 0x23, b'\n']]);
+        assert_eq!(
+            sent,
+            [
+                vec![16 + 32, 0x21, 0x28, 0x60, 0x21, b'\n'],
+                vec![15 + 32, 0x21, 0x24, 0x21, 0x20, 0x25, 0x23, b'\n']
+            ]
+        );
     }
 
     /// The leader gets the follower's hit as PLO_BADDYHURT `21 28 60 21`
@@ -573,9 +745,16 @@ mod tests {
     fn the_leader_applies_a_relayed_hit() {
         let mut s = OfflineSession::new();
         s.current_level = Some(Level::parse("GLEVNW01\n").unwrap());
-        s.baddy_role = BaddyRole { online: true, leader: true };
+        s.baddy_role = BaddyRole {
+            online: true,
+            leader: true,
+        };
         (s.player_x, s.player_y) = (10.0, 10.0);
-        s.receive_baddy_props(&[0x21, 0x21, 0x7c, 0x22, 0x7c, 0x23, 0x20, 0x24, 0x22, 0x2d, b'b', b'a', b'd', b'd', b'y', b'g', b'r', b'a', b'y', b'.', b'p', b'n', b'g', 0x25, 0x20, 0x26, 0x20, 0x27, 0x2a]);
+        s.receive_baddy_props(&[
+            0x21, 0x21, 0x7c, 0x22, 0x7c, 0x23, 0x20, 0x24, 0x22, 0x2d, b'b', b'a', b'd', b'd',
+            b'y', b'g', b'r', b'a', b'y', b'.', b'p', b'n', b'g', 0x25, 0x20, 0x26, 0x20, 0x27,
+            0x2a,
+        ]);
         s.tick_baddies(100, &[]);
         s.take_baddy_sends();
         s.receive_baddy_hurt(&[0x21, 0x28, 0x60, 0x21]);
@@ -588,7 +767,10 @@ mod tests {
         let m = &sent[0];
         // Power 1 with the empty image, mode 3, counter 7, moved east 2 tiles.
         assert!(m.windows(3).any(|w| w == [0x24, 0x21, 0x20]), "{m:?}");
-        assert!(m.windows(2).any(|w| w == [0x25, 0x23]) && m.windows(2).any(|w| w == [0x26, 0x27]), "{m:?}");
+        assert!(
+            m.windows(2).any(|w| w == [0x25, 0x23]) && m.windows(2).any(|w| w == [0x26, 0x27]),
+            "{m:?}"
+        );
         assert!(m.windows(2).any(|w| w == [0x21, 0x7c + 4]), "{m:?}");
     }
 }

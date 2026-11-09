@@ -24,7 +24,12 @@ fn messages(w: &mut ScriptWorld) -> Vec<String> {
 }
 
 fn var(w: &ScriptWorld, id: ObjId, name: &str) -> Val {
-    w.obj(id).unwrap().vars.get(name).cloned().unwrap_or_default()
+    w.obj(id)
+        .unwrap()
+        .vars
+        .get(name)
+        .cloned()
+        .unwrap_or_default()
 }
 
 // ---- events and basic commands ----
@@ -51,35 +56,65 @@ fn hide_and_show_track_visibility_and_emit_effects() {
     let (mut w, id) = npc("if (playertouchsme) { hide; }\nif (timeout) { show; }");
     w.fire(id, "playertouchsme", &[]);
     assert!(!w.obj(id).unwrap().visible);
-    assert_eq!(w.take_effects(), vec![Effect::SetVisible { obj: id, visible: false, local: false }]);
+    assert_eq!(
+        w.take_effects(),
+        vec![Effect::SetVisible {
+            obj: id,
+            visible: false,
+            local: false
+        }]
+    );
     w.fire(id, "timeout", &[]);
     assert!(w.obj(id).unwrap().visible);
 }
 
 #[test]
 fn setimg_sets_image_and_visibility() {
-    let (mut w, id) = npc("if (created) { hide; setimg door.png; setimgpart sheet.png,16,0,16,32; }");
+    let (mut w, id) =
+        npc("if (created) { hide; setimg door.png; setimgpart sheet.png,16,0,16,32; }");
     w.fire(id, "created", &[]);
     let o = w.obj(id).unwrap();
     assert_eq!(o.image, "sheet.png");
     assert!(o.visible);
     let fx = w.take_effects();
-    assert!(fx.contains(&Effect::SetImg { obj: id, file: "door.png".into(), part: None }));
-    assert!(fx.contains(&Effect::SetImg { obj: id, file: "sheet.png".into(), part: Some((16.0, 0.0, 16.0, 32.0)) }));
+    assert!(fx.contains(&Effect::SetImg {
+        obj: id,
+        file: "door.png".into(),
+        part: None
+    }));
+    assert!(fx.contains(&Effect::SetImg {
+        obj: id,
+        file: "sheet.png".into(),
+        part: Some((16.0, 0.0, 16.0, 32.0))
+    }));
 }
 
 #[test]
 fn setlevel2_warps_and_ends_the_run() {
     let (mut w, id) = npc("if (playertouchsme) { setlevel2 house.nw,32,60; message never; }");
     w.fire(id, "playertouchsme", &[]);
-    assert_eq!(w.take_effects(), vec![Effect::SetLevel { level: "house.nw".into(), x: Some(32.0), y: Some(60.0) }]);
+    assert_eq!(
+        w.take_effects(),
+        vec![Effect::SetLevel {
+            level: "house.nw".into(),
+            x: Some(32.0),
+            y: Some(60.0)
+        }]
+    );
 }
 
 #[test]
 fn setlevel_without_position() {
     let (mut w, id) = npc("if (created) setlevel castle.nw;");
     w.fire(id, "created", &[]);
-    assert_eq!(w.take_effects(), vec![Effect::SetLevel { level: "castle.nw".into(), x: None, y: None }]);
+    assert_eq!(
+        w.take_effects(),
+        vec![Effect::SetLevel {
+            level: "castle.nw".into(),
+            x: None,
+            y: None
+        }]
+    );
 }
 
 #[test]
@@ -96,12 +131,36 @@ fn character_and_sound_commands() {
     let (mut w, id) = npc("if (created) { showcharacter; setcharani idle,; setcharprop #3,head1.png; play jump.wav; playlooped loop.mid; say2 Hello there; say 2; }");
     w.fire(id, "created", &[]);
     let fx = w.take_effects();
-    assert!(fx.contains(&Effect::Command { obj: id, name: "showcharacter".into(), args: vec![] }));
-    assert!(fx.contains(&Effect::SetCharAni { obj: id, ani: "idle".into(), params: "".into() }));
-    assert!(fx.contains(&Effect::SetCharProp { obj: id, code: "#3".into(), value: "head1.png".into() }));
-    assert!(fx.contains(&Effect::Play { obj: id, file: "jump.wav".into(), looped: false, at: None }));
-    assert!(fx.contains(&Effect::Play { obj: id, file: "loop.mid".into(), looped: true, at: None }));
-    assert!(fx.contains(&Effect::Say2 { text: "Hello there".into() }));
+    assert!(fx.contains(&Effect::Command {
+        obj: id,
+        name: "showcharacter".into(),
+        args: vec![]
+    }));
+    assert!(fx.contains(&Effect::SetCharAni {
+        obj: id,
+        ani: "idle".into(),
+        params: "".into()
+    }));
+    assert!(fx.contains(&Effect::SetCharProp {
+        obj: id,
+        code: "#3".into(),
+        value: "head1.png".into()
+    }));
+    assert!(fx.contains(&Effect::Play {
+        obj: id,
+        file: "jump.wav".into(),
+        looped: false,
+        at: None
+    }));
+    assert!(fx.contains(&Effect::Play {
+        obj: id,
+        file: "loop.mid".into(),
+        looped: true,
+        at: None
+    }));
+    assert!(fx.contains(&Effect::Say2 {
+        text: "Hello there".into()
+    }));
     assert!(fx.contains(&Effect::SaySign { index: 2 }));
 }
 
@@ -109,7 +168,12 @@ fn character_and_sound_commands() {
 fn sendtoserver_is_a_stub_effect() {
     let (mut w, id) = npc("if (created) { sendtoserver hello,world; }");
     w.fire(id, "created", &[]);
-    assert_eq!(w.take_effects(), vec![Effect::SendToServer { text: "hello,world".into() }]);
+    assert_eq!(
+        w.take_effects(),
+        vec![Effect::SendToServer {
+            text: "hello,world".into()
+        }]
+    );
 }
 
 #[test]
@@ -131,7 +195,11 @@ fn unknown_commands_are_logged_and_ignored() {
     w.fire(id, "created", &[]);
     assert_eq!(messages(&mut w), vec!["after"]);
     let log = w.take_log();
-    assert!(log.iter().any(|l| l.contains("frobnicate") && l.contains("unknown command")), "{log:?}");
+    assert!(
+        log.iter()
+            .any(|l| l.contains("frobnicate") && l.contains("unknown command")),
+        "{log:?}"
+    );
 }
 
 #[test]
@@ -151,13 +219,22 @@ fn commands_with_no_executor_are_noted() {
     let (mut w, id) = npc("if (created) { seturllevel foo; join foo; message ok; }");
     w.fire(id, "created", &[]);
     assert_eq!(messages(&mut w), vec!["ok"]);
-    assert!(w.take_log().iter().filter(|l| l.contains("does nothing")).count() == 2);
+    assert!(
+        w.take_log()
+            .iter()
+            .filter(|l| l.contains("does nothing"))
+            .count()
+            == 2
+    );
 }
 
 #[test]
 fn parse_errors_become_log_lines_and_the_rest_runs() {
     let (mut w, id) = npc("if (created) { message one; x = ; message two; }");
-    let diag_logged = w.take_log().iter().any(|l| l.contains("expected an expression"));
+    let diag_logged = w
+        .take_log()
+        .iter()
+        .any(|l| l.contains("expected an expression"));
     assert!(diag_logged);
     w.fire(id, "created", &[]);
     assert!(messages(&mut w).contains(&"two".to_string()));
@@ -169,20 +246,31 @@ fn parse_errors_become_log_lines_and_the_rest_runs() {
 fn scopes_are_separate_and_this_persists_across_events() {
     let mut w = ScriptWorld::new(Era::V21);
     let a = w.add(ObjSpec::npc("a.png", 0.0, 0.0, "if (created) { this.hp = 3; level.shared = 7; server.s = 9; local.l = 5; client.c = 1; }\nif (playerenters) { this.hp += 1; }"));
-    let b = w.add(ObjSpec::npc("b.png", 0.0, 0.0, "if (created) { message #v(level.shared); }"));
+    let b = w.add(ObjSpec::npc(
+        "b.png",
+        0.0,
+        0.0,
+        "if (created) { message #v(level.shared); }",
+    ));
     w.fire(a, "created", &[]);
     w.fire(a, "playerenters", &[]);
     w.fire(b, "created", &[]);
     let fx = w.take_effects();
     assert_eq!(var(&w, a, "this.hp"), Val::Num(4.0));
     assert_eq!(var(&w, b, "this.hp"), Val::Num(0.0));
-    assert!(fx.iter().any(|e| matches!(e, Effect::Message { text, .. } if text == "7")));
+    assert!(fx
+        .iter()
+        .any(|e| matches!(e, Effect::Message { text, .. } if text == "7")));
     assert_eq!(w.core.server_vars["server.s"], Val::Num(9.0));
     assert_eq!(w.flag("client.c"), Some("1"));
     assert_eq!(w.flag("local.l"), Some("5"));
     // local. flags never go to the server; client. flags do.
-    assert!(fx.iter().any(|e| matches!(e, Effect::SetFlag { name, .. } if name == "client.c")));
-    assert!(!fx.iter().any(|e| matches!(e, Effect::SetFlag { name, .. } if name == "local.l")));
+    assert!(fx
+        .iter()
+        .any(|e| matches!(e, Effect::SetFlag { name, .. } if name == "client.c")));
+    assert!(!fx
+        .iter()
+        .any(|e| matches!(e, Effect::SetFlag { name, .. } if name == "local.l")));
 }
 
 #[test]
@@ -205,7 +293,11 @@ fn flags_set_unset_and_read_back() {
     w.fire(id, "playertouchsme", &[]);
     assert_eq!(messages(&mut w), vec!["locked"]);
     let fx = w.take_effects();
-    assert!(fx.iter().any(|e| matches!(e, Effect::UnsetFlag { name } if name == "hasdoorkey")) || w.flag("hasdoorkey").is_some());
+    assert!(
+        fx.iter()
+            .any(|e| matches!(e, Effect::UnsetFlag { name } if name == "hasdoorkey"))
+            || w.flag("hasdoorkey").is_some()
+    );
 }
 
 #[test]
@@ -247,7 +339,10 @@ fn builtin_player_variables_read_and_write() {
     assert_eq!(w.core.player.rupees, 6.0);
     assert_eq!(w.core.player.dir, 1.0); // 5 mod 4
     let fx = w.take_effects();
-    assert!(fx.contains(&Effect::SetPlayerVar { name: "playerrupees".into(), value: 6.0 }));
+    assert!(fx.contains(&Effect::SetPlayerVar {
+        name: "playerrupees".into(),
+        value: 6.0
+    }));
 }
 
 #[test]
@@ -256,7 +351,11 @@ fn npc_position_variables() {
     w.fire(id, "created", &[]);
     let o = w.obj(id).unwrap();
     assert_eq!((o.x, o.y), (12.0, 19.0));
-    assert!(w.take_effects().contains(&Effect::SetPos { obj: id, x: 12.0, y: 19.0 }));
+    assert!(w.take_effects().contains(&Effect::SetPos {
+        obj: id,
+        x: 12.0,
+        y: 19.0
+    }));
 }
 
 #[test]
@@ -357,7 +456,12 @@ fn builtin_functions() {
 fn random_is_in_range_and_deterministic_per_seed() {
     let run = |seed| {
         let mut w = ScriptWorld::with_seed(Era::V21, seed);
-        let id = w.add(ObjSpec::npc("a.png", 0.0, 0.0, "if (created) { this.a = random(1,7); this.b = random(1,7); }"));
+        let id = w.add(ObjSpec::npc(
+            "a.png",
+            0.0,
+            0.0,
+            "if (created) { this.a = random(1,7); this.b = random(1,7); }",
+        ));
         w.fire(id, "created", &[]);
         (var(&w, id, "this.a"), var(&w, id, "this.b"))
     };
@@ -413,12 +517,10 @@ fn playersays_matches_only_during_a_chat_event() {
 
 #[test]
 fn while_for_break_continue() {
-    let (mut w, id) = npc(
-        "if (created) {
+    let (mut w, id) = npc("if (created) {
            i = 0; while (i < 10) { i++; if (i == 3) continue; if (i == 6) break; this.s += i; }
            for (j = 0; j < 4; j++) { this.f += 1; }
-         }",
-    );
+         }");
     w.fire(id, "created", &[]);
     assert_eq!(var(&w, id, "this.s"), Val::Num(1.0 + 2.0 + 4.0 + 5.0));
     assert_eq!(var(&w, id, "this.f"), Val::Num(4.0));
@@ -459,7 +561,9 @@ fn return_at_top_level_ends_the_script() {
 
 #[test]
 fn recursion_is_cut_off() {
-    let (mut w, id) = npc("if (created) { forever(); message after; }\nfunction forever() { this.d++; forever(); }");
+    let (mut w, id) = npc(
+        "if (created) { forever(); message after; }\nfunction forever() { this.d++; forever(); }",
+    );
     w.fire(id, "created", &[]);
     assert!(var(&w, id, "this.d").num() <= 64.0);
     assert!(w.take_log().iter().any(|l| l.contains("nested deeper")));
@@ -467,7 +571,11 @@ fn recursion_is_cut_off() {
 
 #[test]
 fn deep_expression_nesting_at_runtime_is_cut_off() {
-    let src = format!("if (created) {{ this.r = {}1{}; }}", "(".repeat(150), ")".repeat(150));
+    let src = format!(
+        "if (created) {{ this.r = {}1{}; }}",
+        "(".repeat(150),
+        ")".repeat(150)
+    );
     let (mut w, id) = npc(&src);
     w.fire(id, "created", &[]);
     assert_eq!(var(&w, id, "this.r"), Val::Num(1.0));
@@ -476,7 +584,8 @@ fn deep_expression_nesting_at_runtime_is_cut_off() {
 #[test]
 fn step_budget_stops_runaway_straight_line_work() {
     // 10,000-pass loops nested enough to exceed the step budget.
-    let (mut w, id) = npc("if (created) { for (a=0;a<9000;a++) { for (b=0;b<9000;b++) { this.n++; } } }");
+    let (mut w, id) =
+        npc("if (created) { for (a=0;a<9000;a++) { for (b=0;b<9000;b++) { this.n++; } } }");
     w.fire(id, "created", &[]);
     let log = w.take_log().join("\n");
     assert!(log.contains("stopped after"), "{log}");
@@ -491,7 +600,10 @@ fn message_codes() {
     w.core.player.account = "bob123".into();
     w.core.level = "town.nw".into();
     w.chat("hi there");
-    assert_eq!(messages(&mut w), vec!["Bob said hi there in town.nw (bob123)"]);
+    assert_eq!(
+        messages(&mut w),
+        vec!["Bob said hi there in town.nw (bob123)"]
+    );
     let _ = id;
 }
 
@@ -527,7 +639,8 @@ fn event_parameters_are_codes() {
 
 #[test]
 fn timeout_assignment_fires_the_timeout_event_once() {
-    let (mut w, id) = npc("if (created) { timeout = 1; }\nif (timeout) { this.n++; message tick; }");
+    let (mut w, id) =
+        npc("if (created) { timeout = 1; }\nif (timeout) { this.n++; message tick; }");
     w.fire(id, "created", &[]);
     w.tick(950);
     assert!(messages(&mut w).is_empty());
@@ -540,7 +653,8 @@ fn timeout_assignment_fires_the_timeout_event_once() {
 
 #[test]
 fn a_timeout_block_can_rearm_itself() {
-    let (mut w, id) = npc("if (created) { timeout = 0.5; }\nif (timeout) { this.n++; timeout = 0.5; }");
+    let (mut w, id) =
+        npc("if (created) { timeout = 0.5; }\nif (timeout) { this.n++; timeout = 0.5; }");
     w.fire(id, "created", &[]);
     w.tick(2000);
     assert_eq!(var(&w, id, "this.n"), Val::Num(4.0));
@@ -556,7 +670,8 @@ fn timeout_zero_cancels() {
 
 #[test]
 fn sleep_resumes_after_the_sleep_statement() {
-    let (mut w, id) = npc("if (playertouchsme) { message one; sleep 1; message two; sleep 1; message three; }");
+    let (mut w, id) =
+        npc("if (playertouchsme) { message one; sleep 1; message two; sleep 1; message three; }");
     w.fire(id, "playertouchsme", &[]);
     assert_eq!(messages(&mut w), vec!["one"]);
     w.tick(1000);
@@ -569,7 +684,8 @@ fn sleep_resumes_after_the_sleep_statement() {
 
 #[test]
 fn sleep_inside_a_loop_resumes_in_the_loop() {
-    let (mut w, id) = npc("if (created) { for (i=0;i<3;i++) { this.n++; sleep 0.5; } message done; }");
+    let (mut w, id) =
+        npc("if (created) { for (i=0;i<3;i++) { this.n++; sleep 0.5; } message done; }");
     w.fire(id, "created", &[]);
     // The resume point is the node after `sleep`: the loop continues.
     w.tick(500);
@@ -591,7 +707,12 @@ fn timeouts_fire_in_tick_order_then_creation_order_and_are_repeatable() {
     let run = |slices: &[u64]| {
         let mut w = ScriptWorld::new(Era::V21);
         let mk = |w: &mut ScriptWorld, name: &str, t: f64| {
-            w.add(ObjSpec::npc("a.png", 0.0, 0.0, &format!("if (created) {{ timeout = {t}; }}\nif (timeout) {{ message {name}; }}")))
+            w.add(ObjSpec::npc(
+                "a.png",
+                0.0,
+                0.0,
+                &format!("if (created) {{ timeout = {t}; }}\nif (timeout) {{ message {name}; }}"),
+            ))
         };
         let c = mk(&mut w, "c", 0.2);
         let a = mk(&mut w, "a", 0.1);
@@ -644,7 +765,11 @@ fn touch_fires_on_entry_and_rearms_after_leaving() {
 fn a_thrown_object_finds_the_first_visible_npc_at_its_point_and_pelts_it() {
     let (mut w, id) = npc("if (waspelt) { message ouch; hide; }");
     assert_eq!(w.npc_at(9.9, 20.5), None);
-    assert_eq!(w.npc_at(10.0, 20.0), Some(id), "the box includes its top-left edge");
+    assert_eq!(
+        w.npc_at(10.0, 20.0),
+        Some(id),
+        "the box includes its top-left edge"
+    );
     assert_eq!(w.npc_at(12.0, 20.5), None, "and not its right edge");
     w.fire(id, "waspelt", &[]);
     assert_eq!(messages(&mut w), vec!["ouch"]);
@@ -663,7 +788,11 @@ fn hidden_npcs_are_not_touched() {
 #[test]
 fn weapons_are_not_touched() {
     let mut w = ScriptWorld::new(Era::V21);
-    let id = w.add(ObjSpec::weapon("Bow", "bow.png", "if (playertouchsme) { message no; }"));
+    let id = w.add(ObjSpec::weapon(
+        "Bow",
+        "bow.png",
+        "if (playertouchsme) { message no; }",
+    ));
     w.obj_mut(id).unwrap().x = 10.0;
     assert_eq!(w.touch(10.5, 0.5), 0);
 }
@@ -671,8 +800,16 @@ fn weapons_are_not_touched() {
 #[test]
 fn weaponfired_runs_on_the_named_weapon() {
     let mut w = ScriptWorld::new(Era::V21);
-    w.add(ObjSpec::weapon("Bow", "bow.png", "if (weaponfired) { message bow; }"));
-    w.add(ObjSpec::weapon("Gun", "gun.png", "if (weaponfired) { message gun; }"));
+    w.add(ObjSpec::weapon(
+        "Bow",
+        "bow.png",
+        "if (weaponfired) { message bow; }",
+    ));
+    w.add(ObjSpec::weapon(
+        "Gun",
+        "gun.png",
+        "if (weaponfired) { message gun; }",
+    ));
     w.weapon_fired("Gun");
     assert_eq!(messages(&mut w), vec!["gun"]);
     assert_eq!(w.obj(0).unwrap().kind, ObjKind::Weapon);
@@ -681,8 +818,18 @@ fn weaponfired_runs_on_the_named_weapon() {
 #[test]
 fn callnpc_runs_after_the_caller_finishes() {
     let mut w = ScriptWorld::new(Era::V21);
-    let a = w.add(ObjSpec::npc("a.png", 0.0, 0.0, "if (created) { callnpc 1,playerenters; message caller; }"));
-    w.add(ObjSpec::npc("b.png", 0.0, 0.0, "if (playerenters) { message callee; }"));
+    let a = w.add(ObjSpec::npc(
+        "a.png",
+        0.0,
+        0.0,
+        "if (created) { callnpc 1,playerenters; message caller; }",
+    ));
+    w.add(ObjSpec::npc(
+        "b.png",
+        0.0,
+        0.0,
+        "if (playerenters) { message callee; }",
+    ));
     w.fire(a, "created", &[]);
     assert_eq!(messages(&mut w), vec!["caller", "callee"]);
 }
@@ -690,8 +837,18 @@ fn callnpc_runs_after_the_caller_finishes() {
 #[test]
 fn mutual_calls_are_bounded() {
     let mut w = ScriptWorld::new(Era::V21);
-    let a = w.add(ObjSpec::npc("a.png", 0.0, 0.0, "if (created) { callnpc 1,playerenters; }\nif (playerenters) { callnpc 1,playerenters; }"));
-    w.add(ObjSpec::npc("b.png", 0.0, 0.0, "if (playerenters) { callnpc 0,playerenters; }"));
+    let a = w.add(ObjSpec::npc(
+        "a.png",
+        0.0,
+        0.0,
+        "if (created) { callnpc 1,playerenters; }\nif (playerenters) { callnpc 1,playerenters; }",
+    ));
+    w.add(ObjSpec::npc(
+        "b.png",
+        0.0,
+        0.0,
+        "if (playerenters) { callnpc 0,playerenters; }",
+    ));
     w.fire(a, "created", &[]);
     assert!(w.take_log().iter().any(|l| l.contains("cut off")));
 }
@@ -699,17 +856,35 @@ fn mutual_calls_are_bounded() {
 #[test]
 fn triggeraction_reaches_the_object_under_the_point_and_the_server() {
     let mut w = ScriptWorld::new(Era::V21);
-    let a = w.add(ObjSpec::npc("a.png", 0.0, 0.0, "if (created) { triggeraction 10.5,20.5,Open,red,door; }"));
-    w.add(ObjSpec::npc("b.png", 10.0, 20.0, "if (actionopen) { message #p(0)-#p(1); }"));
+    let a = w.add(ObjSpec::npc(
+        "a.png",
+        0.0,
+        0.0,
+        "if (created) { triggeraction 10.5,20.5,Open,red,door; }",
+    ));
+    w.add(ObjSpec::npc(
+        "b.png",
+        10.0,
+        20.0,
+        "if (actionopen) { message #p(0)-#p(1); }",
+    ));
     w.fire(a, "created", &[]);
     let fx = w.take_effects();
-    assert!(fx.contains(&Effect::TriggerAction { x: 10.5, y: 20.5, action: "open".into(), params: "red,door".into() }));
-    assert!(fx.iter().any(|e| matches!(e, Effect::Message { text, .. } if text == "red-door")));
+    assert!(fx.contains(&Effect::TriggerAction {
+        x: 10.5,
+        y: 20.5,
+        action: "open".into(),
+        params: "red,door".into()
+    }));
+    assert!(fx
+        .iter()
+        .any(|e| matches!(e, Effect::Message { text, .. } if text == "red-door")));
 }
 
 #[test]
 fn destroy_removes_the_object_and_stops_timers() {
-    let (mut w, id) = npc("if (created) { timeout = 1; destroy; message no; }\nif (timeout) { message late; }");
+    let (mut w, id) =
+        npc("if (created) { timeout = 1; destroy; message no; }\nif (timeout) { message late; }");
     w.fire(id, "created", &[]);
     w.tick(2000);
     w.touch(10.5, 20.5);
@@ -719,7 +894,8 @@ fn destroy_removes_the_object_and_stops_timers() {
 
 #[test]
 fn move_applies_the_offset_and_can_signal_the_end() {
-    let (mut w, id) = npc("if (created) { move 2,0,1,8; }\nif (movementfinished) { message arrived; }");
+    let (mut w, id) =
+        npc("if (created) { move 2,0,1,8; }\nif (movementfinished) { message arrived; }");
     w.fire(id, "created", &[]);
     assert_eq!(w.obj(id).unwrap().x, 12.0);
     assert_eq!(messages(&mut w), vec!["arrived"]);
@@ -727,7 +903,13 @@ fn move_applies_the_offset_and_can_signal_the_end() {
     let (mut w, id) = npc_in("if (created) { move 2,0,1,8; }", Era::V202);
     w.fire(id, "created", &[]);
     assert_eq!(w.obj(id).unwrap().x, 12.0);
-    assert!(w.take_effects().contains(&Effect::Move { obj: id, dx: 2.0, dy: 0.0, time: 0.0, options: 0 }));
+    assert!(w.take_effects().contains(&Effect::Move {
+        obj: id,
+        dx: 2.0,
+        dy: 0.0,
+        time: 0.0,
+        options: 0
+    }));
 }
 
 // ---- version gating ----
@@ -738,11 +920,16 @@ fn gated_commands_do_nothing_in_older_eras() {
     let (mut w, id) = npc_in(src, Era::V200);
     w.fire(id, "created", &[]);
     assert_eq!(messages(&mut w), vec!["after"]);
-    assert!(w.take_log().iter().any(|l| l.contains("hitobjects") && l.contains("not available")));
+    assert!(w
+        .take_log()
+        .iter()
+        .any(|l| l.contains("hitobjects") && l.contains("not available")));
     let (mut w, id) = npc_in(src, Era::V201);
     w.fire(id, "created", &[]);
     let fx = w.take_effects();
-    assert!(fx.iter().any(|e| matches!(e, Effect::Command { name, .. } if name == "hitobjects")));
+    assert!(fx
+        .iter()
+        .any(|e| matches!(e, Effect::Command { name, .. } if name == "hitobjects")));
 }
 
 #[test]
@@ -767,7 +954,10 @@ fn actions_and_triggeraction_appear_in_2_03() {
     w.fire(id, "created", &[]);
     assert!(messages(&mut w).is_empty());
     w.fire(id, "actiongo", &[]);
-    assert!(w.take_log().iter().any(|l| l.contains("does not exist in 2.02")));
+    assert!(w
+        .take_log()
+        .iter()
+        .any(|l| l.contains("does not exist in 2.02")));
     let (mut w, id) = npc_in(src, Era::V203);
     w.fire(id, "created", &[]);
     assert_eq!(messages(&mut w), vec!["got"]);
@@ -778,7 +968,10 @@ fn events_added_later_are_not_fired_early() {
     let (mut w, id) = npc_in("if (playerdies) { message dead; }", Era::V200);
     w.fire(id, "playerdies", &[]);
     assert!(messages(&mut w).is_empty());
-    assert!(w.take_log().iter().any(|l| l.contains("does not exist in 2.00")));
+    assert!(w
+        .take_log()
+        .iter()
+        .any(|l| l.contains("does not exist in 2.00")));
     let (mut w, id) = npc_in("if (playerdies) { message dead; }", Era::V201);
     w.fire(id, "playerdies", &[]);
     assert_eq!(messages(&mut w), vec!["dead"]);
@@ -797,7 +990,8 @@ fn builtin_variables_are_gated() {
 
 #[test]
 fn status_flags_come_from_the_player_view() {
-    let (mut w, id) = npc("if (playertouchsme) { if (playerswimming) message wet; else message dry; }");
+    let (mut w, id) =
+        npc("if (playertouchsme) { if (playerswimming) message wet; else message dry; }");
     w.fire(id, "playertouchsme", &[]);
     w.core.player.status.insert("playerswimming".into());
     w.fire(id, "playertouchsme", &[]);
@@ -810,17 +1004,35 @@ fn online_gated_commands_need_an_npc_server_when_connected() {
     // Offline: runs.
     let (mut w, id) = npc(src);
     w.fire(id, "created", &[]);
-    assert_eq!(w.take_effects().iter().filter(|e| matches!(e, Effect::Command { .. })).count(), 2);
+    assert_eq!(
+        w.take_effects()
+            .iter()
+            .filter(|e| matches!(e, Effect::Command { .. }))
+            .count(),
+        2
+    );
     // Online without an NPC server: nothing.
     let (mut w, id) = npc(src);
     w.set_online(true, false);
     w.fire(id, "created", &[]);
-    assert_eq!(w.take_effects().iter().filter(|e| matches!(e, Effect::Command { .. })).count(), 0);
+    assert_eq!(
+        w.take_effects()
+            .iter()
+            .filter(|e| matches!(e, Effect::Command { .. }))
+            .count(),
+        0
+    );
     // Online with one: runs.
     let (mut w, id) = npc(src);
     w.set_online(true, true);
     w.fire(id, "created", &[]);
-    assert_eq!(w.take_effects().iter().filter(|e| matches!(e, Effect::Command { .. })).count(), 2);
+    assert_eq!(
+        w.take_effects()
+            .iter()
+            .filter(|e| matches!(e, Effect::Command { .. }))
+            .count(),
+        2
+    );
 }
 
 #[test]
@@ -871,7 +1083,10 @@ fn corpus_parses_and_runs_without_panicking() {
                 *diag_kinds.entry(d.msg.clone()).or_default() += 1;
             }
             let want = std::env::var("SEIHAI_CORPUS_SHOW").unwrap_or_default();
-            if !want.is_empty() && parsed.diagnostics.iter().any(|d| d.msg.contains(&want)) && shown < 8 {
+            if !want.is_empty()
+                && parsed.diagnostics.iter().any(|d| d.msg.contains(&want))
+                && shown < 8
+            {
                 shown += 1;
                 println!("--- {:?}\n    {:?}", src.trim(), parsed.diagnostics);
             }
@@ -883,13 +1098,23 @@ fn corpus_parses_and_runs_without_panicking() {
                 let _ = i;
             }
         }
-        for ev in ["created", "playerenters", "playertouchsme", "timeout", "wasshot", "playerendsreading", "compusdied"] {
+        for ev in [
+            "created",
+            "playerenters",
+            "playertouchsme",
+            "timeout",
+            "wasshot",
+            "playerendsreading",
+            "compusdied",
+        ] {
             w.fire(id, ev, &[]);
         }
         w.tick(120_000);
         for l in w.take_log() {
             if let Some(f) = l.split("unknown function `").nth(1) {
-                *unknown.entry(format!("fn {}", f.split('`').next().unwrap_or(""))).or_default() += 1;
+                *unknown
+                    .entry(format!("fn {}", f.split('`').next().unwrap_or("")))
+                    .or_default() += 1;
             }
             if let Some(rest) = l.split("`").nth(1) {
                 if l.contains("ignored (unknown command)") {
@@ -906,17 +1131,37 @@ fn corpus_parses_and_runs_without_panicking() {
     top.sort_by(|a, b| b.1.cmp(&a.1));
     println!("corpus: {scripts} scripts, {with_diag} with parse diagnostics");
     println!("diagnostics: {diag_kinds:?}");
-    println!("most common unknown commands: {:?}", &top[..top.len().min(25)]);
+    println!(
+        "most common unknown commands: {:?}",
+        &top[..top.len().min(25)]
+    );
 }
 
 #[test]
 fn diagnostic_names_the_object_and_shows_the_line() {
     let mut w = ScriptWorld::new(Era::V21);
     w.add(ObjSpec::weapon("w1", "a.png", "hide;\nsay 2 3\n"));
-    w.add(ObjSpec::npc("block.png", 4.0, 5.5, "if (playerenters) {\n  say 2 3\n  hide;\n}\n"));
+    w.add(ObjSpec::npc(
+        "block.png",
+        4.0,
+        5.5,
+        "if (playerenters) {\n  say 2 3\n  hide;\n}\n",
+    ));
     let log = w.take_log();
-    assert!(log.iter().any(|l| l.starts_with("object 0 (weapon w1): line 2: expected `;`") && l.ends_with("[say 2 3]")), "{log:?}");
-    assert!(log.iter().any(|l| l.starts_with("object 1 (npc block.png at 4,5.5): line 2:") && l.contains("[say 2 3]")), "{log:?}");
+    assert!(
+        log.iter().any(
+            |l| l.starts_with("object 0 (weapon w1): line 2: expected `;`")
+                && l.ends_with("[say 2 3]")
+        ),
+        "{log:?}"
+    );
+    assert!(
+        log.iter().any(
+            |l| l.starts_with("object 1 (npc block.png at 4,5.5): line 2:")
+                && l.contains("[say 2 3]")
+        ),
+        "{log:?}"
+    );
 }
 
 #[test]
@@ -924,7 +1169,10 @@ fn weapon_script_with_section_signs_keeps_its_lines() {
     // The server's weapon packet writes line breaks as `§`; a UTF-8 server
     // sends it as C2 A7. Both must give a script with real lines.
     let body = "//#CLIENTSIDE\u{a7}//#GS1\u{a7}if (playerenters) {\u{a7}  hearts = 2;\u{a7}}\u{a7}";
-    for bytes in [body.as_bytes().to_vec(), body.chars().map(|c| c as u32 as u8).collect::<Vec<u8>>()] {
+    for bytes in [
+        body.as_bytes().to_vec(),
+        body.chars().map(|c| c as u32 as u8).collect::<Vec<u8>>(),
+    ] {
         let text = crate::protocol::script_text(&bytes);
         assert_eq!(text.lines().count(), 5, "{text:?}");
         let mut w = ScriptWorld::new(Era::V21);
@@ -940,7 +1188,11 @@ fn the_users_touch_script_parses_and_sets_the_chat_bubble() {
     // Line 4 of the script that logged `expected ;`.
     let src = "//#CLIENTSIDE\nif (playertouchsme) {\n  this.n = 1;\n  chat = player.account SPC \"toouched me last\";\n}\n";
     let (mut w, id) = npc(src);
-    assert!(w.obj(id).unwrap().diagnostics().is_empty(), "{:?}", w.obj(id).unwrap().diagnostics());
+    assert!(
+        w.obj(id).unwrap().diagnostics().is_empty(),
+        "{:?}",
+        w.obj(id).unwrap().diagnostics()
+    );
     w.core.player.account = "bob123".into();
     w.fire(id, "playertouchsme", &[]);
     assert_eq!(messages(&mut w), vec!["bob123 toouched me last"]);
@@ -965,7 +1217,8 @@ fn text_join_binds_looser_than_arithmetic_and_tighter_than_and() {
 
 #[test]
 fn chat_and_player_attributes_read_and_write() {
-    let (mut w, id) = npc("if (created) { player.chat = player.nick SPC \"says hi\"; chat = player.chat; }");
+    let (mut w, id) =
+        npc("if (created) { player.chat = player.nick SPC \"says hi\"; chat = player.chat; }");
     w.core.player.nick = "Bob".into();
     w.fire(id, "created", &[]);
     assert_eq!(w.core.player.chat, "Bob says hi");
@@ -1010,8 +1263,15 @@ fn a_gani_attribute_reads_back_what_setcharprop_set() {
 
 #[test]
 fn the_2_1_forms_are_not_read_by_2_05() {
-    for src in ["this.a = {1,2};", "this.a = 1 ? 2 : 3;", "with (players[0]) { x = 1; }"] {
-        assert!(!super::parse(src, Era::V205).diagnostics.is_empty(), "{src}");
+    for src in [
+        "this.a = {1,2};",
+        "this.a = 1 ? 2 : 3;",
+        "with (players[0]) { x = 1; }",
+    ] {
+        assert!(
+            !super::parse(src, Era::V205).diagnostics.is_empty(),
+            "{src}"
+        );
         assert!(super::parse(src, Era::V21).diagnostics.is_empty(), "{src}");
     }
 }
@@ -1020,15 +1280,13 @@ fn the_2_1_forms_are_not_read_by_2_05() {
 
 #[test]
 fn string_lists_add_insert_replace_remove_delete() {
-    let (mut w, _) = npc(
-        "if (created) {\n\
+    let (mut w, _) = npc("if (created) {\n\
          addstring client.l,apple; addstring client.l,pear; addstring client.l,plum;\n\
          insertstring client.l,1,fig; replacestring client.l,0,kiwi;\n\
          message #s(client.l)|#I(client.l,2)|#I(client.l,3)|#v(sarraylen(#s(client.l)));\n\
          deletestring client.l,1; removestring client.l,pear;\n\
          message #s(client.l)|#v(lindexof(kiwi,#s(client.l)))|#v(lindexof(fig,#s(client.l)));\n\
-         }",
-    );
+         }");
     w.start_all();
     let m = messages(&mut w);
     assert_eq!(m.len(), 2, "{m:?}");
@@ -1038,7 +1296,10 @@ fn string_lists_add_insert_replace_remove_delete() {
 
 #[test]
 fn addstring_before_2_1_adds_text() {
-    let (mut w, _) = npc_in("if (created) { setstring client.s,ab; addstring client.s,cd; message #s(client.s); }", Era::V205);
+    let (mut w, _) = npc_in(
+        "if (created) { setstring client.s,ab; addstring client.s,cd; message #s(client.s); }",
+        Era::V205,
+    );
     w.start_all();
     assert_eq!(messages(&mut w), ["abcd"]);
 }
@@ -1050,7 +1311,8 @@ fn strcontains_and_onmap() {
     );
     w.start_all();
     assert_eq!(messages(&mut w), ["10-1"], "no map: -1");
-    let (mut w, _) = npc("if (created) { message #v(onmapx(e.nw)),#v(onmapy(e.nw)),#v(onmapx(nowhere.nw)); }");
+    let (mut w, _) =
+        npc("if (created) { message #v(onmapx(e.nw)),#v(onmapy(e.nw)),#v(onmapx(nowhere.nw)); }");
     w.core.map = crate::gmap::Gmap::parse_grid("\"a.nw\",\"b.nw\"\n\"c.nw\",\"e.nw\"\n");
     w.start_all();
     assert_eq!(messages(&mut w), ["1,1,0"]);
@@ -1062,7 +1324,12 @@ fn play2_and_sendrpgmessage_are_effects() {
     w.start_all();
     let e = w.take_effects();
     assert!(e.iter().any(|x| matches!(x, Effect::Play { file, looped: false, at: Some((30.0, 30.0)), .. } if file == "bell.wav")), "{e:?}");
-    assert!(e.contains(&Effect::RpgMessage { text: "Hi there".into() }), "{e:?}");
+    assert!(
+        e.contains(&Effect::RpgMessage {
+            text: "Hi there".into()
+        }),
+        "{e:?}"
+    );
 }
 
 #[test]
@@ -1092,7 +1359,10 @@ fn lastweapon_list_is_set_once_per_weapon_and_capped() {
         w.fire(id, "timeout", &[]);
     }
     assert_eq!(w.flag("lastweapon"), Some("Bow"));
-    assert!(!w.take_effects().iter().any(|e| matches!(e, Effect::SetFlag { .. })));
+    assert!(!w
+        .take_effects()
+        .iter()
+        .any(|e| matches!(e, Effect::SetFlag { .. })));
     // Twelve weapon changes keep the last ten.
     for i in 0..12 {
         w.core.player.weapon = format!("W{i}");
@@ -1103,16 +1373,27 @@ fn lastweapon_list_is_set_once_per_weapon_and_capped() {
     assert!(list.ends_with("W11"), "{list}");
     // One FLAGSET a change, and one more for each `deletestring` at the cap
     // (Bow and W0 to W8 fill it; W9 to W11 each delete one).
-    assert_eq!(w.take_effects().iter().filter(|e| matches!(e, Effect::SetFlag { .. })).count(), 15);
+    assert_eq!(
+        w.take_effects()
+            .iter()
+            .filter(|e| matches!(e, Effect::SetFlag { .. }))
+            .count(),
+        15
+    );
 }
 
 #[test]
 fn a_flag_set_to_its_value_again_is_not_sent() {
-    let (mut w, id) = npc("if (created) { setstring a,x; }\nif (playerenters) { setstring a,x; setstring a,y; }");
+    let (mut w, id) =
+        npc("if (created) { setstring a,x; }\nif (playerenters) { setstring a,x; setstring a,y; }");
     w.fire(id, "created", &[]);
     w.take_effects();
     w.fire(id, "playerenters", &[]);
-    let sets: Vec<_> = w.take_effects().into_iter().filter(|e| matches!(e, Effect::SetFlag { .. })).collect();
+    let sets: Vec<_> = w
+        .take_effects()
+        .into_iter()
+        .filter(|e| matches!(e, Effect::SetFlag { .. }))
+        .collect();
     assert_eq!(sets.len(), 1);
 }
 
@@ -1122,11 +1403,26 @@ fn a_flag_set_to_its_value_again_is_not_sent() {
 /// weapon, then two server weapons, as 2gta sends them.
 fn weapon_list_world() -> ScriptWorld {
     let mut w = ScriptWorld::new(Era::V21);
-    w.add(ObjSpec::weapon("-System3", "", "if (playerchats) { callweapon selectedweapon,weaponfired; }"));
-    w.add(ObjSpec::weapon("Bomb Bag", "bombbag.png", "if (weaponfired) { message bag #v(selectedweapon); }"));
-    w.add(ObjSpec::weapon("Lamp", "lamp.png", "if (weaponfired) { message lamp; }"));
+    w.add(ObjSpec::weapon(
+        "-System3",
+        "",
+        "if (playerchats) { callweapon selectedweapon,weaponfired; }",
+    ));
+    w.add(ObjSpec::weapon(
+        "Bomb Bag",
+        "bombbag.png",
+        "if (weaponfired) { message bag #v(selectedweapon); }",
+    ));
+    w.add(ObjSpec::weapon(
+        "Lamp",
+        "lamp.png",
+        "if (weaponfired) { message lamp; }",
+    ));
     let p = &mut w.core.player;
-    p.weapons = ["Bow", "-System3", "Bomb Bag", "Lamp"].iter().map(|n| (n.to_string(), format!("{n}.png"))).collect();
+    p.weapons = ["Bow", "-System3", "Bomb Bag", "Lamp"]
+        .iter()
+        .map(|n| (n.to_string(), format!("{n}.png")))
+        .collect();
     p.selected_weapon = Some(2);
     p.weapon = "Bomb Bag".into();
     w
@@ -1152,7 +1448,12 @@ fn a_call_to_a_weapon_with_no_script_does_nothing() {
 #[test]
 fn weapon_names_images_and_count_read_the_whole_list() {
     let mut w = weapon_list_world();
-    let id = w.add(ObjSpec::npc("a.png", 0.0, 0.0, "if (created) { message #v(weaponscount) #w(1) #W(3) #w(9).; }"));
+    let id = w.add(ObjSpec::npc(
+        "a.png",
+        0.0,
+        0.0,
+        "if (created) { message #v(weaponscount) #w(1) #W(3) #w(9).; }",
+    ));
     w.fire(id, "created", &[]);
     assert_eq!(messages(&mut w), vec!["4 -System3 Lamp.png ."]);
 }
@@ -1160,13 +1461,30 @@ fn weapon_names_images_and_count_read_the_whole_list() {
 #[test]
 fn setting_selectedweapon_selects_and_skips_hidden_weapons() {
     let mut w = weapon_list_world();
-    let id = w.add(ObjSpec::npc("a.png", 0.0, 0.0, "if (created) { selectedweapon = 1; message #w; }\nif (timeout) { selectedweapon = 7; }"));
+    let id = w.add(ObjSpec::npc(
+        "a.png",
+        0.0,
+        0.0,
+        "if (created) { selectedweapon = 1; message #w; }\nif (timeout) { selectedweapon = 7; }",
+    ));
     w.fire(id, "created", &[]);
     // -System3 is hidden, so the client's select moves on to Bomb Bag.
     assert_eq!(w.core.player.selected_weapon, Some(2));
     let fx = w.take_effects();
-    assert!(fx.contains(&Effect::SetPlayerVar { name: "selectedweapon".into(), value: 2.0 }), "{fx:?}");
-    assert!(fx.contains(&Effect::Message { obj: id, text: "Bomb Bag".into() }), "{fx:?}");
+    assert!(
+        fx.contains(&Effect::SetPlayerVar {
+            name: "selectedweapon".into(),
+            value: 2.0
+        }),
+        "{fx:?}"
+    );
+    assert!(
+        fx.contains(&Effect::Message {
+            obj: id,
+            text: "Bomb Bag".into()
+        }),
+        "{fx:?}"
+    );
     // Past the end of the list: nothing changes.
     w.fire(id, "timeout", &[]);
     assert_eq!(w.core.player.selected_weapon, Some(2));
@@ -1176,8 +1494,16 @@ fn setting_selectedweapon_selects_and_skips_hidden_weapons() {
 #[test]
 fn selectedweapon_is_a_plain_variable_before_2_04() {
     let mut w = ScriptWorld::new(Era::V203);
-    w.core.player.weapons = vec![("Bow".into(), String::new()), ("Bomb".into(), String::new())];
-    let id = w.add(ObjSpec::npc("a.png", 0.0, 0.0, "if (created) { selectedweapon = 1; message #v(selectedweapon); }"));
+    w.core.player.weapons = vec![
+        ("Bow".into(), String::new()),
+        ("Bomb".into(), String::new()),
+    ];
+    let id = w.add(ObjSpec::npc(
+        "a.png",
+        0.0,
+        0.0,
+        "if (created) { selectedweapon = 1; message #v(selectedweapon); }",
+    ));
     w.fire(id, "created", &[]);
     assert_eq!(w.core.player.selected_weapon, None);
     assert_eq!(messages(&mut w), vec!["1"]);
@@ -1186,7 +1512,11 @@ fn selectedweapon_is_a_plain_variable_before_2_04() {
 #[test]
 fn offline_callweapon_still_counts_weapon_objects() {
     let mut w = ScriptWorld::new(Era::V21);
-    let a = w.add(ObjSpec::weapon("A", "", "if (created) { callweapon 1,weaponfired; }"));
+    let a = w.add(ObjSpec::weapon(
+        "A",
+        "",
+        "if (created) { callweapon 1,weaponfired; }",
+    ));
     w.add(ObjSpec::weapon("B", "", "if (weaponfired) { message b; }"));
     w.fire(a, "created", &[]);
     assert_eq!(messages(&mut w), vec!["b"]);

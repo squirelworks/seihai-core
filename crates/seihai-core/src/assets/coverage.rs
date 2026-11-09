@@ -15,9 +15,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::{
-    read_png_rgba, AssetResolver, AssetRoot, Gani, Level, TileTypes, TileTypesFile,
-};
+use super::{read_png_rgba, AssetResolver, AssetRoot, Gani, Level, TileTypes, TileTypesFile};
 use crate::gmap::Gmap;
 use crate::protocol::{ClientVersion, VersionProfile};
 use crate::sound::decode_wav;
@@ -74,39 +72,124 @@ impl Finding {
 
 /// Sound effects named in the 1.39 binary (`early-clients.md`).
 pub(crate) const SOUNDS_139: [&str; 24] = [
-    "arrow", "arrowon", "axe", "bomb", "chest", "compudead", "crush", "dead", "extra", "fire", "frog", "goal", "item",
-    "item2", "jump", "nextpage", "put", "sign", "steps", "stonemove", "sword", "swordon", "thunder", "water",
+    "arrow",
+    "arrowon",
+    "axe",
+    "bomb",
+    "chest",
+    "compudead",
+    "crush",
+    "dead",
+    "extra",
+    "fire",
+    "frog",
+    "goal",
+    "item",
+    "item2",
+    "jump",
+    "nextpage",
+    "put",
+    "sign",
+    "steps",
+    "stonemove",
+    "sword",
+    "swordon",
+    "thunder",
+    "water",
 ];
 
 /// Effects the 2.05 client knows by name (`sound-and-music.md`). The later
 /// builds are taken as the same list (inferred).
 const SOUNDS_205: [&str; 15] = [
-    "arrow", "axe", "bomb", "crush", "extra", "fire", "horse2", "item", "lift", "lift2", "put", "steps", "sword",
-    "thunder", "water",
+    "arrow", "axe", "bomb", "crush", "extra", "fire", "horse2", "item", "lift", "lift2", "put",
+    "steps", "sword", "thunder", "water",
 ];
 
 fn version_index(v: ClientVersion) -> usize {
-    ClientVersion::all_versions().iter().position(|&x| x == v).unwrap_or(0)
+    ClientVersion::all_versions()
+        .iter()
+        .position(|&x| x == v)
+        .unwrap_or(0)
 }
 
 /// The files this version uses from a data folder.
 pub fn expected_files(profile: &VersionProfile) -> Vec<Need> {
     let mut v = Vec::new();
     let mut need = |group, name: &str, kind, required, why| {
-        v.push(Need { group, name: name.to_string(), kind, required, why })
+        v.push(Need {
+            group,
+            name: name.to_string(),
+            kind,
+            required,
+            why,
+        })
     };
 
-    need("tiles", "pics1.png", NeedKind::Image, true, "tile sheet, every build");
-    need("tiles", "tile types", NeedKind::TileTypes, true, "collision table (arrays.dat or tiledefs.txt)");
-    need("hud", "state.png", NeedKind::Image, true, "HUD art, every build");
-    need("hud", "sprites.png", NeedKind::Image, true, "sprite sheet, every build");
-    need("player", "body.png", NeedKind::ImageIn("bodies"), true, "player body art");
-    need("player", "head0.png", NeedKind::ImageIn("heads"), true, "player head art");
+    need(
+        "tiles",
+        "pics1.png",
+        NeedKind::Image,
+        true,
+        "tile sheet, every build",
+    );
+    need(
+        "tiles",
+        "tile types",
+        NeedKind::TileTypes,
+        true,
+        "collision table (arrays.dat or tiledefs.txt)",
+    );
+    need(
+        "hud",
+        "state.png",
+        NeedKind::Image,
+        true,
+        "HUD art, every build",
+    );
+    need(
+        "hud",
+        "sprites.png",
+        NeedKind::Image,
+        true,
+        "sprite sheet, every build",
+    );
+    need(
+        "player",
+        "body.png",
+        NeedKind::ImageIn("bodies"),
+        true,
+        "player body art",
+    );
+    need(
+        "player",
+        "head0.png",
+        NeedKind::ImageIn("heads"),
+        true,
+        "player head art",
+    );
 
     if profile.ui.ganis {
-        need("gani", "walk.gani", NeedKind::Gani, true, "walk cues and frames");
-        need("gani", "swim.gani", NeedKind::Gani, true, "swim cues and frames");
-        need("gani", "idle.gani", NeedKind::Gani, false, "default animation");
+        need(
+            "gani",
+            "walk.gani",
+            NeedKind::Gani,
+            true,
+            "walk cues and frames",
+        );
+        need(
+            "gani",
+            "swim.gani",
+            NeedKind::Gani,
+            true,
+            "swim cues and frames",
+        );
+        need(
+            "gani",
+            "idle.gani",
+            NeedKind::Gani,
+            false,
+            "default animation",
+        );
         need("gani", "sword.gani", NeedKind::Gani, false, "sword swing");
     }
 
@@ -118,19 +201,43 @@ pub fn expected_files(profile: &VersionProfile) -> Vec<Need> {
     for n in names {
         need("sound", &format!("{n}.wav"), NeedKind::Sound, false, why);
     }
-    need("music", "intro.mid", NeedKind::Music, false, "a music file; every build plays MIDI");
+    need(
+        "music",
+        "intro.mid",
+        NeedKind::Music,
+        false,
+        "a music file; every build plays MIDI",
+    );
 
     if profile.levels.nw {
-        need("level", "new1.nw", NeedKind::Level, true, "sample GLEVNW01 level");
+        need(
+            "level",
+            "new1.nw",
+            NeedKind::Level,
+            true,
+            "sample GLEVNW01 level",
+        );
     }
     if profile.levels.gmap {
-        need("level", "offlinetutorial.gmap", NeedKind::Level, false, "sample GRMAP001 map");
+        need(
+            "level",
+            "offlinetutorial.gmap",
+            NeedKind::Level,
+            false,
+            "sample GRMAP001 map",
+        );
     }
     if version_index(profile.version) >= version_index(ClientVersion::V217) {
         // 2.22 reads tiledefsOffline.txt (offline-tutorial-205.md); 2.17 and
         // 2.31 are taken as the same (inferred). 2.05 uses its embedded
         // tutorial and no such file is claimed for it.
-        need("tiledefs", "tiledefsOffline.txt", NeedKind::TileDefs, false, "offline tile sheets [2.22]");
+        need(
+            "tiledefs",
+            "tiledefsOffline.txt",
+            NeedKind::TileDefs,
+            false,
+            "offline tile sheets [2.22]",
+        );
     }
     v
 }
@@ -148,7 +255,11 @@ fn count_ext(dir: &Path, ext: &str, depth: u32) -> usize {
                     0
                 }
             } else {
-                usize::from(p.extension().and_then(|x| x.to_str()).is_some_and(|x| x.eq_ignore_ascii_case(ext)))
+                usize::from(
+                    p.extension()
+                        .and_then(|x| x.to_str())
+                        .is_some_and(|x| x.eq_ignore_ascii_case(ext)),
+                )
             }
         })
         .sum()
@@ -166,7 +277,10 @@ pub struct Report {
 /// Resolve and load every expected file of `profile` in `root`.
 pub fn check_folder(root: &AssetRoot, profile: &'static VersionProfile) -> Report {
     let r = AssetResolver::new(root.clone(), profile);
-    let findings: Vec<Finding> = expected_files(profile).into_iter().map(|n| check_one(&r, n)).collect();
+    let findings: Vec<Finding> = expected_files(profile)
+        .into_iter()
+        .map(|n| check_one(&r, n))
+        .collect();
     let mut notes = Vec::new();
     if profile.levels.graal {
         let n = count_ext(&root.root, "graal", 3);
@@ -182,10 +296,14 @@ pub fn check_folder(root: &AssetRoot, profile: &'static VersionProfile) -> Repor
         scan_binary_levels(root, profile, &mut findings, &mut notes);
     }
     if !profile.levels.nw {
-        notes.push(".nw levels are not opened by this build (profile levels.nw = false)".to_string());
+        notes.push(
+            ".nw levels are not opened by this build (profile levels.nw = false)".to_string(),
+        );
     }
     if !profile.ui.ganis {
-        notes.push("this build has no GANIs (profile ui.ganis = false); none are looked up".to_string());
+        notes.push(
+            "this build has no GANIs (profile ui.ganis = false); none are looked up".to_string(),
+        );
     }
     Report { findings, notes }
 }
@@ -195,7 +313,12 @@ pub fn check_folder(root: &AssetRoot, profile: &'static VersionProfile) -> Repor
 /// Z3-V1 file must reach the end of the file with nothing odd on the way;
 /// one that does not is a finding. A `GR-V1` file only has to load. A note
 /// gives the counts. Only the first 20 failures are listed.
-fn scan_binary_levels(root: &AssetRoot, profile: &VersionProfile, findings: &mut Vec<Finding>, notes: &mut Vec<String>) {
+fn scan_binary_levels(
+    root: &AssetRoot,
+    profile: &VersionProfile,
+    findings: &mut Vec<Finding>,
+    notes: &mut Vec<String>,
+) {
     use super::zelda::{is_zelda, ZeldaLevel, ZeldaMagic};
     let mut files = Vec::new();
     let mut stack = vec![(root.root.clone(), 6u32)];
@@ -217,7 +340,8 @@ fn scan_binary_levels(root: &AssetRoot, profile: &VersionProfile, findings: &mut
         }
     }
     files.sort();
-    let (mut z103, mut z104, mut zother, mut gr, mut clean, mut other) = (0usize, 0usize, 0usize, 0usize, 0usize, 0usize);
+    let (mut z103, mut z104, mut zother, mut gr, mut clean, mut other) =
+        (0usize, 0usize, 0usize, 0usize, 0usize, 0usize);
     let mut failed = 0usize;
     for p in &files {
         let Ok(data) = fs::read(p) else { continue };
@@ -229,7 +353,9 @@ fn scan_binary_levels(root: &AssetRoot, profile: &VersionProfile, findings: &mut
             }
             ZeldaLevel::parse(&data).and_then(|z| match z.layout.anomalies.first() {
                 Some(a) => Err(a.clone()),
-                None if z.layout.unread_tail > 0 => Err(format!("{} bytes follow the signs", z.layout.unread_tail)),
+                None if z.layout.unread_tail > 0 => {
+                    Err(format!("{} bytes follow the signs", z.layout.unread_tail))
+                }
                 None => {
                     clean += 1;
                     Ok(())
@@ -245,9 +371,17 @@ fn scan_binary_levels(root: &AssetRoot, profile: &VersionProfile, findings: &mut
         if let Err(e) = verdict {
             failed += 1;
             if failed <= 20 {
-                let name = p.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+                let name = p
+                    .file_name()
+                    .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
                 findings.push(Finding {
-                    need: Need { group: "level scan", name, kind: NeedKind::Level, required: true, why: "binary level read to its end" },
+                    need: Need {
+                        group: "level scan",
+                        name,
+                        kind: NeedKind::Level,
+                        required: true,
+                        why: "binary level read to its end",
+                    },
                     path: Some(p.clone()),
                     status: Status::BadFile(e),
                 });
@@ -285,18 +419,30 @@ fn check_one(r: &AssetResolver, need: Need) -> Finding {
         NeedKind::TileDefs => r.tiledef(&need.name),
     };
     let Some(p) = path else {
-        return Finding { need, path: None, status: Status::Missing };
+        return Finding {
+            need,
+            path: None,
+            status: Status::Missing,
+        };
     };
     let status = match load(r, need.kind, &p) {
         Ok(s) => Status::Ok(s),
         Err(e) => Status::BadFile(e),
     };
-    Finding { need, path: Some(p), status }
+    Finding {
+        need,
+        path: Some(p),
+        status,
+    }
 }
 
 /// Run the loader that matches the kind of file.
 fn load(r: &AssetResolver, kind: NeedKind, p: &Path) -> Result<String, String> {
-    let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    let ext = p
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
     match kind {
         NeedKind::Image | NeedKind::ImageIn(_) => {
             let data = fs::read(p).map_err(|e| e.to_string())?;
@@ -343,7 +489,9 @@ fn load(r: &AssetResolver, kind: NeedKind, p: &Path) -> Result<String, String> {
         }
         NeedKind::TileTypes => match r.tile_types().map(|(_, k)| k) {
             Some(TileTypesFile::Text) => TileTypes::load(p).map(|_| "tiledefs.txt".to_string()),
-            Some(TileTypesFile::ArraysDat) => TileTypes::load_arrays(p).map(|_| "arrays.dat".to_string()),
+            Some(TileTypesFile::ArraysDat) => {
+                TileTypes::load_arrays(p).map(|_| "arrays.dat".to_string())
+            }
             None => Err("no table".into()),
         },
         NeedKind::TileDefs => {
@@ -361,7 +509,11 @@ pub fn format_report(label: &str, rep: &Report) -> String {
     let mut out = String::new();
     let total = rep.findings.len();
     let ok = rep.findings.iter().filter(|f| f.is_ok()).count();
-    let req_missing = rep.findings.iter().filter(|f| f.need.required && !f.is_ok()).count();
+    let req_missing = rep
+        .findings
+        .iter()
+        .filter(|f| f.need.required && !f.is_ok())
+        .count();
     out.push_str(&format!(
         "== {label}: {ok}/{total} found and read, {req_missing} required missing ==\n"
     ));
@@ -394,7 +546,11 @@ mod tests {
     }
 
     fn names(v: ClientVersion, group: &str) -> Vec<String> {
-        expected_files(p(v)).into_iter().filter(|n| n.group == group).map(|n| n.name).collect()
+        expected_files(p(v))
+            .into_iter()
+            .filter(|n| n.group == group)
+            .map(|n| n.name)
+            .collect()
     }
 
     #[test]
@@ -408,19 +564,44 @@ mod tests {
         // (tiledefsOffline.txt is read from 2.17 on).
         assert!(names(ClientVersion::V205, "tiledefs").is_empty());
         assert_eq!(names(ClientVersion::V205, "sound").len(), 15);
-        assert_eq!(names(ClientVersion::V205, "gani"), ["walk.gani", "swim.gani", "idle.gani", "sword.gani"]);
-        assert_eq!(names(ClientVersion::V205, "level"), ["new1.nw", "offlinetutorial.gmap"]);
-        for v in [ClientVersion::V217, ClientVersion::V222, ClientVersion::V231] {
+        assert_eq!(
+            names(ClientVersion::V205, "gani"),
+            ["walk.gani", "swim.gani", "idle.gani", "sword.gani"]
+        );
+        assert_eq!(
+            names(ClientVersion::V205, "level"),
+            ["new1.nw", "offlinetutorial.gmap"]
+        );
+        for v in [
+            ClientVersion::V217,
+            ClientVersion::V222,
+            ClientVersion::V231,
+        ] {
             assert_eq!(names(v, "tiledefs"), ["tiledefsOffline.txt"], "{v:?}");
-            assert_eq!(names(v, "level"), ["new1.nw", "offlinetutorial.gmap"], "{v:?}");
+            assert_eq!(
+                names(v, "level"),
+                ["new1.nw", "offlinetutorial.gmap"],
+                "{v:?}"
+            );
         }
     }
 
     #[test]
     fn every_build_lists_the_core_files() {
         for &v in ClientVersion::all_versions() {
-            let core: Vec<String> = expected_files(p(v)).into_iter().filter(|n| n.required).map(|n| n.name).collect();
-            for want in ["pics1.png", "state.png", "sprites.png", "body.png", "head0.png", "tile types"] {
+            let core: Vec<String> = expected_files(p(v))
+                .into_iter()
+                .filter(|n| n.required)
+                .map(|n| n.name)
+                .collect();
+            for want in [
+                "pics1.png",
+                "state.png",
+                "sprites.png",
+                "body.png",
+                "head0.png",
+                "tile types",
+            ] {
                 assert!(core.iter().any(|c| c == want), "{v:?} lacks {want}");
             }
         }
@@ -438,14 +619,34 @@ mod tests {
         };
         let mut png = Vec::new();
         write_png_rgb(&mut png, 4, 4, &[0u8; 4 * 4 * 3]).unwrap();
-        for n in ["pics1.png", "state.png", "sprites.png", "levels/bodies/body.png", "levels/heads/head0.png"] {
+        for n in [
+            "pics1.png",
+            "state.png",
+            "sprites.png",
+            "levels/bodies/body.png",
+            "levels/heads/head0.png",
+        ] {
             put(n, &png);
         }
-        put("tiledefs.txt", format!("{}\n", vec!["0"; 128].join(",")).repeat(32).as_bytes());
+        put(
+            "tiledefs.txt",
+            format!("{}\n", vec!["0"; 128].join(","))
+                .repeat(32)
+                .as_bytes(),
+        );
         put("new1.nw", b"GLEVNW01\nBOARD 0 0 4 0 AAAAAAAA\n");
-        put("maps/offlinetutorial.gmap", b"GRMAP001\nWIDTH 1\nHEIGHT 1\nLEVELNAMES\n\"a.nw\"\nLEVELNAMESEND\n");
-        put("levels/ganis/walk.gani", b"ANI\nSPRITE 0 body.png 0 0 1 1 x\nANIEND\n");
-        put("levels/tiledefs/tiledefsOffline.txt", b"picso.png,offlinetutorial,1,0,0\n");
+        put(
+            "maps/offlinetutorial.gmap",
+            b"GRMAP001\nWIDTH 1\nHEIGHT 1\nLEVELNAMES\n\"a.nw\"\nLEVELNAMESEND\n",
+        );
+        put(
+            "levels/ganis/walk.gani",
+            b"ANI\nSPRITE 0 body.png 0 0 1 1 x\nANIEND\n",
+        );
+        put(
+            "levels/tiledefs/tiledefsOffline.txt",
+            b"picso.png,offlinetutorial,1,0,0\n",
+        );
         put("levels/midis/intro.mid", b"MThd\0\0\0\x06");
         d
     }
@@ -458,7 +659,11 @@ mod tests {
         assert!(get("pics1.png").is_ok(), "{:?}", get("pics1.png").status);
         assert!(get("body.png").is_ok());
         assert!(get("new1.nw").is_ok(), "{:?}", get("new1.nw").status);
-        assert!(get("offlinetutorial.gmap").is_ok(), "{:?}", get("offlinetutorial.gmap").status);
+        assert!(
+            get("offlinetutorial.gmap").is_ok(),
+            "{:?}",
+            get("offlinetutorial.gmap").status
+        );
         assert!(get("walk.gani").is_ok(), "{:?}", get("walk.gani").status);
         assert!(get("tile types").is_ok(), "{:?}", get("tile types").status);
         assert!(get("tiledefsOffline.txt").is_ok());
@@ -466,7 +671,10 @@ mod tests {
         assert_eq!(get("swim.gani").status, Status::Missing);
         assert_eq!(get("arrow.wav").status, Status::Missing);
         let text = format_report("2.22", &rep);
-        assert!(text.contains("MISSING") && text.contains("[tiles]"), "{text}");
+        assert!(
+            text.contains("MISSING") && text.contains("[tiles]"),
+            "{text}"
+        );
         let _ = fs::remove_dir_all(&d);
     }
 
@@ -475,7 +683,11 @@ mod tests {
         let d = synthetic("bad");
         fs::write(d.join("new1.nw"), b"not a level").unwrap();
         let rep = check_folder(&AssetRoot::new(&d), p(ClientVersion::V222));
-        let f = rep.findings.iter().find(|f| f.need.name == "new1.nw").unwrap();
+        let f = rep
+            .findings
+            .iter()
+            .find(|f| f.need.name == "new1.nw")
+            .unwrap();
         assert!(matches!(f.status, Status::BadFile(_)), "{:?}", f.status);
         let _ = fs::remove_dir_all(&d);
     }
@@ -485,13 +697,26 @@ mod tests {
     #[test]
     fn gif_player_art_is_decoded() {
         let d = synthetic("gif");
-        let body = fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/default/bodies/body.gif")).unwrap();
+        let body = fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/default/bodies/body.gif"
+        ))
+        .unwrap();
         fs::write(d.join("levels/bodies/body.gif"), &body).unwrap();
         fs::write(d.join("levels/heads/head0.gif"), b"GIF89a broken").unwrap();
         let rep = check_folder(&AssetRoot::new(&d), p(ClientVersion::V205));
-        let get = |n: &str| rep.findings.iter().find(|f| f.need.name.starts_with(n)).unwrap();
+        let get = |n: &str| {
+            rep.findings
+                .iter()
+                .find(|f| f.need.name.starts_with(n))
+                .unwrap()
+        };
         assert_eq!(get("body").status, Status::Ok("gif 128x720".into()));
-        assert!(matches!(get("head0").status, Status::BadFile(_)), "{:?}", get("head0").status);
+        assert!(
+            matches!(get("head0").status, Status::BadFile(_)),
+            "{:?}",
+            get("head0").status
+        );
         let _ = fs::remove_dir_all(&d);
     }
 
@@ -500,7 +725,10 @@ mod tests {
         let d = synthetic("old");
         let rep = check_folder(&AssetRoot::new(&d), p(ClientVersion::V139));
         // No GANI or level needs; the pics1.png/hud/player ones are found.
-        assert!(rep.findings.iter().all(|f| f.need.group != "gani" && f.need.group != "level"));
+        assert!(rep
+            .findings
+            .iter()
+            .all(|f| f.need.group != "gani" && f.need.group != "level"));
         assert!(rep.notes.iter().any(|n| n.contains(".nw")));
         assert!(rep.notes.iter().any(|n| n.contains("no .graal")));
         let _ = fs::remove_dir_all(&d);
@@ -528,7 +756,13 @@ mod tests {
                     f.need.name,
                     f.status
                 );
-                assert!(!matches!(f.status, Status::BadFile(_)), "{}: {} -> {:?}", v.label(), f.need.name, f.status);
+                assert!(
+                    !matches!(f.status, Status::BadFile(_)),
+                    "{}: {} -> {:?}",
+                    v.label(),
+                    f.need.name,
+                    f.status
+                );
             }
         }
         eprintln!("{summary}");
@@ -566,25 +800,35 @@ mod tests {
         let mut sheets = std::collections::BTreeMap::new();
         let mut missing_snd = std::collections::BTreeMap::new();
         for f in &files {
-            let ext = f.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+            let ext = f
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
             let name = f.file_name().and_then(|n| n.to_str()).unwrap().to_string();
             let res: Result<(), String> = match ext.as_str() {
                 "png" => {
                     png += 1;
-                    fs::read(f).map_err(|e| e.to_string()).and_then(|b| read_png_rgba(&b).map(|_| ()).map_err(|e| e.to_string()))
+                    fs::read(f)
+                        .map_err(|e| e.to_string())
+                        .and_then(|b| read_png_rgba(&b).map(|_| ()).map_err(|e| e.to_string()))
                 }
                 "gani" => {
                     gani += 1;
                     Gani::load(f).map(|g| {
                         for sp in &g.sprites {
                             if r.image(&sp.sheet).is_none() {
-                                *sheets.entry(sp.sheet.to_ascii_lowercase()).or_insert(0usize) += 1;
+                                *sheets
+                                    .entry(sp.sheet.to_ascii_lowercase())
+                                    .or_insert(0usize) += 1;
                             }
                         }
                         for fr in &g.frames {
                             for snd in &fr.sounds {
                                 if r.sound(&snd.file).is_none() {
-                                    *missing_snd.entry(snd.file.to_ascii_lowercase()).or_insert(0usize) += 1;
+                                    *missing_snd
+                                        .entry(snd.file.to_ascii_lowercase())
+                                        .or_insert(0usize) += 1;
                                 }
                             }
                         }
@@ -592,7 +836,9 @@ mod tests {
                 }
                 "wav" => {
                     wav += 1;
-                    fs::read(f).map_err(|e| e.to_string()).and_then(|b| decode_wav(&b).map(|_| ()))
+                    fs::read(f)
+                        .map_err(|e| e.to_string())
+                        .and_then(|b| decode_wav(&b).map(|_| ()))
                 }
                 "nw" => {
                     nw += 1;
@@ -616,7 +862,10 @@ mod tests {
                 bad.push(format!("not found by name: {name}"));
             }
         }
-        eprintln!("png {png}, gani {gani}, wav {wav}, nw {nw}; not loadable or not found: {}", bad.len());
+        eprintln!(
+            "png {png}, gani {gani}, wav {wav}, nw {nw}; not loadable or not found: {}",
+            bad.len()
+        );
         eprintln!("GANI sprite sheets with no file: {sheets:?}");
         eprintln!("GANI sounds with no file: {missing_snd:?}");
         for b in &bad {
@@ -625,14 +874,20 @@ mod tests {
         assert_eq!(lost, 0, "files the resolver cannot find by name");
     }
 
-
     fn z3_bytes(computers: usize) -> Vec<u8> {
         use super::super::zelda::{Computer, ZeldaLevel, ZeldaMagic};
         ZeldaLevel {
             magic: ZeldaMagic::V104,
             board: vec![3; 4096],
             links: vec![],
-            computers: (0..computers).map(|i| Computer { x: i as u8, y: 2, kind: 1, extra: b"\\\\".to_vec() }).collect(),
+            computers: (0..computers)
+                .map(|i| Computer {
+                    x: i as u8,
+                    y: 2,
+                    kind: 1,
+                    extra: b"\\\\".to_vec(),
+                })
+                .collect(),
             signs: vec![],
             layout: Default::default(),
         }
@@ -654,18 +909,40 @@ mod tests {
         fs::write(d.join("levels/bad.zelda"), cut).unwrap();
         fs::write(d.join("levels/junk.graal"), b"not a level at all").unwrap();
         let rep = check_folder(&AssetRoot::new(&d), ClientVersion::V139.profile());
-        let bad: Vec<_> = rep.findings.iter().filter(|f| f.need.group == "level scan").collect();
+        let bad: Vec<_> = rep
+            .findings
+            .iter()
+            .filter(|f| f.need.group == "level scan")
+            .collect();
         assert_eq!(bad.len(), 2, "{bad:?}");
-        assert!(bad.iter().all(|f| matches!(f.status, Status::BadFile(_)) && f.need.required));
-        let note = rep.notes.iter().find(|n| n.starts_with("level scan")).expect("a scan note");
-        assert!(note.contains("4 .zelda/.graal files") && note.contains("0 Z3-V1.03, 3 Z3-V1.04"), "{note}");
-        assert!(note.contains("2 Z3-V1 files parse to the end with no anomaly, 2 files failed"), "{note}");
+        assert!(bad
+            .iter()
+            .all(|f| matches!(f.status, Status::BadFile(_)) && f.need.required));
+        let note = rep
+            .notes
+            .iter()
+            .find(|n| n.starts_with("level scan"))
+            .expect("a scan note");
+        assert!(
+            note.contains("4 .zelda/.graal files") && note.contains("0 Z3-V1.03, 3 Z3-V1.04"),
+            "{note}"
+        );
+        assert!(
+            note.contains("2 Z3-V1 files parse to the end with no anomaly, 2 files failed"),
+            "{note}"
+        );
         let _ = fs::remove_dir_all(&d);
         // A folder with none says so.
         let e = std::env::temp_dir().join(format!("seihai-scan-empty-{}", std::process::id()));
         fs::create_dir_all(&e).unwrap();
         let rep = check_folder(&AssetRoot::new(&e), ClientVersion::V139.profile());
-        assert!(rep.notes.iter().any(|n| n.contains("no Z3-V1 (.zelda) level")), "{:?}", rep.notes);
+        assert!(
+            rep.notes
+                .iter()
+                .any(|n| n.contains("no Z3-V1 (.zelda) level")),
+            "{:?}",
+            rep.notes
+        );
         let _ = fs::remove_dir_all(&e);
     }
 
@@ -684,14 +961,28 @@ mod tests {
                 continue;
             }
             let rep = check_folder(&AssetRoot::new(e.path()), ClientVersion::V139.profile());
-            let bad: Vec<_> = rep.findings.iter().filter(|f| f.need.group == "level scan").collect();
-            let note = rep.notes.iter().find(|n| n.starts_with("level scan")).cloned().unwrap_or_default();
+            let bad: Vec<_> = rep
+                .findings
+                .iter()
+                .filter(|f| f.need.group == "level scan")
+                .collect();
+            let note = rep
+                .notes
+                .iter()
+                .find(|n| n.starts_with("level scan"))
+                .cloned()
+                .unwrap_or_default();
             if note.contains(" 0 .zelda/.graal files") {
                 continue;
             }
             seen += 1;
             eprintln!("{}: {note}", e.file_name().to_string_lossy());
-            assert!(bad.is_empty(), "{}: {} files do not read clean", e.file_name().to_string_lossy(), bad.len());
+            assert!(
+                bad.is_empty(),
+                "{}: {} files do not read clean",
+                e.file_name().to_string_lossy(),
+                bad.len()
+            );
         }
         assert!(seen >= 10, "builds with levels: {seen}");
     }

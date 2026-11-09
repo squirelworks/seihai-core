@@ -95,8 +95,22 @@ pub const HURT_POSE_TICKS: usize = 31;
 /// `player-mannerisms-live.md`, "Other builds"). There is no `lift`: 1.39
 /// goes straight to the carry pose. `hidden` / `hiddenstill` are not
 /// played either, since 1.39 keeps the carry poses while hidden.
-pub const BUILTIN_ANIMS: [&str; 14] =
-    ["idle", "walk", "swim", "sword", "spin", "push", "grab", "pull", "carrystill", "carry", "hurt", "sit", "sleep", "dead"];
+pub const BUILTIN_ANIMS: [&str; 14] = [
+    "idle",
+    "walk",
+    "swim",
+    "sword",
+    "spin",
+    "push",
+    "grab",
+    "pull",
+    "carrystill",
+    "carry",
+    "hurt",
+    "sit",
+    "sleep",
+    "dead",
+];
 
 /// The sprite step S (prop 17 is `dir + 4 * S`) of walk frames 0 to 7: the
 /// 2.05 step table, and what a real 1.39 sends while it walks (lab capture
@@ -122,7 +136,10 @@ pub fn fit_builtin_139(name: &str, gani: &mut Gani) {
     let stem = name.trim().to_ascii_lowercase();
     let stem = stem.strip_suffix(".gani").unwrap_or(&stem);
     match stem {
-        "push" => gani.frames.iter_mut().for_each(|f| f.wait = PUSH_FRAME_139_TICKS - 1),
+        "push" => gani
+            .frames
+            .iter_mut()
+            .for_each(|f| f.wait = PUSH_FRAME_139_TICKS - 1),
         "hurt" if !gani.looped => {
             let n = gani.frames.len().max(1);
             // Spread the 1.39 length over the file's steps.
@@ -180,9 +197,28 @@ pub struct PoseGanis {
 impl PoseGanis {
     /// Every loaded pose GANI.
     pub fn all(&self) -> impl Iterator<Item = &Gani> {
-        [&self.sword, &self.hurt, &self.sit, &self.sleep, &self.idle, &self.carrystill, &self.carry, &self.dead, &self.push, &self.grab, &self.pull, &self.lift, &self.hiddenstill, &self.hidden, &self.spin, &self.maps1, &self.maps2, &self.maps3]
-            .into_iter()
-            .flatten()
+        [
+            &self.sword,
+            &self.hurt,
+            &self.sit,
+            &self.sleep,
+            &self.idle,
+            &self.carrystill,
+            &self.carry,
+            &self.dead,
+            &self.push,
+            &self.grab,
+            &self.pull,
+            &self.lift,
+            &self.hiddenstill,
+            &self.hidden,
+            &self.spin,
+            &self.maps1,
+            &self.maps2,
+            &self.maps3,
+        ]
+        .into_iter()
+        .flatten()
     }
 }
 
@@ -279,24 +315,38 @@ impl PoseKind {
             PoseKind::Maps2,
             PoseKind::Maps3,
         ]
-            .into_iter()
-            .find(|k| k.file().eq_ignore_ascii_case(name))
+        .into_iter()
+        .find(|k| k.file().eq_ignore_ascii_case(name))
     }
 }
 
 fn pick(kind: PoseKind, gani: &Option<Gani>, i: usize) -> Option<PoseFrame<'_>> {
-    gani.as_ref().filter(|g| g.frame_count() > 0).map(|g| PoseFrame { kind, gani: g, frame: i.min(g.frame_count() - 1) })
+    gani.as_ref()
+        .filter(|g| g.frame_count() > 0)
+        .map(|g| PoseFrame {
+            kind,
+            gani: g,
+            frame: i.min(g.frame_count() - 1),
+        })
 }
 
 /// The step `tick` ticks into a pose, each step held for its `WAIT`:
 /// wrapping when `wrap`, else held on the last step.
 fn at_tick(kind: PoseKind, gani: &Option<Gani>, tick: usize, wrap: bool) -> Option<PoseFrame<'_>> {
-    gani.as_ref().filter(|g| g.frame_count() > 0).map(|g| PoseFrame { kind, gani: g, frame: g.frame_at_tick(tick, wrap) })
+    gani.as_ref()
+        .filter(|g| g.frame_count() > 0)
+        .map(|g| PoseFrame {
+            kind,
+            gani: g,
+            frame: g.frame_at_tick(tick, wrap),
+        })
 }
 
 /// A one-pass pose `tick` ticks in: `None` once its waits have run out.
 fn once(kind: PoseKind, gani: &Option<Gani>, tick: usize) -> Option<PoseFrame<'_>> {
-    gani.as_ref().filter(|g| tick < g.total_ticks()).and_then(|_| at_tick(kind, gani, tick, false))
+    gani.as_ref()
+        .filter(|g| tick < g.total_ticks())
+        .and_then(|_| at_tick(kind, gani, tick, false))
 }
 
 /// The step of `hurt.gani` `ms` into hurt mode. A `LOOP` GANI repeats for
@@ -311,7 +361,11 @@ fn hurt_step(hurt: &Option<Gani>, ms: u64) -> Option<PoseFrame<'_>> {
 }
 
 fn pick_player<'a>(kind: PoseKind, p: &'a crate::assets::GaniPlayer) -> Option<PoseFrame<'a>> {
-    (p.gani.frame_count() > 0).then(|| PoseFrame { kind, gani: &p.gani, frame: p.frame.min(p.gani.frame_count() - 1) })
+    (p.gani.frame_count() > 0).then(|| PoseFrame {
+        kind,
+        gani: &p.gani,
+        frame: p.frame.min(p.gani.frame_count() - 1),
+    })
 }
 
 impl OfflineSession {
@@ -319,7 +373,11 @@ impl OfflineSession {
     /// still or sits (2.01 notes: "only when you stand still or sit"), not
     /// while walking, carrying, swimming, hidden or dead.
     pub fn start_map_reading(&mut self) -> bool {
-        let still = !self.walking && self.carried.is_none() && !self.in_water && !self.hidden && !self.life.is_dead();
+        let still = !self.walking
+            && self.carried.is_none()
+            && !self.in_water
+            && !self.hidden
+            && !self.life.is_dead();
         if still && self.poses.maps1.is_some() {
             self.map_pose = Some(MapPose::Reading(0));
         }
@@ -346,7 +404,11 @@ impl OfflineSession {
                 false
             }
             Some(MapPose::Closing(ms)) => {
-                let total = self.poses.maps3.as_ref().map_or(0, |g| g.total_ticks() as u64 * GANI_STEP_MS);
+                let total = self
+                    .poses
+                    .maps3
+                    .as_ref()
+                    .map_or(0, |g| g.total_ticks() as u64 * GANI_STEP_MS);
                 if ms + dt >= total {
                     self.map_pose = None;
                     true
@@ -365,13 +427,20 @@ impl OfflineSession {
         match self.map_pose? {
             MapPose::Reading(ms) => {
                 let tick = (ms / GANI_STEP_MS) as usize;
-                once(PoseKind::Maps1, &self.poses.maps1, tick).or_else(|| {
-                    let into = tick.saturating_sub(self.poses.maps1.as_ref().map_or(0, |g| g.total_ticks()));
-                    at_tick(PoseKind::Maps2, &self.poses.maps2, into, true)
-                })
-                .or_else(|| pick(PoseKind::Maps1, &self.poses.maps1, usize::MAX))
+                once(PoseKind::Maps1, &self.poses.maps1, tick)
+                    .or_else(|| {
+                        let into = tick.saturating_sub(
+                            self.poses.maps1.as_ref().map_or(0, |g| g.total_ticks()),
+                        );
+                        at_tick(PoseKind::Maps2, &self.poses.maps2, into, true)
+                    })
+                    .or_else(|| pick(PoseKind::Maps1, &self.poses.maps1, usize::MAX))
             }
-            MapPose::Closing(ms) => once(PoseKind::Maps3, &self.poses.maps3, (ms / GANI_STEP_MS) as usize),
+            MapPose::Closing(ms) => once(
+                PoseKind::Maps3,
+                &self.poses.maps3,
+                (ms / GANI_STEP_MS) as usize,
+            ),
         }
     }
 
@@ -412,7 +481,9 @@ impl OfflineSession {
     /// hurt mode). This is when the hearts report says GANI `hurt`; it
     /// gives way to `idle` before hurt mode itself ends.
     pub fn hurt_pose_on(&self) -> bool {
-        let Some(ms) = self.combat.hurt_elapsed_ms() else { return false };
+        let Some(ms) = self.combat.hurt_elapsed_ms() else {
+            return false;
+        };
         let ticks = match &self.poses.hurt {
             Some(g) if g.looped => return !self.hurt_walked,
             Some(g) => g.total_ticks(),
@@ -425,11 +496,17 @@ impl OfflineSession {
     /// drawn. Every other tick of hurt mode, from the hit (1.41 on) or once
     /// the hurt pose is over (1.39).
     pub fn blink_off(&self) -> bool {
-        let Some(ms) = self.combat.hurt_elapsed_ms() else { return false };
+        let Some(ms) = self.combat.hurt_elapsed_ms() else {
+            return false;
+        };
         let tick = (ms / GANI_STEP_MS) as usize;
         let from = match self.mannerisms.blink {
             crate::protocol::Blink::FromHit => 0,
-            crate::protocol::Blink::AfterHurtPose => self.poses.hurt.as_ref().map_or(HURT_POSE_139_TICKS, |g| g.total_ticks()),
+            crate::protocol::Blink::AfterHurtPose => self
+                .poses
+                .hurt
+                .as_ref()
+                .map_or(HURT_POSE_139_TICKS, |g| g.total_ticks()),
         };
         tick >= from && (tick - from) % 2 == 1
     }
@@ -459,7 +536,11 @@ impl OfflineSession {
                 *t += 1;
                 // Kept until the object counts as carried, with or without
                 // a `lift.gani`.
-                let done = self.poses.lift.as_ref().map_or(true, |g| *t as usize >= g.total_ticks())
+                let done = self
+                    .poses
+                    .lift
+                    .as_ref()
+                    .map_or(true, |g| *t as usize >= g.total_ticks())
                     && *t >= crate::offline::LIFT_CARRIED_TICK;
                 if done || self.carried.is_none() {
                     self.lift_ticks = None;
@@ -469,7 +550,9 @@ impl OfflineSession {
                 use crate::protocol::SwimStill;
                 let moving = self.walking;
                 let stopped = std::mem::replace(&mut self.swim_was_moving, moving) && !moving;
-                let Some(p) = self.swim_gani.as_mut() else { continue };
+                let Some(p) = self.swim_gani.as_mut() else {
+                    continue;
+                };
                 match self.mannerisms.swim_still {
                     // NewMain 1.41: back to the first step and held.
                     SwimStill::Freezes if !moving => {
@@ -494,7 +577,11 @@ impl OfflineSession {
                 if t == start {
                     let cues = p.current().map(|f| f.sounds.clone()).unwrap_or_default();
                     for c in cues {
-                        self.sound_events.push(SoundEvent { file: c.file, x: self.player_x + c.x, y: self.player_y + c.y });
+                        self.sound_events.push(SoundEvent {
+                            file: c.file,
+                            x: self.player_x + c.x,
+                            y: self.player_y + c.y,
+                        });
                     }
                 }
             }
@@ -517,13 +604,27 @@ impl OfflineSession {
         // Dead: `dead.gani`, one step per 50 ms tick of the death timer,
         // held on its last step.
         if self.life.is_dead() {
-            return at_tick(PoseKind::Dead, &self.poses.dead, usize::from(self.life.timer()), false);
+            return at_tick(
+                PoseKind::Dead,
+                &self.poses.dead,
+                usize::from(self.life.timer()),
+                false,
+            );
         }
         if self.in_water {
-            return self.swim_gani.as_ref().and_then(|p| pick_player(PoseKind::Swim, p));
+            return self
+                .swim_gani
+                .as_ref()
+                .and_then(|p| pick_player(PoseKind::Swim, p));
         }
         // The spin attack: `spin.gani` by its waits, once, then idle.
-        if let Some(p) = self.combat.spin_elapsed_ms().and_then(|ms| once(PoseKind::Spin, &self.poses.spin, (ms / GANI_STEP_MS) as usize)) {
+        if let Some(p) = self.combat.spin_elapsed_ms().and_then(|ms| {
+            once(
+                PoseKind::Spin,
+                &self.poses.spin,
+                (ms / GANI_STEP_MS) as usize,
+            )
+        }) {
             return Some(p);
         }
         if let Some(i) = self.combat.swing_frame() {
@@ -531,18 +632,29 @@ impl OfflineSession {
                 return Some(p);
             }
         }
-        if let Some(p) = self.combat.hurt_elapsed_ms().filter(|_| !self.hurt_walked).and_then(|ms| hurt_step(&self.poses.hurt, ms)) {
+        if let Some(p) = self
+            .combat
+            .hurt_elapsed_ms()
+            .filter(|_| !self.hurt_walked)
+            .and_then(|ms| hurt_step(&self.poses.hurt, ms))
+        {
             return Some(p);
         }
         // Holding a wall with A: the grab pose, or the pull once the arrow
         // away from it was pressed. The pull goes on after the keys are let
         // go, until the player moves. Without those ganis the player stands.
         if self.pushpull.pull_pose() {
-            return at_tick(PoseKind::Pull, &self.poses.pull, self.pushpull.pull_ticks as usize, true)
-                .or_else(|| pick(PoseKind::Idle, &self.poses.idle, 0));
+            return at_tick(
+                PoseKind::Pull,
+                &self.poses.pull,
+                self.pushpull.pull_ticks as usize,
+                true,
+            )
+            .or_else(|| pick(PoseKind::Idle, &self.poses.idle, 0));
         }
         if self.pushpull.grab.is_some() || self.pushpull.grab_shown {
-            return pick(PoseKind::Grab, &self.poses.grab, 0).or_else(|| pick(PoseKind::Idle, &self.poses.idle, 0));
+            return pick(PoseKind::Grab, &self.poses.grab, 0)
+                .or_else(|| pick(PoseKind::Idle, &self.poses.idle, 0));
         }
         // Holding an object: the carry poses (the 2.05 client plays its
         // carrystill and carry ganis then). The carry walk shows the step the
@@ -553,10 +665,17 @@ impl OfflineSession {
             // those files nothing of the figure is drawn. Builds that keep
             // the carry poses (1.39, NewMain 1.41) fall through.
             if self.figure_hidden() {
-                let (kind, g) = if self.walking { (PoseKind::Hidden, &self.poses.hidden) } else { (PoseKind::HiddenStill, &self.poses.hiddenstill) };
+                let (kind, g) = if self.walking {
+                    (PoseKind::Hidden, &self.poses.hidden)
+                } else {
+                    (PoseKind::HiddenStill, &self.poses.hiddenstill)
+                };
                 return pick(kind, g, 0);
             }
-            if let Some(p) = self.lift_ticks.and_then(|t| once(PoseKind::Lift, &self.poses.lift, t as usize)) {
+            if let Some(p) = self
+                .lift_ticks
+                .and_then(|t| once(PoseKind::Lift, &self.poses.lift, t as usize))
+            {
                 return Some(p);
             }
             if self.walking {
@@ -583,11 +702,18 @@ impl OfflineSession {
                 return Some(p);
             }
         }
-        if let Some(p) = self.push_tick().and_then(|t| at_tick(PoseKind::Push, &self.poses.push, t, true)) {
+        if let Some(p) = self
+            .push_tick()
+            .and_then(|t| at_tick(PoseKind::Push, &self.poses.push, t, true))
+        {
             return Some(p);
         }
         if self.walking {
-            if let Some(p) = self.walk_gani.as_ref().and_then(|p| pick_player(PoseKind::Walk, p)) {
+            if let Some(p) = self
+                .walk_gani
+                .as_ref()
+                .and_then(|p| pick_player(PoseKind::Walk, p))
+            {
                 return Some(p);
             }
         }
@@ -597,12 +723,17 @@ impl OfflineSession {
     /// Queue the sound cues of a step of `sword.gani`, once, at its offset
     /// from the player.
     pub(crate) fn queue_sword_cues(&mut self, step: usize) {
-        let cues: Vec<GaniSound> = match self.poses.sword.as_ref().and_then(|g| g.frames.get(step)) {
+        let cues: Vec<GaniSound> = match self.poses.sword.as_ref().and_then(|g| g.frames.get(step))
+        {
             Some(f) => f.sounds.clone(),
             None => return,
         };
         for c in cues {
-            self.sound_events.push(SoundEvent { file: c.file, x: self.player_x + c.x, y: self.player_y + c.y });
+            self.sound_events.push(SoundEvent {
+                file: c.file,
+                x: self.player_x + c.x,
+                y: self.player_y + c.y,
+            });
         }
     }
 }

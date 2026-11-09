@@ -13,7 +13,9 @@
 mod engine;
 mod wav;
 
-pub use engine::{pan_for, wanted_name, Outcome, SoundEngine, SoundEvent, MAX_VOICES, PAN_PER_TILE};
+pub use engine::{
+    pan_for, wanted_name, Outcome, SoundEngine, SoundEvent, MAX_VOICES, PAN_PER_TILE,
+};
 pub use wav::{decode_wav, Pcm};
 
 use std::cell::RefCell;
@@ -66,7 +68,11 @@ impl SoundOut for NullSound {
 /// What a [`RecordingSound`] was told.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Call {
-    Play { name: String, pan: i32, looped: bool },
+    Play {
+        name: String,
+        pan: i32,
+        looped: bool,
+    },
     Stop(String),
     StopAllLoops,
 }
@@ -88,7 +94,11 @@ impl SoundOut for RecordingSound {
         "recording"
     }
     fn play(&mut self, req: &PlayRequest) {
-        self.calls.borrow_mut().push(Call::Play { name: req.name.clone(), pan: req.pan, looped: req.looped });
+        self.calls.borrow_mut().push(Call::Play {
+            name: req.name.clone(),
+            pan: req.pan,
+            looped: req.looped,
+        });
     }
     fn stop(&mut self, name: &str) {
         self.calls.borrow_mut().push(Call::Stop(name.to_string()));
@@ -126,6 +136,9 @@ mod tests {
         let log = r.clone();
         r.stop("a.wav");
         r.stop_all_loops();
-        assert_eq!(log.log(), vec![Call::Stop("a.wav".into()), Call::StopAllLoops]);
+        assert_eq!(
+            log.log(),
+            vec![Call::Stop("a.wav".into()), Call::StopAllLoops]
+        );
     }
 }

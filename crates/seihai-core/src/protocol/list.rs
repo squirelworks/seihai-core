@@ -34,8 +34,14 @@ impl ServerEntry {
     /// One line for a server picker or listing: index, kind letter (`-`
     /// for silver), name, `host:port`, version and player count.
     pub fn display_line(&self, index: usize) -> String {
-        let kind = if self.kind.is_empty() { "-" } else { self.kind.as_str() };
-        let players = self.players.map_or_else(|| "?".to_string(), |n| n.to_string());
+        let kind = if self.kind.is_empty() {
+            "-"
+        } else {
+            self.kind.as_str()
+        };
+        let players = self
+            .players
+            .map_or_else(|| "?".to_string(), |n| n.to_string());
         format!(
             "  {index}) [{kind}] {}  {}:{}  {}  players: {players}",
             self.name, self.host, self.port, self.version
@@ -69,7 +75,9 @@ pub fn parse_svrlist(payload: &[u8]) -> Vec<ServerEntry> {
     };
     let mut i = 1;
     for _ in 0..count.wrapping_sub(0x20) {
-        let Some(&nfields) = payload.get(i) else { break };
+        let Some(&nfields) = payload.get(i) else {
+            break;
+        };
         i += 1;
         let mut fields = Vec::new();
         for _ in 0..nfields.wrapping_sub(0x20) {
@@ -136,7 +144,16 @@ mod tests {
     #[test]
     fn parse_svrlist_one_server() {
         let mut body = vec![0x20, 0x21, 0x28];
-        for f in ["P Classic", "English", "desc", "http://x", "2.05", "3", "127.0.0.1", "14802"] {
+        for f in [
+            "P Classic",
+            "English",
+            "desc",
+            "http://x",
+            "2.05",
+            "3",
+            "127.0.0.1",
+            "14802",
+        ] {
             body.extend(gs(f));
         }
         body.push(b'\n');
@@ -194,7 +211,16 @@ mod tests {
     /// version, players, host, port.
     fn public_row(name: &str, host: &str, port: &str) -> Vec<u8> {
         let mut r = vec![8 + 0x20];
-        for f in [name, "English", "desc", "https://x", "Beta Version: 3.0.9", "0", host, port] {
+        for f in [
+            name,
+            "English",
+            "desc",
+            "https://x",
+            "Beta Version: 3.0.9",
+            "0",
+            host,
+            port,
+        ] {
             r.extend(gs(f));
         }
         r
@@ -247,7 +273,10 @@ mod tests {
         let mut body = b"\"Welcome to X, a.\rThere are 9 server(s) online.\n#https://s.example\n%https://u.example\n".to_vec();
         body.extend_from_slice(&[0, 0]);
         let r = parse_list_reply(&body);
-        assert_eq!(r.status.as_deref(), Some("Welcome to X, a.\nThere are 9 server(s) online."));
+        assert_eq!(
+            r.status.as_deref(),
+            Some("Welcome to X, a.\nThere are 9 server(s) online.")
+        );
         assert_eq!(r.site_url.as_deref(), Some("https://s.example"));
         assert_eq!(r.upgrade_url.as_deref(), Some("https://u.example"));
         assert!(r.servers.is_empty());
@@ -261,7 +290,11 @@ mod tests {
         for f in ["P Short", "English", "d"] {
             short.extend(gs(f));
         }
-        let rows = [public_row("P A", "h", "1"), short, public_row("P B", "h", "2")];
+        let rows = [
+            public_row("P A", "h", "1"),
+            short,
+            public_row("P B", "h", "2"),
+        ];
         let reply = parse_list_reply(&public_list(&rows));
         let names: Vec<_> = reply.servers.iter().map(|e| e.name.as_str()).collect();
         assert_eq!(names, ["A", "B"]);
@@ -278,8 +311,14 @@ mod tests {
             players: Some(3),
             ..Default::default()
         };
-        assert_eq!(e.display_line(2), "  2) [P] Mock  127.0.0.1:14802  Version: 1  players: 3");
-        let silver = ServerEntry { players: None, ..Default::default() };
+        assert_eq!(
+            e.display_line(2),
+            "  2) [P] Mock  127.0.0.1:14802  Version: 1  players: 3"
+        );
+        let silver = ServerEntry {
+            players: None,
+            ..Default::default()
+        };
         assert!(silver.display_line(0).starts_with("  0) [-] "));
         assert!(silver.display_line(0).ends_with("players: ?"));
     }

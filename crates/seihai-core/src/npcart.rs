@@ -39,7 +39,8 @@ impl OfflineSession {
     /// Attach a GANI for the NPCs, by name (`idle`, `walk`, ...). Any
     /// parameters after a comma are dropped (see [`ani_file`]).
     pub fn set_npc_gani(&mut self, name: &str, gani: Gani) {
-        self.npc_ganis.insert(ani_file(name).to_ascii_lowercase(), gani);
+        self.npc_ganis
+            .insert(ani_file(name).to_ascii_lowercase(), gani);
     }
 
     /// The loaded GANI for an NPC's animation, parameters or not.
@@ -63,11 +64,17 @@ impl OfflineSession {
     /// Advance the NPC animations by `ms`. True when any NPC now shows a
     /// different step or animation (so the scene needs drawing again).
     pub fn tick_npc_anis(&mut self, ms: u64) -> bool {
-        let Some(level) = self.current_level.as_mut() else { return false };
+        let Some(level) = self.current_level.as_mut() else {
+            return false;
+        };
         let mut changed = false;
         for npc in level.npcs.iter_mut() {
-            let Some(name) = npc.ani.clone() else { continue };
-            let Some(gani) = self.npc_ganis.get(ani_file(&name)) else { continue };
+            let Some(name) = npc.ani.clone() else {
+                continue;
+            };
+            let Some(gani) = self.npc_ganis.get(ani_file(&name)) else {
+                continue;
+            };
             let frames = gani.frame_count();
             if frames == 0 {
                 continue;

@@ -14,7 +14,12 @@ const DEEP: u16 = 3644;
 /// Arrays 0 to 3 (passable, liquid, throw-through, lava) of an
 /// `arrays.dat`, holding only the new4 tiles as the 2.22 file lists them.
 fn arrays() -> TileTypes {
-    let lists: [&[u32]; 4] = [&[0, 398, 461, 472, 2958], &[461, 472, 2882], &[], &[2882, 2958]];
+    let lists: [&[u32]; 4] = [
+        &[0, 398, 461, 472, 2958],
+        &[461, 472, 2882],
+        &[],
+        &[2882, 2958],
+    ];
     let mut data = Vec::new();
     for l in lists {
         data.extend_from_slice(&(l.len() as u32).to_be_bytes());
@@ -27,7 +32,8 @@ fn arrays() -> TileTypes {
 
 fn session() -> OfflineSession {
     let mut s = OfflineSession::new();
-    s.load_level(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/levels/new4.nw")).unwrap();
+    s.load_level(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/levels/new4.nw"))
+        .unwrap();
     s.tiletypes = Some(arrays());
     s
 }
@@ -41,7 +47,11 @@ fn feet_at(s: &mut OfflineSession, fx: f32, fy: f32) {
 
 fn foot_tile(s: &OfflineSession) -> u16 {
     let (fx, fy) = s.foot();
-    s.current_level.as_ref().unwrap().tile_id_at(fx as i32, fy as i32).unwrap()
+    s.current_level
+        .as_ref()
+        .unwrap()
+        .tile_id_at(fx as i32, fy as i32)
+        .unwrap()
 }
 
 #[test]
@@ -49,7 +59,13 @@ fn the_fixture_has_each_kind() {
     let s = session();
     let l = s.current_level.as_ref().unwrap();
     let t = s.tiletypes.as_ref().unwrap();
-    for (x, y, id, kind) in [(33, 7, SHALLOW, TileKind::Open), (38, 18, WATER, TileKind::Water), (30, 12, DEEP, TileKind::Blocking), (28, 24, LAVA, TileKind::Lava), (28, 21, LAVA_FLOOR, TileKind::Open)] {
+    for (x, y, id, kind) in [
+        (33, 7, SHALLOW, TileKind::Open),
+        (38, 18, WATER, TileKind::Water),
+        (30, 12, DEEP, TileKind::Blocking),
+        (28, 24, LAVA, TileKind::Lava),
+        (28, 21, LAVA_FLOOR, TileKind::Open),
+    ] {
         assert_eq!(l.tile_id_at(x, y), Some(id), "({x}, {y})");
         assert_eq!(t.kind(id), kind, "{id}");
     }

@@ -53,7 +53,10 @@ mod tests {
 
     #[test]
     fn update_is_the_raw_register_step() {
-        assert_eq!(crc32_update(0xFFFFFFFF, b"123456789") ^ 0xFFFFFFFF, 0xCBF43926);
+        assert_eq!(
+            crc32_update(0xFFFFFFFF, b"123456789") ^ 0xFFFFFFFF,
+            0xCBF43926
+        );
         // Splitting the input and feeding the register on gives the same result.
         let r = crc32_update(crc32_update(0xFFFFFFFF, b"1234"), b"56789");
         assert_eq!(r ^ 0xFFFFFFFF, 0xCBF43926);

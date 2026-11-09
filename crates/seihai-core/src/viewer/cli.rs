@@ -3,7 +3,8 @@
 use super::render::{render_layouts, render_view, Format};
 use super::tables::{lint, Tables};
 use super::{
-    build_view, check_output_mode, layout_report, load, resolve_layout_target, write_private, Filter, Range, Sel, ViewOptions,
+    build_view, check_output_mode, layout_report, load, resolve_layout_target, write_private,
+    Filter, Range, Sel, ViewOptions,
 };
 use crate::difftest::trace::Dir;
 use crate::protocol::ClientVersion;
@@ -81,7 +82,11 @@ fn load_tables(dir: &Option<PathBuf>) -> Result<Tables, String> {
 }
 
 fn tables_note(t: &Tables) -> String {
-    t.sources.iter().map(|(n, s)| format!("{n}: {s}")).collect::<Vec<_>>().join(", ")
+    t.sources
+        .iter()
+        .map(|(n, s)| format!("{n}: {s}"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Entry point. `args` are the words after `capture`. Returns the exit code.
@@ -126,13 +131,17 @@ fn run_show(args: &[String]) -> i32 {
                 "--frame" => filter.frame = Range::parse(a.value(w)?)?,
                 "--limit" => {
                     let v = a.value(w)?;
-                    filter.limit = Some(v.parse().map_err(|_| format!("--limit takes a number, not `{v}`"))?);
+                    filter.limit = Some(
+                        v.parse()
+                            .map_err(|_| format!("--limit takes a number, not `{v}`"))?,
+                    );
                 }
                 "--layouts" => show_layout = true,
                 "--raw" => raw_all = true,
                 "--format" => {
                     let v = a.value(w)?;
-                    fmt = Format::parse(v).ok_or_else(|| format!("--format takes text, tsv or json, not `{v}`"))?;
+                    fmt = Format::parse(v)
+                        .ok_or_else(|| format!("--format takes text, tsv or json, not `{v}`"))?;
                 }
                 "--out" => out = Some(PathBuf::from(a.value(w)?)),
                 "--no-mask" => mask = false,
@@ -175,7 +184,12 @@ fn run_show(args: &[String]) -> i32 {
         eprintln!("seihai capture: {file}: the trace header has no version; pass --version");
         return 1;
     }
-    let opts = ViewOptions { filter, show_layout, raw_all, mask };
+    let opts = ViewOptions {
+        filter,
+        show_layout,
+        raw_all,
+        mask,
+    };
     let view = build_view(&loaded, &tables, &opts);
     if let Some(p) = &out {
         if let Err(e) = check_output_mode(p, view.has_login) {
@@ -183,7 +197,9 @@ fn run_show(args: &[String]) -> i32 {
             return 1;
         }
     }
-    let name = Path::new(&file).file_name().map_or(file.clone(), |n| n.to_string_lossy().into_owned());
+    let name = Path::new(&file)
+        .file_name()
+        .map_or(file.clone(), |n| n.to_string_lossy().into_owned());
     let text = render_view(&view, fmt, &name, &tables_note(&tables), show_layout);
     match out {
         Some(p) => {
@@ -213,7 +229,8 @@ fn run_layout(args: &[String]) -> i32 {
                 "--tables" => tdir = Some(PathBuf::from(a.value(w)?)),
                 "--format" => {
                     let v = a.value(w)?;
-                    fmt = Format::parse(v).ok_or_else(|| format!("--format takes text, tsv or json, not `{v}`"))?;
+                    fmt = Format::parse(v)
+                        .ok_or_else(|| format!("--format takes text, tsv or json, not `{v}`"))?;
                 }
                 f if f.starts_with("--") => return Err(format!("unknown option {f}")),
                 f => {
@@ -236,8 +253,10 @@ fn run_layout(args: &[String]) -> i32 {
         Ok(t) => t,
         Err(e) => return fail(&e),
     };
-    let mut reports: Vec<_> =
-        resolve_layout_target(&tables, &what, dir).into_iter().map(|(d, id)| layout_report(&tables, d, id)).collect();
+    let mut reports: Vec<_> = resolve_layout_target(&tables, &what, dir)
+        .into_iter()
+        .map(|(d, id)| layout_report(&tables, d, id))
+        .collect();
     if let Some(v) = version {
         let r = super::tables::rank(v);
         for rep in &mut reports {
@@ -248,7 +267,11 @@ fn run_layout(args: &[String]) -> i32 {
         }
     }
     print!("{}", render_layouts(&reports, fmt));
-    if reports.is_empty() { 1 } else { 0 }
+    if reports.is_empty() {
+        1
+    } else {
+        0
+    }
 }
 
 fn run_tables(args: &[String]) -> i32 {
@@ -270,9 +293,23 @@ fn run_tables(args: &[String]) -> i32 {
     println!("tables in use: {}", tables_note(&t));
     let ids = t.ids();
     let c2s = ids.iter().filter(|(d, _)| *d == Dir::C2S).count();
-    println!("packet-layouts.tsv: {} field rows, {} packets (C>S {}, S>C {})", t.rows.len(), ids.len(), c2s, ids.len() - c2s);
-    for st in [super::tables::Status::Known, super::tables::Status::Partial, super::tables::Status::Unknown] {
-        println!("  {:<8} {}", st.label(), t.rows.iter().filter(|r| r.status == st).count());
+    println!(
+        "packet-layouts.tsv: {} field rows, {} packets (C>S {}, S>C {})",
+        t.rows.len(),
+        ids.len(),
+        c2s,
+        ids.len() - c2s
+    );
+    for st in [
+        super::tables::Status::Known,
+        super::tables::Status::Partial,
+        super::tables::Status::Unknown,
+    ] {
+        println!(
+            "  {:<8} {}",
+            st.label(),
+            t.rows.iter().filter(|r| r.status == st).count()
+        );
     }
     if !t.chain.is_empty() {
         println!("version-chain.tsv: {} rows", t.chain.len());

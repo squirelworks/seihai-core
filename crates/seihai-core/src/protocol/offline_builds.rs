@@ -150,25 +150,158 @@ pub const OFFLINE_BUILDS: &[OfflineBuild] = &[
         plays_as: ClientVersion::V121,
         start_level: None,
     },
-    beta("1st Graal", "1stgraal-1", "1998-09-06", "Z<base>", "Zelda2", Z3),
-    beta("2nd Graal", "2ndgraal", "1998-09-16", "Z<base>", "Zelda2", GR01),
-    beta("3rd Graal", "3rdgraal", "1998-09-30", "G<level>", "Graal", GR01),
-    beta("4th Graal", "4thgraal", "1998-10-05", "G<level>", "Graal", GR01),
-    beta("4th Graal alpha", "4thgraalalpha", "1998-10-12", "G2<level>", "Graal2", GR01),
-    beta("5th Graal", "5thgraal", "1998-10-19", "G3<level>", "Graal3", GR02),
-    beta("5th Graal alpha", "5thgraalalpha", "1998-10-29", "G3<level>", "Graal3", GR02),
-    beta("6th Graal (beta 5)", "6thgraal", "1998-11-09", "G4<level>", "Graal4", GR02),
-    beta("7th Graal (beta 7)", "7thgraal", "1998-12-04", "G5<level>", "Graal5", GR03),
-    beta("8th Graal (beta 8)", "8thgraal", "1998-12-08", "G5<level>", "Graal5", GR03),
-    beta("9th Graal alpha", "9thgraalalpha", "1998-12-16", "G5<level>", "Graal5", GR03),
-    beta("9th Graal (beta 9)", "9thgraal", "1998-12-18", "G5<level>", "Graal5", GR03),
-    beta("10th Graal (1.0)", "10thgraal", "1998-12-22", "G6<level>", "Graal6", GR03),
-    beta("11th Graal (1.0)", "11thgraal", "1998-12-23", "G6<level>", "Graal6", GR03),
-    beta("12th Graal (1.0)", "12thgraal", "1999-01-05", "G6<level>", "Graal6", GR03),
-    beta("13th Graal (1.1 beta 1)", "13thgraal", "1999-01-12", "G7<level>", "Graal7", GR03),
-    beta("14th Graal (1.1)", "14thgraal", "1999-01-15", "G8<level>", "Graal8", GR03),
-    beta("15th Graal (1.1)", "15thgraal", "1999-01-25", "G8<level>", "Graal8", GR03),
-    beta("1.1.9 Gold Edition", "graal1.1.9", "1999-02-11", "G8<level>", "Graal8", GR03),
+    beta(
+        "1st Graal",
+        "1stgraal-1",
+        "1998-09-06",
+        "Z<base>",
+        "Zelda2",
+        Z3,
+    ),
+    beta(
+        "2nd Graal",
+        "2ndgraal",
+        "1998-09-16",
+        "Z<base>",
+        "Zelda2",
+        GR01,
+    ),
+    beta(
+        "3rd Graal",
+        "3rdgraal",
+        "1998-09-30",
+        "G<level>",
+        "Graal",
+        GR01,
+    ),
+    beta(
+        "4th Graal",
+        "4thgraal",
+        "1998-10-05",
+        "G<level>",
+        "Graal",
+        GR01,
+    ),
+    beta(
+        "4th Graal alpha",
+        "4thgraalalpha",
+        "1998-10-12",
+        "G2<level>",
+        "Graal2",
+        GR01,
+    ),
+    beta(
+        "5th Graal",
+        "5thgraal",
+        "1998-10-19",
+        "G3<level>",
+        "Graal3",
+        GR02,
+    ),
+    beta(
+        "5th Graal alpha",
+        "5thgraalalpha",
+        "1998-10-29",
+        "G3<level>",
+        "Graal3",
+        GR02,
+    ),
+    beta(
+        "6th Graal (beta 5)",
+        "6thgraal",
+        "1998-11-09",
+        "G4<level>",
+        "Graal4",
+        GR02,
+    ),
+    beta(
+        "7th Graal (beta 7)",
+        "7thgraal",
+        "1998-12-04",
+        "G5<level>",
+        "Graal5",
+        GR03,
+    ),
+    beta(
+        "8th Graal (beta 8)",
+        "8thgraal",
+        "1998-12-08",
+        "G5<level>",
+        "Graal5",
+        GR03,
+    ),
+    beta(
+        "9th Graal alpha",
+        "9thgraalalpha",
+        "1998-12-16",
+        "G5<level>",
+        "Graal5",
+        GR03,
+    ),
+    beta(
+        "9th Graal (beta 9)",
+        "9thgraal",
+        "1998-12-18",
+        "G5<level>",
+        "Graal5",
+        GR03,
+    ),
+    beta(
+        "10th Graal (1.0)",
+        "10thgraal",
+        "1998-12-22",
+        "G6<level>",
+        "Graal6",
+        GR03,
+    ),
+    beta(
+        "11th Graal (1.0)",
+        "11thgraal",
+        "1998-12-23",
+        "G6<level>",
+        "Graal6",
+        GR03,
+    ),
+    beta(
+        "12th Graal (1.0)",
+        "12thgraal",
+        "1999-01-05",
+        "G6<level>",
+        "Graal6",
+        GR03,
+    ),
+    beta(
+        "13th Graal (1.1 beta 1)",
+        "13thgraal",
+        "1999-01-12",
+        "G7<level>",
+        "Graal7",
+        GR03,
+    ),
+    beta(
+        "14th Graal (1.1)",
+        "14thgraal",
+        "1999-01-15",
+        "G8<level>",
+        "Graal8",
+        GR03,
+    ),
+    beta(
+        "15th Graal (1.1)",
+        "15thgraal",
+        "1999-01-25",
+        "G8<level>",
+        "Graal8",
+        GR03,
+    ),
+    beta(
+        "1.1.9 Gold Edition",
+        "graal1.1.9",
+        "1999-02-11",
+        "G8<level>",
+        "Graal8",
+        GR03,
+    ),
     beta("1.1", "graal1.1", "1999-02-14", "G8<level>", "Graal8", GR03),
     OfflineBuild {
         label: "Java Graal",
@@ -225,8 +358,16 @@ mod tests {
     #[test]
     fn labels_are_unique_and_never_a_profile_label() {
         for (i, b) in OFFLINE_BUILDS.iter().enumerate() {
-            assert!(OFFLINE_BUILDS[..i].iter().all(|o| o.label != b.label), "{} twice", b.label);
-            assert!(ClientVersion::from_label(b.label).is_none(), "{} is also a profile", b.label);
+            assert!(
+                OFFLINE_BUILDS[..i].iter().all(|o| o.label != b.label),
+                "{} twice",
+                b.label
+            );
+            assert!(
+                ClientVersion::from_label(b.label).is_none(),
+                "{} is also a profile",
+                b.label
+            );
             assert_eq!(by_label(b.label), Some(b));
         }
     }
@@ -234,7 +375,12 @@ mod tests {
     #[test]
     fn oldest_first() {
         for w in OFFLINE_BUILDS.windows(2) {
-            assert!(w[0].date <= w[1].date, "{} before {}", w[0].label, w[1].label);
+            assert!(
+                w[0].date <= w[1].date,
+                "{} before {}",
+                w[0].label,
+                w[1].label
+            );
         }
     }
 
@@ -257,10 +403,17 @@ mod tests {
         let fifth = by_label("5th Graal").unwrap();
         assert!(!share_a_room(java, fifth));
         assert!(share_a_room(java, by_label("4th Graal alpha").unwrap()));
-        let g2: Vec<_> = OFFLINE_BUILDS.iter().filter(|b| share_a_room(java, b) && b.label != java.label).map(|b| b.label).collect();
+        let g2: Vec<_> = OFFLINE_BUILDS
+            .iter()
+            .filter(|b| share_a_room(java, b) && b.label != java.label)
+            .map(|b| b.label)
+            .collect();
         assert_eq!(g2, ["4th Graal alpha"]);
         assert!(share_a_room(fifth, by_label("5th Graal alpha").unwrap()));
-        assert!(share_a_room(by_label("3rd Graal").unwrap(), by_label("4th Graal").unwrap()));
+        assert!(share_a_room(
+            by_label("3rd Graal").unwrap(),
+            by_label("4th Graal").unwrap()
+        ));
     }
 
     #[test]

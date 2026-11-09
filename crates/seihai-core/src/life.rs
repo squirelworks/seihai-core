@@ -35,7 +35,12 @@ pub fn claim_message(attacker: u16) -> Vec<u8> {
 
 /// `PLI_PLAYERPROPS` (2) carrying only STATUS (18).
 pub fn status_message(status: u8) -> Vec<u8> {
-    vec![2 + 0x20, PLPROP_STATUS + 0x20, (status & 0x7F) + 0x20, b'\n']
+    vec![
+        2 + 0x20,
+        PLPROP_STATUS + 0x20,
+        (status & 0x7F) + 0x20,
+        b'\n',
+    ]
 }
 
 /// `base` with the dead bit set or cleared.
@@ -92,7 +97,10 @@ pub struct Life {
 
 impl Life {
     pub fn new(rules: Option<DeathRules>) -> Self {
-        Life { rules, ..Life::default() }
+        Life {
+            rules,
+            ..Life::default()
+        }
     }
 
     pub fn rules(&self) -> Option<&DeathRules> {
@@ -214,8 +222,12 @@ pub fn messages_for(event: LifeEvent, version: ClientVersion, status_base: u8) -
         LifeEvent::Died { attacker: Some(a) } if version.sends_claim() => vec![claim_message(a)],
         LifeEvent::Died { .. } => Vec::new(),
         LifeEvent::StatusDead => vec![status_message(with_dead_bit(status_base, true))],
-        LifeEvent::Respawned { clear_status: true } => vec![status_message(with_dead_bit(status_base, false))],
-        LifeEvent::Respawned { clear_status: false } => Vec::new(),
+        LifeEvent::Respawned { clear_status: true } => {
+            vec![status_message(with_dead_bit(status_base, false))]
+        }
+        LifeEvent::Respawned {
+            clear_status: false,
+        } => Vec::new(),
     }
 }
 
@@ -261,7 +273,12 @@ impl PowerReport {
         if self.cur_half.is_none() && gani.is_none() && self.sprite.is_none() {
             return None;
         }
-        Some(crate::net::power_props_message(self.cur_half, gani, (self.x, self.y), self.sprite))
+        Some(crate::net::power_props_message(
+            self.cur_half,
+            gani,
+            (self.x, self.y),
+            self.sprite,
+        ))
     }
 }
 
@@ -290,7 +307,10 @@ pub struct PowerReporter {
 impl Default for PowerReporter {
     /// A new session: three hearts (the default account) and idle.
     fn default() -> Self {
-        PowerReporter { reported_half: 6, pose: ReportPose::Idle }
+        PowerReporter {
+            reported_half: 6,
+            pose: ReportPose::Idle,
+        }
     }
 }
 
@@ -311,7 +331,13 @@ impl PowerReporter {
     /// started (the death starts on the next life tick), so a killing hit
     /// reports `dead`, not `hurt`. `sprite` is the SPRITE value to send with
     /// the start of hurt mode.
-    pub fn report(&mut self, half: i32, dead: bool, hurting: bool, sprite: u8) -> Option<PowerReport> {
+    pub fn report(
+        &mut self,
+        half: i32,
+        dead: bool,
+        hurting: bool,
+        sprite: u8,
+    ) -> Option<PowerReport> {
         let pose = if dead {
             ReportPose::Dead
         } else if hurting {
@@ -323,7 +349,11 @@ impl PowerReporter {
         let cur_half = (half != self.reported_half).then_some(half as u8);
         // The respawn report is CURPOWER and GANI `idle` (2.05, live
         // 2026-10-29), even while hurt mode from the killing hit still runs.
-        let pose = if self.pose == ReportPose::Dead && pose == ReportPose::Hurt { ReportPose::Idle } else { pose };
+        let pose = if self.pose == ReportPose::Dead && pose == ReportPose::Hurt {
+            ReportPose::Idle
+        } else {
+            pose
+        };
         let new_pose = (pose != self.pose).then_some(pose);
         self.pose = pose;
         if cur_half.is_none() && new_pose.is_none() {
@@ -331,7 +361,13 @@ impl PowerReporter {
         }
         self.reported_half = half;
         let sprite = (new_pose == Some(ReportPose::Hurt)).then_some(sprite);
-        Some(PowerReport { cur_half, pose: new_pose, sprite, x: None, y: None })
+        Some(PowerReport {
+            cur_half,
+            pose: new_pose,
+            sprite,
+            x: None,
+            y: None,
+        })
     }
 }
 
@@ -409,7 +445,13 @@ mod tests {
         run(&mut l, 12);
         l.tick(0, true);
         assert_eq!(l.timer(), 12);
-        assert_eq!(l.take_events().iter().filter(|e| matches!(e, LifeEvent::Died { .. })).count(), 1);
+        assert_eq!(
+            l.take_events()
+                .iter()
+                .filter(|e| matches!(e, LifeEvent::Died { .. }))
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -429,7 +471,10 @@ mod tests {
         l.take_events();
         assert!(l.respawn());
         assert!(!l.is_dead() && !l.status_dead() && !l.input_locked());
-        assert_eq!(l.take_events(), vec![LifeEvent::Respawned { clear_status: true }]);
+        assert_eq!(
+            l.take_events(),
+            vec![LifeEvent::Respawned { clear_status: true }]
+        );
         assert!(!l.respawn(), "nothing to respawn from");
         // Dying again starts a fresh timer.
         l.tick(0, true);
@@ -446,7 +491,10 @@ mod tests {
         let mut l = life();
         l.note_attacker(Some(12));
         l.tick(0, true);
-        assert_eq!(l.take_events(), vec![LifeEvent::Died { attacker: Some(12) }]);
+        assert_eq!(
+            l.take_events(),
+            vec![LifeEvent::Died { attacker: Some(12) }]
+        );
     }
 
     #[test]
@@ -484,7 +532,10 @@ mod tests {
             assert_eq!(respawn_half_hearts(&r, ap, 0), 0, "ap {ap}");
         }
         assert!(!r.entry_name_group);
-        assert_eq!((r.timer_cap, r.input_lock_until, r.status_bit_from), (30, 27, 28));
+        assert_eq!(
+            (r.timer_cap, r.input_lock_until, r.status_bit_from),
+            (30, 27, 28)
+        );
         assert_eq!((r.default_x2, r.default_y2), (61, 60));
     }
 
@@ -529,7 +580,11 @@ mod tests {
         for p in PROFILES {
             let msgs = session_messages(p.version, Some(5));
             if p.life.death.is_none() {
-                assert!(msgs.is_empty(), "{}: no death sequence, no messages", p.label);
+                assert!(
+                    msgs.is_empty(),
+                    "{}: no death sequence, no messages",
+                    p.label
+                );
                 continue;
             }
             with_rules += 1;
@@ -553,17 +608,34 @@ mod tests {
     #[test]
     fn profile_gates() {
         assert_eq!(ClientVersion::V205.death_rules(), Some(DEATH_205));
-        for v in [ClientVersion::V200, ClientVersion::V201, ClientVersion::V204] {
+        for v in [
+            ClientVersion::V200,
+            ClientVersion::V201,
+            ClientVersion::V204,
+        ] {
             // 2.00 to 2.04 run the 2.05 sequence (read in 2.00, constants checked in all).
             assert_eq!(v.death_rules(), Some(DEATH_205), "{}", v.label());
             // A real 2.00 sent PLI_CLAIMPKER in its death frame (lab, 2026-10-30).
             assert!(v.sends_claim(), "{}", v.label());
         }
-        for v in [ClientVersion::V205, ClientVersion::V217, ClientVersion::V222, ClientVersion::V231] {
+        for v in [
+            ClientVersion::V205,
+            ClientVersion::V217,
+            ClientVersion::V222,
+            ClientVersion::V231,
+        ] {
             assert!(v.sends_claim(), "{}", v.label());
             // Only the save-entry name-group test differs between them.
             let d = v.death_rules().unwrap();
-            assert_eq!(DeathRules { entry_name_group: true, ..d }, DEATH_205, "{}", v.label());
+            assert_eq!(
+                DeathRules {
+                    entry_name_group: true,
+                    ..d
+                },
+                DEATH_205,
+                "{}",
+                v.label()
+            );
         }
         // 1.39 has its own row: the 2.05 timer, and respawn hearts to the
         // maximum (no AP bands). Id 14 is in its send set, so the claim goes out.
@@ -577,9 +649,15 @@ mod tests {
     #[test]
     fn constants_match_the_decompile_table() {
         let r = DEATH_205;
-        assert_eq!((r.timer_cap, r.input_lock_until, r.status_bit_from), (30, 27, 28));
+        assert_eq!(
+            (r.timer_cap, r.input_lock_until, r.status_bit_from),
+            (30, 27, 28)
+        );
         assert_eq!(u64::from(r.timer_cap) * TICK_MS, 1500);
-        assert_eq!((f32::from(r.default_x2) / 2.0, f32::from(r.default_y2) / 2.0), (30.5, 30.0));
+        assert_eq!(
+            (f32::from(r.default_x2) / 2.0, f32::from(r.default_y2) / 2.0),
+            (30.5, 30.0)
+        );
     }
 
     #[test]
@@ -587,7 +665,16 @@ mod tests {
         // 2.05 lab run 1, t = 130.962 s: 6 -> 5 half hearts, facing up.
         let mut p = PowerReporter::default();
         let r = p.report(5, false, true, 128).expect("a report");
-        assert_eq!(r, PowerReport { cur_half: Some(5), pose: Some(ReportPose::Hurt), sprite: Some(128), x: None, y: None });
+        assert_eq!(
+            r,
+            PowerReport {
+                cur_half: Some(5),
+                pose: Some(ReportPose::Hurt),
+                sprite: Some(128),
+                x: None,
+                y: None
+            }
+        );
         let mut want = vec![0x22];
         want.extend_from_slice(b"\x22\x25\x2a\x24hurt\x31\xa0\n");
         assert_eq!(r.message(true).unwrap(), want);
@@ -607,15 +694,27 @@ mod tests {
     fn a_killing_hit_reports_zero_and_dead() {
         let mut p = PowerReporter::default();
         let r = p.report(0, true, true, 130).unwrap();
-        assert_eq!(r.message(true).unwrap(), b"\x22\x22\x20\x2a\x24dead\n".to_vec());
+        assert_eq!(
+            r.message(true).unwrap(),
+            b"\x22\x22\x20\x2a\x24dead\n".to_vec()
+        );
         // Respawn: the hearts by AP and idle (2.05 live).
         let r = p.report(6, false, false, 2).unwrap();
-        assert_eq!(r.message(true).unwrap(), b"\x22\x22\x26\x2a\x24idle\n".to_vec());
+        assert_eq!(
+            r.message(true).unwrap(),
+            b"\x22\x22\x26\x2a\x24idle\n".to_vec()
+        );
         // Respawned while the killing hit's hurt mode still runs: still idle,
         // and nothing more when it ends.
         let mut p = PowerReporter::default();
         p.report(0, true, true, 130);
-        assert_eq!(p.report(6, false, true, 130).unwrap().message(true).unwrap(), b"\x22\x22\x26\x2a\x24idle\n".to_vec());
+        assert_eq!(
+            p.report(6, false, true, 130)
+                .unwrap()
+                .message(true)
+                .unwrap(),
+            b"\x22\x22\x26\x2a\x24idle\n".to_vec()
+        );
         assert_eq!(p.report(6, false, false, 2), None);
     }
 
@@ -633,17 +732,25 @@ mod tests {
     #[test]
     fn a_burn_or_a_heart_is_a_plain_curpower() {
         let mut p = PowerReporter::default();
-        assert_eq!(p.report(5, false, false, 2).unwrap().message(true).unwrap(), b"\x22\x22\x25\n".to_vec());
-        assert_eq!(p.report(6, false, false, 2).unwrap().message(true).unwrap(), b"\x22\x22\x26\n".to_vec());
+        assert_eq!(
+            p.report(5, false, false, 2).unwrap().message(true).unwrap(),
+            b"\x22\x22\x25\n".to_vec()
+        );
+        assert_eq!(
+            p.report(6, false, false, 2).unwrap().message(true).unwrap(),
+            b"\x22\x22\x26\n".to_vec()
+        );
     }
 
     #[test]
     fn a_build_without_ganis_leaves_the_pose_out() {
         let mut p = PowerReporter::default();
         let r = p.report(5, false, true, 128).unwrap();
-        assert_eq!(r.message(false).unwrap(), b"\x22\x22\x25\x31\xa0\n".to_vec());
+        assert_eq!(
+            r.message(false).unwrap(),
+            b"\x22\x22\x25\x31\xa0\n".to_vec()
+        );
         // Only a pose changed: nothing to send.
         assert_eq!(p.report(5, false, false, 0).unwrap().message(false), None);
     }
-
 }

@@ -5,11 +5,11 @@
 //! be refined against the original client’s offline/tutorial paths.
 
 use crate::assets::{GaniPlayer, Level, Link, Object2x2, ObjectTables, TileKind, TileTypes};
-use crate::sound::SoundEvent;
 use crate::dev::DevMode;
 use crate::gmap::{Crossing, GmapWorld, Resolved};
 use crate::life::{respawn_half_hearts, Life, LifeEvent};
 use crate::protocol::{BoardModify, PlayerUpdate};
+use crate::sound::SoundEvent;
 use std::collections::{HashMap, HashSet};
 
 mod baddies;
@@ -19,14 +19,14 @@ mod laying;
 mod pause;
 mod pushpull;
 mod servernpcs;
+pub use baddies::BaddyRole;
 pub use drops::ITEM_NAMES;
 pub use hide::{HIDDEN_STATUS, HIDE_KINDS, LIFT_CARRIED_TICK};
 pub use laying::{lay_held_centre, LayCost, LAY_OFFSET, LAY_ORDER};
 pub use pause::{focus_pauses, name_label, pause_message_bits, server_status_base, PAUSED_STATUS};
-pub use pushpull::{NpcMoved, Grab, Jump, PushPull, Trigger};
-pub use servernpcs::{block_flags, Linked, ServerNpcSync, NPC_SEND_INTERVAL};
 use pushpull::StepResult;
-pub use baddies::BaddyRole;
+pub use pushpull::{Grab, Jump, NpcMoved, PushPull, Trigger};
+pub use servernpcs::{block_flags, Linked, ServerNpcSync, NPC_SEND_INTERVAL};
 
 /// Facing, in Graal order (ganis and the 2.05 wire): 0 up, 1 left,
 /// 2 down, 3 right.
@@ -64,10 +64,38 @@ pub const BED_PROBE_DY: [f32; 2] = [0.0, 0.5];
 ///
 /// See `documentation/walking-collision.md`.
 pub const WALK_PROBES: [[(f64, f64); 6]; 4] = [
-    [(0.525, 1.0), (1.475, 1.0), (1.525, 1.0), (2.475, 1.0), (2.525, 1.0), (0.475, 1.0)],
-    [(0.5, 1.025), (0.5, 1.975), (0.5, 2.025), (0.5, 2.975), (0.5, 3.025), (0.5, 0.975)],
-    [(0.525, 3.0), (1.475, 3.0), (1.525, 3.0), (2.475, 3.0), (2.525, 3.0), (0.475, 3.0)],
-    [(2.5, 1.025), (2.5, 1.975), (2.5, 2.025), (2.5, 2.975), (2.5, 3.025), (2.5, 0.975)],
+    [
+        (0.525, 1.0),
+        (1.475, 1.0),
+        (1.525, 1.0),
+        (2.475, 1.0),
+        (2.525, 1.0),
+        (0.475, 1.0),
+    ],
+    [
+        (0.5, 1.025),
+        (0.5, 1.975),
+        (0.5, 2.025),
+        (0.5, 2.975),
+        (0.5, 3.025),
+        (0.5, 0.975),
+    ],
+    [
+        (0.525, 3.0),
+        (1.475, 3.0),
+        (1.525, 3.0),
+        (2.475, 3.0),
+        (2.525, 3.0),
+        (0.475, 3.0),
+    ],
+    [
+        (2.5, 1.025),
+        (2.5, 1.975),
+        (2.5, 2.025),
+        (2.5, 2.975),
+        (2.5, 3.025),
+        (2.5, 0.975),
+    ],
 ];
 
 /// The corner nudge per facing: `[(dx, dy) when probe 0 is the blocked one,
@@ -115,7 +143,11 @@ pub const SWIM_STEP_MS: u64 = 50;
 /// keeps the average at one step per `interval` (20 per second, 10 tiles a
 /// second, as the real clients walk). After a pause of two intervals or more
 /// there is nothing to catch up on, and the clock starts from `now`.
-pub fn next_step_clock(last: std::time::Instant, now: std::time::Instant, interval: std::time::Duration) -> std::time::Instant {
+pub fn next_step_clock(
+    last: std::time::Instant,
+    now: std::time::Instant,
+    interval: std::time::Duration,
+) -> std::time::Instant {
     if now.saturating_duration_since(last) >= interval * 2 {
         now
     } else {
@@ -143,7 +175,10 @@ pub const LINK_PROBE: [(f32, f32); 4] = [
 /// rectangle with its far edges included, and a probe within one tile of a
 /// level edge counts only while facing out across that edge.
 pub fn probe_in_link(link: &Link, qx: f32, qy: f32, dir: u8) -> bool {
-    let near_ok = (qy > 1.0 || dir == DIR_NORTH) && (qx > 1.0 || dir == DIR_WEST) && (qy < 63.0 || dir == DIR_SOUTH) && (qx < 63.0 || dir == DIR_EAST);
+    let near_ok = (qy > 1.0 || dir == DIR_NORTH)
+        && (qx > 1.0 || dir == DIR_WEST)
+        && (qy < 63.0 || dir == DIR_SOUTH)
+        && (qx < 63.0 || dir == DIR_EAST);
     let (x0, y0) = (link.x as f32, link.y as f32);
     near_ok && x0 <= qx && qx <= x0 + link.width as f32 && y0 <= qy && qy <= y0 + link.height as f32
 }
@@ -515,14 +550,23 @@ pub struct BoardChange {
 pub enum Interaction {
     /// An object (bush, rock, ...) was lifted; `kind` is its entry in the
     /// lift table.
-    Lifted { kind: usize },
+    Lifted {
+        kind: usize,
+    },
     /// A faced a wall (a rock too heavy for the glove counts): the player
     /// holds on to it until A is let go, and can pull (see [`pushpull`]).
     Grabbed,
     /// The carried object was thrown; `kind` is its lift-table entry.
-    Thrown { kind: usize },
+    Thrown {
+        kind: usize,
+    },
     /// A closed chest was opened at `(x, y)`; `got` describes the item.
-    Chest { x: i32, y: i32, item: String, got: String },
+    Chest {
+        x: i32,
+        y: i32,
+        item: String,
+        got: String,
+    },
     Nothing,
 }
 
@@ -546,7 +590,11 @@ pub fn swim_message(swimming: bool) -> Vec<u8> {
 /// its folder, lower-cased, up to and including its last `§` or `$`; empty
 /// when it has neither.
 pub fn name_group(level: &str) -> String {
-    let base = level.rsplit(['/', '\\', ':']).next().unwrap_or(level).to_lowercase();
+    let base = level
+        .rsplit(['/', '\\', ':'])
+        .next()
+        .unwrap_or(level)
+        .to_lowercase();
     match base.rfind(['§', '$']) {
         Some(i) => base[..i + base[i..].chars().next().map_or(1, char::len_utf8)].to_string(),
         None => String::new(),
@@ -597,8 +645,17 @@ const SEAM_GLIDE_MAX: f32 = 4.0;
 /// real crossing would put it (a Seihai choice): at least -0.5 going east,
 /// at most 61.5 going west, at most 61 going north, at least -1 going
 /// south.
-pub fn edge_link_arrival(map: &crate::gmap::Gmap, here: &str, link: &Link, x: f32, y: f32) -> Option<(f32, f32)> {
-    let next = |dx, dy| map.neighbour_of(here, dx, dy).is_some_and(|n| n.eq_ignore_ascii_case(&link.dest));
+pub fn edge_link_arrival(
+    map: &crate::gmap::Gmap,
+    here: &str,
+    link: &Link,
+    x: f32,
+    y: f32,
+) -> Option<(f32, f32)> {
+    let next = |dx, dy| {
+        map.neighbour_of(here, dx, dy)
+            .is_some_and(|n| n.eq_ignore_ascii_case(&link.dest))
+    };
     if link.x == 0 && link.width == 1 && next(-1, 0) {
         Some(((x + 64.0).min(61.5), y))
     } else if link.x == 63 && link.width == 1 && next(1, 0) {
@@ -748,7 +805,8 @@ impl OfflineSession {
         if self.player_health <= 0 {
             return 0;
         }
-        ((self.player_health as f64 * self.max_hearts as f64 / 100.0).round() as i32).clamp(1, self.max_hearts.max(1))
+        ((self.player_health as f64 * self.max_hearts as f64 / 100.0).round() as i32)
+            .clamp(1, self.max_hearts.max(1))
     }
 
     /// Set the hearts in half hearts (clamped to the maximum). A positive
@@ -774,7 +832,12 @@ impl OfflineSession {
     /// Hearts and AP the server gave: MAXPOWER (heart containers), CURPOWER
     /// (hearts × 2, so half hearts) and ALIGNMENT. Max first, so a CURPOWER
     /// in the same message is read against the new maximum.
-    pub fn apply_server_power(&mut self, max_power: Option<u8>, cur_power: Option<u8>, alignment: Option<u8>) {
+    pub fn apply_server_power(
+        &mut self,
+        max_power: Option<u8>,
+        cur_power: Option<u8>,
+        alignment: Option<u8>,
+    ) {
         if let Some(m) = max_power {
             // Zero from the server leaves the default. A real account
             // has hearts; zero is either a missing prop or a freeze.
@@ -789,7 +852,10 @@ impl OfflineSession {
             // (case 2 at 0x530dd8) has no zero test, and a 2.22 client sent
             // the dead gani on an injected CURPOWER 0. Respawn gives hearts.
             if c == 0 && self.hearts_half() > 0 {
-                eprintln!("server sent cur power 0; hearts {} -> 0", self.hearts_half());
+                eprintln!(
+                    "server sent cur power 0; hearts {} -> 0",
+                    self.hearts_half()
+                );
             }
             self.set_hearts_half(i32::from(c));
         }
@@ -828,7 +894,9 @@ impl OfflineSession {
     /// next [`Self::tick_life`]). The hearts report waits for it, so the
     /// claim, CURPOWER 0 and GANI `dead` go out together.
     pub fn death_pending(&self) -> bool {
-        self.life.rules().is_some() && !self.life.is_dead() && (self.player_health <= 0 || self.hearts_half() <= 0)
+        self.life.rules().is_some()
+            && !self.life.is_dead()
+            && (self.player_health <= 0 || self.hearts_half() <= 0)
     }
 
     /// Take damage in half hearts from `attacker` (a player id) or from
@@ -886,12 +954,16 @@ impl OfflineSession {
 
     /// Whether the burn test point is on a tile of the lava list.
     pub fn on_lava(&self) -> bool {
-        let (Some(level), Some(types)) = (&self.current_level, &self.tiletypes) else { return false };
+        let (Some(level), Some(types)) = (&self.current_level, &self.tiletypes) else {
+            return false;
+        };
         let (px, py) = (self.player_x + 1.5, self.player_y + 2.0);
         if !(0.0..64.0).contains(&px) || !(0.0..64.0).contains(&py) {
             return false;
         }
-        level.tile_id_at(px as i32, py as i32).is_some_and(|id| types.is_lava(id))
+        level
+            .tile_id_at(px as i32, py as i32)
+            .is_some_and(|id| types.is_lava(id))
     }
 
     /// The player cannot act: dead and the timer not yet past the lock.
@@ -916,8 +988,15 @@ impl OfflineSession {
     /// True when the level loaded last is the one named `name` (a file name,
     /// with or without `.nw`, any case).
     pub fn is_loaded(&self, name: &str) -> bool {
-        let base = |n: &str| n.strip_suffix(".nw").or_else(|| n.strip_suffix(".NW")).unwrap_or(n).to_ascii_lowercase();
-        self.loaded_file.as_deref().is_some_and(|f| base(f) == base(name))
+        let base = |n: &str| {
+            n.strip_suffix(".nw")
+                .or_else(|| n.strip_suffix(".NW"))
+                .unwrap_or(n)
+                .to_ascii_lowercase()
+        };
+        self.loaded_file
+            .as_deref()
+            .is_some_and(|f| base(f) == base(name))
     }
 
     /// A level was entered (or the session started in it): maybe remember
@@ -941,12 +1020,18 @@ impl OfflineSession {
                         Some(g) => g.map.list_index(n).map_or(-1, |i| i as i64),
                         None => -1,
                     };
-                    list(level) * list(old) < 0 || (rules.entry_name_group && name_group(old) != name_group(level))
+                    list(level) * list(old) < 0
+                        || (rules.entry_name_group && name_group(old) != name_group(level))
                 }
             },
         };
         if save {
-            self.entry = Some(EntryPoint { level: level.to_string(), x: self.player_x, y: self.player_y, dir: self.player_dir });
+            self.entry = Some(EntryPoint {
+                level: level.to_string(),
+                x: self.player_x,
+                y: self.player_y,
+                dir: self.player_dir,
+            });
         }
     }
 
@@ -970,7 +1055,10 @@ impl OfflineSession {
                 RespawnTo::Saved(e)
             }
             None if online => {
-                let (x, y) = (f32::from(rules.default_x2) / 2.0, f32::from(rules.default_y2) / 2.0);
+                let (x, y) = (
+                    f32::from(rules.default_x2) / 2.0,
+                    f32::from(rules.default_y2) / 2.0,
+                );
                 self.player_x = x;
                 self.player_y = y;
                 self.player_dir = DIR_SOUTH;
@@ -1053,7 +1141,12 @@ impl OfflineSession {
             self.show_chest_item(c.x, c.y);
             let got = self.give_item(&c.item);
             self.reading = note;
-            return Interaction::Chest { x: c.x, y: c.y, item: c.item, got };
+            return Interaction::Chest {
+                x: c.x,
+                y: c.y,
+                item: c.item,
+                got,
+            };
         }
         // Signs are not read with the A key: see `read_sign_ahead`.
         // Nothing to lift or open: A holds on to a wall (a rock too heavy
@@ -1153,7 +1246,10 @@ impl OfflineSession {
         if let Some(old) = self.loaded_file.clone().filter(|_| self.gmap.is_none()) {
             self.keep_level_for_big_map(&old);
         }
-        self.loaded_file = path.as_ref().file_name().map(|n| n.to_string_lossy().into_owned());
+        self.loaded_file = path
+            .as_ref()
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned());
         let level = Level::load(path)?;
         self.current_level = Some(level);
         self.swap_tutorial_tables();
@@ -1177,10 +1273,16 @@ impl OfflineSession {
     /// the player's own back on leaving one.
     fn swap_tutorial_tables(&mut self) {
         let want = self.tutorial_tables.is_some()
-            && self.loaded_file.as_deref().is_some_and(crate::assets::tutorial::is_tutorial_level);
+            && self
+                .loaded_file
+                .as_deref()
+                .is_some_and(crate::assets::tutorial::is_tutorial_level);
         if want && self.stashed_tables.is_none() {
             let (types, obj) = self.tutorial_tables.clone().expect("checked above");
-            self.stashed_tables = Some((self.tiletypes.replace(types), std::mem::replace(&mut self.object_tables, obj)));
+            self.stashed_tables = Some((
+                self.tiletypes.replace(types),
+                std::mem::replace(&mut self.object_tables, obj),
+            ));
             self.refresh_water();
         } else if !want {
             if let Some((types, obj)) = self.stashed_tables.take() {
@@ -1211,13 +1313,18 @@ impl OfflineSession {
 
     /// Load type-0 collision from `arrays.dat` (first array = nowall list).
     /// Tiles in the list get type 0 (passable); everything else gets type 22.
-    pub fn load_tiletypes_arrays<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), String> {
+    pub fn load_tiletypes_arrays<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+    ) -> Result<(), String> {
         let path = path.as_ref();
         let types = TileTypes::load_arrays(path)?;
         self.put_own_tables_back();
         self.tiletypes = Some(types);
         // The same file holds the cut and lift tables.
-        self.object_tables = std::fs::read(path).ok().and_then(|d| ObjectTables::parse(&d));
+        self.object_tables = std::fs::read(path)
+            .ok()
+            .and_then(|d| ObjectTables::parse(&d));
         self.refresh_water();
         self.swap_tutorial_tables();
         Ok(())
@@ -1259,7 +1366,10 @@ impl OfflineSession {
         let tables = self.object_tables.as_ref()?;
         let max = usize::from(self.glove_power) + 2;
         let (px, py) = self.probe_tile();
-        let (kind, ax, ay) = self.current_level.as_ref()?.find_object(&tables.lift, max, px, py)?;
+        let (kind, ax, ay) = self
+            .current_level
+            .as_ref()?
+            .find_object(&tables.lift, max, px, py)?;
         let tiles = tables.lift[kind];
         let left = tables.lift_into.get(kind).copied()?;
         self.current_level.as_mut()?.put_object(ax, ay, &left);
@@ -1285,7 +1395,12 @@ impl OfflineSession {
         // throw (A or S): the carry walk stops, and a held arrow starts the
         // walk again on the next step.
         self.walking = false;
-        self.thrown.push(crate::throwing::Thrown::launch(c.kind, self.player_x, self.player_y, self.player_dir));
+        self.thrown.push(crate::throwing::Thrown::launch(
+            c.kind,
+            self.player_x,
+            self.player_y,
+            self.player_dir,
+        ));
         Some(c.kind)
     }
 
@@ -1293,7 +1408,9 @@ impl OfflineSession {
     /// object leaves from their position `(px, py)` (in this player's
     /// coordinates) facing `dir`, and can hit this player.
     pub fn throw_remote(&mut self, sprite: u16, px: f32, py: f32, dir: u8, thrower: u16) {
-        self.thrown.push(crate::throwing::Thrown::launch_remote(sprite, px, py, dir, thrower));
+        self.thrown.push(crate::throwing::Thrown::launch_remote(
+            sprite, px, py, dir, thrower,
+        ));
     }
 
     /// Drop every object in flight, every effect and every floor item (a
@@ -1320,16 +1437,21 @@ impl OfflineSession {
     /// wall type objects fly through. (Hits on NPCs, players and chests are
     /// open: see `documentation/throwing.md`.)
     fn throw_blocked(&self, fx: f32, fy: f32) -> bool {
-        let Some(level) = &self.current_level else { return false };
+        let Some(level) = &self.current_level else {
+            return false;
+        };
         let outside = !(0.0..64.0).contains(&fx) || !(0.0..64.0).contains(&fy);
-        let Some(types) = &self.tiletypes else { return outside && self.gmap.is_none() };
+        let Some(types) = &self.tiletypes else {
+            return outside && self.gmap.is_none();
+        };
         if self.kind_at_point(level, types, fx, fy) != TileKind::Blocking {
             return false;
         }
         let inside = (0.0..64.0).contains(&fx) && (0.0..64.0).contains(&fy);
         if inside {
             if let Some(id) = level.tile_id_at(fx as i32, fy as i32) {
-                return types.types.get(usize::from(id)).copied() != Some(crate::throwing::TYPE_THROW_THROUGH);
+                return types.types.get(usize::from(id)).copied()
+                    != Some(crate::throwing::TYPE_THROW_THROUGH);
             }
         }
         true
@@ -1338,7 +1460,9 @@ impl OfflineSession {
     /// Whether the water test point is on a water tile.
     fn throw_in_water(&self, fx: f32, fy: f32) -> bool {
         match (&self.current_level, &self.tiletypes) {
-            (Some(level), Some(types)) => self.kind_at_point(level, types, fx, fy) == TileKind::Water,
+            (Some(level), Some(types)) => {
+                self.kind_at_point(level, types, fx, fy) == TileKind::Water
+            }
             _ => false,
         }
     }
@@ -1392,10 +1516,18 @@ impl OfflineSession {
             if !stop {
                 // A baddy takes 3, or 1 from the bush or a bomb
                 // (documentation/throwing.md).
-                let power = if o.sprite == Some(261) || o.kind == usize::MAX { 1 } else { 3 };
+                let power = if o.sprite == Some(261) || o.kind == usize::MAX {
+                    1
+                } else {
+                    3
+                };
                 stop = self.throw_hits_baddy(wx, wy, o.dir, power);
             }
-            if !stop && !o.own && self.victim().state == crate::combat::Vulnerability::Hurtable && o.hits_player(self.player_x, self.player_y) {
+            if !stop
+                && !o.own
+                && self.victim().state == crate::combat::Vulnerability::Hurtable
+                && o.hits_player(self.player_x, self.player_y)
+            {
                 self.thrown_hit(&o);
                 stop = true;
             }
@@ -1405,15 +1537,29 @@ impl OfflineSession {
             }
             if t::stays_on_ground(o.sprite) {
                 if let Some(sprite) = o.sprite {
-                    self.grounded.push(t::Grounded { sprite, x: o.x, y: o.y });
+                    self.grounded.push(t::Grounded {
+                        sprite,
+                        x: o.x,
+                        y: o.y,
+                    });
                 }
-                self.landings.push(Landing { kind: o.kind, effect: None, x: o.x, y: o.y });
+                self.landings.push(Landing {
+                    kind: o.kind,
+                    effect: None,
+                    x: o.x,
+                    y: o.y,
+                });
                 continue;
             }
             let (ox, oy) = o.water_probe();
             let kind = t::leap_kind(o.sprite, self.throw_in_water(ox, oy));
             self.spawn_leap(kind, o.x, o.ground);
-            self.landings.push(Landing { kind: o.kind, effect: Some(kind), x: o.x, y: o.ground });
+            self.landings.push(Landing {
+                kind: o.kind,
+                effect: Some(kind),
+                x: o.x,
+                y: o.ground,
+            });
         }
     }
 
@@ -1430,7 +1576,8 @@ impl OfflineSession {
         if self.damage_half(half, o.thrower) {
             self.log_hurt("thrown object", o.thrower, half);
         }
-        self.combat.start_hurt_knock(Some(crate::throwing::throw_knock(o.dir)));
+        self.combat
+            .start_hurt_knock(Some(crate::throwing::throw_knock(o.dir)));
         self.throw_hurt = true;
     }
 
@@ -1438,14 +1585,25 @@ impl OfflineSession {
     /// current level (a lift, a cut, a moved stone block), clipped to the
     /// board, with the tiles as they are now.
     pub(crate) fn note_board_change(&mut self, x: i32, y: i32, w: i32, h: i32) {
-        let Some(level) = self.current_level.as_ref() else { return };
+        let Some(level) = self.current_level.as_ref() else {
+            return;
+        };
         let (x0, y0) = (x.max(0), y.max(0));
         let (x1, y1) = ((x + w).min(64), (y + h).min(64));
         if x0 >= x1 || y0 >= y1 {
             return;
         }
-        let tiles = (y0..y1).flat_map(|ty| (x0..x1).map(move |tx| (tx, ty))).map(|(tx, ty)| level.tile_id_at(tx, ty).unwrap_or(0)).collect();
-        self.board_changes.push(BoardChange { x: x0, y: y0, width: x1 - x0, height: y1 - y0, tiles });
+        let tiles = (y0..y1)
+            .flat_map(|ty| (x0..x1).map(move |tx| (tx, ty)))
+            .map(|(tx, ty)| level.tile_id_at(tx, ty).unwrap_or(0))
+            .collect();
+        self.board_changes.push(BoardChange {
+            x: x0,
+            y: y0,
+            width: x1 - x0,
+            height: y1 - y0,
+            tiles,
+        });
     }
 
     /// The board areas the player changed since the last call. Online each
@@ -1479,9 +1637,16 @@ impl OfflineSession {
         if self.throw_in_water(x + 1.0, y + 1.0) {
             self.spawn_leap(crate::throwing::LEAP_SPLASH, x, y);
         } else {
-            self.placed_bombs.push(b::Bomb::new(x, y, power, b::FUSE_TICKS));
+            self.placed_bombs
+                .push(b::Bomb::new(x, y, power, b::FUSE_TICKS));
         }
-        self.bomb_sends.push(b::bomb_add_message(x, y, power, from_weapon, b::FUSE_TICKS - b::SEND_LEAD));
+        self.bomb_sends.push(b::bomb_add_message(
+            x,
+            y,
+            power,
+            from_weapon,
+            b::FUSE_TICKS - b::SEND_LEAD,
+        ));
     }
 
     /// The `PLI_BOMBADD` messages since the last call.
@@ -1511,13 +1676,16 @@ impl OfflineSession {
     fn bomb_tick(&mut self) {
         for p in std::mem::take(&mut self.blast) {
             let mut p = p;
-            if self.victim().state == crate::combat::Vulnerability::Hurtable && p.hits_player(self.player_x, self.player_y) {
+            if self.victim().state == crate::combat::Vulnerability::Hurtable
+                && p.hits_player(self.player_x, self.player_y)
+            {
                 let owner = self.owner_named(p.owner);
                 if !(self.no_pk && owner.is_some()) {
                     if self.damage_half(p.damage_half(), owner) {
                         self.log_hurt("explosion", owner, p.damage_half());
                     }
-                    self.combat.start_hurt_knock(Some(crate::throwing::throw_knock(p.knock_dir())));
+                    self.combat
+                        .start_hurt_knock(Some(crate::throwing::throw_knock(p.knock_dir())));
                     self.throw_hurt = true;
                 }
             }
@@ -1530,7 +1698,11 @@ impl OfflineSession {
                 self.placed_bombs.push(bomb);
                 continue;
             }
-            self.sound_events.push(SoundEvent { file: bomb.sound().into(), x: bomb.x + 1.0, y: bomb.y + 1.0 });
+            self.sound_events.push(SoundEvent {
+                file: bomb.sound().into(),
+                x: bomb.x + 1.0,
+                y: bomb.y + 1.0,
+            });
             let room = crate::bombs::MAX_PIECES.saturating_sub(self.blast.len());
             self.blast.extend(bomb.pieces().into_iter().take(room));
         }
@@ -1539,7 +1711,10 @@ impl OfflineSession {
     /// The stderr line for a hit that is not a sword or hit packet, so a lab
     /// log shows where the hearts went.
     fn log_hurt(&self, source: &str, owner: Option<u16>, half: i32) {
-        eprintln!("hurt by {source} (owner {owner:?}): {half} half hearts, now {}", self.hearts_half());
+        eprintln!(
+            "hurt by {source} (owner {owner:?}): {half} half hearts, now {}",
+            self.hearts_half()
+        );
     }
 
     /// The owner a hit names: `owner` while that player is in the server's
@@ -1571,15 +1746,24 @@ impl OfflineSession {
     /// a bomb's (inferred).
     pub fn receive_explosion(&mut self, e: &crate::bombs::Explosion, sender: Option<u16>) {
         use crate::bombs as b;
-        self.sound_events.push(SoundEvent { file: b::sound(e.power).into(), x: e.x + 1.0, y: e.y + 1.0 });
+        self.sound_events.push(SoundEvent {
+            file: b::sound(e.power).into(),
+            x: e.x + 1.0,
+            y: e.y + 1.0,
+        });
         let room = b::MAX_PIECES.saturating_sub(self.blast.len());
         let owner = sender.filter(|_| e.owned);
-        self.blast.extend(b::explosion_pieces(e.radius, e.x, e.y, e.power, owner).into_iter().take(room));
+        self.blast.extend(
+            b::explosion_pieces(e.radius, e.x, e.y, e.power, owner)
+                .into_iter()
+                .take(room),
+        );
     }
 
     /// Another player's shot (`PLO_ARROWADD`), in this level's coordinates.
     pub fn receive_arrow(&mut self, a: &crate::arrows::ArrowAdd, sender: Option<u16>) {
-        self.arrows.push(crate::arrows::Arrow::received(a, sender, self.no_pk));
+        self.arrows
+            .push(crate::arrows::Arrow::received(a, sender, self.no_pk));
     }
 
     /// A shot hit this player: the hearts and the push unless it is a
@@ -1588,15 +1772,23 @@ impl OfflineSession {
         let owner = self.owner_named(a.owner);
         if !(self.no_pk && owner.is_some()) {
             if self.damage_half(a.damage_half(), owner) {
-                let name = ["arrow", "fireball", "fireblast", "nuke"].get(usize::from(a.kind)).copied().unwrap_or("shot");
+                let name = ["arrow", "fireball", "fireblast", "nuke"]
+                    .get(usize::from(a.kind))
+                    .copied()
+                    .unwrap_or("shot");
                 self.log_hurt(name, owner, a.damage_half());
             }
-            self.combat.start_hurt_knock(Some(crate::throwing::throw_knock(a.dir())));
+            self.combat
+                .start_hurt_knock(Some(crate::throwing::throw_knock(a.dir())));
             self.throw_hurt = true;
         }
         if let Some((bx, by)) = a.blast_at(w, h) {
             let room = crate::bombs::MAX_PIECES.saturating_sub(self.blast.len());
-            self.blast.extend(crate::bombs::explosion_pieces(2, bx, by, 1, a.owner).into_iter().take(room));
+            self.blast.extend(
+                crate::bombs::explosion_pieces(2, bx, by, 1, a.owner)
+                    .into_iter()
+                    .take(room),
+            );
         }
     }
 
@@ -1606,11 +1798,26 @@ impl OfflineSession {
     /// ([`crate::arrows::player_start`]; `w` and `h` are not used).
     pub fn shoot_arrow(&mut self, x: f32, y: f32, w: f32, h: f32, dir: u8, from_weapon: bool) {
         use crate::arrows as a;
-        let (sx, sy) = if from_weapon { a::player_start(x, y, dir) } else { a::start(x, y, w, h, dir) };
+        let (sx, sy) = if from_weapon {
+            a::player_start(x, y, dir)
+        } else {
+            a::start(x, y, w, h, dir)
+        };
         let mut arrow = a::Arrow::new(sx, sy, dir);
         arrow.harmless = from_weapon;
-        self.sound_events.push(SoundEvent { file: "arrow.wav".into(), x: sx + 0.5, y: sy + 0.5 });
-        self.arrow_sends.push(a::arrow_add_message(sx, sy, dir, from_weapon, arrow.sprite, 0));
+        self.sound_events.push(SoundEvent {
+            file: "arrow.wav".into(),
+            x: sx + 0.5,
+            y: sy + 0.5,
+        });
+        self.arrow_sends.push(a::arrow_add_message(
+            sx,
+            sy,
+            dir,
+            from_weapon,
+            arrow.sprite,
+            0,
+        ));
         self.arrows.push(arrow);
     }
 
@@ -1650,14 +1857,18 @@ impl OfflineSession {
                 // table gives, and once hurt (by an earlier shot of this
                 // tick too) no more.
                 if let Some((_, _, w, h)) = crate::throwing::sprite_rect(tables, a.sprite) {
-                    if !hurt_now && self.victim().state == crate::combat::Vulnerability::Hurtable && a.hits_player(w, h, self.player_x, self.player_y) {
+                    if !hurt_now
+                        && self.victim().state == crate::combat::Vulnerability::Hurtable
+                        && a.hits_player(w, h, self.player_x, self.player_y)
+                    {
                         hurt_now = !(self.no_pk && self.owner_named(a.owner).is_some());
                         hits.push((a, w, h));
                         continue;
                     }
                 }
                 if a.reflect < 0 {
-                    let (w, h) = crate::throwing::sprite_rect(tables, a.sprite).map_or((16, 16), |(_, _, w, h)| (w, h));
+                    let (w, h) = crate::throwing::sprite_rect(tables, a.sprite)
+                        .map_or((16, 16), |(_, _, w, h)| (w, h));
                     let (mx, my) = (a.x + w as f32 / 32.0, a.y + h as f32 / 32.0);
                     if let Some(npc) = npc_at(mx, my) {
                         self.shots.push(npc);
@@ -1680,7 +1891,10 @@ impl OfflineSession {
     pub fn try_cut(&mut self) -> Option<usize> {
         let tables = self.object_tables.as_ref()?;
         let (px, py) = self.probe_tile();
-        let (kind, ax, ay) = self.current_level.as_ref()?.find_object(&tables.cut, tables.cut.len(), px, py)?;
+        let (kind, ax, ay) =
+            self.current_level
+                .as_ref()?
+                .find_object(&tables.cut, tables.cut.len(), px, py)?;
         let left = tables.cut_into.get(kind).copied()?;
         self.current_level.as_mut()?.put_object(ax, ay, &left);
         self.note_board_change(ax, ay, 2, 2);
@@ -1697,9 +1911,22 @@ impl OfflineSession {
     /// does for every leap: `water.wav` for the splash, `crush.wav` for the
     /// others, played at `(x + 1, y + 1)`.
     pub fn spawn_leap(&mut self, kind: usize, x: f32, y: f32) {
-        self.leaps.push(crate::throwing::Leap { kind, x, y, frame: -1 });
-        let file = if kind == crate::throwing::LEAP_SPLASH { "water.wav" } else { "crush.wav" };
-        self.sound_events.push(SoundEvent { file: file.into(), x: x + 1.0, y: y + 1.0 });
+        self.leaps.push(crate::throwing::Leap {
+            kind,
+            x,
+            y,
+            frame: -1,
+        });
+        let file = if kind == crate::throwing::LEAP_SPLASH {
+            "water.wav"
+        } else {
+            "crush.wav"
+        };
+        self.sound_events.push(SoundEvent {
+            file: file.into(),
+            x: x + 1.0,
+            y: y + 1.0,
+        });
     }
 
     /// Current player state as a protocol update.
@@ -1840,7 +2067,13 @@ impl OfflineSession {
 
     /// Place a named stamp from an object set onto the current level.
     /// Returns true if the stamp was found and written.
-    pub fn place_named_stamp(&mut self, set: &crate::assets::ObjectSet, name: &str, x: i32, y: i32) -> bool {
+    pub fn place_named_stamp(
+        &mut self,
+        set: &crate::assets::ObjectSet,
+        name: &str,
+        x: i32,
+        y: i32,
+    ) -> bool {
         if let Some(stamp) = set.find(name) {
             if let Some(level) = self.current_level.as_mut() {
                 level.place_stamp(stamp, x, y);
@@ -1875,7 +2108,11 @@ impl OfflineSession {
             }
             self.arrival_tile = None;
         }
-        let here = self.online_level.as_deref().or(self.loaded_file.as_deref()).unwrap_or("");
+        let here = self
+            .online_level
+            .as_deref()
+            .or(self.loaded_file.as_deref())
+            .unwrap_or("");
         let big_map = self.big_map.as_ref();
         let (x, y) = (self.player_x, self.player_y);
         let mut seam = None;
@@ -1886,7 +2123,10 @@ impl OfflineSession {
                 let (dx, dy) = (((x - nx) / 64.0).round(), ((y - ny) / 64.0).round());
                 seam = Some((x - 64.0 * dx, y - 64.0 * dy));
             }
-            let (nx, ny) = edge.unwrap_or((link.new_x.unwrap_or(x + link.x_offset), link.new_y.unwrap_or(y + link.y_offset)));
+            let (nx, ny) = edge.unwrap_or((
+                link.new_x.unwrap_or(x + link.x_offset),
+                link.new_y.unwrap_or(y + link.y_offset),
+            ));
             (link.dest.clone(), nx, ny)
         });
         self.seam_from = seam;
@@ -1902,8 +2142,12 @@ impl OfflineSession {
     /// Run the glide on by `dt_ms`. True while it is still moving (the view
     /// needs drawing again).
     pub fn tick_seam_glide(&mut self, dt_ms: u64) -> bool {
-        let Some(g) = self.seam_glide.as_mut() else { return false };
-        g.left_ms = g.left_ms.saturating_sub(dt_ms.min(u64::from(u32::MAX)) as u32);
+        let Some(g) = self.seam_glide.as_mut() else {
+            return false;
+        };
+        g.left_ms = g
+            .left_ms
+            .saturating_sub(dt_ms.min(u64::from(u32::MAX)) as u32);
         if g.left_ms == 0 {
             self.seam_glide = None;
         }
@@ -1916,7 +2160,11 @@ impl OfflineSession {
     /// [`Self::sync_big_map`]).
     pub fn keep_level_for_big_map(&mut self, name: &str) {
         let key = crate::gmap::level_key(name);
-        let on_grid = self.big_map.as_ref().is_some_and(|m| m.names.iter().any(|n| !n.is_empty() && crate::gmap::level_key(n) == key));
+        let on_grid = self.big_map.as_ref().is_some_and(|m| {
+            m.names
+                .iter()
+                .any(|n| !n.is_empty() && crate::gmap::level_key(n) == key)
+        });
         if let (true, Some(level)) = (on_grid, self.current_level.as_ref()) {
             // Chests opened on this visit stay open on the far side.
             let mut level = level.clone();
@@ -1930,7 +2178,11 @@ impl OfflineSession {
     /// Bring the big-map neighbours up to date for the player's level
     /// `here` (see [`crate::gmap::BigMapView::sync`]). Off a gmap only: a
     /// gmap draws its own neighbours. True when the view changed.
-    pub fn sync_big_map(&mut self, here: Option<&str>, load: &mut dyn FnMut(&str) -> Option<Level>) -> bool {
+    pub fn sync_big_map(
+        &mut self,
+        here: Option<&str>,
+        load: &mut dyn FnMut(&str) -> Option<Level>,
+    ) -> bool {
         let map = self.big_map.as_ref().filter(|_| self.gmap.is_none());
         self.big_map_view.sync(map, here, load)
     }
@@ -1951,7 +2203,10 @@ impl OfflineSession {
         self.seam_glide = self.seam_from.take().and_then(|(fx, fy)| {
             let from = (fx - x, fy - y);
             let near = from.0.abs() <= SEAM_GLIDE_MAX && from.1.abs() <= SEAM_GLIDE_MAX;
-            (near && from != (0.0, 0.0)).then_some(SeamGlide { from, left_ms: SEAM_GLIDE_MS })
+            (near && from != (0.0, 0.0)).then_some(SeamGlide {
+                from,
+                left_ms: SEAM_GLIDE_MS,
+            })
         });
         self.warp_pending = None;
         self.pending_link = None;
@@ -1987,7 +2242,10 @@ impl OfflineSession {
         let was = self.in_water;
         self.in_water = match (&self.current_level, &self.tiletypes) {
             // The liquid list holds lava too: the 2.05 client swims in both.
-            (Some(level), Some(types)) => matches!(self.kind_at_point(level, types, fx, fy), TileKind::Water | TileKind::Lava),
+            (Some(level), Some(types)) => matches!(
+                self.kind_at_point(level, types, fx, fy),
+                TileKind::Water | TileKind::Lava
+            ),
             _ => false,
         };
         if self.in_water != was {
@@ -2013,11 +2271,15 @@ impl OfflineSession {
     /// True if the tile of the current level under a point passes `test`.
     /// Off the board nothing does.
     fn tile_is(&self, fx: f32, fy: f32, test: fn(&TileTypes, u16) -> bool) -> bool {
-        let (Some(level), Some(types)) = (&self.current_level, &self.tiletypes) else { return false };
+        let (Some(level), Some(types)) = (&self.current_level, &self.tiletypes) else {
+            return false;
+        };
         if !(0.0..64.0).contains(&fx) || !(0.0..64.0).contains(&fy) {
             return false;
         }
-        level.tile_id_at(fx as i32, fy as i32).is_some_and(|id| test(types, id))
+        level
+            .tile_id_at(fx as i32, fy as i32)
+            .is_some_and(|id| test(types, id))
     }
 
     /// Sit on a chair or lie down in a bed, as the 2.05 client decides it.
@@ -2047,7 +2309,10 @@ impl OfflineSession {
             return;
         }
         let bed_top = |s: &Self, dx: f32, dy: f32| s.tile_is(x + dx, y + dy, TileTypes::is_bed_top);
-        if !BED_PROBE_DX.iter().all(|&dx| BED_PROBE_DY.iter().any(|&dy| bed_top(self, dx, dy))) {
+        if !BED_PROBE_DX
+            .iter()
+            .all(|&dx| BED_PROBE_DY.iter().any(|&dy| bed_top(self, dx, dy)))
+        {
             return;
         }
         self.sleeping = true;
@@ -2060,7 +2325,11 @@ impl OfflineSession {
 
     /// Time between steps now (swimming and walking are the same pace).
     pub fn step_interval(&self) -> std::time::Duration {
-        std::time::Duration::from_millis(if self.in_water { SWIM_STEP_MS } else { WALK_STEP_MS })
+        std::time::Duration::from_millis(if self.in_water {
+            SWIM_STEP_MS
+        } else {
+            WALK_STEP_MS
+        })
     }
 
     /// `Some(swimming)` when the swimming state changed since the last
@@ -2119,7 +2388,9 @@ impl OfflineSession {
         match w.map.resolve(w.cell, (nx, ny)) {
             Resolved::Inside => true,
             Resolved::NoLevel => false,
-            Resolved::Crossed(c) => !(c.x_changed() && c.y_changed()) && w.levels.contains_key(&c.to),
+            Resolved::Crossed(c) => {
+                !(c.x_changed() && c.y_changed()) && w.levels.contains_key(&c.to)
+            }
         }
     }
 
@@ -2191,7 +2462,11 @@ impl OfflineSession {
         }
         let (fx, fy) = ((px + WALK_FLOOR_EPS) as f32, (py + WALK_FLOOR_EPS) as f32);
         match (&self.current_level, &self.tiletypes) {
-            (Some(level), Some(types)) if self.kind_at_point(level, types, fx, fy) == TileKind::Blocking => return true,
+            (Some(level), Some(types))
+                if self.kind_at_point(level, types, fx, fy) == TileKind::Blocking =>
+            {
+                return true
+            }
             (Some(_), None) if self.off_board(fx, fy) => return true,
             _ => {}
         }
@@ -2211,7 +2486,10 @@ impl OfflineSession {
     fn body_overlap(&self, x: f64, y: f64) -> usize {
         const XS: [f64; 3] = [0.525, 1.5, 2.475];
         const YS: [f64; 3] = [1.025, 2.0, 2.975];
-        XS.iter().flat_map(|&px| YS.iter().map(move |&py| (px, py))).filter(|&(px, py)| self.walk_blocked(x + px, y + py)).count()
+        XS.iter()
+            .flat_map(|&px| YS.iter().map(move |&py| (px, py)))
+            .filter(|&(px, py)| self.walk_blocked(x + px, y + py))
+            .count()
     }
 
     /// One arrow key of the real client's walking routine: the sprite at
@@ -2239,7 +2517,10 @@ impl OfflineSession {
         if !self.gmap_step_ok(nx as f32, ny as f32) {
             return (x, y, StepResult::Refused { nudged: false });
         }
-        let hit: Vec<bool> = WALK_PROBES[dir].iter().map(|&(px, py)| self.walk_blocked(nx + px, ny + py)).collect();
+        let hit: Vec<bool> = WALK_PROBES[dir]
+            .iter()
+            .map(|&(px, py)| self.walk_blocked(nx + px, ny + py))
+            .collect();
         let (mut fx, mut fy) = (nx, ny);
         let refused = hit[0] || hit[1] || hit[2] || hit[3];
         if refused {
@@ -2279,7 +2560,15 @@ impl OfflineSession {
         if !(WALK_SNAP_EDGE..=1.0 - WALK_SNAP_EDGE).contains(&f) {
             fx = walk_floor(t + WALK_SNAP_EDGE) - 0.5;
         }
-        (fx, fy, if refused { StepResult::Refused { nudged } } else { StepResult::Free })
+        (
+            fx,
+            fy,
+            if refused {
+                StepResult::Refused { nudged }
+            } else {
+                StepResult::Free
+            },
+        )
     }
 
     /// Move the player by (dx, dy) as the real client's walking routine
@@ -2296,7 +2585,8 @@ impl OfflineSession {
     /// Returns the emitted `PlayerUpdate` if the position changed.
     pub fn try_move(&mut self, dx: f32, dy: f32) -> Option<PlayerUpdate> {
         // An open sign takes the arrows (2.05): no step and no turn.
-        if dx == 0.0 && dy == 0.0 || self.life.is_dead() || self.jumping() || self.reading.is_some() {
+        if dx == 0.0 && dy == 0.0 || self.life.is_dead() || self.jumping() || self.reading.is_some()
+        {
             return None;
         }
         // Hurt: the arrows are ignored for the first ticks; after that a
@@ -2326,7 +2616,12 @@ impl OfflineSession {
         // Hidden under a carried object: a fifth of the speed.
         let k = if self.hidden { hide::HIDE_SPEED } else { 1.0 };
         let (dx, dy) = ((dx * k) as f64, (dy * k) as f64);
-        let steps = [(dy < 0.0, DIR_NORTH, 0.0, dy), (dx < 0.0, DIR_WEST, dx, 0.0), (dy > 0.0, DIR_SOUTH, 0.0, dy), (dx > 0.0, DIR_EAST, dx, 0.0)];
+        let steps = [
+            (dy < 0.0, DIR_NORTH, 0.0, dy),
+            (dx < 0.0, DIR_WEST, dx, 0.0),
+            (dy > 0.0, DIR_SOUTH, 0.0, dy),
+            (dx > 0.0, DIR_EAST, dx, 0.0),
+        ];
         for (pressed, dir, mx, my) in steps {
             if !pressed {
                 continue;
@@ -2382,7 +2677,11 @@ impl OfflineSession {
         if let Some(gani) = self.walk_gani.as_mut().filter(|_| !swimming) {
             let cues = gani.step_sounds();
             for c in cues {
-                self.sound_events.push(SoundEvent { file: c.file, x: self.player_x + c.x, y: self.player_y + c.y });
+                self.sound_events.push(SoundEvent {
+                    file: c.file,
+                    x: self.player_x + c.x,
+                    y: self.player_y + c.y,
+                });
             }
         }
         Some(self.player_update())
@@ -2396,12 +2695,21 @@ impl OfflineSession {
             return false;
         }
         match (&self.current_level, &self.tiletypes) {
-            (Some(level), Some(types)) if self.kind_at_point(level, types, fx, fy) == TileKind::Blocking => return true,
+            (Some(level), Some(types))
+                if self.kind_at_point(level, types, fx, fy) == TileKind::Blocking =>
+            {
+                return true
+            }
             (Some(_), None) if self.off_board(fx, fy) => return true,
             _ => {}
         }
         match &self.current_level {
-            Some(level) => level.chests.iter().any(|c| fx >= c.x as f32 && fx < c.x as f32 + 2.0 && fy >= c.y as f32 && fy < c.y as f32 + 2.0),
+            Some(level) => level.chests.iter().any(|c| {
+                fx >= c.x as f32
+                    && fx < c.x as f32 + 2.0
+                    && fy >= c.y as f32
+                    && fy < c.y as f32 + 2.0
+            }),
             None => false,
         }
     }
@@ -2414,11 +2722,17 @@ impl OfflineSession {
         if self.warp_pending.is_some() || self.life.is_dead() {
             return false;
         }
-        let (nx, ny) = (self.player_x + ux * crate::combat::KNOCKBACK_STEP_TILES, self.player_y + uy * crate::combat::KNOCKBACK_STEP_TILES);
+        let (nx, ny) = (
+            self.player_x + ux * crate::combat::KNOCKBACK_STEP_TILES,
+            self.player_y + uy * crate::combat::KNOCKBACK_STEP_TILES,
+        );
         if !self.gmap_step_ok(nx, ny) {
             return false;
         }
-        if crate::combat::KNOCKBACK_PROBES.iter().any(|&(px, py)| self.blocked_point(nx + px, ny + py)) {
+        if crate::combat::KNOCKBACK_PROBES
+            .iter()
+            .any(|&(px, py)| self.blocked_point(nx + px, ny + py))
+        {
             return false;
         }
         self.player_x = nx;
@@ -2511,7 +2825,11 @@ mod tests {
             for k in 1..=625u64 {
                 let now = t0 + Duration::from_millis(k * 16);
                 if now - last >= interval {
-                    last = if catch_up { next_step_clock(last, now, interval) } else { now };
+                    last = if catch_up {
+                        next_step_clock(last, now, interval)
+                    } else {
+                        now
+                    };
                     steps += 1;
                 }
             }
@@ -2528,7 +2846,10 @@ mod tests {
         use std::time::{Duration, Instant};
         let interval = Duration::from_millis(50);
         let t0 = Instant::now();
-        assert_eq!(next_step_clock(t0, t0 + Duration::from_millis(60), interval), t0 + interval);
+        assert_eq!(
+            next_step_clock(t0, t0 + Duration::from_millis(60), interval),
+            t0 + interval
+        );
         let late = t0 + Duration::from_millis(100);
         assert_eq!(next_step_clock(t0, late, interval), late);
     }
@@ -2540,12 +2861,27 @@ mod tests {
     fn the_debug_log_names_each_level_change_once() {
         let mut last = None;
         assert_eq!(level_change_line(&mut last, None), None);
-        assert_eq!(level_change_line(&mut last, Some("onlinestartlocal.nw")).as_deref(), Some("level: onlinestartlocal.nw"));
-        assert_eq!(level_change_line(&mut last, Some("onlinestartlocal.nw")), None);
-        assert_eq!(level_change_line(&mut last, Some("OnlineStartLocal.nw")), None);
-        assert_eq!(level_change_line(&mut last, Some("new3.nw")).as_deref(), Some("level: new3.nw"));
+        assert_eq!(
+            level_change_line(&mut last, Some("onlinestartlocal.nw")).as_deref(),
+            Some("level: onlinestartlocal.nw")
+        );
+        assert_eq!(
+            level_change_line(&mut last, Some("onlinestartlocal.nw")),
+            None
+        );
+        assert_eq!(
+            level_change_line(&mut last, Some("OnlineStartLocal.nw")),
+            None
+        );
+        assert_eq!(
+            level_change_line(&mut last, Some("new3.nw")).as_deref(),
+            Some("level: new3.nw")
+        );
         // Back again is a change too.
-        assert_eq!(level_change_line(&mut last, Some("onlinestartlocal.nw")).as_deref(), Some("level: onlinestartlocal.nw"));
+        assert_eq!(
+            level_change_line(&mut last, Some("onlinestartlocal.nw")).as_deref(),
+            Some("level: onlinestartlocal.nw")
+        );
         let mut s = OfflineSession::new();
         assert_eq!(s.level_name(), None);
         s.loaded_file = Some("new3.nw".into());
@@ -2568,7 +2904,12 @@ mod tests {
         let got = s.interact();
         assert_eq!(
             got,
-            Interaction::Chest { x: 20, y: 24, item: "greenrupee".into(), got: "1 rupee".into() }
+            Interaction::Chest {
+                x: 20,
+                y: 24,
+                item: "greenrupee".into(),
+                got: "1 rupee".into()
+            }
         );
         assert_eq!(s.rupees, 1);
         // Sign 0 is the chest's note.
@@ -2587,15 +2928,28 @@ mod tests {
         s.reading = None;
         s.player_x = 8.5;
         s.player_y = 11.0;
-        assert!(matches!(s.interact(), Interaction::Chest { x: 10, y: 10, .. }));
+        assert!(matches!(
+            s.interact(),
+            Interaction::Chest { x: 10, y: 10, .. }
+        ));
         assert_eq!(s.max_hearts, 8);
         assert!(s.reading.is_none());
     }
 
     /// A level with a sign at (30, 10) on wall tiles (30..31, 10).
     fn sign_on_wall() -> OfflineSession {
-        let mut lvl = level(|x, y| if (x == 30 || x == 31) && y == 10 { WALL } else { 0 });
-        lvl.signs.push(crate::assets::Sign { x: 30, y: 10, text: "Hello".into() });
+        let mut lvl = level(|x, y| {
+            if (x == 30 || x == 31) && y == 10 {
+                WALL
+            } else {
+                0
+            }
+        });
+        lvl.signs.push(crate::assets::Sign {
+            x: 30,
+            y: 10,
+            text: "Hello".into(),
+        });
         let mut s = OfflineSession::new();
         s.current_level = Some(lvl);
         s.tiletypes = Some(types());
@@ -2652,12 +3006,19 @@ mod tests {
         s.player_dir = DIR_NORTH;
         s.reading = Some("Hello".into());
         assert!(s.try_move(0.5, 0.0).is_none(), "no step");
-        assert_eq!((s.player_x, s.player_y, s.player_dir), (29.0, 10.0, DIR_NORTH), "nor a turn");
+        assert_eq!(
+            (s.player_x, s.player_y, s.player_dir),
+            (29.0, 10.0, DIR_NORTH),
+            "nor a turn"
+        );
         assert!(!s.walking);
         // The wall ahead would be grabbed outside reading.
         assert_eq!(s.interact(), Interaction::Nothing);
         assert!(s.pushpull.grab.is_none());
-        s.carried = Some(Carried { kind: 0, tiles: [[0, 0], [0, 0]] });
+        s.carried = Some(Carried {
+            kind: 0,
+            tiles: [[0, 0], [0, 0]],
+        });
         assert!(!s.toggle_hide(), "D does not hide");
         assert!(!s.hidden);
         assert_eq!(s.interact(), Interaction::Nothing, "A does not throw");
@@ -2683,7 +3044,10 @@ mod tests {
         s.player_x = 18.5;
         s.player_y = 25.0;
         s.player_dir = DIR_NORTH;
-        assert!(matches!(s.interact(), Interaction::Chest { x: 20, y: 24, .. }));
+        assert!(matches!(
+            s.interact(),
+            Interaction::Chest { x: 20, y: 24, .. }
+        ));
         // Chest to the east of the player, facing east: probe point is inside, nothing happens.
         let mut s = new();
         s.player_x = 16.5;
@@ -2712,7 +3076,6 @@ mod tests {
     }
 
     // ---- tile movement and warp arrival ------------------------------------
-
 
     const OPEN: u16 = 0;
     const WALL: u16 = 1;
@@ -2769,7 +3132,12 @@ mod tests {
     /// (here empty), then the cut table (array 9), what a cut leaves (10),
     /// the lift table (11) and what a lift leaves (12), each a nested list
     /// of 2 x 2 objects stored `[column][row]`.
-    fn object_arrays(cut: &[[[u32; 2]; 2]], cut_into: &[[[u32; 2]; 2]], lift: &[[[u32; 2]; 2]], lift_into: &[[[u32; 2]; 2]]) -> Vec<u8> {
+    fn object_arrays(
+        cut: &[[[u32; 2]; 2]],
+        cut_into: &[[[u32; 2]; 2]],
+        lift: &[[[u32; 2]; 2]],
+        lift_into: &[[[u32; 2]; 2]],
+    ) -> Vec<u8> {
         fn objs(out: &mut Vec<u8>, list: &[[[u32; 2]; 2]]) {
             out.extend_from_slice(&((1u32 << 16) | list.len() as u32).to_be_bytes());
             for o in list {
@@ -2819,7 +3187,12 @@ mod tests {
     }
 
     fn object_session(glove: u8) -> OfflineSession {
-        let data = object_arrays(&[BUSH, [[420, 436], [421, 437]]], &[BUSH_CUT, [[679, 695], [680, 696]]], &[BUSH, BLOCK, ROCK], &[BUSH_CUT, BLOCK_LEFT, ROCK_LEFT]);
+        let data = object_arrays(
+            &[BUSH, [[420, 436], [421, 437]]],
+            &[BUSH_CUT, [[679, 695], [680, 696]]],
+            &[BUSH, BLOCK, ROCK],
+            &[BUSH_CUT, BLOCK_LEFT, ROCK_LEFT],
+        );
         let mut lvl = level(|_, _| 2047);
         put(&mut lvl, 20, 20, BUSH);
         put(&mut lvl, 30, 20, BLOCK);
@@ -2842,7 +3215,8 @@ mod tests {
 
     #[test]
     fn object_tables_parse_the_nested_arrays() {
-        let t = ObjectTables::parse(&object_arrays(&[BUSH], &[BUSH_CUT], &[ROCK], &[ROCK_LEFT])).unwrap();
+        let t = ObjectTables::parse(&object_arrays(&[BUSH], &[BUSH_CUT], &[ROCK], &[ROCK_LEFT]))
+            .unwrap();
         assert_eq!(t.cut, vec![[[2, 18], [3, 19]]]);
         assert_eq!(t.cut_into, vec![[[677, 693], [678, 694]]]);
         assert_eq!(t.lift[0], [[34, 50], [35, 51]]);
@@ -2882,7 +3256,15 @@ mod tests {
         assert!(s.leaps.is_empty(), "nothing cut, no effect");
         face_up_at(&mut s, 20, 20);
         assert_eq!(s.try_cut(), Some(0));
-        assert_eq!(s.leaps, vec![crate::throwing::Leap { kind: crate::throwing::LEAP_BUSH, x: 20.0, y: 20.0, frame: -1 }]);
+        assert_eq!(
+            s.leaps,
+            vec![crate::throwing::Leap {
+                kind: crate::throwing::LEAP_BUSH,
+                x: 20.0,
+                y: 20.0,
+                frame: -1
+            }]
+        );
         // not drawn before its first tick; then one frame per tick
         assert!(s.tick_throw(50));
         for f in 0..7 {
@@ -2918,7 +3300,17 @@ mod tests {
         let c = s.take_board_changes();
         assert_eq!(c.len(), 1, "the cut goes to the server as one board modify");
         assert_eq!((c[0].x, c[0].y, c[0].width, c[0].height), (20, 20, 2, 2));
-        assert_eq!(c[0].tiles, [BUSH_CUT[0][0], BUSH_CUT[1][0], BUSH_CUT[0][1], BUSH_CUT[1][1]].map(|t| t as u16), "row by row");
+        assert_eq!(
+            c[0].tiles,
+            [
+                BUSH_CUT[0][0],
+                BUSH_CUT[1][0],
+                BUSH_CUT[0][1],
+                BUSH_CUT[1][1]
+            ]
+            .map(|t| t as u16),
+            "row by row"
+        );
     }
 
     #[test]
@@ -2931,7 +3323,10 @@ mod tests {
         assert!(!s.walking, "the throw ends the carry walk");
         // A hidden player is thrown out of hiding the same way.
         face_up_at(&mut s, 30, 20);
-        s.carried = Some(Carried { kind: 0, tiles: [[2, 18], [3, 19]] });
+        s.carried = Some(Carried {
+            kind: 0,
+            tiles: [[2, 18], [3, 19]],
+        });
         assert!(s.toggle_hide());
         s.walking = true;
         assert!(s.throw_carried().is_some());
@@ -2943,10 +3338,28 @@ mod tests {
         let mut s = object_session(0);
         face_up_at(&mut s, 20, 20);
         assert_eq!(s.interact(), Interaction::Lifted { kind: 0 });
-        assert_eq!(get(s.current_level.as_ref().unwrap(), 20, 20), BUSH_CUT, "the bush leaves its stump");
+        assert_eq!(
+            get(s.current_level.as_ref().unwrap(), 20, 20),
+            BUSH_CUT,
+            "the bush leaves its stump"
+        );
         let c = s.take_board_changes();
-        assert_eq!((c.len(), c[0].x, c[0].y, c[0].width, c[0].height), (1, 20, 20, 2, 2), "the lift is a 2 x 2 board modify");
-        assert_eq!(c[0].tiles, [BUSH_CUT[0][0], BUSH_CUT[1][0], BUSH_CUT[0][1], BUSH_CUT[1][1]].map(|t| t as u16), "row by row");
+        assert_eq!(
+            (c.len(), c[0].x, c[0].y, c[0].width, c[0].height),
+            (1, 20, 20, 2, 2),
+            "the lift is a 2 x 2 board modify"
+        );
+        assert_eq!(
+            c[0].tiles,
+            [
+                BUSH_CUT[0][0],
+                BUSH_CUT[1][0],
+                BUSH_CUT[0][1],
+                BUSH_CUT[1][1]
+            ]
+            .map(|t| t as u16),
+            "row by row"
+        );
         assert_eq!(s.carried.as_ref().unwrap().tiles, [[2u16, 18], [3, 19]]);
         // Hands full: A throws it.
         assert_eq!(s.interact(), Interaction::Thrown { kind: 0 });
@@ -2967,10 +3380,22 @@ mod tests {
         }
         face_up_at(&mut s, 40, 20);
         s.player_y = 21.0;
-        assert_eq!(s.interact(), Interaction::Grabbed, "the rock is grabbed, not lifted");
+        assert_eq!(
+            s.interact(),
+            Interaction::Grabbed,
+            "the rock is grabbed, not lifted"
+        );
         assert!(s.carried.is_none());
-        assert_eq!(s.pushpull.grab, Some(Grab { count: 1 }), "held until A is let go");
-        assert_eq!(get(s.current_level.as_ref().unwrap(), 40, 20), ROCK, "the rock does not move");
+        assert_eq!(
+            s.pushpull.grab,
+            Some(Grab { count: 1 }),
+            "held until A is let go"
+        );
+        assert_eq!(
+            get(s.current_level.as_ref().unwrap(), 40, 20),
+            ROCK,
+            "the rock does not move"
+        );
     }
 
     /// arrays.dat array 11's third entry is the pot: 2.05 players start at
@@ -2980,7 +3405,11 @@ mod tests {
         assert_eq!(OfflineSession::new().glove_power, 1);
         let mut s = object_session(OfflineSession::new().glove_power);
         face_up_at(&mut s, 40, 20);
-        assert_eq!(s.interact(), Interaction::Lifted { kind: 2 }, "the third entry without a glove item");
+        assert_eq!(
+            s.interact(),
+            Interaction::Lifted { kind: 2 },
+            "the third entry without a glove item"
+        );
         let mut s = OfflineSession::new();
         s.glove_power = 1;
         s.give_item("glove1");
@@ -3044,14 +3473,25 @@ mod tests {
     #[test]
     fn the_body_on_a_chair_tile_sits() {
         // Chair tiles in column 20, rows 10..=11 (a 1 x 2 bench).
-        let tiles = |x: i32, y: i32| if x == 20 && (10..=11).contains(&y) { CHAIR } else { OPEN };
+        let tiles = |x: i32, y: i32| {
+            if x == 20 && (10..=11).contains(&y) {
+                CHAIR
+            } else {
+                OPEN
+            }
+        };
         // probe at (19.5, 10.5): tile 19, not a chair
         let mut s = body_at(level(tiles), 18.0, 8.5);
         s.refresh_water();
         assert!(!s.sitting);
         // one step right: the probe is at (20.0, 10.5), on the bench
         assert!(s.try_move(0.5, 0.0).is_some());
-        assert!(s.sitting, "probe at ({}, {})", s.player_x + SIT_PROBE.0, s.player_y + SIT_PROBE.1);
+        assert!(
+            s.sitting,
+            "probe at ({}, {})",
+            s.player_x + SIT_PROBE.0,
+            s.player_y + SIT_PROBE.1
+        );
         // walking on: still on it at 20.5, then off at 21.0
         assert!(s.try_move(0.5, 0.0).is_some());
         assert!(s.sitting);
@@ -3064,7 +3504,13 @@ mod tests {
     /// the lower row whenever the body was drawn over it).
     #[test]
     fn both_halves_of_a_chair_sit() {
-        let tiles = |x: i32, y: i32| if (20..=21).contains(&x) && (10..=11).contains(&y) { CHAIR } else { OPEN };
+        let tiles = |x: i32, y: i32| {
+            if (20..=21).contains(&x) && (10..=11).contains(&y) {
+                CHAIR
+            } else {
+                OPEN
+            }
+        };
         let probe_y = |s: &OfflineSession| s.player_y + SIT_PROBE.1;
         // y + 2 runs over rows 10 and 11: y from 8.0 up to (not with) 10.0.
         for y in [8.0, 8.5, 9.0, 9.5] {
@@ -3083,7 +3529,13 @@ mod tests {
     /// loaded; carrying or swimming does not sit.
     #[test]
     fn a_player_placed_on_a_chair_sits() {
-        let tiles = |x: i32, y: i32| if (20..=21).contains(&x) && (10..=11).contains(&y) { CHAIR } else { OPEN };
+        let tiles = |x: i32, y: i32| {
+            if (20..=21).contains(&x) && (10..=11).contains(&y) {
+                CHAIR
+            } else {
+                OPEN
+            }
+        };
         let mut s = OfflineSession::new();
         s.current_level = Some(level(tiles));
         s.player_x = 20.0 - SIT_PROBE.0 + 0.5;
@@ -3091,7 +3543,10 @@ mod tests {
         s.tiletypes = Some(types());
         s.refresh_water();
         assert!(s.sitting);
-        s.carried = Some(Carried { kind: 0, tiles: [[0, 0], [0, 0]] });
+        s.carried = Some(Carried {
+            kind: 0,
+            tiles: [[0, 0], [0, 0]],
+        });
         s.refresh_rest();
         assert!(!s.sitting, "not while carrying");
         s.carried = None;
@@ -3154,13 +3609,24 @@ mod tests {
     #[test]
     fn sit_and_sleep_poses_win_over_the_walk() {
         use crate::pose::PoseKind;
-        let one = || crate::assets::Gani::parse("ANI\n1 0 0\n1 0 0\n1 0 0\n1 0 0\nANIEND\n").unwrap();
-        let tiles = |x: i32, y: i32| if (20..=21).contains(&x) && (10..=11).contains(&y) { CHAIR } else { bed(x, y - 20) };
+        let one =
+            || crate::assets::Gani::parse("ANI\n1 0 0\n1 0 0\n1 0 0\n1 0 0\nANIEND\n").unwrap();
+        let tiles = |x: i32, y: i32| {
+            if (20..=21).contains(&x) && (10..=11).contains(&y) {
+                CHAIR
+            } else {
+                bed(x, y - 20)
+            }
+        };
         let mut s = body_at(level(tiles), 19.0, 8.5);
         s.set_pose_gani(PoseKind::Idle, one());
         s.refresh_water();
         assert!(s.sitting);
-        assert_eq!(s.current_pose().map(|p| p.kind), Some(PoseKind::Idle), "no sit.gani: idle");
+        assert_eq!(
+            s.current_pose().map(|p| p.kind),
+            Some(PoseKind::Idle),
+            "no sit.gani: idle"
+        );
         s.set_pose_gani(PoseKind::Sit, one());
         s.set_pose_gani(PoseKind::Sleep, one());
         s.walking = true;
@@ -3176,7 +3642,13 @@ mod tests {
     #[test]
     fn the_map_reading_pose_runs_maps1_maps2_then_maps3() {
         use crate::pose::PoseKind;
-        let g = |n: usize| crate::assets::Gani::parse(&format!("ANI\n{}ANIEND\n", "1 0 0\n1 0 0\n1 0 0\n1 0 0\n\n".repeat(n))).unwrap();
+        let g = |n: usize| {
+            crate::assets::Gani::parse(&format!(
+                "ANI\n{}ANIEND\n",
+                "1 0 0\n1 0 0\n1 0 0\n1 0 0\n\n".repeat(n)
+            ))
+            .unwrap()
+        };
         let mut s = OfflineSession::new();
         s.set_pose_gani(PoseKind::Idle, g(1));
         assert!(!s.start_map_reading(), "no maps1.gani: nothing");
@@ -3191,7 +3663,11 @@ mod tests {
         s.tick_map_pose(100);
         assert_eq!(s.current_pose().map(|p| p.kind), Some(PoseKind::Maps2));
         s.tick_map_pose(1000);
-        assert_eq!(s.current_pose().map(|p| p.kind), Some(PoseKind::Maps2), "maps2 loops");
+        assert_eq!(
+            s.current_pose().map(|p| p.kind),
+            Some(PoseKind::Maps2),
+            "maps2 loops"
+        );
         s.stop_map_reading();
         assert_eq!(s.current_pose().map(|p| p.kind), Some(PoseKind::Maps3));
         s.tick_map_pose(100);
@@ -3236,10 +3712,21 @@ mod tests {
         // 63 runs from 63.0 to 64.0; only 64.0 and beyond is off the board.
         // The body's right edge is x + 2.5 and its left edge x + 0.5.
         let mut s = body_at(level(|_, _| OPEN), 60.5, 10.0);
-        assert_eq!(walk(&mut s, 0.5, 0.0, 10), 2, "edge 63.0 -> 63.5; 64.0 is outside, and the snap closes the last half tile");
-        assert_eq!(s.player_x, 61.5, "right edge flush with the board edge at 64.0");
+        assert_eq!(
+            walk(&mut s, 0.5, 0.0, 10),
+            2,
+            "edge 63.0 -> 63.5; 64.0 is outside, and the snap closes the last half tile"
+        );
+        assert_eq!(
+            s.player_x, 61.5,
+            "right edge flush with the board edge at 64.0"
+        );
         let mut s = body_at(level(|_, _| OPEN), 0.0, 10.0);
-        assert_eq!(walk(&mut s, -0.5, 0.0, 4), 1, "edge 0.5 -> 0.0 ok, -0.5 is off the board");
+        assert_eq!(
+            walk(&mut s, -0.5, 0.0, 4),
+            1,
+            "edge 0.5 -> 0.0 ok, -0.5 is off the board"
+        );
         assert_eq!(s.player_x, -0.5);
     }
 
@@ -3260,7 +3747,11 @@ mod tests {
     #[test]
     fn water_is_swimmable_not_a_wall() {
         // Water at x 10..=13 on every row.
-        let mut s = session_at(level(|x, _| if (10..=13).contains(&x) { WATER } else { OPEN }), 8.5, 20.5);
+        let mut s = session_at(
+            level(|x, _| if (10..=13).contains(&x) { WATER } else { OPEN }),
+            8.5,
+            20.5,
+        );
         assert!(!s.in_water);
         assert_eq!(s.take_swim_change(), None);
         assert!(s.try_move(0.5, 0.0).is_some()); // 9.0
@@ -3283,10 +3774,16 @@ mod tests {
         assert!(s.try_move(0.5, 0.0).is_some());
         assert!(s.in_water);
         // 2.05 rev 2 swims 0.5 tile a tick, the walking pace.
-        assert_eq!(s.step_interval(), std::time::Duration::from_millis(WALK_STEP_MS));
+        assert_eq!(
+            s.step_interval(),
+            std::time::Duration::from_millis(WALK_STEP_MS)
+        );
         let mut dry = session_at(level(|_, _| OPEN), 30.5, 30.5);
         dry.try_move(0.5, 0.0);
-        assert_eq!(dry.step_interval(), std::time::Duration::from_millis(WALK_STEP_MS));
+        assert_eq!(
+            dry.step_interval(),
+            std::time::Duration::from_millis(WALK_STEP_MS)
+        );
         // PLI_PLAYERPROPS, PLPROP_GANI, GSTRING
         assert_eq!(swim_message(true), b"\x22\x2a\x24swim\n");
         assert_eq!(swim_message(false), b"\x22\x2a\x24idle\n");
@@ -3305,13 +3802,21 @@ mod tests {
         // A wall row at y = 30 and a wall column at x = 20: the body below
         // the row and left of the column cannot go down-right, since both of
         // its axis steps are blocked.
-        let mut s = body_at(level(|x, y| if y == 30 || x == 20 { WALL } else { OPEN }), 17.5, 27.0);
+        let mut s = body_at(
+            level(|x, y| if y == 30 || x == 20 { WALL } else { OPEN }),
+            17.5,
+            27.0,
+        );
         let before = (s.player_x, s.player_y);
         assert!(s.try_move(0.5, 0.5).is_none());
         assert_eq!((s.player_x, s.player_y), before);
         // From half a tile short on both sides, the body is pulled flush into
         // the corner (the snap of each refused step) and then stays.
-        let mut s = body_at(level(|x, y| if y == 30 || x == 20 { WALL } else { OPEN }), 17.0, 26.5);
+        let mut s = body_at(
+            level(|x, y| if y == 30 || x == 20 { WALL } else { OPEN }),
+            17.0,
+            26.5,
+        );
         assert!(s.try_move(0.5, 0.5).is_some());
         assert_eq!((s.player_x, s.player_y), (17.5, 27.0));
         assert!(s.try_move(0.5, 0.5).is_none());
@@ -3342,12 +3847,16 @@ mod tests {
         let mut s = body_at(level(tiles), 19.0, 20.5);
         // top edge 21.5, x range 19.5..21.5: the point at 21.475 is in tile 21.
         assert!(s.try_move(0.0, -0.5).is_some()); // edge 21.0: row 21, open
-        // Edge 20.5 is row 20 and 21.475 is the wall: the step is refused. Only
-        // the right-hand probe is blocked, so the client nudges the body 0.1
-        // to the left instead of leaving it stuck on the corner.
+                                                  // Edge 20.5 is row 20 and 21.475 is the wall: the step is refused. Only
+                                                  // the right-hand probe is blocked, so the client nudges the body 0.1
+                                                  // to the left instead of leaving it stuck on the corner.
         let before = s.player_y;
         assert!(s.try_move(0.0, -0.5).is_some());
-        assert_eq!((s.player_x, s.player_y), (18.9, before), "nudged left, not up");
+        assert_eq!(
+            (s.player_x, s.player_y),
+            (18.9, before),
+            "nudged left, not up"
+        );
         // One tile to the left it is clear.
         let mut s = body_at(level(tiles), 18.0, 20.5);
         assert_eq!(walk(&mut s, 0.0, -0.5, 4), 4);
@@ -3391,7 +3900,11 @@ mod tests {
     fn a_player_inside_a_wall_can_walk_out() {
         // Walls in columns 20 and 21; a body at x = 19.0 spans 19.5 to 21.5,
         // so it is half in the wall. It may step back out (left) ...
-        let mut s = body_at(level(|x, _| if (20..=21).contains(&x) { WALL } else { OPEN }), 19.0, 10.0);
+        let mut s = body_at(
+            level(|x, _| if (20..=21).contains(&x) { WALL } else { OPEN }),
+            19.0,
+            10.0,
+        );
         assert!(s.try_move(-0.5, 0.0).is_some());
         assert_eq!(s.player_x, 18.5);
         // ... and, once out, the wall blocks it again.
@@ -3410,7 +3923,13 @@ mod tests {
     /// edge on the tile line, wall column 20) must not open the wall.
     #[test]
     fn resting_against_a_wall_does_not_unlock_walking_through_it() {
-        let tiles = |x: i32, y: i32| if x == 20 && (10..=12).contains(&y) { WALL } else { OPEN };
+        let tiles = |x: i32, y: i32| {
+            if x == 20 && (10..=12).contains(&y) {
+                WALL
+            } else {
+                OPEN
+            }
+        };
         let mut s = body_at(level(tiles), 17.5, 5.0);
         // walk down past the wall: nothing in the way for a body at 17.5 (right probes are not used going down)
         assert_eq!(walk(&mut s, 0.0, 0.5, 20), 20);
@@ -3430,7 +3949,13 @@ mod tests {
     /// Same at the bottom edge: a body whose bottom edge rests on a wall row.
     #[test]
     fn resting_on_a_wall_row_does_not_unlock_walking_through_it() {
-        let tiles = |x: i32, y: i32| if y == 20 && (10..=12).contains(&x) { WALL } else { OPEN };
+        let tiles = |x: i32, y: i32| {
+            if y == 20 && (10..=12).contains(&x) {
+                WALL
+            } else {
+                OPEN
+            }
+        };
         // y + 3.0 = 20.0: the bottom edge is on the tile line above the wall row.
         let mut s = body_at(level(tiles), 9.5, 17.0);
         assert_eq!(walk(&mut s, 0.0, 0.5, 10), 0);
@@ -3444,14 +3969,44 @@ mod tests {
     /// body beside one is not freed by it.
     #[test]
     fn a_body_overlap_of_zero_for_every_position_reached_by_walking() {
-        let tiles = |x: i32, y: i32| if (x * 7 + y * 13) % 5 == 0 { WALL } else { OPEN };
-        let mut s = body_at(level(|x, y| if (6..40).contains(&x) && (6..40).contains(&y) { tiles(x, y) } else { OPEN }), 2.0, 2.0);
+        let tiles = |x: i32, y: i32| {
+            if (x * 7 + y * 13) % 5 == 0 {
+                WALL
+            } else {
+                OPEN
+            }
+        };
+        let mut s = body_at(
+            level(|x, y| {
+                if (6..40).contains(&x) && (6..40).contains(&y) {
+                    tiles(x, y)
+                } else {
+                    OPEN
+                }
+            }),
+            2.0,
+            2.0,
+        );
         // a long scripted walk of mixed directions
-        let dirs = [(0.5, 0.0), (0.0, 0.5), (-0.5, 0.0), (0.0, -0.5), (0.5, 0.5), (-0.5, 0.5), (0.5, -0.5)];
+        let dirs = [
+            (0.5, 0.0),
+            (0.0, 0.5),
+            (-0.5, 0.0),
+            (0.0, -0.5),
+            (0.5, 0.5),
+            (-0.5, 0.5),
+            (0.5, -0.5),
+        ];
         for i in 0..4000usize {
             let (dx, dy) = dirs[(i / 7 + i / 31) % dirs.len()];
             s.try_move(dx, dy);
-            assert_eq!(s.body_overlap(s.player_x as f64, s.player_y as f64), 0, "step {i} at ({}, {})", s.player_x, s.player_y);
+            assert_eq!(
+                s.body_overlap(s.player_x as f64, s.player_y as f64),
+                0,
+                "step {i} at ({}, {})",
+                s.player_x,
+                s.player_y
+            );
         }
     }
 
@@ -3464,14 +4019,30 @@ mod tests {
 
     /// A 2 x 2 rock of wall tiles with its top-left tile at `(rx, ry)`.
     fn rock_at(rx: i32, ry: i32) -> Level {
-        level(move |x, y| if (rx..rx + 2).contains(&x) && (ry..ry + 2).contains(&y) { WALL } else { OPEN })
+        level(move |x, y| {
+            if (rx..rx + 2).contains(&x) && (ry..ry + 2).contains(&y) {
+                WALL
+            } else {
+                OPEN
+            }
+        })
     }
 
     /// The body (x + 0.5 to x + 2.5, y + 1 to y + 3) must never contain a
     /// blocked point, and the six probe table must be what the clients carry.
     #[test]
     fn the_probe_table_is_the_clients() {
-        assert_eq!(WALK_PROBES[0], [(0.525, 1.0), (1.475, 1.0), (1.525, 1.0), (2.475, 1.0), (2.525, 1.0), (0.475, 1.0)]);
+        assert_eq!(
+            WALK_PROBES[0],
+            [
+                (0.525, 1.0),
+                (1.475, 1.0),
+                (1.525, 1.0),
+                (2.475, 1.0),
+                (2.525, 1.0),
+                (0.475, 1.0)
+            ]
+        );
         assert_eq!(WALK_PROBES[2][3], (2.475, 3.0));
         assert_eq!(WALK_PROBES[1][0], (0.5, 1.025));
         assert_eq!(WALK_PROBES[3][5], (2.5, 0.975));
@@ -3486,8 +4057,8 @@ mod tests {
     #[test]
     fn every_side_of_a_rock_ends_flush_from_both_alignments() {
         let lvl = || rock_at(30, 20); // tiles 30..31 x 20..21
-        // from the west, rows 20.0 to 22.0 exactly on the rock's rows: right
-        // edge x + 2.5 -> 30.0
+                                      // from the west, rows 20.0 to 22.0 exactly on the rock's rows: right
+                                      // edge x + 2.5 -> 30.0
         for x0 in [24.0, 24.5] {
             let mut s = body_at(lvl(), x0, 19.5);
             walk(&mut s, 0.5, 0.0, 30);
@@ -3536,16 +4107,35 @@ mod tests {
     #[test]
     fn a_body_walks_along_a_wall_into_a_two_tile_gap_and_not_a_one_tile_gap() {
         // Walls at columns 19 and 22 for rows 10..=29; the gap is 20..=21.
-        let two = |x: i32, y: i32| if (10..30).contains(&y) && (x == 19 || x == 22) { WALL } else { OPEN };
+        let two = |x: i32, y: i32| {
+            if (10..30).contains(&y) && (x == 19 || x == 22) {
+                WALL
+            } else {
+                OPEN
+            }
+        };
         let mut s = body_at(level(two), 19.5, 5.0);
-        assert_eq!(walk(&mut s, 0.0, 0.5, 60), 60, "the body (20.0 to 22.0) goes straight through");
+        assert_eq!(
+            walk(&mut s, 0.0, 0.5, 60),
+            60,
+            "the body (20.0 to 22.0) goes straight through"
+        );
         assert_eq!((s.player_x, s.player_y), (19.5, 35.0));
         // Walls at columns 19 and 21 (gap is column 20 only): the body is
         // two wide; it stops with its bottom edge flush on the walls' top.
-        let one = |x: i32, y: i32| if (10..30).contains(&y) && (x == 19 || x == 21) { WALL } else { OPEN };
+        let one = |x: i32, y: i32| {
+            if (10..30).contains(&y) && (x == 19 || x == 21) {
+                WALL
+            } else {
+                OPEN
+            }
+        };
         let mut s = body_at(level(one), 19.5, 5.0);
         walk(&mut s, 0.0, 0.5, 60);
-        assert_eq!(s.player_y, 7.0, "bottom edge flush at row 10, not inside the gap");
+        assert_eq!(
+            s.player_y, 7.0,
+            "bottom edge flush at row 10, not inside the gap"
+        );
     }
 
     /// A wall that ends: walking east along a wall's end, the body slides
@@ -3558,7 +4148,11 @@ mod tests {
         // 1.025 = 19.525) is in the wall, the rest are free: nudge down.
         let mut s = body_at(lvl(), 19.5, 18.5);
         assert!(s.try_move(0.5, 0.0).is_some());
-        assert_eq!((s.player_x, s.player_y), (19.5, 18.6), "nudged 0.1 down, not moved east");
+        assert_eq!(
+            (s.player_x, s.player_y),
+            (19.5, 18.6),
+            "nudged 0.1 down, not moved east"
+        );
         // Four more nudges clear the wall (18.9 -> 19.0 by the snap) ...
         walk(&mut s, 0.5, 0.0, 4);
         assert_eq!((s.player_x, s.player_y), (19.5, 19.0));
@@ -3568,7 +4162,11 @@ mod tests {
         // Mirror: the wall's end is below, the lower probe is the one blocked:
         // nudge up (-0.1). Wall column 22 rows 21..; the body's lower edge
         // y + 2.975 = 21.475 at y = 18.5.
-        let mut s = body_at(level(|x, y| if x == 22 && y >= 21 { WALL } else { OPEN }), 19.5, 18.5);
+        let mut s = body_at(
+            level(|x, y| if x == 22 && y >= 21 { WALL } else { OPEN }),
+            19.5,
+            18.5,
+        );
         assert!(s.try_move(0.5, 0.0).is_some());
         assert_eq!((s.player_x, s.player_y), (19.5, 18.4), "nudged 0.1 up");
         walk(&mut s, 0.5, 0.0, 30);
@@ -3583,7 +4181,11 @@ mod tests {
         // One wall tile (30, 21). A body at x = 27.5 going east reads the
         // column x = 30.0 at rows y + 1.025 .. y + 2.975 (20.525 to 22.475
         // at y = 19.5): point 0 (row 20) is free, point 1 (row 21) is blocked.
-        let mut s = body_at(level(|x, y| if (x, y) == (30, 21) { WALL } else { OPEN }), 27.5, 19.5);
+        let mut s = body_at(
+            level(|x, y| if (x, y) == (30, 21) { WALL } else { OPEN }),
+            27.5,
+            19.5,
+        );
         walk(&mut s, 0.5, 0.0, 10);
         assert_eq!((s.player_x, s.player_y), (27.5, 19.5));
         // Point 0 and point 3 both in a two-row rock: no nudge either.
@@ -3598,7 +4200,11 @@ mod tests {
     fn positions_near_a_tile_line_snap_to_it() {
         let mut s = body_at(level(|_, _| OPEN), 10.46, 10.04);
         assert!(s.try_move(0.0, 0.5).is_some());
-        assert_eq!((s.player_x, s.player_y), (10.5, 10.54), "x 10.46 -> 10.5; y 10.04 + 0.5 = 10.54 is not near a line");
+        assert_eq!(
+            (s.player_x, s.player_y),
+            (10.5, 10.54),
+            "x 10.46 -> 10.5; y 10.04 + 0.5 = 10.54 is not near a line"
+        );
         let mut s = body_at(level(|_, _| OPEN), 10.0, 10.02);
         s.try_move(0.5, 0.0);
         assert_eq!((s.player_x, s.player_y), (10.5, 10.0), "y 10.02 -> 10.0");
@@ -3623,19 +4229,55 @@ mod tests {
     /// included, never leaves the body overlapping a wall.
     #[test]
     fn walking_in_every_direction_never_enters_a_rock() {
-        let tiles = |x: i32, y: i32| if (x * 7 + y * 13) % 5 == 0 { WALL } else { OPEN };
-        let mut s = body_at(level(|x, y| if (6..40).contains(&x) && (6..40).contains(&y) { tiles(x, y) } else { OPEN }), 2.0, 2.0);
-        let dirs = [(0.5, 0.0), (0.0, 0.5), (-0.5, 0.0), (0.0, -0.5), (0.5, 0.5), (-0.5, 0.5), (0.5, -0.5)];
+        let tiles = |x: i32, y: i32| {
+            if (x * 7 + y * 13) % 5 == 0 {
+                WALL
+            } else {
+                OPEN
+            }
+        };
+        let mut s = body_at(
+            level(|x, y| {
+                if (6..40).contains(&x) && (6..40).contains(&y) {
+                    tiles(x, y)
+                } else {
+                    OPEN
+                }
+            }),
+            2.0,
+            2.0,
+        );
+        let dirs = [
+            (0.5, 0.0),
+            (0.0, 0.5),
+            (-0.5, 0.0),
+            (0.0, -0.5),
+            (0.5, 0.5),
+            (-0.5, 0.5),
+            (0.5, -0.5),
+        ];
         for i in 0..6000usize {
             let (dx, dy) = dirs[(i / 5 + i / 29) % dirs.len()];
             s.try_move(dx, dy);
-            assert_eq!(s.body_overlap(s.player_x as f64, s.player_y as f64), 0, "step {i} at ({}, {})", s.player_x, s.player_y);
+            assert_eq!(
+                s.body_overlap(s.player_x as f64, s.player_y as f64),
+                0,
+                "step {i} at ({}, {})",
+                s.player_x,
+                s.player_y
+            );
         }
     }
 
     #[test]
     fn chests_block_the_feet() {
-        let chest = crate::assets::Chest { x: 20, y: 10, item: "greenrupee".into(), sign_index: -1, opened: false };
+        let chest = crate::assets::Chest {
+            x: 20,
+            y: 10,
+            item: "greenrupee".into(),
+            sign_index: -1,
+            opened: false,
+        };
         // The body (rows 9.0 + 1.0 to + 3.0) covers the chest's rows 10 to 12
         // with its whole right edge: it stops flush against it (edge 20.0).
         let mut s = body_at(level(|_, _| OPEN), 16.5, 9.0);
@@ -3666,7 +4308,17 @@ mod tests {
     }
 
     fn link(dest: &str, x: i32, y: i32, w: i32, h: i32, nx: Option<f32>, ny: Option<f32>) -> Link {
-        Link { dest: dest.into(), x, y, width: w, height: h, new_x: nx, new_y: ny, x_offset: 0.0, y_offset: 0.0 }
+        Link {
+            dest: dest.into(),
+            x,
+            y,
+            width: w,
+            height: h,
+            new_x: nx,
+            new_y: ny,
+            x_offset: 0.0,
+            y_offset: 0.0,
+        }
     }
 
     #[test]
@@ -3693,19 +4345,43 @@ mod tests {
         // East edge, the link says x = 0 and y = playery: the 2.05 client
         // uses x - 64 instead (held at -0.5, where its own crossing lands).
         let east = link("e.nw", 63, 0, 1, 64, Some(0.0), None);
-        assert_eq!(edge_link_arrival(&m, "mid.nw", &east, 63.75, 20.0), Some((-0.25, 20.0)));
-        assert_eq!(edge_link_arrival(&m, "mid.nw", &east, 61.5, 20.0), Some((-0.5, 20.0)));
+        assert_eq!(
+            edge_link_arrival(&m, "mid.nw", &east, 63.75, 20.0),
+            Some((-0.25, 20.0))
+        );
+        assert_eq!(
+            edge_link_arrival(&m, "mid.nw", &east, 61.5, 20.0),
+            Some((-0.5, 20.0))
+        );
         // A playerx link on the east edge does not land on the far edge.
         let east_px = link("E.NW", 63, 10, 1, 20, None, None);
-        assert_eq!(edge_link_arrival(&m, "MID.nw", &east_px, 63.75, 12.0), Some((-0.25, 12.0)));
+        assert_eq!(
+            edge_link_arrival(&m, "MID.nw", &east_px, 63.75, 12.0),
+            Some((-0.25, 12.0))
+        );
         let west = link("w.nw", 0, 0, 1, 64, Some(61.0), None);
-        assert_eq!(edge_link_arrival(&m, "mid.nw", &west, -2.75, 7.0), Some((61.25, 7.0)));
-        assert_eq!(edge_link_arrival(&m, "mid.nw", &west, 0.5, 7.0), Some((61.5, 7.0)));
+        assert_eq!(
+            edge_link_arrival(&m, "mid.nw", &west, -2.75, 7.0),
+            Some((61.25, 7.0))
+        );
+        assert_eq!(
+            edge_link_arrival(&m, "mid.nw", &west, 0.5, 7.0),
+            Some((61.5, 7.0))
+        );
         let north = link("n.nw", 0, 0, 64, 1, None, Some(61.0));
-        assert_eq!(edge_link_arrival(&m, "mid.nw", &north, 9.0, -3.5), Some((9.0, 60.5)));
+        assert_eq!(
+            edge_link_arrival(&m, "mid.nw", &north, 9.0, -3.5),
+            Some((9.0, 60.5))
+        );
         let south = link("s.nw", 0, 63, 64, 1, None, Some(0.0));
-        assert_eq!(edge_link_arrival(&m, "mid.nw", &south, 9.0, 63.5), Some((9.0, -0.5)));
-        assert_eq!(edge_link_arrival(&m, "mid.nw", &south, 9.0, 61.0), Some((9.0, -1.0)));
+        assert_eq!(
+            edge_link_arrival(&m, "mid.nw", &south, 9.0, 63.5),
+            Some((9.0, -0.5))
+        );
+        assert_eq!(
+            edge_link_arrival(&m, "mid.nw", &south, 9.0, 61.0),
+            Some((9.0, -1.0))
+        );
     }
 
     #[test]
@@ -3713,11 +4389,47 @@ mod tests {
         let m = big3();
         // Not the neighbour on that side, not one tile wide, or no big-map
         // cell for the level: the link's own coordinates.
-        assert_eq!(edge_link_arrival(&m, "mid.nw", &link("w.nw", 63, 0, 1, 64, Some(0.0), None), 63.5, 5.0), None);
-        assert_eq!(edge_link_arrival(&m, "mid.nw", &link("e.nw", 62, 0, 2, 64, Some(0.0), None), 63.5, 5.0), None);
-        assert_eq!(edge_link_arrival(&m, "house.nw", &link("e.nw", 63, 0, 1, 64, Some(0.0), None), 63.5, 5.0), None);
+        assert_eq!(
+            edge_link_arrival(
+                &m,
+                "mid.nw",
+                &link("w.nw", 63, 0, 1, 64, Some(0.0), None),
+                63.5,
+                5.0
+            ),
+            None
+        );
+        assert_eq!(
+            edge_link_arrival(
+                &m,
+                "mid.nw",
+                &link("e.nw", 62, 0, 2, 64, Some(0.0), None),
+                63.5,
+                5.0
+            ),
+            None
+        );
+        assert_eq!(
+            edge_link_arrival(
+                &m,
+                "house.nw",
+                &link("e.nw", 63, 0, 1, 64, Some(0.0), None),
+                63.5,
+                5.0
+            ),
+            None
+        );
         // The corner level is not a side neighbour.
-        assert_eq!(edge_link_arrival(&m, "mid.nw", &link("ne.nw", 63, 0, 1, 64, Some(0.0), None), 63.5, 5.0), None);
+        assert_eq!(
+            edge_link_arrival(
+                &m,
+                "mid.nw",
+                &link("ne.nw", 63, 0, 1, 64, Some(0.0), None),
+                63.5,
+                5.0
+            ),
+            None
+        );
     }
 
     /// Laundry item 9: walking east to the edge link of `mid.nw` on a big
@@ -3739,7 +4451,11 @@ mod tests {
             if s.check_links() {
                 link_at = Some(step);
                 assert_eq!(s.pending_link.as_ref().map(|l| l.0.as_str()), Some("e.nw"));
-                assert!(map.big_map_ahead("mid.nw", s.player_x, s.player_y, &mut asked).is_empty(), "nothing new at the link");
+                assert!(
+                    map.big_map_ahead("mid.nw", s.player_x, s.player_y, &mut asked)
+                        .is_empty(),
+                    "nothing new at the link"
+                );
                 break;
             }
             let ahead = map.big_map_ahead("mid.nw", s.player_x, s.player_y, &mut asked);
@@ -3749,9 +4465,15 @@ mod tests {
                 asked_at = Some(step);
             }
         }
-        let (asked_at, link_at) = (asked_at.expect("asked ahead"), link_at.expect("the link fired"));
+        let (asked_at, link_at) = (
+            asked_at.expect("asked ahead"),
+            link_at.expect("the link fired"),
+        );
         // Half-tile steps: at least five tiles (ten steps, 500 ms) ahead.
-        assert!(link_at - asked_at >= 10, "asked at step {asked_at}, link at {link_at}");
+        assert!(
+            link_at - asked_at >= 10,
+            "asked at step {asked_at}, link at {link_at}"
+        );
     }
 
     /// The ahead request covers the corner level too, and a bare big-map
@@ -3760,7 +4482,10 @@ mod tests {
     fn big_map_ahead_names_files_once() {
         let map = crate::gmap::Gmap::parse_grid("\"mid\",\"e\"\r\n\"s\",\"se\"\r\n").unwrap();
         let mut asked = std::collections::HashSet::new();
-        assert_eq!(map.big_map_ahead("mid", 60.0, 60.0, &mut asked), ["e.nw", "s.nw", "se.nw"]);
+        assert_eq!(
+            map.big_map_ahead("mid", 60.0, 60.0, &mut asked),
+            ["e.nw", "s.nw", "se.nw"]
+        );
         assert!(map.big_map_ahead("MID", 61.0, 61.0, &mut asked).is_empty());
     }
 
@@ -3788,7 +4513,11 @@ mod tests {
         // Ticks while the warp is pending keep it.
         assert!(!s.check_links());
         s.arrive(x, y);
-        assert_eq!(s.view_glide(), (-2.0, 0.0), "drawn at x -2.5: where 61.5 is, seen from e.nw");
+        assert_eq!(
+            s.view_glide(),
+            (-2.0, 0.0),
+            "drawn at x -2.5: where 61.5 is, seen from e.nw"
+        );
         // The server put the player somewhere else: drawn there at once.
         let mut s = session_at(lvl.clone(), 30.0, 20.0);
         s.loaded_file = Some("mid.nw".into());
@@ -3817,7 +4546,13 @@ mod tests {
     #[test]
     fn the_level_left_on_a_big_map_is_kept_with_its_opened_chests() {
         let mut lvl = level(|_, _| OPEN);
-        lvl.chests.push(crate::assets::Chest { x: 5, y: 5, item: "greenrupee".into(), sign_index: -1, opened: false });
+        lvl.chests.push(crate::assets::Chest {
+            x: 5,
+            y: 5,
+            item: "greenrupee".into(),
+            sign_index: -1,
+            opened: false,
+        });
         let mut s = session_at(lvl, 30.0, 20.0);
         s.big_map = Some(big3());
         s.opened_chests.insert((5, 5));
@@ -3848,7 +4583,11 @@ mod tests {
         assert!(!s.check_links());
         s.player_dir = DIR_EAST;
         assert!(s.check_links());
-        assert_eq!(s.pending_link, Some(("e.nw".into(), 61.5, 17.25)), "without a big map: playerx");
+        assert_eq!(
+            s.pending_link,
+            Some(("e.nw".into(), 61.5, 17.25)),
+            "without a big map: playerx"
+        );
         s.big_map = Some(big3());
         assert!(s.check_links());
         assert_eq!(s.pending_link, Some(("e.nw".into(), -0.5, 17.25)));
@@ -3862,7 +4601,11 @@ mod tests {
         let mut s = body_at(level(|_, _| OPEN), 30.0, 32.0);
         s.tiletypes = None;
         walk(&mut s, 0.0, 0.5, 200);
-        assert!(s.player_y <= 61.0, "south: stopped at the edge, got {}", s.player_y);
+        assert!(
+            s.player_y <= 61.0,
+            "south: stopped at the edge, got {}",
+            s.player_y
+        );
         walk(&mut s, 0.5, 0.0, 200);
         assert!(s.player_x <= 61.5, "east: got {}", s.player_x);
         walk(&mut s, 0.0, -0.5, 200);
@@ -3904,13 +4647,20 @@ mod tests {
             s.tiletypes = None;
             for _ in 0..40 {
                 if s.try_move(-0.5, 0.0).is_some() && s.check_links() {
-                    return s.pending_link.take().map(|(d, nx, ny)| (d, nx, ny, s.player_x));
+                    return s
+                        .pending_link
+                        .take()
+                        .map(|(d, nx, ny)| (d, nx, ny, s.player_x));
                 }
             }
             None
         };
         for y in [26.0, 28.0, 28.5, 30.0, 31.5, 32.0] {
-            assert_eq!(fire_at(y), Some(("testworld.nw".into(), 61.0, y, 0.5)), "y {y}");
+            assert_eq!(
+                fire_at(y),
+                Some(("testworld.nw".into(), 61.0, y, 0.5)),
+                "y {y}"
+            );
         }
         assert_eq!(fire_at(25.5), None);
         assert_eq!(fire_at(32.5), None);
@@ -3926,8 +4676,24 @@ mod tests {
             magic: ZeldaMagic::V103,
             board: vec![0; 4096],
             links: vec![
-                ZeldaLink { dest: "b.zelda".into(), x: 40.0, y: 0.0, width: 4.0, height: 64.0, new_x: 1.5, new_y: -1.0 },
-                ZeldaLink { dest: "c.zelda".into(), x: 0.0, y: 50.0, width: 64.0, height: 2.0, new_x: -1.0, new_y: 2.0 },
+                ZeldaLink {
+                    dest: "b.zelda".into(),
+                    x: 40.0,
+                    y: 0.0,
+                    width: 4.0,
+                    height: 64.0,
+                    new_x: 1.5,
+                    new_y: -1.0,
+                },
+                ZeldaLink {
+                    dest: "c.zelda".into(),
+                    x: 0.0,
+                    y: 50.0,
+                    width: 64.0,
+                    height: 2.0,
+                    new_x: -1.0,
+                    new_y: 2.0,
+                },
             ],
             computers: vec![],
             signs: vec![],
@@ -3967,7 +4733,11 @@ mod tests {
         assert!(!s.check_links(), "no link fires while a warp is pending");
         assert!(s.try_move(0.5, 0.0).is_none(), "and nothing walks");
         s.arrive(1.0, 12.0);
-        assert_eq!((s.player_x, s.player_y), (1.0, 12.0), "arrival is the destination, exactly");
+        assert_eq!(
+            (s.player_x, s.player_y),
+            (1.0, 12.0),
+            "arrival is the destination, exactly"
+        );
         assert!(s.warp_pending.is_none());
         assert!(!s.check_links(), "not before the player has moved");
         // Holding the key toward the edge keeps the player in that link.
@@ -3975,7 +4745,10 @@ mod tests {
             s.try_move(-0.5, 0.0);
             assert!(!s.check_links());
         }
-        assert!(s.player_x <= 0.0, "the left edge (x + 0.5) stops at the board edge");
+        assert!(
+            s.player_x <= 0.0,
+            "the left edge (x + 0.5) stops at the board edge"
+        );
     }
 
     #[test]
@@ -3992,7 +4765,8 @@ mod tests {
     #[test]
     fn a_link_elsewhere_still_fires_after_the_first_move() {
         let mut b = level_b();
-        b.links.push(link("c.nw", 30, 0, 4, 64, Some(5.0), Some(5.0)));
+        b.links
+            .push(link("c.nw", 30, 0, 4, 64, Some(5.0), Some(5.0)));
         let mut s = session_at(b, 28.0, 30.0);
         s.arrive(26.0, 27.25);
         assert!(!s.check_links());
@@ -4007,10 +4781,14 @@ mod tests {
     /// fires at, or `None` after `steps` steps.
     fn first_fire(x: f32, y: f32, dx: f32, dy: f32, steps: usize) -> Option<(f32, f32)> {
         let mut lvl = level(|_, _| OPEN);
-        lvl.links.push(link("lv_b.nw", 0, 0, 64, 2, None, Some(60.0)));
-        lvl.links.push(link("lv_c.nw", 10, 28, 2, 5, Some(60.0), Some(30.0)));
-        lvl.links.push(link("lv_w.nw", 0, 62, 64, 2, None, Some(4.0)));
-        lvl.links.push(link("lv_s.nw", 62, 0, 2, 64, Some(4.0), None));
+        lvl.links
+            .push(link("lv_b.nw", 0, 0, 64, 2, None, Some(60.0)));
+        lvl.links
+            .push(link("lv_c.nw", 10, 28, 2, 5, Some(60.0), Some(30.0)));
+        lvl.links
+            .push(link("lv_w.nw", 0, 62, 64, 2, None, Some(4.0)));
+        lvl.links
+            .push(link("lv_s.nw", 62, 0, 2, 64, Some(4.0), None));
         let mut s = session_at(lvl, 0.0, 0.0);
         s.player_x = x;
         s.player_y = y;
@@ -4033,18 +4811,34 @@ mod tests {
     fn the_probe_fires_where_the_real_client_does_on_the_rectangle_link() {
         // Down at x 8.5 ... 10.5 reached the link after reporting y 24.5.
         for x in [8.5, 9.0, 9.5, 10.0, 10.5] {
-            assert_eq!(first_fire(x, 20.0, 0.0, 0.5, 40), Some((x, 25.0)), "down at x {x}");
+            assert_eq!(
+                first_fire(x, 20.0, 0.0, 0.5, 40),
+                Some((x, 25.0)),
+                "down at x {x}"
+            );
         }
         // Up at x 8.5 and 9.5 from y 40 went on after y 32.5.
         for x in [8.5, 9.5] {
-            assert_eq!(first_fire(x, 40.0, 0.0, -0.5, 40), Some((x, 32.0)), "up at x {x}");
+            assert_eq!(
+                first_fire(x, 40.0, 0.0, -0.5, 40),
+                Some((x, 32.0)),
+                "up at x {x}"
+            );
         }
         // Left from x 14 after x 12; right from x 6 after x 7.
         for y in [26.0, 26.5, 27.0, 27.5] {
-            assert_eq!(first_fire(14.0, y, -0.5, 0.0, 40), Some((11.5, y)), "left at y {y}");
+            assert_eq!(
+                first_fire(14.0, y, -0.5, 0.0, 40),
+                Some((11.5, y)),
+                "left at y {y}"
+            );
         }
         for y in [26.5, 27.0, 27.5] {
-            assert_eq!(first_fire(6.0, y, 0.5, 0.0, 40), Some((7.5, y)), "right at y {y}");
+            assert_eq!(
+                first_fire(6.0, y, 0.5, 0.0, 40),
+                Some((7.5, y)),
+                "right at y {y}"
+            );
         }
     }
 
@@ -4076,7 +4870,8 @@ mod tests {
     fn the_south_probe_includes_the_far_edge() {
         // Facing south the probe is (x + 1.5, y + 3), far edges included.
         let mut lvl = level(|_, _| OPEN);
-        lvl.links.push(link("lv_c.nw", 10, 28, 2, 5, Some(60.0), Some(30.0)));
+        lvl.links
+            .push(link("lv_c.nw", 10, 28, 2, 5, Some(60.0), Some(30.0)));
         let mut s = session_at(lvl, 0.0, 0.0);
         s.player_x = 8.5;
         s.player_y = 20.0;
@@ -4135,7 +4930,12 @@ mod tests {
 
     /// A 2x2 world, the player in the north-west cell with the sprite at
     /// `(x, y)`. `load` says which neighbour cells have a level.
-    fn gmap_session(x: f32, y: f32, load: &[(i32, i32)], wall_ne: Option<(i32, i32)>) -> OfflineSession {
+    fn gmap_session(
+        x: f32,
+        y: f32,
+        load: &[(i32, i32)],
+        wall_ne: Option<(i32, i32)>,
+    ) -> OfflineSession {
         let mut s = OfflineSession::new();
         s.tiletypes = Some(types());
         s.current_level = Some(marked(0, None));
@@ -4145,7 +4945,10 @@ mod tests {
         let w = s.gmap.as_mut().unwrap();
         for &(cx, cy) in load {
             let i = (cy * 2 + cx) as usize;
-            w.levels.insert((cx, cy), marked(i, if (cx, cy) == (1, 0) { wall_ne } else { None }));
+            w.levels.insert(
+                (cx, cy),
+                marked(i, if (cx, cy) == (1, 0) { wall_ne } else { None }),
+            );
         }
         s
     }
@@ -4163,11 +4966,17 @@ mod tests {
         assert!(s.take_gmap_crossing().is_none());
         assert!(s.try_move(0.5, 0.0).is_some());
         let c = s.take_gmap_crossing().expect("the step crossed");
-        assert_eq!((c.from, c.to, c.local_x, c.local_y), ((0, 0), (1, 0), 0.0, 30.5));
+        assert_eq!(
+            (c.from, c.to, c.local_x, c.local_y),
+            ((0, 0), (1, 0), 0.0, 30.5)
+        );
         assert_eq!((s.player_x, s.player_y), (0.0, 30.5));
         assert_eq!(marker(&s), Some(11), "the north-east level is current");
         assert_eq!(s.gmap.as_ref().unwrap().cell, (1, 0));
-        assert!(s.gmap.as_ref().unwrap().levels.contains_key(&(0, 0)), "the old level stays as a neighbour");
+        assert!(
+            s.gmap.as_ref().unwrap().levels.contains_key(&(0, 0)),
+            "the old level stays as a neighbour"
+        );
         assert!(s.take_gmap_crossing().is_none(), "taken once");
     }
 
@@ -4188,7 +4997,10 @@ mod tests {
         let mut s = gmap_session(30.5, 63.0, &[(1, 0), (0, 1), (1, 1)], None);
         walk(&mut s, 0.0, 0.5, 2);
         let c = s.take_gmap_crossing().unwrap();
-        assert_eq!((c.to, c.local_y, c.y_changed(), c.x_changed()), ((0, 1), 0.0, true, false));
+        assert_eq!(
+            (c.to, c.local_y, c.y_changed(), c.x_changed()),
+            ((0, 1), 0.0, true, false)
+        );
         assert_eq!(marker(&s), Some(12));
         s.try_move(0.0, -0.5);
         let c = s.take_gmap_crossing().unwrap();
@@ -4217,10 +5029,17 @@ mod tests {
         let mut s = gmap_session(60.0, 30.5, &[], None);
         walk(&mut s, 0.5, 0.0, 20);
         assert!(s.take_gmap_crossing().is_none());
-        assert_eq!(s.player_x, 61.5, "stops with the body edge flush at the seam");
+        assert_eq!(
+            s.player_x, 61.5,
+            "stops with the body edge flush at the seam"
+        );
         assert_eq!(marker(&s), Some(10));
         // Once it is loaded the walk goes on.
-        s.gmap.as_mut().unwrap().levels.insert((1, 0), marked(1, None));
+        s.gmap
+            .as_mut()
+            .unwrap()
+            .levels
+            .insert((1, 0), marked(1, None));
         walk(&mut s, 0.5, 0.0, 20);
         assert!(s.take_gmap_crossing().is_some());
     }
@@ -4243,7 +5062,11 @@ mod tests {
     #[test]
     fn water_across_the_seam_is_read_from_the_neighbour() {
         let mut s = gmap_session(60.0, 30.5, &[(1, 0), (0, 1), (1, 1)], None);
-        s.gmap.as_mut().unwrap().levels.insert((1, 0), level(|_, _| WATER));
+        s.gmap
+            .as_mut()
+            .unwrap()
+            .levels
+            .insert((1, 0), level(|_, _| WATER));
         walk(&mut s, 0.5, 0.0, 4);
         assert!(s.in_water, "feet at 64.0 are in the east level's water");
     }
@@ -4389,7 +5212,10 @@ mod tests {
         assert!(s.controls_locked());
         s.tick_life(50);
         assert!(!s.controls_locked());
-        assert!(s.try_move(0.5, 0.0).is_none(), "dead until a respawn, even unlocked");
+        assert!(
+            s.try_move(0.5, 0.0).is_none(),
+            "dead until a respawn, even unlocked"
+        );
     }
 
     #[test]
@@ -4411,7 +5237,14 @@ mod tests {
     #[test]
     fn respawn_hearts_follow_ap() {
         // (ap, max half hearts) -> half hearts after the respawn.
-        for (ap, max, want) in [(0, 20, 6), (19, 20, 6), (20, 20, 10), (39, 8, 8), (40, 20, 20), (100, 12, 12)] {
+        for (ap, max, want) in [
+            (0, 20, 6),
+            (19, 20, 6),
+            (20, 20, 10),
+            (39, 8, 8),
+            (40, 20, 20),
+            (100, 12, 12),
+        ] {
             let mut s = mortal();
             s.set_max_hearts_half(max);
             s.set_hearts_half(max);
@@ -4437,17 +5270,31 @@ mod tests {
         die(&mut s, None);
         s.tick_life(28 * 50);
         let to = s.respawn(true).unwrap();
-        let want = EntryPoint { level: "a.nw".into(), x: 12.5, y: 20.0, dir: DIR_WEST };
+        let want = EntryPoint {
+            level: "a.nw".into(),
+            x: 12.5,
+            y: 20.0,
+            dir: DIR_WEST,
+        };
         assert_eq!(to, RespawnTo::Saved(want));
-        assert_eq!((s.player_x, s.player_y, s.player_dir), (12.5, 20.0, DIR_WEST));
+        assert_eq!(
+            (s.player_x, s.player_y, s.player_dir),
+            (12.5, 20.0, DIR_WEST)
+        );
         // A later entry of the same name group (plain names share the empty
         // group) does not replace it in the 2.05 rules.
         s.player_x = 3.0;
         s.note_entry("b.nw");
-        assert_eq!(s.entry.as_ref().map(|e| (e.level.as_str(), e.x)), Some(("a.nw", 12.5)));
+        assert_eq!(
+            s.entry.as_ref().map(|e| (e.level.as_str(), e.x)),
+            Some(("a.nw", 12.5))
+        );
         // A different group does.
         s.note_entry("cave$1.nw");
-        assert_eq!(s.entry.as_ref().map(|e| (e.level.as_str(), e.x)), Some(("cave$1.nw", 3.0)));
+        assert_eq!(
+            s.entry.as_ref().map(|e| (e.level.as_str(), e.x)),
+            Some(("cave$1.nw", 3.0))
+        );
     }
 
     #[test]
@@ -4463,7 +5310,11 @@ mod tests {
 
     fn gmap_world(names: &str) -> crate::gmap::GmapWorld {
         let text = format!("GRMAP001\nWIDTH 2\nHEIGHT 1\nLEVELNAMES\n{names}\nLEVELNAMESEND\n");
-        crate::gmap::GmapWorld::new("w.gmap".into(), crate::gmap::Gmap::parse(&text).unwrap(), (0, 0))
+        crate::gmap::GmapWorld::new(
+            "w.gmap".into(),
+            crate::gmap::Gmap::parse(&text).unwrap(),
+            (0, 0),
+        )
     }
 
     #[test]
@@ -4483,10 +5334,18 @@ mod tests {
         s.note_entry("outside.nw");
         s.player_x = 2.0;
         s.note_entry("second.nw");
-        assert_eq!(s.entry.as_ref().map(|e| (e.level.as_str(), e.x)), Some(("second.nw", 2.0)), "into the gmap");
+        assert_eq!(
+            s.entry.as_ref().map(|e| (e.level.as_str(), e.x)),
+            Some(("second.nw", 2.0)),
+            "into the gmap"
+        );
         s.player_x = 3.0;
         s.note_entry("outside.nw");
-        assert_eq!(s.entry.as_ref().map(|e| (e.level.as_str(), e.x)), Some(("outside.nw", 3.0)), "out of it");
+        assert_eq!(
+            s.entry.as_ref().map(|e| (e.level.as_str(), e.x)),
+            Some(("outside.nw", 3.0)),
+            "out of it"
+        );
         // Both in the list (indices 0 and 1, or 1 and 1): the product is not
         // negative, so the group test decides: same group, not saved.
         s.player_x = 4.0;
@@ -4505,7 +5364,11 @@ mod tests {
         s.note_entry("outside.nw");
         s.player_x = 2.0;
         s.note_entry("first.nw");
-        assert_eq!(s.entry.as_ref().map(|e| e.x), Some(1.0), "the quirk: entering at index 0 does not save");
+        assert_eq!(
+            s.entry.as_ref().map(|e| e.x),
+            Some(1.0),
+            "the quirk: entering at index 0 does not save"
+        );
     }
 
     #[test]
@@ -4517,13 +5380,25 @@ mod tests {
         s.note_entry("a$1.nw");
         s.player_x = 2.0;
         s.note_entry("b$1.nw");
-        assert_eq!(s.entry.as_ref().map(|e| e.x), Some(1.0), "different groups, still not saved");
+        assert_eq!(
+            s.entry.as_ref().map(|e| e.x),
+            Some(1.0),
+            "different groups, still not saved"
+        );
     }
 
     #[test]
     fn the_name_group_test_is_the_2_00_to_2_05_builds_only() {
         use crate::protocol::ClientVersion as V;
-        for v in [V::V200, V::V201, V::V202, V::V202R2, V::V203, V::V204, V::V205] {
+        for v in [
+            V::V200,
+            V::V201,
+            V::V202,
+            V::V202R2,
+            V::V203,
+            V::V204,
+            V::V205,
+        ] {
             assert!(v.death_rules().unwrap().entry_name_group, "{}", v.label());
         }
         for v in [V::V217, V::V222, V::V231] {
@@ -4541,8 +5416,14 @@ mod tests {
         die(&mut s, None);
         s.tick_life(28 * 50);
         s.player_x = 5.0;
-        assert_eq!(s.respawn(true), Some(RespawnTo::Default { x: 30.5, y: 30.0 }));
-        assert_eq!((s.player_x, s.player_y, s.player_dir), (30.5, 30.0, DIR_SOUTH));
+        assert_eq!(
+            s.respawn(true),
+            Some(RespawnTo::Default { x: 30.5, y: 30.0 })
+        );
+        assert_eq!(
+            (s.player_x, s.player_y, s.player_dir),
+            (30.5, 30.0, DIR_SOUTH)
+        );
         let mut s = mortal();
         die(&mut s, None);
         s.tick_life(28 * 50);
@@ -4595,8 +5476,17 @@ mod tests {
         s.combat.set_rules(Some(crate::protocol::COMBAT_205));
         s.apply_server_power(Some(3), Some(6), Some(50));
         assert_eq!(s.take_power_report(), None, "the server's own hearts");
-        let h = crate::combat::HurtPlayer { attacker: 2, dx: 1.0, dy: 0.0, half: 1, npc: None };
-        assert!(s.receive_hurtplayer(&h, Some((s.player_x, s.player_y))).outcome.is_ok());
+        let h = crate::combat::HurtPlayer {
+            attacker: 2,
+            dx: 1.0,
+            dy: 0.0,
+            half: 1,
+            npc: None,
+        };
+        assert!(s
+            .receive_hurtplayer(&h, Some((s.player_x, s.player_y)))
+            .outcome
+            .is_ok());
         let r = s.take_power_report().unwrap();
         assert_eq!(r.cur_half, Some(5));
         assert_eq!(r.pose, Some(crate::life::ReportPose::Hurt));
@@ -4604,7 +5494,10 @@ mod tests {
         // Hurt mode over: idle.
         s.tick_combat(40 * 50);
         let r = s.take_power_report().unwrap();
-        assert_eq!((r.cur_half, r.pose), (None, Some(crate::life::ReportPose::Idle)));
+        assert_eq!(
+            (r.cur_half, r.pose),
+            (None, Some(crate::life::ReportPose::Idle))
+        );
     }
 
     #[test]
@@ -4619,9 +5512,22 @@ mod tests {
         s.combat.set_rules(v.combat_rules());
         s.apply_server_power(Some(3), Some(4), Some(50));
         s.player_dir = DIR_EAST;
-        let h = crate::combat::HurtPlayer { attacker: 2, dx: 1.0, dy: 0.0, half: 1, npc: None };
-        assert!(s.receive_hurtplayer(&h, Some((s.player_x, s.player_y))).outcome.is_ok());
-        let m = s.take_power_report().unwrap().message(v.profile().ui.ganis).unwrap();
+        let h = crate::combat::HurtPlayer {
+            attacker: 2,
+            dx: 1.0,
+            dy: 0.0,
+            half: 1,
+            npc: None,
+        };
+        assert!(s
+            .receive_hurtplayer(&h, Some((s.player_x, s.player_y)))
+            .outcome
+            .is_ok());
+        let m = s
+            .take_power_report()
+            .unwrap()
+            .message(v.profile().ui.ganis)
+            .unwrap();
         // With the first knockback step: X 30 -> 31 (`2f 5e`), as run 2's
         // `22 24 2a 24 "hurt" 2f 5f 31 a2`.
         assert_eq!(s.player_x, 31.0);
@@ -4633,8 +5539,14 @@ mod tests {
         assert!(s.combat.is_hurt());
         s.tick_combat(50);
         let r = s.take_power_report().unwrap();
-        assert_eq!((r.cur_half, r.pose, r.sprite), (None, Some(crate::life::ReportPose::Idle), None));
-        assert!(s.combat.is_hurt(), "hurt mode, and its sprite, run on to 40 ticks");
+        assert_eq!(
+            (r.cur_half, r.pose, r.sprite),
+            (None, Some(crate::life::ReportPose::Idle), None)
+        );
+        assert!(
+            s.combat.is_hurt(),
+            "hurt mode, and its sprite, run on to 40 ticks"
+        );
         s.tick_combat(9 * 50);
         assert!(!s.combat.is_hurt());
         assert_eq!(s.take_power_report(), None);
@@ -4647,14 +5559,20 @@ mod tests {
         assert!(s.damage_half(6, None));
         // Before the life tick: already reported as dead, not hurt.
         let r = s.take_power_report().unwrap();
-        assert_eq!((r.cur_half, r.pose), (Some(0), Some(crate::life::ReportPose::Dead)));
+        assert_eq!(
+            (r.cur_half, r.pose),
+            (Some(0), Some(crate::life::ReportPose::Dead))
+        );
         s.tick_life(0);
         s.tick_life(28 * 50);
         assert_eq!(s.take_power_report(), None);
         assert!(s.respawn(false).is_some());
         // AP 30: min(5 hearts, max 3 hearts) = 6 half hearts.
         let r = s.take_power_report().unwrap();
-        assert_eq!((r.cur_half, r.pose), (Some(6), Some(crate::life::ReportPose::Idle)));
+        assert_eq!(
+            (r.cur_half, r.pose),
+            (Some(6), Some(crate::life::ReportPose::Idle))
+        );
     }
 
     #[test]
@@ -4742,7 +5660,11 @@ mod tests {
 
     #[test]
     fn swimming_steps_the_swim_gani_not_the_walk_one() {
-        let mut s = session_at(level(|x, _| if (10..=13).contains(&x) { WATER } else { OPEN }), 8.5, 20.5);
+        let mut s = session_at(
+            level(|x, _| if (10..=13).contains(&x) { WATER } else { OPEN }),
+            8.5,
+            20.5,
+        );
         s.set_walk_gani(gani_with(1, &[(0, "steps.wav")]));
         s.set_swim_gani(gani_with(1, &[(0, "stroke.wav")]));
         walk(&mut s, 0.5, 0.0, 1); // 9.0, still on land
@@ -4750,7 +5672,10 @@ mod tests {
         walk(&mut s, 0.5, 0.0, 4); // into the water
         assert!(s.in_water);
         let files: Vec<String> = s.take_sound_events().into_iter().map(|e| e.file).collect();
-        assert!(!files.iter().any(|f| f == "stroke.wav"), "the stroke is not stepped by moves: {files:?}");
+        assert!(
+            !files.iter().any(|f| f == "stroke.wav"),
+            "the stroke is not stepped by moves: {files:?}"
+        );
         // The stroke runs on the tick clock: its cue comes with the tick.
         s.tick_poses(50);
         let files: Vec<String> = s.take_sound_events().into_iter().map(|e| e.file).collect();
@@ -4761,14 +5686,19 @@ mod tests {
     fn the_swim_stroke_goes_on_while_floating_still() {
         let mut s = session_at(level(|_, _| WATER), 30.5, 30.5);
         // Eight steps of two ticks (WAIT 1), as the stock swim.gani.
-        let text = format!("SINGLEDIRECTION\nLOOP\nANI\n{}ANIEND\n", "1 0 0\nWAIT 1\n\n".repeat(8));
+        let text = format!(
+            "SINGLEDIRECTION\nLOOP\nANI\n{}ANIEND\n",
+            "1 0 0\nWAIT 1\n\n".repeat(8)
+        );
         s.set_swim_gani(GaniPlayer::new(Gani::parse(&text).unwrap()));
         s.try_move(0.5, 0.0);
         assert!(s.in_water);
-        let frames: Vec<usize> = (0..17).map(|_| {
-            s.tick_poses(50);
-            s.swim_gani.as_ref().unwrap().frame
-        }).collect();
+        let frames: Vec<usize> = (0..17)
+            .map(|_| {
+                s.tick_poses(50);
+                s.swim_gani.as_ref().unwrap().frame
+            })
+            .collect();
         assert_eq!(&frames[..5], [0, 1, 1, 2, 2]);
         assert_eq!(frames[15], 0, "a 16-tick stroke");
     }
@@ -4779,17 +5709,22 @@ mod tests {
         let run = |m| {
             let mut s = session_at(level(|_, _| WATER), 30.5, 30.5);
             s.set_mannerisms(m);
-            let text = format!("SINGLEDIRECTION\nLOOP\nANI\n{}ANIEND\n", "1 0 0\nWAIT 1\n\n".repeat(8));
+            let text = format!(
+                "SINGLEDIRECTION\nLOOP\nANI\n{}ANIEND\n",
+                "1 0 0\nWAIT 1\n\n".repeat(8)
+            );
             s.set_swim_gani(GaniPlayer::new(Gani::parse(&text).unwrap()));
             s.try_move(0.5, 0.0);
             for _ in 0..6 {
                 s.tick_poses(50);
             }
             s.stop_walking();
-            (0..4).map(|_| {
-                s.tick_poses(50);
-                s.swim_gani.as_ref().unwrap().frame
-            }).collect::<Vec<_>>()
+            (0..4)
+                .map(|_| {
+                    s.tick_poses(50);
+                    s.swim_gani.as_ref().unwrap().frame
+                })
+                .collect::<Vec<_>>()
         };
         assert_eq!(run(MANNER_205), [3, 4, 4, 5], "2.05 runs on");
         assert_eq!(run(MANNER_222), [0, 0, 1, 1], "2.22 restarts at the stop");
@@ -4815,7 +5750,10 @@ mod tests {
         s.combat.set_rules(Some(crate::protocol::COMBAT_205));
         assert!(!s.start_swing(), "no swing with something in the hands");
         assert!(!s.combat.is_swinging());
-        assert!(s.carried.is_some(), "the refused swing leaves the object carried");
+        assert!(
+            s.carried.is_some(),
+            "the refused swing leaves the object carried"
+        );
         // The same key press then throws (the key goes on to the interact).
         assert_eq!(s.interact(), Interaction::Thrown { kind: 0 });
         assert!(s.start_swing(), "empty hands swing again");
@@ -4828,7 +5766,10 @@ mod tests {
         assert!(s.carried.is_none());
         assert_eq!(s.thrown.len(), 1);
         let o = &s.thrown[0];
-        assert_eq!((o.x, o.y, o.ground, o.dir, o.ticks_left), (10.5, 28.625, 31.0, DIR_EAST, 9));
+        assert_eq!(
+            (o.x, o.y, o.ground, o.dir, o.ticks_left),
+            (10.5, 28.625, 31.0, DIR_EAST, 9)
+        );
         // Empty hands, nothing in front: no throw.
         s.thrown.clear();
         s.player_x = 5.0;
@@ -4868,7 +5809,11 @@ mod tests {
         assert!(!s.take_throw_hurt(), "reported once");
         let l = s.take_landings();
         assert_eq!(l.len(), 1);
-        assert_eq!(l[0].effect, Some(crate::throwing::LEAP_BUSH), "the bush breaks where it hit");
+        assert_eq!(
+            l[0].effect,
+            Some(crate::throwing::LEAP_BUSH),
+            "the bush breaks where it hit"
+        );
         // The push runs east, the way the bush flew.
         s.tick_combat(50);
         assert!(s.player_x > 14.0);
@@ -4886,7 +5831,10 @@ mod tests {
         s.tick_throw(3 * 50);
         assert_eq!(s.hearts_half(), 0);
         let events = s.tick_life(50);
-        assert!(events.contains(&LifeEvent::Died { attacker: Some(7) }), "{events:?}");
+        assert!(
+            events.contains(&LifeEvent::Died { attacker: Some(7) }),
+            "{events:?}"
+        );
     }
 
     #[test]
@@ -4894,7 +5842,8 @@ mod tests {
         let mut s = pelted();
         s.thrown.clear();
         s.player_dir = DIR_EAST;
-        s.thrown.push(crate::throwing::Thrown::launch(0, 10.0, 30.0, DIR_EAST));
+        s.thrown
+            .push(crate::throwing::Thrown::launch(0, 10.0, 30.0, DIR_EAST));
         s.tick_throw(3 * 50);
         assert_eq!(s.thrown.len(), 1, "flies on through the player");
         assert_eq!(s.hearts_half(), 6);
@@ -4962,7 +5911,10 @@ mod tests {
         assert!(s.thrown.is_empty());
         let l = s.take_landings();
         assert_eq!(l.len(), 1);
-        assert_eq!((l[0].kind, l[0].effect), (0, Some(crate::throwing::LEAP_BUSH)));
+        assert_eq!(
+            (l[0].kind, l[0].effect),
+            (0, Some(crate::throwing::LEAP_BUSH))
+        );
         assert_eq!((l[0].x, l[0].y), (19.5, 31.0));
         // The effect shows its 7 frames, one per tick, then is gone.
         assert_eq!(s.leaps.len(), 1);
@@ -5038,7 +5990,10 @@ mod tests {
         for _ in 0..9 {
             s.tick_throw(50);
         }
-        assert_eq!(s.take_landings()[0].effect, Some(crate::throwing::LEAP_SPLASH));
+        assert_eq!(
+            s.take_landings()[0].effect,
+            Some(crate::throwing::LEAP_SPLASH)
+        );
         // A rock (lift entry 2 -> sprite 265) breaks into the rock pieces.
         let mut s = object_session(1);
         face_up_at(&mut s, 40, 20);
@@ -5047,7 +6002,10 @@ mod tests {
         for _ in 0..9 {
             s.tick_throw(50);
         }
-        assert_eq!(s.take_landings()[0].effect, Some(crate::throwing::LEAP_ROCK));
+        assert_eq!(
+            s.take_landings()[0].effect,
+            Some(crate::throwing::LEAP_ROCK)
+        );
     }
 
     #[test]
@@ -5070,7 +6028,12 @@ mod tests {
 
     #[test]
     fn the_four_directions_fly_their_own_way() {
-        for (dir, dx, dz) in [(DIR_NORTH, 0.0, -9.0), (DIR_WEST, -9.0, 0.0), (DIR_SOUTH, 0.0, 9.0), (DIR_EAST, 9.0, 0.0)] {
+        for (dir, dx, dz) in [
+            (DIR_NORTH, 0.0, -9.0),
+            (DIR_WEST, -9.0, 0.0),
+            (DIR_SOUTH, 0.0, 9.0),
+            (DIR_EAST, 9.0, 0.0),
+        ] {
             let mut s = carrying_bush(30.0, 30.0, dir);
             s.throw_carried();
             let (x0, z0) = (s.thrown[0].x, s.thrown[0].ground);
@@ -5078,7 +6041,11 @@ mod tests {
                 s.tick_throw(50);
             }
             let o = &s.thrown[0];
-            assert!((o.x - x0 - dx * 4.0 / 9.0).abs() < 1e-3 && (o.ground - z0 - dz * 4.0 / 9.0).abs() < 1e-3, "dir {dir}");
+            assert!(
+                (o.x - x0 - dx * 4.0 / 9.0).abs() < 1e-3
+                    && (o.ground - z0 - dz * 4.0 / 9.0).abs() < 1e-3,
+                "dir {dir}"
+            );
         }
     }
 
@@ -5110,10 +6077,19 @@ mod tests {
         data.extend_from_slice(&((1u32 << 24) | (2 << 12) | (3 << 6) | 4).to_be_bytes());
         let t = ObjectTables::parse(&data).unwrap();
         assert_eq!(t.leaps, vec![vec![vec![(7u32 << 16) | (3 << 8) | 0xfe]]]);
-        assert_eq!(crate::throwing::leap_frames(Some(&t), 0), vec![vec![(7u16, 3i8, -2i8)]]);
-        assert_eq!(crate::throwing::sprite_rect(Some(&t), 0), Some((2, 4, 6, 8)));
+        assert_eq!(
+            crate::throwing::leap_frames(Some(&t), 0),
+            vec![vec![(7u16, 3i8, -2i8)]]
+        );
+        assert_eq!(
+            crate::throwing::sprite_rect(Some(&t), 0),
+            Some((2, 4, 6, 8))
+        );
         // ids the file lacks fall back to the built-in rect
-        assert_eq!(crate::throwing::sprite_rect(Some(&t), 261), Some((0, 338, 32, 32)));
+        assert_eq!(
+            crate::throwing::sprite_rect(Some(&t), 261),
+            Some((0, 338, 32, 32))
+        );
     }
 
     // -- Bush and pot drops (`offline/drops.rs`). ---------------------------
@@ -5138,9 +6114,20 @@ mod tests {
         let mut s = drop_session(crate::protocol::DROPS_138);
         face_up_at(&mut s, 20, 20);
         assert_eq!(s.try_cut(), Some(0));
-        assert_eq!(s.floor_items, vec![crate::items::FloorItem::new(crate::items::GREENRUPEE, 20.0, 20.0)], "at the bush's top-left tile");
+        assert_eq!(
+            s.floor_items,
+            vec![crate::items::FloorItem::new(
+                crate::items::GREENRUPEE,
+                20.0,
+                20.0
+            )],
+            "at the bush's top-left tile"
+        );
         // The 1.39 capture: C>S 12 x*2, y*2, item.
-        assert_eq!(s.take_item_messages(true), vec![crate::items::item_add_message(0, 20.0, 20.0)]);
+        assert_eq!(
+            s.take_item_messages(true),
+            vec![crate::items::item_add_message(0, 20.0, 20.0)]
+        );
         // 1.33 to 1.37 roll the same but tell nobody over TCP.
         let mut s = drop_session(crate::protocol::DROPS_133);
         face_up_at(&mut s, 20, 20);
@@ -5161,7 +6148,11 @@ mod tests {
         face_up_at(&mut s, 20, 20);
         s.try_cut();
         assert!(s.floor_items.is_empty());
-        assert_eq!(s.item_rng, crate::items::DelphiRandom::new(0), "no roll at all");
+        assert_eq!(
+            s.item_rng,
+            crate::items::DelphiRandom::new(0),
+            "no roll at all"
+        );
     }
 
     #[test]
@@ -5174,12 +6165,23 @@ mod tests {
         s.floor_items.clear();
         face_up_at(&mut s, 30, 20);
         assert_eq!(s.try_lift(), Some(1));
-        assert!(s.floor_items.is_empty(), "entry 1 (the sign) leaves nothing");
+        assert!(
+            s.floor_items.is_empty(),
+            "entry 1 (the sign) leaves nothing"
+        );
         s.carried = None;
         s.item_rng = crate::items::DelphiRandom::new(0xffff_ffff);
         face_up_at(&mut s, 40, 20);
         assert_eq!(s.try_lift(), Some(2));
-        assert_eq!(s.floor_items, vec![crate::items::FloorItem::new(crate::items::HEART, 40.0, 20.0)], "entry 2 (the pot) always a heart");
+        assert_eq!(
+            s.floor_items,
+            vec![crate::items::FloorItem::new(
+                crate::items::HEART,
+                40.0,
+                20.0
+            )],
+            "entry 2 (the pot) always a heart"
+        );
     }
 
     #[test]
@@ -5204,21 +6206,43 @@ mod tests {
         let mut s = drop_session(crate::protocol::DROPS_142);
         face_up_at(&mut s, 20, 20);
         s.player_y = 19.5;
-        s.add_server_item(crate::items::FloorItem::new(crate::items::BLUERUPEE, 20.0, 20.0));
+        s.add_server_item(crate::items::FloorItem::new(
+            crate::items::BLUERUPEE,
+            20.0,
+            20.0,
+        ));
         ticks(&mut s, 5, true);
         assert_eq!(s.rupees, 0, "the server sends the rupees with props");
-        assert_eq!(s.take_item_messages(true), vec![crate::items::item_take_message(1, 20.0, 20.0)]);
+        assert_eq!(
+            s.take_item_messages(true),
+            vec![crate::items::item_take_message(1, 20.0, 20.0)]
+        );
         // Out of reach it times out after 165 ticks: PLI_ITEMDEL.
-        s.add_server_item(crate::items::FloorItem::new(crate::items::BOMBS, 50.0, 50.0));
+        s.add_server_item(crate::items::FloorItem::new(
+            crate::items::BOMBS,
+            50.0,
+            50.0,
+        ));
         ticks(&mut s, 164, true);
         assert!(s.take_item_messages(true).is_empty());
         ticks(&mut s, 1, true);
-        assert_eq!(s.take_item_messages(true), vec![crate::items::item_del_message(50.0, 50.0)]);
+        assert_eq!(
+            s.take_item_messages(true),
+            vec![crate::items::item_del_message(50.0, 50.0)]
+        );
         // PLO_ITEMDEL takes an item away; a level change clears the floor.
-        s.add_server_item(crate::items::FloorItem::new(crate::items::BOMBS, 50.0, 50.0));
+        s.add_server_item(crate::items::FloorItem::new(
+            crate::items::BOMBS,
+            50.0,
+            50.0,
+        ));
         s.remove_server_item(50.0, 50.0);
         assert!(s.floor_items.is_empty());
-        s.add_server_item(crate::items::FloorItem::new(crate::items::BOMBS, 50.0, 50.0));
+        s.add_server_item(crate::items::FloorItem::new(
+            crate::items::BOMBS,
+            50.0,
+            50.0,
+        ));
         s.clear_throws();
         assert!(s.floor_items.is_empty());
     }
@@ -5228,12 +6252,23 @@ mod tests {
         let mut s = drop_session(crate::protocol::DROPS_133);
         face_up_at(&mut s, 20, 20);
         s.player_y = 19.5;
-        s.add_server_item(crate::items::FloorItem::new(crate::items::BOMBS, 20.0, 20.0));
+        s.add_server_item(crate::items::FloorItem::new(
+            crate::items::BOMBS,
+            20.0,
+            20.0,
+        ));
         s.bombs = 97;
         ticks(&mut s, 5, true);
         assert_eq!(s.bombs, 99, "five bombs, up to 99");
-        assert_eq!(s.take_item_messages(true), vec![crate::items::item_del_message(20.0, 20.0)]);
-        s.add_server_item(crate::items::FloorItem::new(crate::items::BOMBS, 50.0, 50.0));
+        assert_eq!(
+            s.take_item_messages(true),
+            vec![crate::items::item_del_message(20.0, 20.0)]
+        );
+        s.add_server_item(crate::items::FloorItem::new(
+            crate::items::BOMBS,
+            50.0,
+            50.0,
+        ));
         ticks(&mut s, 165, true);
         assert!(s.floor_items.is_empty());
         assert!(s.take_item_messages(true).is_empty());
@@ -5248,11 +6283,17 @@ mod tests {
         s.player_x = 19.5;
         s.player_y = 25.0;
         s.player_dir = DIR_NORTH;
-        assert!(matches!(s.interact(), Interaction::Chest { x: 20, y: 24, .. }));
+        assert!(matches!(
+            s.interact(),
+            Interaction::Chest { x: 20, y: 24, .. }
+        ));
         ticks(&mut s, 23, true);
         assert!(s.take_item_messages(true).is_empty());
         ticks(&mut s, 1, true);
-        assert_eq!(s.take_item_messages(true), vec![crate::items::item_del_message(20.0, 23.0)]);
+        assert_eq!(
+            s.take_item_messages(true),
+            vec![crate::items::item_del_message(20.0, 23.0)]
+        );
         // A level change before the end sends nothing.
         s.opened_chests.clear();
         assert!(matches!(s.interact(), Interaction::Chest { .. }));
@@ -5284,7 +6325,13 @@ mod tests {
     fn explosion(owned: bool) -> crate::bombs::Explosion {
         // one cross of reach 2 whose centre piece covers the player:
         // (13.5 + 1, 32 + 1) against (14 + 1.5, 30 + 2)
-        crate::bombs::Explosion { radius: 2, x: 14.0, y: 31.0, power: 1, owned }
+        crate::bombs::Explosion {
+            radius: 2,
+            x: 14.0,
+            y: 31.0,
+            power: 1,
+            owned,
+        }
     }
 
     #[test]
@@ -5292,7 +6339,10 @@ mod tests {
         let mut s = bombed();
         s.receive_explosion(&explosion(true), Some(7));
         assert_eq!(s.blast.len(), 9);
-        assert_eq!(s.take_sound_events().first().map(|e| e.file.clone()), Some("bomb.wav".into()));
+        assert_eq!(
+            s.take_sound_events().first().map(|e| e.file.clone()),
+            Some("bomb.wav".into())
+        );
         s.tick_bombs(50);
         assert_eq!(s.hearts_half(), 5);
         assert!(s.combat.is_hurt());
@@ -5302,7 +6352,10 @@ mod tests {
         s.receive_explosion(&explosion(true), Some(7));
         s.tick_bombs(50);
         let events = s.tick_life(50);
-        assert!(events.contains(&LifeEvent::Died { attacker: Some(7) }), "{events:?}");
+        assert!(
+            events.contains(&LifeEvent::Died { attacker: Some(7) }),
+            "{events:?}"
+        );
     }
 
     /// One blast hurts once: the hit starts hurt mode, which keeps the
@@ -5311,7 +6364,8 @@ mod tests {
     #[test]
     fn a_139_player_is_hurt_once_by_one_blast() {
         let mut s = bombed();
-        s.combat = crate::combat::CombatState::new(crate::protocol::ClientVersion::V139.combat_rules());
+        s.combat =
+            crate::combat::CombatState::new(crate::protocol::ClientVersion::V139.combat_rules());
         s.receive_explosion(&explosion(false), None);
         for _ in 0..10 {
             s.tick_bombs(50);
@@ -5348,14 +6402,23 @@ mod tests {
             assert_eq!(s.hearts_half(), 5, "owned {owned}");
             s.set_hearts_half(0);
             let events = s.tick_life(50);
-            assert!(events.contains(&LifeEvent::Died { attacker: None }), "{events:?}");
+            assert!(
+                events.contains(&LifeEvent::Died { attacker: None }),
+                "{events:?}"
+            );
         }
     }
 
     #[test]
     fn a_received_bomb_burns_its_own_fuse_then_hurts_and_bombdel_removes_it() {
         let mut s = bombed();
-        let add = crate::bombs::BombAdd { x: 14.0, y: 31.0, power: 3, fuse: 2, owned: true };
+        let add = crate::bombs::BombAdd {
+            x: 14.0,
+            y: 31.0,
+            power: 3,
+            fuse: 2,
+            owned: true,
+        };
         s.receive_bomb(&add, Some(7));
         assert_eq!(s.placed_bombs[0].owner, Some(7));
         s.tick_bombs(2 * 50);
@@ -5385,7 +6448,15 @@ mod tests {
     fn shot(kind: u8, owned: bool) -> crate::arrows::ArrowAdd {
         // flying east along y 31 from x 10, a tile a tick; its half-tile
         // box is past the player's x + 0.5 = 14.5 first at x 15 (tick 5)
-        crate::arrows::ArrowAdd { x: 10.0, y: 31.0, dir: 3, replaces: false, owned, sprite: 110, kind }
+        crate::arrows::ArrowAdd {
+            x: 10.0,
+            y: 31.0,
+            dir: 3,
+            replaces: false,
+            owned,
+            sprite: 110,
+            kind,
+        }
     }
 
     #[test]

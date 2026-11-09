@@ -71,7 +71,10 @@ pub struct Event {
 
 impl Event {
     pub fn field(&self, key: &str) -> Option<&str> {
-        self.fields.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+        self.fields
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
     }
 }
 
@@ -84,7 +87,10 @@ pub struct Trace {
 
 impl Trace {
     pub fn meta(&self, key: &str) -> Option<&str> {
-        self.meta.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+        self.meta
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
     }
 
     pub fn set_meta(&mut self, key: &str, value: &str) {
@@ -107,7 +113,9 @@ impl Trace {
 
     /// Events of one connection and direction, in order.
     pub fn stream<'a>(&'a self, conn: &'a str, dir: Dir) -> impl Iterator<Item = &'a Event> + 'a {
-        self.events.iter().filter(move |e| e.conn == conn && e.dir == dir)
+        self.events
+            .iter()
+            .filter(move |e| e.conn == conn && e.dir == dir)
     }
 
     pub fn to_tsv(&self) -> String {
@@ -117,7 +125,11 @@ impl Trace {
         }
         s.push_str("#conn\tdir\tt_ms\tframe\tid\tname\tlen\tfields\n");
         for e in &self.events {
-            let fields: Vec<String> = e.fields.iter().map(|(k, v)| format!("{}={}", esc(k), esc(v))).collect();
+            let fields: Vec<String> = e
+                .fields
+                .iter()
+                .map(|(k, v)| format!("{}={}", esc(k), esc(v)))
+                .collect();
             let _ = writeln!(
                 s,
                 "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
@@ -143,7 +155,9 @@ impl Trace {
         }
         for (n, line) in lines.enumerate() {
             if let Some(m) = line.strip_prefix("#meta ") {
-                let (k, v) = m.split_once('=').ok_or_else(|| format!("line {}: bad meta", n + 2))?;
+                let (k, v) = m
+                    .split_once('=')
+                    .ok_or_else(|| format!("line {}: bad meta", n + 2))?;
                 t.meta.push((unesc(k), unesc(v)));
                 continue;
             }
@@ -152,7 +166,11 @@ impl Trace {
             }
             let c: Vec<&str> = line.split('\t').collect();
             if c.len() != 8 {
-                return Err(format!("line {}: expected 8 columns, got {}", n + 2, c.len()));
+                return Err(format!(
+                    "line {}: expected 8 columns, got {}",
+                    n + 2,
+                    c.len()
+                ));
             }
             let bad = |what: &str| format!("line {}: bad {what}", n + 2);
             let mut fields = Vec::new();
@@ -237,7 +255,10 @@ mod tests {
             id: ID_LOGIN,
             name: "LOGIN".into(),
             len: 38,
-            fields: vec![("token".into(), "GNW28015".into()), ("account".into(), "<ACCT>".into())],
+            fields: vec![
+                ("token".into(), "GNW28015".into()),
+                ("account".into(), "<ACCT>".into()),
+            ],
             raw: Vec::new(),
         });
         t.events.push(Event {

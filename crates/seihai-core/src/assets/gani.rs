@@ -75,11 +75,15 @@ fn parse_playsound(rest: &str) -> Option<GaniSound> {
     let (name, x, y) = match toks.as_slice() {
         [] => return None,
         [n] => (n.to_string(), LISTENER_DX, LISTENER_DY),
-        [.., xs, ys] if toks.len() >= 3 && xs.parse::<f32>().is_ok() && ys.parse::<f32>().is_ok() => (
-            toks[..toks.len() - 2].join(" "),
-            xs.parse().unwrap_or(LISTENER_DX),
-            ys.parse().unwrap_or(LISTENER_DY),
-        ),
+        [.., xs, ys]
+            if toks.len() >= 3 && xs.parse::<f32>().is_ok() && ys.parse::<f32>().is_ok() =>
+        {
+            (
+                toks[..toks.len() - 2].join(" "),
+                xs.parse().unwrap_or(LISTENER_DX),
+                ys.parse().unwrap_or(LISTENER_DY),
+            )
+        }
         _ => (toks.join(" "), LISTENER_DX, LISTENER_DY),
     };
     Some(GaniSound { file: name, x, y })
@@ -186,7 +190,12 @@ impl Gani {
                 continue;
             }
 
-            if let Some(n) = line.strip_prefix("DEFAULTATTR").and_then(|r| r.chars().next()).and_then(|c| c.to_digit(10)).filter(|n| (1..=5).contains(n)) {
+            if let Some(n) = line
+                .strip_prefix("DEFAULTATTR")
+                .and_then(|r| r.chars().next())
+                .and_then(|c| c.to_digit(10))
+                .filter(|n| (1..=5).contains(n))
+            {
                 if line.as_bytes().get(12) == Some(&b' ') {
                     let v = line[13..].trim().to_string();
                     if n == 1 {
@@ -208,7 +217,10 @@ impl Gani {
             if in_ani {
                 // `WAIT n` (the stock `hidden.gani` writes `WAIT4`) belongs to
                 // the step whose rows came just before it.
-                if let Some(n) = line.strip_prefix("WAIT").and_then(|r| r.trim().parse::<u32>().ok()) {
+                if let Some(n) = line
+                    .strip_prefix("WAIT")
+                    .and_then(|r| r.trim().parse::<u32>().ok())
+                {
                     if !current.rows.is_empty() {
                         current.wait = n;
                     } else if let Some(last) = frames.last_mut() {
@@ -292,7 +304,11 @@ impl Gani {
         if total == 0 {
             return 0;
         }
-        let mut t = if wrap { tick % total } else { tick.min(total - 1) };
+        let mut t = if wrap {
+            tick % total
+        } else {
+            tick.min(total - 1)
+        };
         for i in 0..self.frames.len() {
             let n = self.frame_ticks(i);
             if t < n {
@@ -385,7 +401,12 @@ mod tests {
         let g = Gani::parse("SETBACKTO idle\nANI\n1 0 0\n1 0 0\n1 0 0\n1 0 0\nANIEND\n").unwrap();
         assert_eq!(g.setback_to.as_deref(), Some("idle"));
         assert_eq!(g.frame_count(), 1);
-        assert_eq!(Gani::parse("ANI\n1 0 0\n1 0 0\n1 0 0\n1 0 0\nANIEND\n").unwrap().setback_to, None);
+        assert_eq!(
+            Gani::parse("ANI\n1 0 0\n1 0 0\n1 0 0\n1 0 0\nANIEND\n")
+                .unwrap()
+                .setback_to,
+            None
+        );
     }
 
     #[test]
@@ -441,9 +462,23 @@ ANIEND
 ";
         let g = Gani::parse(text).unwrap();
         assert_eq!(g.frame_count(), 3);
-        assert_eq!(g.frames[0].sounds, vec![GaniSound { file: "steps2.wav".into(), x: 1.5, y: 2.0 }]);
+        assert_eq!(
+            g.frames[0].sounds,
+            vec![GaniSound {
+                file: "steps2.wav".into(),
+                x: 1.5,
+                y: 2.0
+            }]
+        );
         assert!(g.frames[1].sounds.is_empty());
-        assert_eq!(g.frames[2].sounds, vec![GaniSound { file: "jump.wav".into(), x: 0.5, y: 3.25 }]);
+        assert_eq!(
+            g.frames[2].sounds,
+            vec![GaniSound {
+                file: "jump.wav".into(),
+                x: 0.5,
+                y: 3.25
+            }]
+        );
     }
 
     #[test]
@@ -508,7 +543,10 @@ ANIEND
         for e in std::fs::read_dir(dir).unwrap().flatten() {
             let path = e.path();
             let raw = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).to_string();
-            let want = raw.lines().filter(|l| l.trim().starts_with("PLAYSOUND ")).count();
+            let want = raw
+                .lines()
+                .filter(|l| l.trim().starts_with("PLAYSOUND "))
+                .count();
             let g = Gani::load(&path).unwrap();
             let got: usize = g.frames.iter().map(|f| f.sounds.len()).sum();
             assert_eq!(got, want, "{}", path.display());
@@ -518,9 +556,14 @@ ANIEND
             cues += got;
         }
         eprintln!("{cues} cues in {files} files");
-        let walk = Gani::load(std::path::Path::new(&std::env::var("SEIHAI_GANI_DIR").unwrap()).join("walk.gani")).unwrap();
+        let walk = Gani::load(
+            std::path::Path::new(&std::env::var("SEIHAI_GANI_DIR").unwrap()).join("walk.gani"),
+        )
+        .unwrap();
         assert_eq!(walk.frame_count(), 8);
-        let with: Vec<usize> = (0..8).filter(|i| !walk.frames[*i].sounds.is_empty()).collect();
+        let with: Vec<usize> = (0..8)
+            .filter(|i| !walk.frames[*i].sounds.is_empty())
+            .collect();
         assert_eq!(with, vec![0, 4]);
     }
 }

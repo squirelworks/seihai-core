@@ -84,9 +84,13 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Malformed(what) => write!(f, "malformed secure-login message: {what}"),
-            Error::BadSignature => f.write_str("the server's signature on the secure login does not verify"),
+            Error::BadSignature => {
+                f.write_str("the server's signature on the secure login does not verify")
+            }
             Error::WeakKey => f.write_str("the key exchange gave a weak shared secret"),
-            Error::BadSeal => f.write_str("a sealed message did not open (wrong key, or changed in transit)"),
+            Error::BadSeal => {
+                f.write_str("a sealed message did not open (wrong key, or changed in transit)")
+            }
             Error::TooLong => write!(f, "the login is over {MAX_TAIL} bytes"),
         }
     }
@@ -118,8 +122,12 @@ pub fn decode_key(text: &str) -> Option<[u8; 32]> {
 }
 
 fn key32(b64: &[u8]) -> Result<[u8; 32], Error> {
-    let bytes = B64.decode(b64).map_err(|_| Error::Malformed("bad base64 key"))?;
-    bytes.try_into().map_err(|_| Error::Malformed("key is not 32 bytes"))
+    let bytes = B64
+        .decode(b64)
+        .map_err(|_| Error::Malformed("bad base64 key"))?;
+    bytes
+        .try_into()
+        .map_err(|_| Error::Malformed("key is not 32 bytes"))
 }
 
 /// The bytes the server signs.
@@ -144,7 +152,11 @@ struct Keys {
 }
 
 /// The transcript hash and the keys.
-fn derive(shared: &x25519_dalek::SharedSecret, signed: &[u8], sig: &[u8; 64]) -> Result<Keys, Error> {
+fn derive(
+    shared: &x25519_dalek::SharedSecret,
+    signed: &[u8],
+    sig: &[u8; 64],
+) -> Result<Keys, Error> {
     if !shared.was_contributory() {
         return Err(Error::WeakKey);
     }
@@ -155,10 +167,16 @@ fn derive(shared: &x25519_dalek::SharedSecret, signed: &[u8], sig: &[u8; 64]) ->
     let hk = Hkdf::<Sha256>::new(Some(&th), shared.as_bytes());
     let expand = |info: &[u8]| {
         let mut k = [0u8; 32];
-        hk.expand(info, &mut k).expect("32 bytes is a valid HKDF-SHA256 length");
+        hk.expand(info, &mut k)
+            .expect("32 bytes is a valid HKDF-SHA256 length");
         k
     };
-    Ok(Keys { th, key: expand(KEY_INFO), c2s: expand(CHANNEL_C2S), s2c: expand(CHANNEL_S2C) })
+    Ok(Keys {
+        th,
+        key: expand(KEY_INFO),
+        c2s: expand(CHANNEL_C2S),
+        s2c: expand(CHANNEL_S2C),
+    })
 }
 
 /// The long-term key a server signs its hello with.
@@ -169,12 +187,16 @@ pub struct ServerIdentity {
 impl ServerIdentity {
     /// A new random key.
     pub fn generate() -> Self {
-        Self { key: SigningKey::generate(&mut OsRng) }
+        Self {
+            key: SigningKey::generate(&mut OsRng),
+        }
     }
 
     /// The key from its 32-byte seed (what a server keeps on disk).
     pub fn from_seed(seed: &[u8; 32]) -> Self {
-        Self { key: SigningKey::from_bytes(seed) }
+        Self {
+            key: SigningKey::from_bytes(seed),
+        }
     }
 
     /// The 32-byte seed, to store.
@@ -195,7 +217,10 @@ impl ServerIdentity {
         match std::fs::read_to_string(path) {
             Ok(text) => {
                 let seed = decode_key(&text).ok_or_else(|| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{}: not a secure-login key", path.display()))
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("{}: not a secure-login key", path.display()),
+                    )
                 })?;
                 Ok((Self::from_seed(&seed), false))
             }
@@ -259,7 +284,9 @@ impl ClientHandshake {
     /// compare with its pin before it seals anything.
     pub fn finish(self, s1: &[u8]) -> Result<Verified, Error> {
         let s1 = s1.strip_suffix(b"\n").unwrap_or(s1);
-        let rest = s1.strip_prefix(TOKEN_B).ok_or(Error::Malformed("server hello does not start with the token"))?;
+        let rest = s1.strip_prefix(TOKEN_B).ok_or(Error::Malformed(
+            "server hello does not start with the token",
+        ))?;
         if rest.len() != KEY_B64 * 2 + SIG_B64 {
             return Err(Error::Malformed("server hello has the wrong length"));
         }
@@ -270,12 +297,23 @@ impl ClientHandshake {
             .map_err(|_| Error::Malformed("bad base64 signature"))?
             .try_into()
             .map_err(|_| Error::Malformed("signature is not 64 bytes"))?;
-        let verifying = VerifyingKey::from_bytes(&id).map_err(|_| Error::Malformed("server key is not an Ed25519 key"))?;
+        let verifying = VerifyingKey::from_bytes(&id)
+            .map_err(|_| Error::Malformed("server key is not an Ed25519 key"))?;
         let signed = signed_bytes(&self.hello, &eph, &id);
-        verifying.verify_strict(&signed, &Signature::from_bytes(&sig)).map_err(|_| Error::BadSignature)?;
+        verifying
+            .verify_strict(&signed, &Signature::from_bytes(&sig))
+            .map_err(|_| Error::BadSignature)?;
         let shared = self.secret.diffie_hellman(&PublicKey::from(eph));
         let k = derive(&shared, &signed, &sig)?;
-        Ok(Verified { server_key: id, sealer: Sealer { th: k.th, key: k.key, c2s: k.c2s, s2c: k.s2c } })
+        Ok(Verified {
+            server_key: id,
+            sealer: Sealer {
+                th: k.th,
+                key: k.key,
+                c2s: k.c2s,
+                s2c: k.s2c,
+            },
+        })
     }
 }
 
@@ -307,7 +345,10 @@ fn pad(tail: &[u8]) -> Result<Vec<u8>, Error> {
 }
 
 fn unpad(p: &[u8]) -> Result<Vec<u8>, Error> {
-    let n = u16::from_le_bytes([*p.first().ok_or(Error::BadSeal)?, *p.get(1).ok_or(Error::BadSeal)?]) as usize;
+    let n = u16::from_le_bytes([
+        *p.first().ok_or(Error::BadSeal)?,
+        *p.get(1).ok_or(Error::BadSeal)?,
+    ]) as usize;
     let tail = p.get(2..2 + n).ok_or(Error::BadSeal)?;
     if n > MAX_TAIL || p[2 + n..].iter().any(|&b| b != 0) {
         return Err(Error::BadSeal);
@@ -329,7 +370,13 @@ impl Sealer {
     pub fn seal(self, tail: &[u8]) -> Result<Vec<u8>, Error> {
         let cipher = ChaCha20Poly1305::new(&self.key.into());
         let ct = cipher
-            .encrypt(&[0u8; 12].into(), Payload { msg: &pad(tail)?, aad: &self.th })
+            .encrypt(
+                &[0u8; 12].into(),
+                Payload {
+                    msg: &pad(tail)?,
+                    aad: &self.th,
+                },
+            )
             .map_err(|_| Error::TooLong)?;
         let mut line = TOKEN_B.to_vec();
         line.extend_from_slice(B64.encode(ct).as_bytes());
@@ -361,9 +408,22 @@ impl ClientHello {
         }
         let rest = &line[prefix_len + 8..];
         Some((|| {
-            let inner: [u8; 8] = rest.get(..8).ok_or(Error::Malformed("no inner token"))?.try_into().unwrap();
-            let key = key32(rest.get(8..8 + KEY_B64).ok_or(Error::Malformed("no client key"))?)?;
-            Ok(Self { prefix: line[..prefix_len].to_vec(), inner, suffix: rest[8 + KEY_B64..].to_vec(), client_key: key, line: line.to_vec() })
+            let inner: [u8; 8] = rest
+                .get(..8)
+                .ok_or(Error::Malformed("no inner token"))?
+                .try_into()
+                .unwrap();
+            let key = key32(
+                rest.get(8..8 + KEY_B64)
+                    .ok_or(Error::Malformed("no client key"))?,
+            )?;
+            Ok(Self {
+                prefix: line[..prefix_len].to_vec(),
+                inner,
+                suffix: rest[8 + KEY_B64..].to_vec(),
+                client_key: key,
+                line: line.to_vec(),
+            })
         })())
     }
 
@@ -385,7 +445,15 @@ impl ClientHello {
         for part in [&eph[..], &id[..], &sig[..]] {
             s1.extend_from_slice(B64.encode(part).as_bytes());
         }
-        Ok((s1, Opener { th: k.th, key: k.key, c2s: k.c2s, s2c: k.s2c }))
+        Ok((
+            s1,
+            Opener {
+                th: k.th,
+                key: k.key,
+                c2s: k.c2s,
+                s2c: k.s2c,
+            },
+        ))
     }
 }
 
@@ -406,10 +474,22 @@ impl Opener {
     /// The tail sealed in C2 (one line, with or without its line feed).
     pub fn open(self, c2: &[u8]) -> Result<Vec<u8>, Error> {
         let c2 = c2.strip_suffix(b"\n").unwrap_or(c2);
-        let b64 = c2.strip_prefix(TOKEN_B).ok_or(Error::Malformed("sealed login does not start with the token"))?;
-        let ct = B64.decode(b64).map_err(|_| Error::Malformed("bad base64 in the sealed login"))?;
+        let b64 = c2.strip_prefix(TOKEN_B).ok_or(Error::Malformed(
+            "sealed login does not start with the token",
+        ))?;
+        let ct = B64
+            .decode(b64)
+            .map_err(|_| Error::Malformed("bad base64 in the sealed login"))?;
         let cipher = ChaCha20Poly1305::new(&self.key.into());
-        let p = cipher.decrypt(&[0u8; 12].into(), Payload { msg: &ct, aad: &self.th }).map_err(|_| Error::BadSeal)?;
+        let p = cipher
+            .decrypt(
+                &[0u8; 12].into(),
+                Payload {
+                    msg: &ct,
+                    aad: &self.th,
+                },
+            )
+            .map_err(|_| Error::BadSeal)?;
         unpad(&p)
     }
 }
@@ -442,14 +522,22 @@ fn nonce(n: u64) -> [u8; 12] {
 
 impl Channel {
     fn new(send: [u8; 32], recv: [u8; 32]) -> Self {
-        Self { send: ChaCha20Poly1305::new(&send.into()), recv: ChaCha20Poly1305::new(&recv.into()), sent: 0, got: 0 }
+        Self {
+            send: ChaCha20Poly1305::new(&send.into()),
+            recv: ChaCha20Poly1305::new(&recv.into()),
+            sent: 0,
+            got: 0,
+        }
     }
 
     /// The records (with their length headers) carrying `data`.
     pub fn seal(&mut self, data: &[u8]) -> Vec<u8> {
         let mut out = Vec::with_capacity(data.len() + 18);
         for chunk in data.chunks(MAX_RECORD) {
-            let ct = self.send.encrypt(&nonce(self.sent).into(), chunk).expect("a record is within the AEAD limit");
+            let ct = self
+                .send
+                .encrypt(&nonce(self.sent).into(), chunk)
+                .expect("a record is within the AEAD limit");
             self.sent += 1;
             out.extend_from_slice(&(ct.len() as u16).to_be_bytes());
             out.extend_from_slice(&ct);
@@ -459,7 +547,10 @@ impl Channel {
 
     /// Open one record's body (the bytes after its length).
     pub fn open(&mut self, record: &[u8]) -> Result<Vec<u8>, Error> {
-        let pt = self.recv.decrypt(&nonce(self.got).into(), record).map_err(|_| Error::BadSeal)?;
+        let pt = self
+            .recv
+            .decrypt(&nonce(self.got).into(), record)
+            .map_err(|_| Error::BadSeal)?;
         self.got += 1;
         Ok(pt)
     }
@@ -467,13 +558,27 @@ impl Channel {
     /// The two directions apart, for a link that reads on one thread and
     /// writes on another.
     pub fn split(self) -> (ChannelSend, ChannelRecv) {
-        (ChannelSend { key: self.send, n: self.sent }, ChannelRecv { key: self.recv, n: self.got })
+        (
+            ChannelSend {
+                key: self.send,
+                n: self.sent,
+            },
+            ChannelRecv {
+                key: self.recv,
+                n: self.got,
+            },
+        )
     }
 
     /// Wrap a blocking stream: what is written is sealed, what is read is
     /// opened.
     pub fn wrap<S: std::io::Read + std::io::Write>(self, inner: S) -> SecureStream<S> {
-        SecureStream { inner, ch: self, buf: Vec::new(), at: 0 }
+        SecureStream {
+            inner,
+            ch: self,
+            buf: Vec::new(),
+            at: 0,
+        }
     }
 }
 
@@ -488,7 +593,10 @@ impl ChannelSend {
     pub fn seal(&mut self, data: &[u8]) -> Vec<u8> {
         let mut out = Vec::with_capacity(data.len() + 18);
         for chunk in data.chunks(MAX_RECORD) {
-            let ct = self.key.encrypt(&nonce(self.n).into(), chunk).expect("a record is within the AEAD limit");
+            let ct = self
+                .key
+                .encrypt(&nonce(self.n).into(), chunk)
+                .expect("a record is within the AEAD limit");
             self.n += 1;
             out.extend_from_slice(&(ct.len() as u16).to_be_bytes());
             out.extend_from_slice(&ct);
@@ -518,7 +626,9 @@ impl ChannelRecv {
         let pt = self
             .key
             .decrypt(&nonce(self.n).into(), rec.as_slice())
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, Error::BadSeal.to_string()))?;
+            .map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, Error::BadSeal.to_string())
+            })?;
         self.n += 1;
         Ok(Some(pt))
     }
@@ -554,7 +664,10 @@ impl<S: std::io::Read + std::io::Write> std::io::Read for SecureStream<S> {
             }
             let mut rec = vec![0u8; u16::from_be_bytes(len) as usize];
             self.inner.read_exact(&mut rec)?;
-            self.buf = self.ch.open(&rec).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
+            self.buf = self
+                .ch
+                .open(&rec)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
             self.at = 0;
         }
         let n = out.len().min(self.buf.len() - self.at);
@@ -633,7 +746,10 @@ impl Pins {
         if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
             std::fs::create_dir_all(dir)?;
         }
-        let mut f = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
+        let mut f = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)?;
         writeln!(f, "{server} {}", encode_key(key))
     }
 }
@@ -668,7 +784,10 @@ mod tests {
         let (c1, s1, c2, opened) = exchange(tail);
         assert_eq!(opened, tail);
         for line in [&c1, &s1, &c2] {
-            assert!(line.iter().all(|&b| b >= 0x20 && b != b'\n'), "every byte is a message byte");
+            assert!(
+                line.iter().all(|&b| b >= 0x20 && b != b'\n'),
+                "every byte is a message byte"
+            );
         }
         // Neither the account nor the password shows in any line.
         for line in [&c1, &s1, &c2] {
@@ -718,9 +837,20 @@ mod tests {
         let hello = ClientHello::parse(c.hello(), 2).unwrap().unwrap();
         let (s1, _) = hello.respond(&fake).unwrap();
         let v = c.finish(&s1).unwrap();
-        let pins = Pins::parse(&format!("127.0.0.1:14802 {}\n", encode_key(&real.public_key())));
-        assert_eq!(pins.check("127.0.0.1:14802", &v.server_key), PinCheck::Mismatch { pinned: real.public_key() });
-        assert_eq!(pins.check("127.0.0.1:14803", &v.server_key), PinCheck::Unknown);
+        let pins = Pins::parse(&format!(
+            "127.0.0.1:14802 {}\n",
+            encode_key(&real.public_key())
+        ));
+        assert_eq!(
+            pins.check("127.0.0.1:14802", &v.server_key),
+            PinCheck::Mismatch {
+                pinned: real.public_key()
+            }
+        );
+        assert_eq!(
+            pins.check("127.0.0.1:14803", &v.server_key),
+            PinCheck::Unknown
+        );
     }
 
     #[test]
@@ -753,7 +883,10 @@ mod tests {
         let id = ServerIdentity::generate();
         let again = ServerIdentity::from_seed(&id.seed());
         assert_eq!(id.public_key(), again.public_key());
-        assert_eq!(decode_key(&encode_key(&id.public_key())), Some(id.public_key()));
+        assert_eq!(
+            decode_key(&encode_key(&id.public_key())),
+            Some(id.public_key())
+        );
         assert!(fingerprint(&id.public_key()).starts_with("SHA256:"));
     }
 
@@ -784,10 +917,17 @@ mod tests {
         let back = server.seal(b"pong");
         assert_eq!(client2.open(&back[2..]).unwrap(), b"pong");
         let mine = client2.seal(b"mine");
-        assert!(client2.open(&mine[2..]).is_err(), "a record from the own direction fails");
+        assert!(
+            client2.open(&mine[2..]).is_err(),
+            "a record from the own direction fails"
+        );
         // The halves of a fresh pair, each direction counted on its own.
         let c = ClientHandshake::new(b"", LINK_TOKEN, b"").unwrap();
-        let (s1, op) = ClientHello::parse(c.hello(), 0).unwrap().unwrap().respond(&id).unwrap();
+        let (s1, op) = ClientHello::parse(c.hello(), 0)
+            .unwrap()
+            .unwrap()
+            .respond(&id)
+            .unwrap();
         let (mut tx, _) = c.finish(&s1).unwrap().sealer.into_channel().split();
         let (_, mut rx) = op.into_channel().split();
         let recs = [tx.seal(b"one"), tx.seal(b"two")].concat();
@@ -819,9 +959,15 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("seihai-pins-{}", std::process::id()));
         let path = dir.join("known_servers.txt");
         let key = ServerIdentity::generate().public_key();
-        assert_eq!(Pins::load(&path).unwrap().check("127.0.0.1:1", &key), PinCheck::Unknown);
+        assert_eq!(
+            Pins::load(&path).unwrap().check("127.0.0.1:1", &key),
+            PinCheck::Unknown
+        );
         Pins::append(&path, "127.0.0.1:1", &key).unwrap();
-        assert_eq!(Pins::load(&path).unwrap().check("127.0.0.1:1", &key), PinCheck::Matches);
+        assert_eq!(
+            Pins::load(&path).unwrap().check("127.0.0.1:1", &key),
+            PinCheck::Matches
+        );
         let _ = std::fs::remove_dir_all(dir);
     }
 }

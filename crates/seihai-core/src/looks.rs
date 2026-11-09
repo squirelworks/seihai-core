@@ -62,33 +62,56 @@ pub struct Looks {
 
 impl Default for Looks {
     fn default() -> Self {
-        Looks { head: None, body: None, colors: DEFAULT_COLORS, attrs: Default::default() }
+        Looks {
+            head: None,
+            body: None,
+            colors: DEFAULT_COLORS,
+            attrs: Default::default(),
+        }
     }
 }
 
 /// The picture an `ATTR1` … `ATTR5` sprite (`i` 0 to 4) of `gani` is drawn
 /// with for a player whose attributes are `attrs`: their own, else the
 /// GANI's default. An attribute set to an empty text draws nothing.
-pub fn attr_image<'a>(attrs: &'a [Option<String>; 5], gani: &'a crate::assets::Gani, i: usize) -> Option<&'a str> {
+pub fn attr_image<'a>(
+    attrs: &'a [Option<String>; 5],
+    gani: &'a crate::assets::Gani,
+    i: usize,
+) -> Option<&'a str> {
     match attrs.get(i)? {
         Some(a) => Some(a.as_str()).filter(|a| !a.is_empty()),
-        None => gani.default_attrs.get(i)?.as_deref().filter(|a| !a.is_empty()),
+        None => gani
+            .default_attrs
+            .get(i)?
+            .as_deref()
+            .filter(|a| !a.is_empty()),
     }
 }
 
 /// The folder an attribute picture is looked for in: the hat (attribute 1)
 /// in `hats/`, the others wherever images are.
 pub fn attr_dir(i: usize) -> &'static str {
-    if i == 0 { "hats" } else { "" }
+    if i == 0 {
+        "hats"
+    } else {
+        ""
+    }
 }
 
 impl Looks {
     pub fn head_name(&self) -> &str {
-        self.head.as_deref().filter(|h| !h.is_empty()).unwrap_or(DEFAULT_HEAD)
+        self.head
+            .as_deref()
+            .filter(|h| !h.is_empty())
+            .unwrap_or(DEFAULT_HEAD)
     }
 
     pub fn body_name(&self) -> &str {
-        self.body.as_deref().filter(|b| !b.is_empty()).unwrap_or(DEFAULT_BODY)
+        self.body
+            .as_deref()
+            .filter(|b| !b.is_empty())
+            .unwrap_or(DEFAULT_BODY)
     }
 }
 
@@ -107,7 +130,10 @@ pub fn body_recolor(colors: &[u8; 5]) -> Vec<(usize, [u8; 3])> {
 /// The key a body picture drawn in `colors` is kept under, next to the
 /// plain pictures.
 pub fn colored_body_key(body: &str, colors: &[u8; 5]) -> String {
-    format!("{body}#colors={},{},{},{},{}", colors[0], colors[1], colors[2], colors[3], colors[4])
+    format!(
+        "{body}#colors={},{},{},{},{}",
+        colors[0], colors[1], colors[2], colors[3], colors[4]
+    )
 }
 
 /// The colour slot a command or chat word names: `setskincolor` / `setskin`
@@ -140,21 +166,34 @@ pub fn colors_from_prop(raw: &[u8]) -> Option<[u8; 5]> {
 /// the list or a number, rounded. `None` past the list.
 pub fn color_value(v: &str) -> Option<u8> {
     let v = v.trim();
-    color_by_name(v).or_else(|| v.parse::<f64>().ok().map(f64::round).filter(|n| (0.0..20.0).contains(n)).map(|n| n as u8))
+    color_by_name(v).or_else(|| {
+        v.parse::<f64>()
+            .ok()
+            .map(f64::round)
+            .filter(|n| (0.0..20.0).contains(n))
+            .map(|n| n as u8)
+    })
 }
 
 /// A character NPC's looks, from what `setcharprop` set (2.05: `#1` sword,
 /// `#2` shield, `#3` head, `#8` body, `#C0` … `#C4` colours, `#P1` … `#P5`
 /// attributes). Colours not set are the new-player ones.
 pub fn npc_looks(n: &crate::assets::Npc) -> Looks {
-    let mut l = Looks { head: n.head.clone().filter(|h| !h.is_empty()), body: n.body.clone().filter(|b| !b.is_empty()), ..Looks::default() };
+    let mut l = Looks {
+        head: n.head.clone().filter(|h| !h.is_empty()),
+        body: n.body.clone().filter(|b| !b.is_empty()),
+        ..Looks::default()
+    };
     for (i, c) in l.colors.iter_mut().enumerate() {
         if let Some(v) = n.props.get(&format!("#C{i}")).and_then(|v| color_value(v)) {
             *c = v;
         }
     }
     for (i, a) in l.attrs.iter_mut().enumerate() {
-        *a = n.props.get(&format!("#P{}", i + 1)).map(|v| v.trim().to_string());
+        *a = n
+            .props
+            .get(&format!("#P{}", i + 1))
+            .map(|v| v.trim().to_string());
     }
     l
 }
@@ -199,7 +238,10 @@ pub fn parse_chat_look(line: &str) -> Option<ChatLook> {
         "setbody" => Some(ChatLook::Body(arg.to_string())),
         c => {
             let slot = color_slot(c).filter(|_| !c.ends_with("color"))?;
-            Some(ChatLook::Color { slot, color: color_by_name(arg)? })
+            Some(ChatLook::Color {
+                slot,
+                color: color_by_name(arg)?,
+            })
         }
     }
 }
@@ -224,7 +266,14 @@ mod tests {
         let r = body_recolor(&[2, 0, 4, 5, 10]);
         assert_eq!(
             r,
-            vec![(5, [255, 173, 107]), (6, [255, 255, 255]), (4, [255, 0, 0]), (3, [206, 24, 41]), (1, [0, 0, 255]), (0, [0, 0, 8])]
+            vec![
+                (5, [255, 173, 107]),
+                (6, [255, 255, 255]),
+                (4, [255, 0, 0]),
+                (3, [206, 24, 41]),
+                (1, [0, 0, 255]),
+                (0, [0, 0, 8])
+            ]
         );
     }
 
@@ -247,7 +296,10 @@ mod tests {
 
     #[test]
     fn own_attribute_wins_over_the_gani_default() {
-        let g = crate::assets::Gani::parse("DEFAULTATTR1 hat0.png\nANI\n1 0 0\n1 0 0\n1 0 0\n1 0 0\nANIEND\n").unwrap();
+        let g = crate::assets::Gani::parse(
+            "DEFAULTATTR1 hat0.png\nANI\n1 0 0\n1 0 0\n1 0 0\n1 0 0\nANIEND\n",
+        )
+        .unwrap();
         let mut attrs: [Option<String>; 5] = Default::default();
         assert_eq!(attr_image(&attrs, &g, 0), Some("hat0.png"));
         attrs[0] = Some("hat3.png".into());
@@ -260,22 +312,46 @@ mod tests {
 
     #[test]
     fn chat_forms() {
-        assert_eq!(parse_chat_look("set head head927"), Some(ChatLook::Head("head927".into())));
-        assert_eq!(parse_chat_look("set body body13"), Some(ChatLook::Body("body13".into())));
-        assert_eq!(parse_chat_look("sethead head927.png"), Some(ChatLook::Head("head927.png".into())));
-        assert_eq!(parse_chat_look("setcoat Grey"), Some(ChatLook::Color { slot: 1, color: 17 }));
-        assert_eq!(parse_chat_look("setbelt black"), Some(ChatLook::Color { slot: 4, color: 18 }));
+        assert_eq!(
+            parse_chat_look("set head head927"),
+            Some(ChatLook::Head("head927".into()))
+        );
+        assert_eq!(
+            parse_chat_look("set body body13"),
+            Some(ChatLook::Body("body13".into()))
+        );
+        assert_eq!(
+            parse_chat_look("sethead head927.png"),
+            Some(ChatLook::Head("head927.png".into()))
+        );
+        assert_eq!(
+            parse_chat_look("setcoat Grey"),
+            Some(ChatLook::Color { slot: 1, color: 17 })
+        );
+        assert_eq!(
+            parse_chat_look("setbelt black"),
+            Some(ChatLook::Color { slot: 4, color: 18 })
+        );
         assert_eq!(parse_chat_look("setcoat plaid"), None);
         assert_eq!(parse_chat_look("setcoatcolor red"), None);
         assert_eq!(parse_chat_look("hello there"), None);
         assert_eq!(parse_chat_look("sethead"), None);
-        assert_eq!(ChatLook::Head("head927".into()).server_line(), "sethead head927");
-        assert_eq!(ChatLook::Color { slot: 2, color: 4 }.server_line(), "setsleeves red");
+        assert_eq!(
+            ChatLook::Head("head927".into()).server_line(),
+            "sethead head927"
+        );
+        assert_eq!(
+            ChatLook::Color { slot: 2, color: 4 }.server_line(),
+            "setsleeves red"
+        );
     }
 
     #[test]
     fn colors_prop_and_names() {
-        assert_eq!(colors_from_prop(&[0x22, 0x20, 0x2a, 0x24, 0x32]), Some([2, 0, 10, 4, 18]));
+        assert_eq!(
+            colors_from_prop(&[0x22, 0x20, 0x2a, 0x24, 0x32]),
+            Some([2, 0, 10, 4, 18])
+        );
         assert_eq!(colors_from_prop(&[0x22]), None);
         assert_eq!(with_image_ext("head927"), "head927.png");
         assert_eq!(with_image_ext("body13.PNG"), "body13.PNG");
@@ -294,7 +370,11 @@ mod default_body {
     /// clear colour stays clear.
     #[test]
     fn default_body_takes_the_colours() {
-        let data = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/default/bodies/body.png")).unwrap();
+        let data = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/default/bodies/body.png"
+        ))
+        .unwrap();
         let colors = [13, 7, 14, 1, 10];
         let (w, _, plain) = read_png_rgba(&data).unwrap();
         let (_, _, px) = read_png_rgba_recolored(&data, &body_recolor(&colors)).unwrap();
@@ -331,6 +411,9 @@ mod default_body {
         let png = std::fs::read(format!("{dir}body.png")).unwrap();
         let gif = std::fs::read(format!("{dir}body.gif")).unwrap();
         let recolor = body_recolor(&[13, 7, 14, 1, 10]);
-        assert_eq!(read_png_rgba_recolored(&gif, &recolor).unwrap(), read_png_rgba_recolored(&png, &recolor).unwrap());
+        assert_eq!(
+            read_png_rgba_recolored(&gif, &recolor).unwrap(),
+            read_png_rgba_recolored(&png, &recolor).unwrap()
+        );
     }
 }

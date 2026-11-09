@@ -84,11 +84,24 @@ mod tests {
 
     #[test]
     fn dir_picks_the_longer_axis() {
-        assert_eq!([dir(0.0, -2.0), dir(-3.0, 1.0), dir(1.0, 1.0), dir(5.0, 0.0)], [0.0, 1.0, 2.0, 3.0]);
+        assert_eq!(
+            [dir(0.0, -2.0), dir(-3.0, 1.0), dir(1.0, 1.0), dir(5.0, 0.0)],
+            [0.0, 1.0, 2.0, 3.0]
+        );
     }
 
     #[test]
     fn shifts_mask_the_count() {
-        assert_eq!((shl(1, 4), shl(1, 32), shl(1, 68), shr(-256, 2), shr(-1, 40), shr(256, 40)), (16, 0, 16, -64, -1, 0));
+        assert_eq!(
+            (
+                shl(1, 4),
+                shl(1, 32),
+                shl(1, 68),
+                shr(-256, 2),
+                shr(-1, 40),
+                shr(256, 40)
+            ),
+            (16, 0, 16, -64, -1, 0)
+        );
     }
 }

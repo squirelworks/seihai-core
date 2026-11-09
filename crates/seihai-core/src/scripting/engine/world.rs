@@ -47,11 +47,27 @@ pub struct ObjSpec {
 
 impl ObjSpec {
     pub fn npc(image: &str, x: f64, y: f64, script: &str) -> Self {
-        ObjSpec { kind: ObjKind::Npc, name: String::new(), image: image.into(), x, y, script: script.into(), tag: 0 }
+        ObjSpec {
+            kind: ObjKind::Npc,
+            name: String::new(),
+            image: image.into(),
+            x,
+            y,
+            script: script.into(),
+            tag: 0,
+        }
     }
 
     pub fn weapon(name: &str, image: &str, script: &str) -> Self {
-        ObjSpec { kind: ObjKind::Weapon, name: name.into(), image: image.into(), x: 0.0, y: 0.0, script: script.into(), tag: 0 }
+        ObjSpec {
+            kind: ObjKind::Weapon,
+            name: name.into(),
+            image: image.into(),
+            x: 0.0,
+            y: 0.0,
+            script: script.into(),
+            tag: 0,
+        }
     }
 
     pub fn with_tag(mut self, tag: usize) -> Self {
@@ -100,7 +116,12 @@ impl ScriptObject {
 
     /// Touch rectangle `(x, y, w, h)` in tiles.
     pub fn rect(&self) -> (f64, f64, f64, f64) {
-        (self.x, self.y, self.w_px / PX_PER_TILE, self.h_px / PX_PER_TILE)
+        (
+            self.x,
+            self.y,
+            self.w_px / PX_PER_TILE,
+            self.h_px / PX_PER_TILE,
+        )
     }
 }
 
@@ -168,40 +189,117 @@ impl Default for PlayerView {
 /// these into the real session.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Effect {
-    Message { obj: ObjId, text: String },
+    Message {
+        obj: ObjId,
+        text: String,
+    },
     /// `say n`: show sign `n` of the level.
-    SaySign { index: i64 },
+    SaySign {
+        index: i64,
+    },
     /// `say2 text`: show the text itself.
-    Say2 { text: String },
-    SetImg { obj: ObjId, file: String, part: Option<(f64, f64, f64, f64)> },
-    SetVisible { obj: ObjId, visible: bool, local: bool },
-    SetShape { obj: ObjId, kind: i64, w: f64, h: f64 },
+    Say2 {
+        text: String,
+    },
+    SetImg {
+        obj: ObjId,
+        file: String,
+        part: Option<(f64, f64, f64, f64)>,
+    },
+    SetVisible {
+        obj: ObjId,
+        visible: bool,
+        local: bool,
+    },
+    SetShape {
+        obj: ObjId,
+        kind: i64,
+        w: f64,
+        h: f64,
+    },
     /// An NPC's position changed (assignment to `x` / `y`, or `move`).
-    SetPos { obj: ObjId, x: f64, y: f64 },
-    Move { obj: ObjId, dx: f64, dy: f64, time: f64, options: i64 },
-    Destroy { obj: ObjId },
-    SetCharAni { obj: ObjId, ani: String, params: String },
-    SetCharProp { obj: ObjId, code: String, value: String },
-    SetPlayerProp { code: String, value: String },
+    SetPos {
+        obj: ObjId,
+        x: f64,
+        y: f64,
+    },
+    Move {
+        obj: ObjId,
+        dx: f64,
+        dy: f64,
+        time: f64,
+        options: i64,
+    },
+    Destroy {
+        obj: ObjId,
+    },
+    SetCharAni {
+        obj: ObjId,
+        ani: String,
+        params: String,
+    },
+    SetCharProp {
+        obj: ObjId,
+        code: String,
+        value: String,
+    },
+    SetPlayerProp {
+        code: String,
+        value: String,
+    },
     /// `play`, `playlooped`: an effect at the object's position. `play2`
     /// (2.1 and later) names the position itself, in `at`.
-    Play { obj: ObjId, file: String, looped: bool, at: Option<(f64, f64)> },
-    StopSound { file: String },
+    Play {
+        obj: ObjId,
+        file: String,
+        looped: bool,
+        at: Option<(f64, f64)>,
+    },
+    StopSound {
+        file: String,
+    },
     StopMidi,
     /// `setlevel` (no position) and `setlevel2`.
-    SetLevel { level: String, x: Option<f64>, y: Option<f64> },
-    Hurt { half_hearts: f64 },
+    SetLevel {
+        level: String,
+        x: Option<f64>,
+        y: Option<f64>,
+    },
+    Hurt {
+        half_hearts: f64,
+    },
     /// A write to a built-in player number (`playerx = 5`).
-    SetPlayerVar { name: String, value: f64 },
-    SetFlag { name: String, value: Option<String> },
-    UnsetFlag { name: String },
-    TriggerAction { x: f64, y: f64, action: String, params: String },
+    SetPlayerVar {
+        name: String,
+        value: f64,
+    },
+    SetFlag {
+        name: String,
+        value: Option<String>,
+    },
+    UnsetFlag {
+        name: String,
+    },
+    TriggerAction {
+        x: f64,
+        y: f64,
+        action: String,
+        params: String,
+    },
     /// `sendrpgmessage text`: a line for the player's message window.
-    RpgMessage { text: String },
+    RpgMessage {
+        text: String,
+    },
     /// Seihai's `sendtoserver` stub.
-    SendToServer { text: String },
+    SendToServer {
+        text: String,
+    },
     /// Any other command in the table, with its evaluated arguments.
-    Command { obj: ObjId, name: String, args: Vec<Val> },
+    Command {
+        obj: ObjId,
+        name: String,
+        args: Vec<Val>,
+    },
 }
 
 /// A call queued to run after the current event finishes.
@@ -353,7 +451,16 @@ impl ScriptWorld {
             // be matched to a script without the level at hand.
             let who = match spec.kind {
                 ObjKind::Weapon => format!("weapon {}", spec.name),
-                ObjKind::Npc => format!("npc {} at {},{}", if spec.image.is_empty() { "-" } else { &spec.image }, spec.x, spec.y),
+                ObjKind::Npc => format!(
+                    "npc {} at {},{}",
+                    if spec.image.is_empty() {
+                        "-"
+                    } else {
+                        &spec.image
+                    },
+                    spec.x,
+                    spec.y
+                ),
             };
             let src: String = spec
                 .script
@@ -406,7 +513,12 @@ impl ScriptWorld {
 
     /// Ids of the live objects, in creation order.
     pub fn ids(&self) -> Vec<ObjId> {
-        self.objects.iter().flatten().filter(|o| !o.destroyed).map(|o| o.id).collect()
+        self.objects
+            .iter()
+            .flatten()
+            .filter(|o| !o.destroyed)
+            .map(|o| o.id)
+            .collect()
     }
 
     /// Set the current level's NPCs and `level.` variables aside under
@@ -421,14 +533,18 @@ impl ScriptWorld {
             }
         }
         let vars = std::mem::take(&mut self.core.level_vars);
-        self.core.pending.retain(|p| !matches!(p.target, Target::Npc(_)));
+        self.core
+            .pending
+            .retain(|p| !matches!(p.target, Target::Npc(_)));
         self.parked.insert(name.to_ascii_lowercase(), (objs, vars));
     }
 
     /// Bring back the NPCs parked under `name` (new ids, same state). False
     /// when nothing is parked under it.
     pub fn unpark_level(&mut self, name: &str) -> bool {
-        let Some((objs, vars)) = self.parked.remove(&name.to_ascii_lowercase()) else { return false };
+        let Some((objs, vars)) = self.parked.remove(&name.to_ascii_lowercase()) else {
+            return false;
+        };
         for mut o in objs {
             o.id = self.objects.len();
             self.objects.push(Some(o));
@@ -451,24 +567,33 @@ impl ScriptWorld {
             }
         }
         self.core.level_vars.clear();
-        self.core.pending.retain(|p| !matches!(p.target, Target::Npc(_)));
+        self.core
+            .pending
+            .retain(|p| !matches!(p.target, Target::Npc(_)));
     }
 
     /// Remove the weapon with this name, if present.
     pub fn remove_weapon(&mut self, name: &str) {
         for o in self.objects.iter_mut() {
-            if o.as_ref().is_some_and(|o| o.kind == ObjKind::Weapon && o.name == name) {
+            if o.as_ref()
+                .is_some_and(|o| o.kind == ObjKind::Weapon && o.name == name)
+            {
                 *o = None;
             }
         }
     }
 
     pub fn flag(&self, name: &str) -> Option<&str> {
-        self.core.flags.get(&name.to_ascii_lowercase()).map(|s| s.as_str())
+        self.core
+            .flags
+            .get(&name.to_ascii_lowercase())
+            .map(|s| s.as_str())
     }
 
     pub fn set_flag(&mut self, name: &str, value: &str) {
-        self.core.flags.insert(name.to_ascii_lowercase(), value.to_string());
+        self.core
+            .flags
+            .insert(name.to_ascii_lowercase(), value.to_string());
     }
 
     /// Effects produced since the last call.
@@ -515,8 +640,14 @@ impl ScriptWorld {
 
     /// The player pressed the weapon button for the named weapon.
     pub fn weapon_fired(&mut self, name: &str) {
-        let ids: Vec<ObjId> =
-            self.ids().into_iter().filter(|&i| self.obj(i).is_some_and(|o| o.kind == ObjKind::Weapon && o.name == name)).collect();
+        let ids: Vec<ObjId> = self
+            .ids()
+            .into_iter()
+            .filter(|&i| {
+                self.obj(i)
+                    .is_some_and(|o| o.kind == ObjKind::Weapon && o.name == name)
+            })
+            .collect();
         for id in ids {
             self.fire_one(id, "weaponfired", &[]);
         }
@@ -554,7 +685,13 @@ impl ScriptWorld {
         self.ids().into_iter().find(|&id| {
             self.obj(id).is_some_and(|o| {
                 let (x, y, w, h) = o.rect();
-                o.kind == ObjKind::Npc && o.visible && !o.destroyed && fx >= x && fx < x + w && fy >= y && fy < y + h
+                o.kind == ObjKind::Npc
+                    && o.visible
+                    && !o.destroyed
+                    && fx >= x
+                    && fx < x + w
+                    && fy >= y
+                    && fy < y + h
             })
         })
     }
@@ -588,7 +725,8 @@ impl ScriptWorld {
         let mut budget = 1000;
         while let Some(p) = self.core.pending.pop_front() {
             if budget == 0 {
-                self.core.note("queued script calls cut off after 1000".into());
+                self.core
+                    .note("queued script calls cut off after 1000".into());
                 self.core.pending.clear();
                 break;
             }
@@ -601,7 +739,11 @@ impl ScriptWorld {
                         .filter(|&i| {
                             self.obj(i).is_some_and(|o| {
                                 let (ox, oy, w, h) = o.rect();
-                                o.kind == ObjKind::Npc && x >= ox && x < ox + w && y >= oy && y < oy + h
+                                o.kind == ObjKind::Npc
+                                    && x >= ox
+                                    && x < ox + w
+                                    && y >= oy
+                                    && y < oy + h
                             })
                         })
                         .collect();
@@ -611,21 +753,36 @@ impl ScriptWorld {
                     continue;
                 }
                 Target::Id(i) => Some(i),
-                Target::Npc(n) => self.ids().into_iter().filter(|&i| self.obj(i).is_some_and(|o| o.kind == ObjKind::Npc)).nth(n),
+                Target::Npc(n) => self
+                    .ids()
+                    .into_iter()
+                    .filter(|&i| self.obj(i).is_some_and(|o| o.kind == ObjKind::Npc))
+                    .nth(n),
                 // `callweapon i` indexes the client's whole weapon list, as
                 // `selectedweapon` does; offline there is no list.
-                Target::Weapon(n) if !self.core.player.weapons.is_empty() => match self.core.player.weapons.get(n) {
-                    Some((name, _)) => {
-                        let name = name.clone();
-                        self.ids().into_iter().find(|&i| self.obj(i).is_some_and(|o| o.kind == ObjKind::Weapon && o.name == name))
+                Target::Weapon(n) if !self.core.player.weapons.is_empty() => {
+                    match self.core.player.weapons.get(n) {
+                        Some((name, _)) => {
+                            let name = name.clone();
+                            self.ids().into_iter().find(|&i| {
+                                self.obj(i)
+                                    .is_some_and(|o| o.kind == ObjKind::Weapon && o.name == name)
+                            })
+                        }
+                        None => None,
                     }
-                    None => None,
-                },
-                Target::Weapon(n) => self.ids().into_iter().filter(|&i| self.obj(i).is_some_and(|o| o.kind == ObjKind::Weapon)).nth(n),
+                }
+                Target::Weapon(n) => self
+                    .ids()
+                    .into_iter()
+                    .filter(|&i| self.obj(i).is_some_and(|o| o.kind == ObjKind::Weapon))
+                    .nth(n),
             };
             match id {
                 Some(id) => self.fire_one(id, &p.event, &p.params),
-                None => self.core.note(format!("call to a missing object ({})", p.event)),
+                None => self
+                    .core
+                    .note(format!("call to a missing object ({})", p.event)),
             }
         }
     }
@@ -635,7 +792,10 @@ impl ScriptWorld {
         match vocab::event_since(&event) {
             Some(e) if e <= self.core.era => {}
             Some(_) => {
-                self.core.note(format!("event `{event}` does not exist in {}", self.core.era.label()));
+                self.core.note(format!(
+                    "event `{event}` does not exist in {}",
+                    self.core.era.label()
+                ));
                 return;
             }
             None => {
@@ -652,7 +812,11 @@ impl ScriptWorld {
         }
         obj.params = params.to_vec();
         obj.runs += 1;
-        let start = if event == "timeout" { obj.resume.take().unwrap_or(0) } else { 0 };
+        let start = if event == "timeout" {
+            obj.resume.take().unwrap_or(0)
+        } else {
+            0
+        };
         {
             let mut run = Run::new(&mut self.core, &mut obj, &event);
             run.exec(start);

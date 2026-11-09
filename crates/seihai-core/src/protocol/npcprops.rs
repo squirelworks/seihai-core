@@ -203,7 +203,11 @@ pub fn parse_npc_props(b: &[u8], bow_prop12: bool) -> Option<(u32, NpcProps)> {
             }
             44..=47 | 53..=73 => {
                 let (s, n) = text(i)?;
-                p.attrs[if prop < 53 { prop - 44 + 5 } else { prop - 53 + 9 }] = Some(s);
+                p.attrs[if prop < 53 {
+                    prop - 44 + 5
+                } else {
+                    prop - 53 + 9
+                }] = Some(s);
                 i += n;
             }
             52 => {
@@ -303,7 +307,12 @@ pub enum PropValue {
 /// `setimg`, X and Y (half tiles) after a push, a pull or `x = …`,
 /// VISFLAGS, BLOCKFLAGS after `canbepushed` and the like, MESSAGE.
 pub fn npc_props_message(id: u32, props: &[(u8, PropValue)]) -> Vec<u8> {
-    let mut m = vec![3 + 0x20, ((id >> 14) & 0x7F) as u8 + 0x20, ((id >> 7) & 0x7F) as u8 + 0x20, (id & 0x7F) as u8 + 0x20];
+    let mut m = vec![
+        3 + 0x20,
+        ((id >> 14) & 0x7F) as u8 + 0x20,
+        ((id >> 7) & 0x7F) as u8 + 0x20,
+        (id & 0x7F) as u8 + 0x20,
+    ];
     for (prop, v) in props {
         m.push(prop + 0x20);
         match v {
@@ -327,7 +336,10 @@ pub fn npc_props_message(id: u32, props: &[(u8, PropValue)]) -> Vec<u8> {
 }
 
 fn latin1_bytes(t: &str, max: usize) -> Vec<u8> {
-    let mut bytes: Vec<u8> = t.chars().map(|c| u8::try_from(u32::from(c)).unwrap_or(b'?')).collect();
+    let mut bytes: Vec<u8> = t
+        .chars()
+        .map(|c| u8::try_from(u32::from(c)).unwrap_or(b'?'))
+        .collect();
     bytes.truncate(max);
     bytes
 }
@@ -375,7 +387,20 @@ mod tests {
         let mut p = vec![gc(0), gc(0), gc(5)];
         p.extend([gc(10), gc(31), gc(3)]);
         p.extend_from_slice(b"s.p");
-        p.extend([gc(11), gc(2), gc(5), gc(0), gc(1), gc(2), gc(19), 1, 2, 3, 4, 5]);
+        p.extend([
+            gc(11),
+            gc(2),
+            gc(5),
+            gc(0),
+            gc(1),
+            gc(2),
+            gc(19),
+            1,
+            2,
+            3,
+            4,
+            5,
+        ]);
         p.extend([gc(15), gc(2)]);
         p.extend_from_slice(b"hi");
         p.extend([gc(22), gc(103)]);
@@ -388,17 +413,52 @@ mod tests {
 
     #[test]
     fn an_unknown_prop_ends_the_record_and_a_short_one_is_dropped() {
-        let p = [gc(0), gc(0), gc(1), gc(2), gc(8), gc(78), gc(1), gc(3), gc(9)];
+        let p = [
+            gc(0),
+            gc(0),
+            gc(1),
+            gc(2),
+            gc(8),
+            gc(78),
+            gc(1),
+            gc(3),
+            gc(9),
+        ];
         assert_eq!(parse_npc_props(&p, true).unwrap().1.x, Some(4.0));
         assert_eq!(parse_npc_props(&p[..2], true), None);
-        assert_eq!(parse_npc_props(&[gc(0), gc(0), gc(1), gc(0), gc(9), b'a'], true), None);
+        assert_eq!(
+            parse_npc_props(&[gc(0), gc(0), gc(1), gc(0), gc(9), b'a'], true),
+            None
+        );
     }
 
     #[test]
     fn prop_12_is_the_bow_before_2_1_and_a_gani_after() {
-        let p = [gc(0), gc(0), gc(1), gc(12), gc(12), b'b', b'w', gc(2), gc(4)];
+        let p = [
+            gc(0),
+            gc(0),
+            gc(1),
+            gc(12),
+            gc(12),
+            b'b',
+            b'w',
+            gc(2),
+            gc(4),
+        ];
         assert_eq!(parse_npc_props(&p, true).unwrap().1.x, Some(2.0));
-        let p = [gc(0), gc(0), gc(1), gc(12), gc(4), b'i', b'd', b'l', b'e', gc(2), gc(4)];
+        let p = [
+            gc(0),
+            gc(0),
+            gc(1),
+            gc(12),
+            gc(4),
+            b'i',
+            b'd',
+            b'l',
+            b'e',
+            gc(2),
+            gc(4),
+        ];
         assert_eq!(parse_npc_props(&p, false).unwrap().1.x, Some(2.0));
     }
 
@@ -406,13 +466,31 @@ mod tests {
     fn the_message_matches_the_2_05_client() {
         // Lab capture: after a push up the 2.05 client sent `3`, id 1001,
         // Y = 48 half tiles; after `canbepushed; canbepulled;` BLOCKFLAGS 12.
-        assert_eq!(npc_props_message(1001, &[(NPCPROP_Y, PropValue::Byte(48))]), b"# '\x89#P\n");
-        assert_eq!(npc_props_message(1001, &[(NPCPROP_BLOCKFLAGS, PropValue::Byte(12))]), b"# '\x89.,\n");
+        assert_eq!(
+            npc_props_message(1001, &[(NPCPROP_Y, PropValue::Byte(48))]),
+            b"# '\x89#P\n"
+        );
+        assert_eq!(
+            npc_props_message(1001, &[(NPCPROP_BLOCKFLAGS, PropValue::Byte(12))]),
+            b"# '\x89.,\n"
+        );
         // NPC 1121 (`message hi;`): VISFLAGS 81, MESSAGE "hi".
-        let m = npc_props_message(1121, &[(NPCPROP_VISFLAGS, PropValue::Byte(81)), (NPCPROP_MESSAGE, PropValue::Text("hi".into()))]);
+        let m = npc_props_message(
+            1121,
+            &[
+                (NPCPROP_VISFLAGS, PropValue::Byte(81)),
+                (NPCPROP_MESSAGE, PropValue::Text("hi".into())),
+            ],
+        );
         assert_eq!(m, b"# (\x81-q/\"hi\n");
         // NPC 1118 (`setimg bomb1.png;`): IMAGE, then VISFLAGS.
-        let m = npc_props_message(1118, &[(NPCPROP_IMAGE, PropValue::Text("bomb1.png".into())), (NPCPROP_VISFLAGS, PropValue::Byte(81))]);
+        let m = npc_props_message(
+            1118,
+            &[
+                (NPCPROP_IMAGE, PropValue::Text("bomb1.png".into())),
+                (NPCPROP_VISFLAGS, PropValue::Byte(81)),
+            ],
+        );
         assert_eq!(m, b"# (~ )bomb1.png-q\n");
     }
 
@@ -423,32 +501,62 @@ mod tests {
             (0, PropValue::Text("#c#".into())),
             (NPCPROP_GANI, PropValue::Text("idle".into())),
             (NPCPROP_VISFLAGS, PropValue::Byte(81)),
-            (NPCPROP_HEAD, PropValue::Head(Head::Name("head7.png".into()))),
+            (
+                NPCPROP_HEAD,
+                PropValue::Head(Head::Name("head7.png".into())),
+            ),
             (NPCPROP_BODY, PropValue::Text("body2.png".into())),
         ];
         let m = npc_props_message(3002, &props);
         assert_eq!(m, b"# 7Z ##c#,$idle-q6\x8dhead7.pngC)body2.png\n");
         let (id, p) = parse_npc_props(&m[1..m.len() - 1], false).unwrap();
         assert_eq!(id, 3002);
-        assert_eq!((p.image.as_deref(), p.gani.as_deref(), p.body.as_deref()), (Some("#c#"), Some("idle"), Some("body2.png")));
+        assert_eq!(
+            (p.image.as_deref(), p.gani.as_deref(), p.body.as_deref()),
+            (Some("#c#"), Some("idle"), Some("body2.png"))
+        );
         assert_eq!(p.head, Some(Head::Name("head7.png".into())));
         // NPC 3005: colours; 3001: head index 0; 3006: SPRITE 1; 3007: #P1.
-        let m = npc_props_message(1, &[(NPCPROP_COLORS, PropValue::Bytes(vec![4, 10, 18, 5, 18])), (NPCPROP_HEAD, PropValue::Head(Head::Index(0)))]);
+        let m = npc_props_message(
+            1,
+            &[
+                (NPCPROP_COLORS, PropValue::Bytes(vec![4, 10, 18, 5, 18])),
+                (NPCPROP_HEAD, PropValue::Head(Head::Index(0))),
+            ],
+        );
         assert_eq!(m, b"#  !3$*2%26 \n");
         let mut tail = vec![gc(0), gc(0), gc(1)];
         tail.extend_from_slice(&m[4..m.len() - 1]);
         tail.extend([gc(18), gc(1), gc(36), gc(8)]);
         tail.extend_from_slice(b"hat0.png");
         let (_, p) = parse_npc_props(&tail, false).unwrap();
-        assert_eq!((p.colors, p.head, p.sprite), (Some([4, 10, 18, 5, 18]), Some(Head::Index(0)), Some(1)));
+        assert_eq!(
+            (p.colors, p.head, p.sprite),
+            (Some([4, 10, 18, 5, 18]), Some(Head::Index(0)), Some(1))
+        );
         assert_eq!(p.attrs[0].as_deref(), Some("hat0.png"));
     }
 
     #[test]
     fn the_message_prop_is_read() {
-        let p = [gc(0), gc(0), gc(1), gc(15), gc(4), b't', b'i', b'c', b'k', gc(13), gc(81)];
+        let p = [
+            gc(0),
+            gc(0),
+            gc(1),
+            gc(15),
+            gc(4),
+            b't',
+            b'i',
+            b'c',
+            b'k',
+            gc(13),
+            gc(81),
+        ];
         let (_, p) = parse_npc_props(&p, true).unwrap();
-        assert_eq!((p.message.as_deref(), p.vis_flags), (Some("tick"), Some(81)));
+        assert_eq!(
+            (p.message.as_deref(), p.vis_flags),
+            (Some("tick"), Some(81))
+        );
     }
 
     /// The order GServer-v2 sends a moved NPC in: GANI attributes 1 to 30
@@ -484,7 +592,17 @@ mod tests {
         let (id, n) = parse_npc_props(&p, false).unwrap();
         assert_eq!(id, 9);
         let a = |i: usize| n.attrs[i - 1].as_deref();
-        assert_eq!((a(1), a(6), a(9), a(10), a(30), a(7)), (Some("a1.png"), Some("a6.png"), Some("a9.png"), Some("a10.png"), Some("a30.png"), None));
+        assert_eq!(
+            (a(1), a(6), a(9), a(10), a(30), a(7)),
+            (
+                Some("a1.png"),
+                Some("a6.png"),
+                Some("a9.png"),
+                Some("a10.png"),
+                Some("a30.png"),
+                None
+            )
+        );
         assert_eq!(n.level.as_deref(), Some("onlinestartlocal.nw"));
         assert_eq!((n.x, n.y), (Some(30.5), Some(-2.0)));
         assert_eq!(n.message.as_deref(), Some("hi"));
@@ -507,19 +625,28 @@ mod tests {
     #[test]
     fn lab_beta4_record_keeps_attribute_6_past_prop_43() {
         let hex = "20224c2023236323212179696620286372656174656429207ba773686f776368617261637465723ba77365746368617270726f702023332c68656164302e706e673ba77365746368617270726f70202350312c6f6e653ba77da769662028706c61796572656e7465727320262620737472657175616c732823612c6c61623232322929207ba77365746368617270726f70202350362c7369783ba77365746368617270726f7020235031302c74656e3ba77365746368617270726f7020235033302c7468697274793ba76d6573736167652070363d235036207033303d235033303ba77d225423542c2469646c652d312f2970363d207033303d303120224c322244236f6e654bff4c237369786b26606c26606d2c81";
-        let b: Vec<u8> = (0..hex.len()).step_by(2).map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap()).collect();
+        let b: Vec<u8> = (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect();
         let (id, n) = parse_npc_props(&b, false).unwrap();
         assert_eq!(id, 300);
         assert_eq!(n.image.as_deref(), Some(CHARACTER_IMAGE));
         assert_eq!(n.message.as_deref(), Some("p6= p30=0"));
-        assert_eq!((n.attrs[0].as_deref(), n.attrs[5].as_deref()), (Some("one"), Some("six")));
+        assert_eq!(
+            (n.attrs[0].as_deref(), n.attrs[5].as_deref()),
+            (Some("one"), Some("six"))
+        );
         assert_eq!((n.x, n.y), (Some(26.0), Some(26.0)));
     }
 
     #[test]
     fn merge_keeps_what_an_update_leaves_out() {
         let (_, mut full) = parse_npc_props(&lab_record(), true).unwrap();
-        full.merge(&NpcProps { y: Some(24.0), ..NpcProps::default() });
+        full.merge(&NpcProps {
+            y: Some(24.0),
+            ..NpcProps::default()
+        });
         assert_eq!((full.x, full.y), (Some(30.0), Some(24.0)));
         assert!(full.image.is_some() && full.script.is_some());
     }

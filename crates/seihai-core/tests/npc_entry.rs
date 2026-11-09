@@ -14,7 +14,10 @@ use seihai_core::protocol::ClientVersion;
 use seihai_core::scripting::engine::host::SessionScripts;
 
 fn hex(s: &str) -> Vec<u8> {
-    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+        .collect()
 }
 
 /// The server's `PLO_NPCPROPS` payloads: script, position and VISFLAGS,
@@ -39,7 +42,9 @@ fn first_round(version: ClientVersion, settle_first: bool) -> (Vec<Vec<u8>>, Vec
     sync.settle_first = settle_first;
     for record in [SERVER_WARP_NPC, SERVER_CLOTHES_NPC] {
         let (id, p) = parse_npc_props(&hex(record), false).expect("the server's record parses");
-        let Linked::Added(i) = s.take_server_npc(id, &p) else { panic!("{id} not added") };
+        let Linked::Added(i) = s.take_server_npc(id, &p) else {
+            panic!("{id} not added")
+        };
         sc.add_npc(&mut s, i);
         sync.heard(id, &p, &s.current_level.as_ref().unwrap().npcs[i]);
     }
@@ -52,7 +57,10 @@ fn first_round(version: ClientVersion, settle_first: bool) -> (Vec<Vec<u8>>, Vec
 #[test]
 fn on_2_22_the_first_entry_reports_what_created_set() {
     let (sent, again) = first_round(ClientVersion::V222, false);
-    let want: Vec<Vec<u8>> = [REAL_WARP_NPC, REAL_CLOTHES_NPC].iter().map(|h| [&[3 + 0x20][..], &hex(h), b"\n"].concat()).collect();
+    let want: Vec<Vec<u8>> = [REAL_WARP_NPC, REAL_CLOTHES_NPC]
+        .iter()
+        .map(|h| [&[3 + 0x20][..], &hex(h), b"\n"].concat())
+        .collect();
     assert_eq!(sent, want);
     assert!(again.is_empty(), "nothing twice");
 }

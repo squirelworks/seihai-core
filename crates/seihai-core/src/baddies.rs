@@ -31,8 +31,18 @@ pub const PLAYER_TICK_MS: u64 = 50;
 pub const KINDS: usize = 10;
 /// The default picture of each type, without the extension (the 2.05
 /// client names `.gif`, GServer sends `.png` to 2.1 and later).
-pub const IMAGES: [&str; KINDS] =
-    ["baddygray", "baddyblue", "baddyred", "baddyblue", "baddygray", "baddyhare", "baddyoctopus", "baddygold", "baddylizardon", "baddydragon"];
+pub const IMAGES: [&str; KINDS] = [
+    "baddygray",
+    "baddyblue",
+    "baddyred",
+    "baddyblue",
+    "baddygray",
+    "baddyhare",
+    "baddyoctopus",
+    "baddygold",
+    "baddylizardon",
+    "baddydragon",
+];
 /// Starting power of each type (`0x5482cc`), in sword-power units.
 pub const POWER: [i32; KINDS] = [2, 3, 4, 3, 2, 1, 1, 6, 12, 8];
 /// The archer's and the swamp soldier's bow.
@@ -173,7 +183,15 @@ impl Baddy {
     /// A new baddy (`0x4d5e0c`). `player` is the local player's `(x, y,
     /// dir)`: a baddy within 30 tiles of it (or a blue one anywhere) starts
     /// facing it, else up or down towards it.
-    pub fn new(id: u8, kind: u8, x: f64, y: f64, verses: [String; 3], player: (f64, f64, u8), rng: &mut DelphiRandom) -> Baddy {
+    pub fn new(
+        id: u8,
+        kind: u8,
+        x: f64,
+        y: f64,
+        verses: [String; 3],
+        player: (f64, f64, u8),
+        rng: &mut DelphiRandom,
+    ) -> Baddy {
         let kind = if usize::from(kind) < KINDS { kind } else { 0 };
         let (px, py, pdir) = player;
         let dir = if (x - px).abs() + (y - py).abs() <= 30.0 || kind == 1 {
@@ -239,11 +257,28 @@ impl Baddy {
     }
 
     /// A baddy from a level's `BADDY` record (its verses one per line).
-    pub fn from_level(id: u8, rec: &crate::assets::Baddy, player: (f64, f64, u8), rng: &mut DelphiRandom) -> Baddy {
+    pub fn from_level(
+        id: u8,
+        rec: &crate::assets::Baddy,
+        player: (f64, f64, u8),
+        rng: &mut DelphiRandom,
+    ) -> Baddy {
         let kind = rec.kind.trim().parse::<u8>().unwrap_or(0);
         let mut lines = rec.verses.split('\n').map(str::to_string);
-        let verses = [lines.next().unwrap_or_default(), lines.next().unwrap_or_default(), lines.next().unwrap_or_default()];
-        Baddy::new(id, kind, f64::from(rec.x), f64::from(rec.y), verses, player, rng)
+        let verses = [
+            lines.next().unwrap_or_default(),
+            lines.next().unwrap_or_default(),
+            lines.next().unwrap_or_default(),
+        ];
+        Baddy::new(
+            id,
+            kind,
+            f64::from(rec.x),
+            f64::from(rec.y),
+            verses,
+            player,
+            rng,
+        )
     }
 
     /// A baddy the server announced: type 0 at (0, 0), then its props.
@@ -284,7 +319,9 @@ impl Baddy {
     }
 
     fn blocked_ahead(&self, w: &dyn World, dir: u8) -> bool {
-        AHEAD[usize::from(dir & 3)].iter().any(|&(dx, dy)| w.blocked(self.x + dx, self.y + dy))
+        AHEAD[usize::from(dir & 3)]
+            .iter()
+            .any(|&(dx, dy)| w.blocked(self.x + dx, self.y + dy))
     }
 
     /// One baddy tick (`0x4d6bd8`). `think` runs the AI: offline, or online
@@ -407,7 +444,13 @@ impl Baddy {
                     6 => {
                         self.ani = 7;
                         let (ox, oy) = ROCK_FROM[usize::from(self.dir)];
-                        w.shoot(Shot { sprite: ROCK_SPRITE, x: self.x + ox / 8.0, y: self.y + oy / 8.0, dir: self.dir, kind: 0 });
+                        w.shoot(Shot {
+                            sprite: ROCK_SPRITE,
+                            x: self.x + ox / 8.0,
+                            y: self.y + oy / 8.0,
+                            dir: self.dir,
+                            kind: 0,
+                        });
                     }
                     10 => self.ani = 6,
                     _ => {}
@@ -436,13 +479,21 @@ impl Baddy {
             }
             if self.mode == mode::WALK {
                 if !self.blocked_ahead(w, self.dir) {
-                    let speed = if self.kind == 6 || self.kind == 8 { 2.0 } else { 1.0 };
+                    let speed = if self.kind == 6 || self.kind == 8 {
+                        2.0
+                    } else {
+                        1.0
+                    };
                     let (sx, sy) = STEP[usize::from(self.dir)];
                     self.x += sx * speed;
                     self.y += sy * speed;
                 } else {
                     self.head = mod4(i32::from(self.dir) + 2);
-                    self.dir = if self.kind == 6 { self.head } else { mod4(i32::from(self.dir) + 3) };
+                    self.dir = if self.kind == 6 {
+                        self.head
+                    } else {
+                        mod4(i32::from(self.dir) + 3)
+                    };
                     if self.counter & 1 == 0 {
                         self.counter -= 1;
                     }
@@ -462,7 +513,11 @@ impl Baddy {
     fn target_at(&self, w: &dyn World, t: Target) -> Option<(f64, f64)> {
         let (x, y) = match t {
             Target::Local => w.player()?,
-            Target::Other(id) => w.others().into_iter().find(|o| o.0 == id).map(|o| (o.1, o.2))?,
+            Target::Other(id) => w
+                .others()
+                .into_iter()
+                .find(|o| o.0 == id)
+                .map(|o| (o.1, o.2))?,
         };
         Some((x + 1.5, y + 2.0))
     }
@@ -510,7 +565,11 @@ impl Baddy {
         let way = |t: (f64, f64)| {
             let (dx, dy) = (t.0 - c.0, t.1 - c.1);
             let d = if dy.abs() <= dx.abs() {
-                if dx <= 0.0 { 1 } else { 3 }
+                if dx <= 0.0 {
+                    1
+                } else {
+                    3
+                }
             } else if dy <= 0.0 {
                 0
             } else {
@@ -518,7 +577,11 @@ impl Baddy {
             };
             (dx.abs().max(dy.abs()), d)
         };
-        let mut candidates: Vec<(Target, (f64, f64))> = w.others().into_iter().map(|(id, x, y)| (Target::Other(id), (x + 1.5, y + 2.0))).collect();
+        let mut candidates: Vec<(Target, (f64, f64))> = w
+            .others()
+            .into_iter()
+            .map(|(id, x, y)| (Target::Other(id), (x + 1.5, y + 2.0)))
+            .collect();
         if let Some((x, y)) = w.player() {
             candidates.push((Target::Local, (x + 1.5, y + 2.0)));
         }
@@ -536,7 +599,9 @@ impl Baddy {
     /// Look for a player while walking or looking round (`0x4d73e4`).
     fn look(&mut self, w: &mut dyn World) {
         let d = self.choose_target(w);
-        let Some(at) = self.target_at(w, self.target) else { return };
+        let Some(at) = self.target_at(w, self.target) else {
+            return;
+        };
         if self.sees(w, self.head, (self.x + 1.0, self.y + 1.0), at) && self.target_dist < 20.0 {
             self.mode = mode::HUNT;
             self.counter = 16;
@@ -576,7 +641,9 @@ impl Baddy {
         }
         self.choose_target(w);
         let b = (self.x + 1.0, self.y + 1.0);
-        let Some(t) = self.target_at(w, self.target) else { return };
+        let Some(t) = self.target_at(w, self.target) else {
+            return;
+        };
         let (dx, dy) = (t.0 - b.0, t.1 - b.1);
         let (ax, ay) = (dx.abs(), dy.abs());
         let seen = self.sees(w, self.dir, b, t);
@@ -593,9 +660,17 @@ impl Baddy {
             return;
         }
         let (mut major, minor, ratio) = if ay <= ax {
-            (if dx <= 0.0 { 1 } else { 3 }, if dy <= 0.0 { 0 } else { 2 }, if ax <= 0.0 { 0.0 } else { ay / ax })
+            (
+                if dx <= 0.0 { 1 } else { 3 },
+                if dy <= 0.0 { 0 } else { 2 },
+                if ax <= 0.0 { 0.0 } else { ay / ax },
+            )
         } else {
-            (if dy <= 0.0 { 0 } else { 2 }, if dx <= 0.0 { 1 } else { 3 }, ax / ay)
+            (
+                if dy <= 0.0 { 0 } else { 2 },
+                if dx <= 0.0 { 1 } else { 3 },
+                ax / ay,
+            )
         };
         let wanted = major;
         if ay < 2.0 && ax < 2.0 && !seen {
@@ -653,7 +728,9 @@ impl Baddy {
         self.dir = d;
         self.head = d;
         let b = (self.x + 1.0, self.y + 1.0);
-        let Some(t) = self.target_at(w, self.target) else { return };
+        let Some(t) = self.target_at(w, self.target) else {
+            return;
+        };
         let aim = (AIM_X[usize::from(d)] + t.0, AIM_Y[usize::from(d)] + t.1);
         if self.shot_out {
             self.shot_out = false;
@@ -706,7 +783,13 @@ impl Baddy {
         self.shot_out = true;
         let (ox, oy) = ARROW_FROM[usize::from(self.dir)];
         let kind = if self.kind == 9 { 2 } else { 0 };
-        w.shoot(Shot { sprite: ARROW_SPRITE + u16::from(self.dir), x: self.x + ox / 8.0, y: self.y + oy / 8.0, dir: self.dir, kind });
+        w.shoot(Shot {
+            sprite: ARROW_SPRITE + u16::from(self.dir),
+            x: self.x + ox / 8.0,
+            y: self.y + oy / 8.0,
+            dir: self.dir,
+            kind,
+        });
         self.aux2 = 0;
     }
 
@@ -775,7 +858,15 @@ impl Baddy {
     /// thrown away from `(dx, dy)`, the hitter's centre less its own. A
     /// client that is online but not the leader only takes the power and
     /// shows the hurt mode until the leader's props come back.
-    pub fn hurt(&mut self, w: &mut dyn World, clash: bool, power: i32, dx: f64, dy: f64, follower: bool) {
+    pub fn hurt(
+        &mut self,
+        w: &mut dyn World,
+        clash: bool,
+        power: i32,
+        dx: f64,
+        dy: f64,
+        follower: bool,
+    ) {
         if follower {
             if !clash {
                 self.power -= power;
@@ -809,7 +900,11 @@ impl Baddy {
         self.counter = 8;
         let (vx, vy) = (-dx * 2.0, -dy * 2.0);
         let len = (vx * vx + vy * vy).sqrt();
-        self.knock = if len <= 0.0 { (-speed, vy) } else { (vx * speed / len, vy * speed / len) };
+        self.knock = if len <= 0.0 {
+            (-speed, vy)
+        } else {
+            (vx * speed / len, vy * speed / len)
+        };
     }
 
     /// The local player's sword against this baddy (`0x4d6268`), during
@@ -883,7 +978,11 @@ impl Baddy {
                 // out as the default name, the default as no name (GServer
                 // notes that a hurt baddy loses its picture).
                 let def = default_image(self.kind, ext);
-                let name = if self.image.is_empty() || self.image.eq_ignore_ascii_case(&def) { String::new() } else { def };
+                let name = if self.image.is_empty() || self.image.eq_ignore_ascii_case(&def) {
+                    String::new()
+                } else {
+                    def
+                };
                 let mut v = vec![g(self.power)];
                 v.extend(text(&name));
                 v
@@ -924,7 +1023,11 @@ impl Baddy {
                 }
                 3 => {
                     let k = v(d[1]);
-                    self.kind = if (0..KINDS as i32).contains(&k) { k as u8 } else { 0 };
+                    self.kind = if (0..KINDS as i32).contains(&k) {
+                        k as u8
+                    } else {
+                        0
+                    };
                     match self.kind {
                         4 => self.ani = 2,
                         6 => self.ani = 4,
@@ -935,7 +1038,10 @@ impl Baddy {
                     self.power = v(d[1]);
                     let len = d.get(2).map_or(0, |&b| v(b)).max(0) as usize;
                     used = 3 + len;
-                    self.image = d.get(3..(3 + len).min(d.len())).map(crate::protocol::latin1).unwrap_or_default();
+                    self.image = d
+                        .get(3..(3 + len).min(d.len()))
+                        .map(crate::protocol::latin1)
+                        .unwrap_or_default();
                 }
                 5 => {
                     let m = v(d[1]);
@@ -969,7 +1075,10 @@ impl Baddy {
                 8..=10 => {
                     let len = v(d[1]).max(0) as usize;
                     used = 2 + len;
-                    self.verses[(id - 8) as usize] = d.get(2..(2 + len).min(d.len())).map(crate::protocol::latin1).unwrap_or_default();
+                    self.verses[(id - 8) as usize] = d
+                        .get(2..(2 + len).min(d.len()))
+                        .map(crate::protocol::latin1)
+                        .unwrap_or_default();
                 }
                 _ => break,
             }
@@ -980,7 +1089,11 @@ impl Baddy {
 
     /// What the picture is: the custom one, else the type's default.
     pub fn image_name(&self, ext: &str) -> String {
-        if self.image.is_empty() { default_image(self.kind, ext) } else { self.image.clone() }
+        if self.image.is_empty() {
+            default_image(self.kind, ext)
+        } else {
+            self.image.clone()
+        }
     }
 }
 
@@ -1011,14 +1124,30 @@ pub fn props_message(id: u8, before: &[Vec<u8>], now: &[Vec<u8>]) -> Option<Vec<
 pub fn hurt_message(id: u8, dx: f64, dy: f64, power: i32) -> Vec<u8> {
     let q = |v: f64| ((v.clamp(-4.0, 4.0) + 4.0) * 16.0 + 0.0001).floor() as i32;
     let g = |v: i32| (v.clamp(0, 223) + 32) as u8;
-    vec![16 + 32, g(i32::from(id)), g(q(dx)), g(q(dy)), g(power), b'\n']
+    vec![
+        16 + 32,
+        g(i32::from(id)),
+        g(q(dx)),
+        g(q(dy)),
+        g(power),
+        b'\n',
+    ]
 }
 
 /// The `PLI_BADDYPROPS` a follower sends after its `PLI_BADDYHURT`: the new
 /// power with an empty image, and mode 3 (`lan-222hurt`: `21 24 21 20 25 23`).
 pub fn follower_hurt_props(b: &Baddy) -> Vec<u8> {
     let g = |v: i32| (v.clamp(0, 223) + 32) as u8;
-    vec![15 + 32, g(i32::from(b.id)), 4 + 32, g(b.power), 32, 5 + 32, g(i32::from(mode::HURT)), b'\n']
+    vec![
+        15 + 32,
+        g(i32::from(b.id)),
+        4 + 32,
+        g(b.power),
+        32,
+        5 + 32,
+        g(i32::from(mode::HURT)),
+        b'\n',
+    ]
 }
 
 /// A `PLO_BADDYHURT` (27) the leader gets: id, `dx`, `dy`, power.
@@ -1031,7 +1160,9 @@ pub struct HurtIn {
 }
 
 pub fn parse_hurt(payload: &[u8]) -> Option<HurtIn> {
-    let [id, a, b, p, ..] = payload else { return None };
+    let [id, a, b, p, ..] = payload else {
+        return None;
+    };
     Some(HurtIn {
         id: id.wrapping_sub(32),
         dx: (f64::from(*a) - 96.0) / 16.0,
@@ -1073,7 +1204,11 @@ pub struct DrawTables {
 }
 
 fn unpack(v: u32) -> (u16, i32, i32) {
-    ((v >> 16) as u16, i32::from(((v >> 8) & 0xff) as u8 as i8), i32::from((v & 0xff) as u8 as i8))
+    (
+        (v >> 16) as u16,
+        i32::from(((v >> 8) & 0xff) as u8 as i8),
+        i32::from((v & 0xff) as u8 as i8),
+    )
 }
 
 impl Baddy {
@@ -1081,7 +1216,8 @@ impl Baddy {
     /// drawing frame counter (the hurt blink is off on odd frames).
     pub fn pieces(&self, t: &DrawTables, frame: u64) -> Vec<Piece> {
         let mut raw: Vec<u32> = Vec::new();
-        let get = |list: &Vec<Vec<u32>>, i: i32| list.get(i.max(0) as usize).cloned().unwrap_or_default();
+        let get =
+            |list: &Vec<Vec<u32>>, i: i32| list.get(i.max(0) as usize).cloned().unwrap_or_default();
         let pose = (self.ani * 4 + i32::from(self.dir)).max(0);
         if self.mode != mode::DIE || self.counter > 3 {
             match self.kind {
@@ -1132,12 +1268,22 @@ impl Baddy {
                 111..=114 => PieceSheet::Bow,
                 _ => PieceSheet::Sprites,
             };
-            out.push(Piece { sprite: s, dx: ox * 2, dy: oy * 2, sheet });
+            out.push(Piece {
+                sprite: s,
+                dx: ox * 2,
+                dy: oy * 2,
+                sheet,
+            });
         }
         if self.mode == mode::DIE && (0..10).contains(&self.counter) {
             for v in get(&t.puff, 4 - self.counter / 2) {
                 let (s, ox, oy) = unpack(v);
-                out.push(Piece { sprite: s, dx: ox * 2, dy: oy * 2, sheet: PieceSheet::Sprites });
+                out.push(Piece {
+                    sprite: s,
+                    dx: ox * 2,
+                    dy: oy * 2,
+                    sheet: PieceSheet::Sprites,
+                });
             }
         }
         out
@@ -1155,7 +1301,11 @@ impl DrawTables {
     /// 2.22 file's.
     pub fn from_tables(t: Option<&crate::assets::ObjectTables>) -> DrawTables {
         match t.filter(|t| !t.baddy_poses.is_empty()) {
-            Some(t) => DrawTables { poses: t.baddy_poses.clone(), puff: t.baddy_puff.clone(), swamp: t.baddy_swamp.clone() },
+            Some(t) => DrawTables {
+                poses: t.baddy_poses.clone(),
+                puff: t.baddy_puff.clone(),
+                swamp: t.baddy_swamp.clone(),
+            },
             None => DrawTables::builtin(),
         }
     }
@@ -1163,7 +1313,11 @@ impl DrawTables {
     /// The 2.22 `arrays.dat` arrays 20, 22 and 23.
     pub fn builtin() -> DrawTables {
         let own = |l: &[&[u32]]| l.iter().map(|e| e.to_vec()).collect();
-        DrawTables { poses: own(BUILTIN_POSES), puff: own(BUILTIN_PUFF), swamp: own(BUILTIN_SWAMP) }
+        DrawTables {
+            poses: own(BUILTIN_POSES),
+            puff: own(BUILTIN_PUFF),
+            swamp: own(BUILTIN_SWAMP),
+        }
     }
 }
 
@@ -1297,13 +1451,22 @@ mod tests {
 
     impl Field {
         fn new(player: Option<(f64, f64)>) -> Field {
-            Field { player, rng: DelphiRandom::new(1), walls: Vec::new(), sounds: Vec::new(), shots: Vec::new(), touched: Vec::new() }
+            Field {
+                player,
+                rng: DelphiRandom::new(1),
+                walls: Vec::new(),
+                sounds: Vec::new(),
+                shots: Vec::new(),
+                touched: Vec::new(),
+            }
         }
     }
 
     impl World for Field {
         fn blocked(&self, x: f64, y: f64) -> bool {
-            !(0.0..64.0).contains(&x) || !(0.0..64.0).contains(&y) || self.walls.contains(&(x.floor() as i32, y.floor() as i32))
+            !(0.0..64.0).contains(&x)
+                || !(0.0..64.0).contains(&y)
+                || self.walls.contains(&(x.floor() as i32, y.floor() as i32))
         }
         fn random(&mut self, n: u32) -> i32 {
             self.rng.next(n) as i32
@@ -1326,8 +1489,20 @@ mod tests {
     }
 
     fn baddy(kind: u8, x: f64, y: f64) -> Baddy {
-        let verses = ["Halt, intruder!".to_string(), "Ouch!".to_string(), "You got me...".to_string()];
-        Baddy::new(1, kind, x, y, verses, (50.0, 50.0, 2), &mut DelphiRandom::new(7))
+        let verses = [
+            "Halt, intruder!".to_string(),
+            "Ouch!".to_string(),
+            "You got me...".to_string(),
+        ];
+        Baddy::new(
+            1,
+            kind,
+            x,
+            y,
+            verses,
+            (50.0, 50.0, 2),
+            &mut DelphiRandom::new(7),
+        )
     }
 
     /// The six props of the testworld capture (real 2.22, S>C f14), taken
@@ -1335,7 +1510,10 @@ mod tests {
     #[test]
     fn server_props_of_the_capture_make_the_baddies() {
         let hex = "21 21 7c 22 7c 23 20 24 22 2d 62 61 64 64 79 67 72 61 79 2e 70 6e 67 25 20 26 20 27 2a 28 2f 48 61 6c 74 2c 20 69 6e 74 72 75 64 65 72 21 29 25 4f 75 63 68 21 2a 2d 59 6f 75 20 67 6f 74 20 6d 65 2e 2e 2e";
-        let bytes: Vec<u8> = hex.split(' ').map(|b| u8::from_str_radix(b, 16).unwrap()).collect();
+        let bytes: Vec<u8> = hex
+            .split(' ')
+            .map(|b| u8::from_str_radix(b, 16).unwrap())
+            .collect();
         let mut w = Field::new(None);
         // the id first, then the props
         let mut b = Baddy::from_server(bytes[0] - 32, (0.0, 0.0, 2), &mut DelphiRandom::new(0));
@@ -1343,13 +1521,26 @@ mod tests {
         assert_eq!((b.id, b.kind, b.x, b.y, b.power), (1, 0, 46.0, 46.0, 2));
         assert_eq!(b.image, "baddygray.png");
         assert_eq!((b.mode, b.counter, b.dir, b.head), (0, 0, 2, 2));
-        assert_eq!(b.verses, ["Halt, intruder!".to_string(), "Ouch!".into(), "You got me...".into()]);
+        assert_eq!(
+            b.verses,
+            [
+                "Halt, intruder!".to_string(),
+                "Ouch!".into(),
+                "You got me...".into()
+            ]
+        );
         // the hare (id 5): mode 7, prop 4 len 13 + name
         let hare = "25 21 90 22 8e 23 25 24 21 2d 62 61 64 64 79 68 61 72 65 2e 70 6e 67 25 27 26 20 27 2a";
-        let hb: Vec<u8> = hare.split(' ').map(|b| u8::from_str_radix(b, 16).unwrap()).collect();
+        let hb: Vec<u8> = hare
+            .split(' ')
+            .map(|b| u8::from_str_radix(b, 16).unwrap())
+            .collect();
         let mut h = Baddy::from_server(hb[0] - 32, (0.0, 0.0, 2), &mut DelphiRandom::new(0));
         h.apply_props(&hb[1..], &mut w);
-        assert_eq!((h.id, h.kind, h.x, h.y, h.mode, h.power), (5, 5, 56.0, 55.0, 7, 1));
+        assert_eq!(
+            (h.id, h.kind, h.x, h.y, h.mode, h.power),
+            (5, 5, 56.0, 55.0, 7, 1)
+        );
     }
 
     /// The leader's answer in the capture: props 6 and 7 for a walker

@@ -67,7 +67,9 @@ pub fn wanted_name(file: &str) -> String {
 
 /// Pan for a sound at `sound_x` heard from `listener_x`.
 pub fn pan_for(sound_x: f32, listener_x: f32, reverse_stereo: bool) -> i32 {
-    let pan = ((sound_x - listener_x) * PAN_PER_TILE).round().clamp(-10000.0, 10000.0) as i32;
+    let pan = ((sound_x - listener_x) * PAN_PER_TILE)
+        .round()
+        .clamp(-10000.0, 10000.0) as i32;
     if reverse_stereo {
         -pan
     } else {
@@ -155,7 +157,8 @@ impl SoundEngine {
     }
 
     fn prune(&mut self, now_ms: u64) {
-        self.voices.retain(|v| v.end_ms.map_or(true, |e| e > now_ms));
+        self.voices
+            .retain(|v| v.end_ms.map_or(true, |e| e > now_ms));
     }
 
     fn warn_once(&mut self, msg: String) {
@@ -204,7 +207,14 @@ impl SoundEngine {
             looped,
         };
         self.out.play(&req);
-        self.voices.push(Voice { name, end_ms: if looped { None } else { Some(now_ms + pcm.duration_ms().max(1)) } });
+        self.voices.push(Voice {
+            name,
+            end_ms: if looped {
+                None
+            } else {
+                Some(now_ms + pcm.duration_ms().max(1))
+            },
+        });
         Outcome::Played
     }
 
@@ -229,7 +239,9 @@ impl SoundEngine {
             self.warn_once(format!("missing sound {name}"));
             return Err(Outcome::Missing);
         };
-        let decoded = std::fs::read(&path).map_err(|e| e.to_string()).and_then(|b| decode_wav(&b));
+        let decoded = std::fs::read(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|b| decode_wav(&b));
         match decoded {
             Ok(pcm) => {
                 let pcm = Arc::new(pcm);
@@ -303,7 +315,11 @@ mod tests {
     }
 
     fn ev(file: &str) -> SoundEvent {
-        SoundEvent { file: file.into(), x: 10.0 + 1.5, y: 5.0 + 2.0 }
+        SoundEvent {
+            file: file.into(),
+            x: 10.0 + 1.5,
+            y: 5.0 + 2.0,
+        }
     }
 
     const L: (f32, f32) = (11.5, 7.0);
@@ -314,14 +330,25 @@ mod tests {
             std::fs::write(dir.join(n), test_wav(*rate, *len)).unwrap();
         }
         let rec = RecordingSound::default();
-        (SoundEngine::new(Box::new(rec.clone()), Some(dir.clone()), true), rec, dir)
+        (
+            SoundEngine::new(Box::new(rec.clone()), Some(dir.clone()), true),
+            rec,
+            dir,
+        )
     }
 
     #[test]
     fn plays_a_wav_once_with_centre_pan_at_the_listener() {
         let (mut e, rec, _) = engine("one", &[("steps.wav", 8000, 800)]);
         assert_eq!(e.play(&ev("steps.wav"), L, 0), Outcome::Played);
-        assert_eq!(rec.log(), vec![Call::Play { name: "steps.wav".into(), pan: 0, looped: false }]);
+        assert_eq!(
+            rec.log(),
+            vec![Call::Play {
+                name: "steps.wav".into(),
+                pan: 0,
+                looped: false
+            }]
+        );
     }
 
     #[test]
@@ -337,15 +364,27 @@ mod tests {
     #[test]
     fn a_sound_to_the_right_pans_right() {
         let (mut e, rec, _) = engine("pan", &[("a.wav", 8000, 80)]);
-        let right = SoundEvent { file: "a.wav".into(), x: 21.5, y: 7.0 };
+        let right = SoundEvent {
+            file: "a.wav".into(),
+            x: 21.5,
+            y: 7.0,
+        };
         e.play(&right, L, 0);
         e.reverse_stereo = true;
         e.play(&right, L, 1000);
         assert_eq!(
             rec.log(),
             vec![
-                Call::Play { name: "a.wav".into(), pan: 1500, looped: false },
-                Call::Play { name: "a.wav".into(), pan: -1500, looped: false },
+                Call::Play {
+                    name: "a.wav".into(),
+                    pan: 1500,
+                    looped: false
+                },
+                Call::Play {
+                    name: "a.wav".into(),
+                    pan: -1500,
+                    looped: false
+                },
             ]
         );
     }
@@ -354,7 +393,14 @@ mod tests {
     fn plus_prefix_loops_and_is_stripped() {
         let (mut e, rec, _) = engine("loop", &[("rain.wav", 8000, 80)]);
         assert_eq!(e.play(&ev("+Rain.WAV"), L, 0), Outcome::Played);
-        assert_eq!(rec.log(), vec![Call::Play { name: "rain.wav".into(), pan: 0, looped: true }]);
+        assert_eq!(
+            rec.log(),
+            vec![Call::Play {
+                name: "rain.wav".into(),
+                pan: 0,
+                looped: true
+            }]
+        );
         // A loop never ends by itself.
         assert_eq!(e.active_voices(10_000_000), 1);
         e.stop_all_loops();
@@ -375,7 +421,10 @@ mod tests {
     fn file_lookup_ignores_case_and_path() {
         let (mut e, _, _) = engine("case", &[("Steps2.WAV", 8000, 80)]);
         assert_eq!(e.play(&ev("steps2.wav"), L, 0), Outcome::Played);
-        assert_eq!(e.play(&ev("levels\\sounds\\STEPS2.wav"), L, 1000), Outcome::Played);
+        assert_eq!(
+            e.play(&ev("levels\\sounds\\STEPS2.wav"), L, 1000),
+            Outcome::Played
+        );
     }
 
     #[test]
