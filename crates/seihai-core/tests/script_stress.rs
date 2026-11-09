@@ -60,20 +60,19 @@ fn scripts_in(path: &Path) -> Vec<(String, String)> {
     // Inside an `NPC ...` block: a script line that starts `NPC ` (a sign's
     // text, `NPC made by ...`) is not a new block.
     let mut in_body = false;
-    let mut push =
-        |name: &String, body: &mut String, binary: bool, out: &mut Vec<(String, String)>| {
-            if body.is_empty() {
-                return;
+    let push = |name: &String, body: &mut String, binary: bool, out: &mut Vec<(String, String)>| {
+        if body.is_empty() {
+            return;
+        }
+        if binary {
+            for (i, s) in split_binary(body).into_iter().enumerate() {
+                out.push((format!("{name}#{i}"), s));
             }
-            if binary {
-                for (i, s) in split_binary(body).into_iter().enumerate() {
-                    out.push((format!("{name}#{i}"), s));
-                }
-            } else {
-                out.push((name.clone(), body.clone()));
-            }
-            body.clear();
-        };
+        } else {
+            out.push((name.clone(), body.clone()));
+        }
+        body.clear();
+    };
     for line in text.lines() {
         if line.starts_with("// ===== ") {
             push(&name, &mut cur, binary, &mut out);
@@ -114,7 +113,7 @@ fn parse_all_unique_npc_scripts() {
     let mut seen = std::collections::HashSet::new();
     for entry in fs::read_dir(dir).unwrap() {
         let path = entry.unwrap().path();
-        if path.extension().map_or(true, |e| e != "txt") {
+        if path.extension().is_none_or(|e| e != "txt") {
             continue;
         }
         for (name, body) in scripts_in(&path) {

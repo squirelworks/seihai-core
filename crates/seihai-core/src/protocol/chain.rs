@@ -1402,7 +1402,7 @@ pub const CHAIN: &[Step] = &[
 ];
 
 /// The resolved rows, one per step.
-pub const RESOLVED: [VersionProfile; CHAIN.len()] = resolve_chain();
+pub static RESOLVED: [VersionProfile; CHAIN.len()] = resolve_chain();
 
 /// Walk the chain from [`ORIGIN`], applying each step to the row before it.
 const fn resolve_chain() -> [VersionProfile; CHAIN.len()] {

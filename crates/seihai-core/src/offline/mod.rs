@@ -1185,7 +1185,7 @@ impl OfflineSession {
     /// Item names are the CHEST record's (`greenrupee`, `fullheart`, ...).
     pub fn give_item(&mut self, item: &str) -> String {
         let item = item.to_ascii_lowercase();
-        let mut gain = |what: &mut i32, n: i32, label: &str| {
+        let gain = |what: &mut i32, n: i32, label: &str| {
             *what += n;
             format!("{n} {label}")
         };

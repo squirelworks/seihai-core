@@ -68,6 +68,11 @@ pub use version::{ClientVersion, EncryptionGen};
 
 use std::io::{self, Write};
 
+// Values retained only for the provisional compatibility writers below.
+const LEGACY_LOGIN_ID: u8 = 0x01;
+const LEGACY_LEVEL_REQUEST_ID: u8 = 0x10;
+const LEGACY_PLAYER_UPDATE_ID: u8 = 0x20;
+
 /// Retired provisional packet ids.
 ///
 /// These were early placeholders. The real ids are documented in
@@ -133,7 +138,7 @@ impl LoginRequest {
 
     /// Write the classic login line (no packet id, no framing).
     pub fn write_classic<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        let prefix = self.prefix.unwrap_or_else(|| {
+        let prefix = self.prefix.unwrap_or({
             // (rand & 0x7F) + 0x20 — printable ASCII.
             // Fixed seed-free: use a mid-range printable when not testing.
             0x41
@@ -160,7 +165,7 @@ impl LoginRequest {
         let pass = self.password.as_bytes();
         let ver = self.version.as_bytes();
 
-        w.write_all(&[PacketId::Login as u8])?;
+        w.write_all(&[LEGACY_LOGIN_ID])?;
         w.write_all(&(user.len() as u16).to_le_bytes())?;
         w.write_all(user)?;
         w.write_all(&(pass.len() as u16).to_le_bytes())?;
@@ -231,7 +236,7 @@ impl LevelRequest {
 
     pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
         let name = self.name.as_bytes();
-        w.write_all(&[PacketId::LevelRequest as u8])?;
+        w.write_all(&[LEGACY_LEVEL_REQUEST_ID])?;
         w.write_all(&(name.len() as u16).to_le_bytes())?;
         w.write_all(name)?;
         Ok(())
@@ -252,7 +257,7 @@ pub struct PlayerUpdate {
 impl PlayerUpdate {
     /// Provisional: raw f32 x/y + dir. Do not use against a real server.
     pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&[PacketId::PlayerUpdate as u8])?;
+        w.write_all(&[LEGACY_PLAYER_UPDATE_ID])?;
         w.write_all(&self.x.to_le_bytes())?;
         w.write_all(&self.y.to_le_bytes())?;
         w.write_all(&[self.dir])?;
@@ -261,7 +266,7 @@ impl PlayerUpdate {
 
     /// Classic encoding: PLPROP-style (pos * 2) as u8. Packet id still provisional.
     pub fn write_classic<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&[PacketId::PlayerUpdate as u8])?;
+        w.write_all(&[LEGACY_PLAYER_UPDATE_ID])?;
         w.write_all(&[encode_pos_classic(self.x)])?;
         w.write_all(&[encode_pos_classic(self.y)])?;
         w.write_all(&[self.dir])?;
@@ -270,7 +275,7 @@ impl PlayerUpdate {
 
     /// Precise encoding: PLPROP_X2/Y2 style u16. Packet id still provisional.
     pub fn write_precise<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&[PacketId::PlayerUpdate as u8])?;
+        w.write_all(&[LEGACY_PLAYER_UPDATE_ID])?;
         w.write_all(&encode_pos_precise(self.x).to_le_bytes())?;
         w.write_all(&encode_pos_precise(self.y).to_le_bytes())?;
         w.write_all(&[self.dir])?;
@@ -286,7 +291,7 @@ impl PlayerUpdate {
         w.write_all(&[encode_pos_classic(self.x).wrapping_add(0x20)])?;
         w.write_all(&[encode_pos_classic(self.y).wrapping_add(0x20)])?;
         w.write_all(&[self.dir.wrapping_add(0x20)])?;
-        w.write_all(&[b'\n'])?;
+        w.write_all(b"\n")?;
         Ok(())
     }
 }

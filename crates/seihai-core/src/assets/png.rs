@@ -72,7 +72,7 @@ pub fn write_png_indexed<W: Write>(
             "index buffer size mismatch",
         ));
     }
-    if palette.len() % 3 != 0 || palette.len() > 256 * 3 {
+    if !palette.len().is_multiple_of(3) || palette.len() > 256 * 3 {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "invalid palette",
@@ -159,7 +159,7 @@ pub fn read_png_rgba_recolored(
         return super::mng::read_mng_rgba(data, recolor);
     }
     let bad = |m: &str| io::Error::new(io::ErrorKind::InvalidData, m.to_string());
-    if data.len() < 8 || &data[..8] != &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A] {
+    if data.len() < 8 || data[..8] != [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A] {
         return Err(bad("not a PNG"));
     }
     let mut pos = 8;

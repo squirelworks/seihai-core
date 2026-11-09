@@ -94,10 +94,8 @@ pub fn decode_wav(bytes: &[u8]) -> Result<Pcm, String> {
                     bits,
                 });
             }
-            b"data" => {
-                if data.is_none() {
-                    data = Some(body);
-                }
+            b"data" if data.is_none() => {
+                data = Some(body);
             }
             _ => {}
         }
@@ -115,15 +113,21 @@ pub fn decode_wav(bytes: &[u8]) -> Result<Pcm, String> {
     let samples = match (fmt.tag, fmt.bits) {
         (1, 8) => data.iter().map(|b| ((*b as i16) - 128) << 8).collect(),
         (1, 16) => data
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|c| i16::from_le_bytes([c[0], c[1]]))
             .collect(),
         (1, 24) => data
-            .chunks_exact(3)
+            .as_chunks::<3>()
+            .0
+            .iter()
             .map(|c| i16::from_le_bytes([c[1], c[2]]))
             .collect(),
         (1, 32) => data
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|c| i16::from_le_bytes([c[2], c[3]]))
             .collect(),
         (17, 4) => decode_ima(data, &fmt)?,
@@ -142,7 +146,7 @@ pub fn decode_wav(bytes: &[u8]) -> Result<Pcm, String> {
 fn decode_ima(data: &[u8], fmt: &Fmt) -> Result<Vec<i16>, String> {
     let ch = fmt.channels as usize;
     let align = fmt.block_align;
-    if align < 4 * ch || (align - 4 * ch) % (4 * ch) != 0 {
+    if align < 4 * ch || !(align - 4 * ch).is_multiple_of(4 * ch) {
         return Err(format!("bad IMA ADPCM block size {align}"));
     }
     let mut out = Vec::new();
@@ -185,10 +189,9 @@ fn decode_ima(data: &[u8], fmt: &Fmt) -> Result<Vec<i16>, String> {
                 }
             }
         }
-        let n = chan[0].len();
-        for i in 0..n {
-            for c in 0..ch {
-                out.push(chan[c][i]);
+        for (i, _) in chan[0].iter().enumerate() {
+            for channel in &chan {
+                out.push(channel[i]);
             }
         }
     }

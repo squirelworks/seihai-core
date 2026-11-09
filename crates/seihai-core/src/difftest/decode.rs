@@ -198,17 +198,27 @@ struct ConnCtx<'a> {
     t0: f64,
 }
 
+struct DecodedPacket {
+    id: i32,
+    name: String,
+    len: usize,
+    fields: Fields,
+}
+
 fn push_event(
     out: &mut Vec<Event>,
     cx: &ConnCtx<'_>,
     dir: Dir,
     ts: f64,
     frame: u32,
-    id: i32,
-    name: String,
-    len: usize,
-    fields: Fields,
+    packet: DecodedPacket,
 ) {
+    let DecodedPacket {
+        id,
+        name,
+        len,
+        fields,
+    } = packet;
     let _ = (cx.stream_c, cx.stream_s);
     out.push(Event {
         conn: cx.name.to_string(),
@@ -264,10 +274,12 @@ fn decode_conn(
                 Dir::C2S,
                 ts,
                 frame_no,
-                ID_BADFRAME,
-                "BADFRAME".into(),
-                bytes.len() - off,
-                vec![f("reason", "truncated frame")],
+                DecodedPacket {
+                    id: ID_BADFRAME,
+                    name: "BADFRAME".into(),
+                    len: bytes.len() - off,
+                    fields: vec![f("reason", "truncated frame")],
+                },
             );
             break;
         };
@@ -289,10 +301,12 @@ fn decode_conn(
                     Dir::C2S,
                     ts,
                     frame_no,
-                    ID_BADFRAME,
-                    "BADFRAME".into(),
-                    body.len(),
-                    vec![f("reason", why)],
+                    DecodedPacket {
+                        id: ID_BADFRAME,
+                        name: "BADFRAME".into(),
+                        len: body.len(),
+                        fields: vec![f("reason", why)],
+                    },
                 );
                 first = false;
                 frame_no += 1;
@@ -325,10 +339,12 @@ fn decode_conn(
                 Dir::C2S,
                 ts,
                 frame_no,
-                ID_LOGIN,
-                nm.into(),
-                line.len(),
-                fields,
+                DecodedPacket {
+                    id: ID_LOGIN,
+                    name: nm.into(),
+                    len: line.len(),
+                    fields,
+                },
             );
         }
         for line in &lines[li.min(lines.len())..] {
@@ -348,10 +364,12 @@ fn decode_conn(
                             Dir::C2S,
                             ts,
                             frame_no,
-                            ID_BADFRAME,
-                            "BADMSG".into(),
-                            msg.len(),
-                            vec![f("reason", "gen-3 junk byte did not match")],
+                            DecodedPacket {
+                                id: ID_BADFRAME,
+                                name: "BADMSG".into(),
+                                len: msg.len(),
+                                fields: vec![f("reason", "gen-3 junk byte did not match")],
+                            },
                         );
                         continue;
                     }
@@ -372,10 +390,12 @@ fn decode_conn(
                 Dir::C2S,
                 ts,
                 frame_no,
-                id,
-                nm,
-                payload.len(),
-                fields,
+                DecodedPacket {
+                    id,
+                    name: nm,
+                    len: payload.len(),
+                    fields,
+                },
             );
             if opts.keep_raw && !listserver {
                 if let Some(e) = out.last_mut() {
@@ -414,10 +434,12 @@ fn decode_conn(
                 Dir::S2C,
                 ts,
                 frame_no,
-                ID_BADFRAME,
-                "BADFRAME".into(),
-                bytes.len() - off,
-                vec![f("reason", "truncated frame")],
+                DecodedPacket {
+                    id: ID_BADFRAME,
+                    name: "BADFRAME".into(),
+                    len: bytes.len() - off,
+                    fields: vec![f("reason", "truncated frame")],
+                },
             );
             break;
         };
@@ -436,10 +458,12 @@ fn decode_conn(
                     Dir::S2C,
                     ts,
                     frame_no,
-                    ID_BADFRAME,
-                    "BADFRAME".into(),
-                    body.len(),
-                    vec![f("reason", why)],
+                    DecodedPacket {
+                        id: ID_BADFRAME,
+                        name: "BADFRAME".into(),
+                        len: body.len(),
+                        fields: vec![f("reason", why)],
+                    },
                 );
                 frame_no += 1;
                 continue;
@@ -462,13 +486,15 @@ fn decode_conn(
                     Dir::S2C,
                     ts,
                     frame_no,
-                    1000,
-                    "LS_SERVERLIST".into(),
-                    plain.len(),
-                    vec![
-                        f("servers", reply.servers.len().to_string()),
-                        f("list", names.join(",")),
-                    ],
+                    DecodedPacket {
+                        id: 1000,
+                        name: "LS_SERVERLIST".into(),
+                        len: plain.len(),
+                        fields: vec![
+                            f("servers", reply.servers.len().to_string()),
+                            f("list", names.join(",")),
+                        ],
+                    },
                 );
                 frame_no += 1;
                 continue;
@@ -486,10 +512,12 @@ fn decode_conn(
                 Dir::S2C,
                 ts,
                 frame_no,
-                i32::from(m.id),
-                nm,
-                m.payload.len(),
-                fields,
+                DecodedPacket {
+                    id: i32::from(m.id),
+                    name: nm,
+                    len: m.payload.len(),
+                    fields,
+                },
             );
             if opts.keep_raw {
                 if let Some(e) = out.last_mut() {
@@ -865,7 +893,7 @@ fn describe_s2c(ver: ClientVersion, id: i32, p: &[u8], mask: &mut Masker) -> (St
         42 => vec![f("time", mask.val(hex(p)))],
         // file name replies and weapon names
         30 | 34 | 45 | 156 => vec![f("text", latin1(p))],
-        44 | 45 => generic(p),
+        44 => generic(p),
         _ => {
             if p.len() > 32 {
                 vec![

@@ -2,13 +2,13 @@
 //! order they were seen, with the session-specific values masked.
 //!
 //! A trace is what the differ reads. It is a plain tab-separated file so a
-//! person can read it, `grep` it and diff it:
+//! person can read it, `grep` it and diff it (`\t` below denotes a tab):
 //!
 //! ```text
 //! #seihai-trace v1
 //! #meta version=2.31
-//! #conn	dir	t_ms	frame	id	name	len	fields
-//! gs0	C>S	0	0	-1	LOGIN	38	type=0|token=GNW28015|key=<KEY>|account=<ACCT>|password=<PASS>
+//! #conn\tdir\tt_ms\tframe\tid\tname\tlen\tfields
+//! gs0\tC>S\t0\t0\t-1\tLOGIN\t38\ttype=0|token=GNW28015|key=<KEY>|account=<ACCT>|password=<PASS>
 //! ```
 //!
 //! Fields are `key=value` pairs joined with `|`; `%`, `|`, `=` (in a key or

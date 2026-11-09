@@ -918,7 +918,7 @@ impl<'a> Run<'a> {
                 // no index or -1 (2.1 and later). Seihai keeps the ones a
                 // script set with `setcharprop`; a player's are not known.
                 ('P', x) if num.is_some() && era >= Era::V21 => {
-                    let own = x.map_or(true, |x| {
+                    let own = x.is_none_or(|x| {
                         self.expand(x, depth + 1)
                             .trim()
                             .parse::<f64>()

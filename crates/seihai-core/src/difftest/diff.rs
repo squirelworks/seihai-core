@@ -269,7 +269,7 @@ fn label(e: &Event) -> String {
     format!("{} ({})", e.name, e.id)
 }
 
-fn median(v: &mut Vec<i64>) -> i64 {
+fn median(v: &mut [i64]) -> i64 {
     v.sort_unstable();
     v[v.len() / 2]
 }
@@ -485,7 +485,7 @@ fn compare_stream(
             let k = runs.iter().position(|r| r.pos == pos).unwrap_or(0);
             let before = k
                 .checked_sub(1)
-                .map(|p| format!("{}", runs[p].first.name))
+                .map(|p| runs[p].first.name.to_string())
                 .unwrap_or_else(|| "(start)".into());
             let after = runs
                 .get(k + 1)

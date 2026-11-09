@@ -267,7 +267,9 @@ pub fn parse_board_heights(payload: &[u8]) -> Option<BoardHeights> {
         width,
         height,
         cells: cells
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|c| (f32::from(gchar(c[0])) - 50.0) + f32::from(gchar(c[1])) / 128.0)
             .collect(),
     })
@@ -306,7 +308,9 @@ pub fn parse_board_modify2(payload: &[u8]) -> Option<BoardModify2> {
         width,
         height,
         tiles: body
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|c| read_gshort(c).unwrap_or(0))
             .collect(),
         trailer: rest[2 * width * height..].to_vec(),

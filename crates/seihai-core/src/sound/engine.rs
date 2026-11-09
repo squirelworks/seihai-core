@@ -157,8 +157,7 @@ impl SoundEngine {
     }
 
     fn prune(&mut self, now_ms: u64) {
-        self.voices
-            .retain(|v| v.end_ms.map_or(true, |e| e > now_ms));
+        self.voices.retain(|v| v.end_ms.is_none_or(|e| e > now_ms));
     }
 
     fn warn_once(&mut self, msg: String) {
@@ -275,7 +274,7 @@ impl SoundEngine {
         }
         // A file that arrived since the last scan, or one whose case
         // differs on a case-sensitive file system.
-        let due = self.last_scan_ms.map_or(true, |t| now_ms >= t + RESCAN_MS);
+        let due = self.last_scan_ms.is_none_or(|t| now_ms >= t + RESCAN_MS);
         if due {
             self.last_scan_ms = Some(now_ms);
             let mut index = HashMap::new();

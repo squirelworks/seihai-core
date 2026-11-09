@@ -540,7 +540,7 @@ impl OfflineSession {
                     .poses
                     .lift
                     .as_ref()
-                    .map_or(true, |g| *t as usize >= g.total_ticks())
+                    .is_none_or(|g| *t as usize >= g.total_ticks())
                     && *t >= crate::offline::LIFT_CARRIED_TICK;
                 if done || self.carried.is_none() {
                     self.lift_ticks = None;

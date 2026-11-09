@@ -46,7 +46,7 @@ pub fn position_message(x: f32, y: f32, dir: u8) -> Vec<u8> {
 }
 
 /// `PLI_PLAYERPROPS` (2) with prop 10 in the pre-2.1 bow form, `c(10 + len)`
-/// + `name`: how the real 2.00 and 2.05 tell others their animation
+/// followed by `name`: how the real 2.00 and 2.05 tell others their animation
 /// (`sword` as a swing starts, `idle` after it). See
 /// [`crate::combat::swing_in_bow_slot`].
 pub fn bow_slot_message(name: &str) -> Vec<u8> {
@@ -711,7 +711,7 @@ pub fn login_gserver(
         password,
         send_tampercheck,
         true,
-        |n| wantfile_message(n),
+        wantfile_message,
     )
 }
 
@@ -1124,7 +1124,7 @@ impl Connection {
     /// True if this connection's client version has message `id` in its
     /// send set (always true before the login fixed the version).
     pub fn can_send(&self, id: u8) -> bool {
-        self.pli.as_ref().map_or(true, |p| p.contains(id))
+        self.pli.as_ref().is_none_or(|p| p.contains(id))
     }
 
     /// Send a raw byte buffer.
@@ -1204,6 +1204,10 @@ impl Connection {
     /// password go sealed, to a server whose key `secure` trusts. `server`
     /// names the server in the pin file (`host:port` as given). After the
     /// handshake the session is `version`'s, as after its classic login.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Preserve the public secure-login API used by existing clients"
+    )]
     pub fn login_secure_with(
         &mut self,
         version: ClientVersion,
@@ -2180,6 +2184,10 @@ impl Connection {
     /// player's `dir` goes into the props that follow 46. Returns what the
     /// frame held; `with_enter_level` means the caller owes no 46 after the
     /// server's answer ([`EnterLevelSender::cached_link`]).
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Preserve the public level-link API used by existing clients"
+    )]
     pub fn send_link(
         &mut self,
         version: ClientVersion,

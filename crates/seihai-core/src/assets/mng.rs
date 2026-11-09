@@ -145,7 +145,11 @@ fn transparent_index(trns: &[u8]) -> i32 {
 }
 
 fn palette_of(plte: &[u8]) -> Vec<[u8; 3]> {
-    plte.chunks_exact(3).map(|c| [c[0], c[1], c[2]]).collect()
+    plte.as_chunks::<3>()
+        .0
+        .iter()
+        .map(|c| [c[0], c[1], c[2]])
+        .collect()
 }
 
 /// Decode a palette PNG stream into its indices: the stream is decoded with
@@ -160,7 +164,7 @@ fn decode_indices(ihdr_and_idat: &[u8], w: u32, h: u32) -> io::Result<Vec<u8>> {
     if (pw, ph) != (w, h) {
         return Err(bad("MNG frame size"));
     }
-    Ok(rgba.chunks_exact(4).map(|p| p[0]).collect())
+    Ok(rgba.as_chunks::<4>().0.iter().map(|p| p[0]).collect())
 }
 
 /// Decode an MNG into its frames the way the Graal client does (see the
@@ -184,6 +188,7 @@ fn decode_indices(ihdr_and_idat: &[u8], w: u32, h: u32) -> io::Result<Vec<u8>> {
 /// lasting delay before each frame) this gives each frame the delay of the
 /// `FRAM` before it, and the last frame 1 tick more (the lead time).
 pub fn read_mng(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<MngAnimation> {
+    type PendingFrame = (Vec<u8>, Option<Vec<[u8; 3]>>, Option<i32>);
     if !is_mng(data) {
         return Err(bad("not an MNG"));
     }
@@ -195,7 +200,7 @@ pub fn read_mng(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<MngAnim
     let mut global_palette: Option<Vec<[u8; 3]>> = None;
     let mut global_transparent = -1i32;
     // The frame being read: its `IHDR` and `IDAT` chunks as they came.
-    let mut open: Option<(Vec<u8>, Option<Vec<[u8; 3]>>, Option<i32>)> = None;
+    let mut open: Option<PendingFrame> = None;
     let mut pos = 8;
     while pos + 8 <= data.len() {
         let len = u32::from_be_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;

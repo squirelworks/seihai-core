@@ -324,8 +324,10 @@ fn parse_arr_node(data: &[u8], off: &mut usize, depth: u32) -> Option<ArrNode> {
         let end = off.checked_add(n.checked_mul(4)?)?;
         let ints = data
             .get(*off..end)?
-            .chunks_exact(4)
-            .map(|c| u32::from_be_bytes(c.try_into().unwrap()))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|c| u32::from_be_bytes(*c))
             .collect();
         *off = end;
         Some(ArrNode::Ints(ints))
@@ -655,8 +657,10 @@ impl TileTypes {
             }
             arrays.push(
                 data[off + 4..end]
-                    .chunks_exact(4)
-                    .map(|c| u32::from_be_bytes(c.try_into().unwrap()) as usize)
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .map(|c| u32::from_be_bytes(*c) as usize)
                     .collect(),
             );
             off = end;
@@ -1258,7 +1262,7 @@ impl Level {
                 }
             } else if line.starts_with("NPC ") {
                 let mut npc_lines = vec![line.to_string()];
-                while let Some(l) = lines.next() {
+                for l in lines.by_ref() {
                     npc_lines.push(l.to_string());
                     if l.trim() == "NPCEND" {
                         break;
@@ -1273,7 +1277,7 @@ impl Level {
                 }
             } else if line.starts_with("SIGN ") {
                 let mut sign_lines = vec![line.to_string()];
-                while let Some(l) = lines.next() {
+                for l in lines.by_ref() {
                     sign_lines.push(l.to_string());
                     if l.trim() == "SIGNEND" {
                         break;
@@ -1284,7 +1288,7 @@ impl Level {
                 }
             } else if line.starts_with("BADDY ") {
                 let mut baddy_lines = vec![line.to_string()];
-                while let Some(l) = lines.next() {
+                for l in lines.by_ref() {
                     baddy_lines.push(l.to_string());
                     if l.trim() == "BADDYEND" {
                         break;
@@ -1535,9 +1539,9 @@ impl Level {
 
     /// Put a 2 x 2 object's tiles at top-left `(ax, ay)`.
     pub fn put_object(&mut self, ax: i32, ay: i32, tiles: &Object2x2) {
-        for i in 0..2 {
-            for j in 0..2 {
-                self.set_tile_id(ax + i as i32, ay + j as i32, tiles[i][j]);
+        for (i, column) in tiles.iter().enumerate() {
+            for (j, &tile) in column.iter().enumerate() {
+                self.set_tile_id(ax + i as i32, ay + j as i32, tile);
             }
         }
     }

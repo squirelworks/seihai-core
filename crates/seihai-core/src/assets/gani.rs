@@ -205,12 +205,12 @@ impl Gani {
                     continue;
                 }
             }
-            if line.starts_with("DEFAULTHEAD ") {
-                default_head = Some(line[12..].trim().to_string());
+            if let Some(value) = line.strip_prefix("DEFAULTHEAD ") {
+                default_head = Some(value.trim().to_string());
                 continue;
             }
-            if line.starts_with("DEFAULTBODY ") {
-                default_body = Some(line[12..].trim().to_string());
+            if let Some(value) = line.strip_prefix("DEFAULTBODY ") {
+                default_body = Some(value.trim().to_string());
                 continue;
             }
 

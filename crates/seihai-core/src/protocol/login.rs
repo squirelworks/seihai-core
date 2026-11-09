@@ -166,7 +166,7 @@ fn worn_images(own_props: &[u8], accepted: Option<&IdSet>) -> [Option<String>; 4
             // power byte, then a GSTRING image when the power byte says so
             8 | 9 => {
                 let limit = if p.id == 8 { 4 } else { 3 };
-                if r.first().map_or(false, |b| b.wrapping_sub(0x20) > limit) {
+                if r.first().is_some_and(|b| b.wrapping_sub(0x20) > limit) {
                     let n = r.get(1).map_or(0, |b| b.wrapping_sub(0x20) as usize);
                     let v = name(r.get(2..2 + n));
                     if p.id == 8 {

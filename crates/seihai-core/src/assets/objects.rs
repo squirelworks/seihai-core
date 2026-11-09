@@ -73,7 +73,7 @@ impl ObjectSet {
                         tiles,
                     });
                 }
-            } else if let Some((name, w, _, tiles)) = current.as_mut() {
+            } else if let Some((_name, w, _, tiles)) = current.as_mut() {
                 let width = *w;
                 let bytes = line.as_bytes();
                 if bytes.len() != width * 2 {

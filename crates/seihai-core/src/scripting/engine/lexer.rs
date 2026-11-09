@@ -111,10 +111,20 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Legacy token reader, including an explicit EOF token. New callers
+    /// can use [`Self::next_token`] or the standard iterator interface.
+    #[expect(
+        clippy::should_implement_trait,
+        reason = "Retain the public explicit-EOF token API for existing parsers"
+    )]
+    pub fn next(&mut self) -> Spanned {
+        self.next_token()
+    }
+
     /// Next token. Characters that start no token are skipped as `Op`
     /// would be wrong for them; they come back as a one-character `Str`
     /// so the parser can report them.
-    pub fn next(&mut self) -> Spanned {
+    pub fn next_token(&mut self) -> Spanned {
         self.skip_blank();
         let start = self.pos;
         let line = self.line;
@@ -332,9 +342,29 @@ impl<'a> Lexer<'a> {
     }
 }
 
+impl Iterator for Lexer<'_> {
+    type Item = Spanned;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let token = self.next_token();
+        (!matches!(token.tok, Tok::Eof)).then_some(token)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn iterator_omits_eof_without_changing_the_token_api() {
+        let mut lexer = Lexer::new(" // comment\n X 2");
+        let first = Iterator::next(&mut lexer).unwrap();
+        assert_eq!((first.tok, first.line), (Tok::Ident("x".into()), 2));
+        assert_eq!(lexer.next().tok, Tok::Num(2.0));
+        assert!(Iterator::next(&mut lexer).is_none());
+        assert!(Iterator::next(&mut lexer).is_none());
+        assert_eq!(lexer.next().tok, Tok::Eof);
+    }
 
     fn toks(src: &str) -> Vec<Tok> {
         let mut l = Lexer::new(src);

@@ -273,7 +273,7 @@ impl AssetResolver {
             if let Some(r) = r {
                 if path.starts_with(&r.root) {
                     let depth = r.root.components().count();
-                    if best.map_or(true, |(_, d)| depth > d) {
+                    if best.is_none_or(|(_, d)| depth > d) {
                         best = Some((layer, depth));
                     }
                 }

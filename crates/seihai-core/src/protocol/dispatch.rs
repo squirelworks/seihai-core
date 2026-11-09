@@ -987,7 +987,9 @@ impl SessionState {
                 if msg.payload.len() >= 8192 {
                     self.board = Some(
                         msg.payload[..8192]
-                            .chunks_exact(2)
+                            .as_chunks::<2>()
+                            .0
+                            .iter()
                             .map(|p| u16::from_le_bytes([p[0], p[1]]) & 0x0FFF)
                             .collect(),
                     );
