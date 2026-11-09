@@ -4,7 +4,10 @@
 //! Both front ends must reproduce that bytecode. No real client is involved.
 
 use seihai_core::scripting::engine::Era;
+use seihai_core::scripting::engine::Val;
 use seihai_core::scripting::gs2::compile::{self, gs1_commands_without_gs2, gs2_event_function};
+use seihai_core::scripting::gs2::exec::{EffectHost, Machine, Outcome, Root};
+use seihai_core::scripting::gs2::lists::Value;
 use seihai_core::scripting::gs2::{Op, Script};
 use std::path::Path;
 
@@ -351,4 +354,133 @@ fn format_requires_a_pattern_but_keeps_variadic_arguments() {
     }
     // A name outside the opcode subset is still a script/host call.
     compile::compile_gs2("function onCreated() { custom(); custom(1, 2, 3, 4); }").unwrap();
+}
+
+fn first_literal(script: &Script) -> Vec<(Op, seihai_core::scripting::gs2::Operand)> {
+    let end = script
+        .code
+        .iter()
+        .position(|i| i.op == Op::ArrayEnd)
+        .unwrap();
+    let start = script.code[..end]
+        .iter()
+        .rposition(|i| i.op == Op::TypeArray)
+        .unwrap();
+    script.code[start..=end]
+        .iter()
+        .map(|i| (i.op, i.operand.clone()))
+        .collect()
+}
+
+fn run_created(script: Script) -> Machine {
+    let mut machine = Machine::new(script);
+    let mut host = EffectHost::new(Era::V21, 7);
+    assert_eq!(machine.run_top_level(&mut host), Outcome::Done);
+    assert_eq!(
+        machine.call_event("onCreated", &[], &mut host),
+        Outcome::Done
+    );
+    assert!(host.log.is_empty(), "{:?}", host.log);
+    machine
+}
+
+#[test]
+fn array_literal_matches_the_existing_fixture_and_both_front_ends() {
+    let gs2 = compile::compile_gs2("function onCreated() { this.a = {10, \"two\", 30}; }").unwrap();
+    let gs1 =
+        compile::compile_gs1("if (created) { this.a = {10, \"two\", 30}; }", Era::V21).unwrap();
+    assert_eq!(gs1.write(), gs2.write());
+    let reference = Script::parse(&fixture("lists.gs2bc")).unwrap();
+    assert_eq!(&gs2.strings[..2], &reference.strings[..2]);
+    assert_eq!(first_literal(&gs2), first_literal(&reference));
+    let machine = run_created(gs1);
+    assert_eq!(
+        machine.list(Root::This, "a"),
+        Some(
+            [
+                Value::from(Val::Num(10.0)),
+                Value::from(Val::from("two")),
+                Value::from(Val::Num(30.0)),
+            ]
+            .as_slice()
+        )
+    );
+}
+
+#[test]
+fn empty_nested_and_trailing_comma_literals_keep_their_structure() {
+    let script =
+        compile::compile_gs2("function onCreated() { this.a = {}; this.b = {1, {2, 3,}, {},}; }")
+            .unwrap();
+    let machine = run_created(script);
+    assert_eq!(machine.list(Root::This, "a"), Some([].as_slice()));
+    assert_eq!(
+        machine.list(Root::This, "b"),
+        Some(
+            [
+                Value::from(Val::Num(1.0)),
+                Value::List(vec![Value::from(Val::Num(2.0)), Value::from(Val::Num(3.0))]),
+                Value::List(vec![]),
+            ]
+            .as_slice()
+        )
+    );
+}
+
+#[test]
+fn gs2_literal_calls_preserve_the_reverse_push_order_and_array_marker() {
+    let script = compile::compile_gs2(
+        "function next() { this.count += 1; return this.count; }
+         function onCreated() { this.count = 0; this.a = {next(), next()}; }",
+    )
+    .unwrap();
+    let machine = run_created(script);
+    assert_eq!(machine.var(Root::This, "count"), Some(&Val::Num(2.0)));
+    assert_eq!(
+        machine.list(Root::This, "a"),
+        Some([Value::from(Val::Num(2.0)), Value::from(Val::Num(1.0))].as_slice())
+    );
+}
+
+#[test]
+fn gs1_sparse_entries_and_scalar_expressions_lower_without_losing_positions() {
+    let gs1 = compile::compile_gs1(
+        "if (created) { this.a = {1 + 2, , -4,}; this.b = {}; }",
+        Era::V21,
+    )
+    .unwrap();
+    let gs2 =
+        compile::compile_gs2("function onCreated() { this.a = {1 + 2, 0, -4,}; this.b = {}; }")
+            .unwrap();
+    assert_eq!(gs1.write(), gs2.write());
+    let machine = run_created(gs1);
+    assert_eq!(
+        machine.list(Root::This, "a"),
+        Some(
+            [
+                Value::from(Val::Num(3.0)),
+                Value::from(Val::Num(0.0)),
+                Value::from(Val::Num(-4.0)),
+            ]
+            .as_slice()
+        )
+    );
+    assert_eq!(machine.list(Root::This, "b"), Some([].as_slice()));
+}
+
+#[test]
+fn malformed_and_unsupported_array_forms_fail_clearly() {
+    for literal in ["{1", "{1,,2}", "{,1}", "{1 2}"] {
+        let source = format!("function onCreated() {{ this.a = {literal}; }}");
+        assert!(compile::compile_gs2(&source).is_err(), "{source}");
+    }
+    for literal in ["{next(), 1}", "{1 + next(), 2}", "{{1}, 2}"] {
+        let source = format!("if (created) {{ this.a = {literal}; }}");
+        let error = compile::compile_gs1(&source, Era::V21)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("calls or nested lists"), "{source}: {error}");
+    }
+    assert!(compile::compile_gs1("if (created) { this.a = {1, 2}; }", Era::V205).is_err());
+    assert!(compile::compile_gs2("function onCreated() { this.a[0] = 1; }").is_err());
 }
