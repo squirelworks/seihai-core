@@ -15,6 +15,9 @@
 //! `format` needs a pattern and accepts additional values. This is Seihai's
 //! compile-time validation policy, not a claim about original-client errors.
 //! Script and host calls are not subject to those opcode-specific checks.
+//! Array literals use the documented reverse-push encoding. GS1 lowering is
+//! limited to scalar elements without calls: the GS1 interpreter evaluates
+//! elements left to right, so calls need a separate order-preserving lowering.
 
 use super::{Function, Instr, Op, Operand, Script};
 use crate::scripting::engine::ast::*;
@@ -1347,10 +1350,18 @@ impl Builder {
                 self.emit_int(0);
                 Kind::Number
             }
-            Expr::List(_) => {
-                self.err("array literals are not lowered by this temporary front end");
-                self.emit_int(0);
-                Kind::Number
+            Expr::List(values) => {
+                if self.gs1 && !values.iter().all(gs1_array_element) {
+                    self.err("GS1 array elements with calls or nested lists are not lowered yet");
+                    self.emit_int(0);
+                    return Kind::Number;
+                }
+                self.op(Op::TypeArray);
+                for value in values.iter().rev() {
+                    self.value(value);
+                }
+                self.op(Op::ArrayEnd);
+                Kind::Other
             }
         }
     }
@@ -1532,6 +1543,22 @@ impl Builder {
                 trues.push(self.hole(Op::Or));
             }
         }
+    }
+}
+
+/// Scalar expressions whose evaluation cannot call script or host code.
+fn gs1_array_element(expr: &Expr) -> bool {
+    match expr {
+        Expr::Num(_) | Expr::Str(_) | Expr::Var(_) => true,
+        Expr::Unary(_, value) => gs1_array_element(value),
+        Expr::Bin(_, left, right) => gs1_array_element(left) && gs1_array_element(right),
+        Expr::InRange { e, lo, hi } => {
+            gs1_array_element(e) && gs1_array_element(lo) && gs1_array_element(hi)
+        }
+        Expr::Cond { cond, then, els } => {
+            gs1_array_element(cond) && gs1_array_element(then) && gs1_array_element(els)
+        }
+        Expr::Call { .. } | Expr::List(_) | Expr::InList { .. } | Expr::InArray { .. } => false,
     }
 }
 
@@ -1942,6 +1969,19 @@ impl<'a> Gs2<'a> {
                 let e = self.expr()?;
                 self.expect(")")?;
                 Ok(e)
+            }
+            GTok::Op("{") => {
+                let mut values = Vec::new();
+                if !self.eat("}") {
+                    loop {
+                        values.push(self.expr()?);
+                        if !self.eat(",") || self.sees("}") {
+                            break;
+                        }
+                    }
+                    self.expect("}")?;
+                }
+                Ok(Expr::List(values))
             }
             GTok::Op("|") => Err(CompileErrors::one(
                 self.line,
