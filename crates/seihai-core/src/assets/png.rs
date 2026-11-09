@@ -72,7 +72,7 @@ pub fn write_png_indexed<W: Write>(
             "index buffer size mismatch",
         ));
     }
-    if palette.len() % 3 != 0 || palette.len() > 256 * 3 {
+    if !palette.len().is_multiple_of(3) || palette.len() > 256 * 3 {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "invalid palette",
@@ -146,7 +146,10 @@ pub fn read_png_rgba(data: &[u8]) -> io::Result<(u32, u32, Vec<u8>)> {
 /// colour types ignore `recolor`. This is how a body picture is drawn in
 /// the player's colours (see `looks.rs`). A GIF's colour table is
 /// recoloured the same way, so a `.gif` body takes the colours too.
-pub fn read_png_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<(u32, u32, Vec<u8>)> {
+pub fn read_png_rgba_recolored(
+    data: &[u8],
+    recolor: &[(usize, [u8; 3])],
+) -> io::Result<(u32, u32, Vec<u8>)> {
     if super::gif::is_gif(data) {
         return super::gif::read_gif_rgba_recolored(data, recolor);
     }
@@ -156,7 +159,7 @@ pub fn read_png_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io:
         return super::mng::read_mng_rgba(data, recolor);
     }
     let bad = |m: &str| io::Error::new(io::ErrorKind::InvalidData, m.to_string());
-    if data.len() < 8 || &data[..8] != &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A] {
+    if data.len() < 8 || data[..8] != [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A] {
         return Err(bad("not a PNG"));
     }
     let mut pos = 8;
@@ -171,7 +174,9 @@ pub fn read_png_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io:
     while pos + 8 <= data.len() {
         let len = u32::from_be_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
         let tag = &data[pos + 4..pos + 8];
-        let chunk = data.get(pos + 8..pos + 8 + len).ok_or_else(|| bad("truncated chunk"))?;
+        let chunk = data
+            .get(pos + 8..pos + 8 + len)
+            .ok_or_else(|| bad("truncated chunk"))?;
         if tag == b"IHDR" && chunk.len() >= 13 {
             width = u32::from_be_bytes(chunk[0..4].try_into().unwrap());
             height = u32::from_be_bytes(chunk[4..8].try_into().unwrap());
@@ -220,13 +225,17 @@ pub fn read_png_rgba_recolored(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io:
     // each): the IDAT stream is the server's too.
     let want = (stride + 1) * height as usize;
     let mut raw = Vec::new();
-    ZlibDecoder::new(&idat[..]).take(want as u64).read_to_end(&mut raw)?;
+    ZlibDecoder::new(&idat[..])
+        .take(want as u64)
+        .read_to_end(&mut raw)?;
     let mut pixels = Vec::with_capacity(width as usize * height as usize * 4);
     let mut prev = vec![0u8; stride];
     let mut row = vec![0u8; stride];
     let mut i = 0;
     for _ in 0..height {
-        let line = raw.get(i..i + 1 + stride).ok_or_else(|| bad("truncated image data"))?;
+        let line = raw
+            .get(i..i + 1 + stride)
+            .ok_or_else(|| bad("truncated image data"))?;
         i += 1 + stride;
         let filter = line[0];
         for x in 0..stride {
@@ -305,19 +314,31 @@ mod tests {
             c.extend(crc32(&[tag, d].concat()).to_be_bytes());
             c
         }
-        for (w, h) in [(60000u32, 60000u32), (1, u32::MAX >> 1), (u32::MAX >> 1, u32::MAX >> 1)] {
+        for (w, h) in [
+            (60000u32, 60000u32),
+            (1, u32::MAX >> 1),
+            (u32::MAX >> 1, u32::MAX >> 1),
+        ] {
             let mut ihdr = w.to_be_bytes().to_vec();
             ihdr.extend(h.to_be_bytes());
             ihdr.extend([8, 6, 0, 0, 0]);
             let mut enc = ZlibEncoder::new(Vec::new(), Compression::default());
             enc.write_all(&[0u8; 1000]).unwrap();
-            let png = [&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A][..], &chunk(b"IHDR", &ihdr), &chunk(b"IDAT", &enc.finish().unwrap()), &chunk(b"IEND", b"")].concat();
+            let png = [
+                &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A][..],
+                &chunk(b"IHDR", &ihdr),
+                &chunk(b"IDAT", &enc.finish().unwrap()),
+                &chunk(b"IEND", b""),
+            ]
+            .concat();
             let e = read_png_rgba(&png).unwrap_err();
             assert_eq!(e.kind(), io::ErrorKind::InvalidData, "{w} x {h}");
         }
         let mut gif = b"GIF89a".to_vec();
         gif.extend([0xFF, 0xFF, 0xFF, 0xFF, 0x80, 0, 0, 0, 0, 0, 0, 0, 0]);
-        gif.extend([0x2C, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0, 2, 2, 0x44, 1, 0, b';']);
+        gif.extend([
+            0x2C, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0, 2, 2, 0x44, 1, 0, b';',
+        ]);
         assert!(read_png_rgba(&gif).is_err());
     }
 

@@ -104,7 +104,12 @@ pub struct GmapSession {
 
 impl GmapSession {
     pub fn new(name: String, cell: (i32, i32)) -> Self {
-        Self { name, cell, awaiting_level: true, ..Default::default() }
+        Self {
+            name,
+            cell,
+            awaiting_level: true,
+            ..Default::default()
+        }
     }
 
     /// Whether `name` is this gmap's file name (a 6 that names it means
@@ -115,7 +120,10 @@ impl GmapSession {
 
     /// The level at `cell` per the grid.
     pub fn level_at(&self, cell: (i32, i32)) -> Option<String> {
-        self.map.as_ref()?.level_at(cell.0, cell.1).map(str::to_string)
+        self.map
+            .as_ref()?
+            .level_at(cell.0, cell.1)
+            .map(str::to_string)
     }
 
     /// The player's level: the grid's, else the one the server named first.
@@ -140,13 +148,23 @@ pub struct GmapWorld {
 
 impl GmapWorld {
     pub fn new(name: String, map: Gmap, cell: (i32, i32)) -> Self {
-        Self { name, map, cell, levels: HashMap::new(), crossing: None }
+        Self {
+            name,
+            map,
+            cell,
+            levels: HashMap::new(),
+            crossing: None,
+        }
     }
 
     /// Neighbouring cells that hold a level in the grid but have none
     /// loaded.
     pub fn missing(&self) -> Vec<(i32, i32)> {
-        self.map.neighbours(self.cell).into_iter().filter(|c| !self.levels.contains_key(c)).collect()
+        self.map
+            .neighbours(self.cell)
+            .into_iter()
+            .filter(|c| !self.levels.contains_key(c))
+            .collect()
     }
 }
 
@@ -206,14 +224,24 @@ impl BigMapView {
     /// to eight) through `load`, each name tried once until [`Self::retry`].
     /// Off the grid, or with no map, the view is empty. Returns true when
     /// a level came or went (the view changed).
-    pub fn sync(&mut self, map: Option<&Gmap>, here: Option<&str>, load: &mut dyn FnMut(&str) -> Option<Level>) -> bool {
+    pub fn sync(
+        &mut self,
+        map: Option<&Gmap>,
+        here: Option<&str>,
+        load: &mut dyn FnMut(&str) -> Option<Level>,
+    ) -> bool {
         // The grid may name a level with or without `.nw`.
         let cell_of = |m: &Gmap, h: &str| {
             let k = level_key(h);
-            let i = m.names.iter().position(|n| !n.is_empty() && level_key(n) == k)?;
+            let i = m
+                .names
+                .iter()
+                .position(|n| !n.is_empty() && level_key(n) == k)?;
             Some(((i % m.width) as i32, (i / m.width) as i32))
         };
-        let cell = map.zip(here).and_then(|(m, h)| Some((m, h, cell_of(m, h)?)));
+        let cell = map
+            .zip(here)
+            .and_then(|(m, h)| Some((m, h, cell_of(m, h)?)));
         let Some((map, here, cell)) = cell else {
             let changed = !self.levels.is_empty();
             *self = Self::default();
@@ -221,7 +249,12 @@ impl BigMapView {
         };
         let key = level_key(here);
         let mut changed = false;
-        let around: Vec<String> = map.neighbours(cell).into_iter().filter_map(|(x, y)| map.level_at(x, y)).map(level_key).collect();
+        let around: Vec<String> = map
+            .neighbours(cell)
+            .into_iter()
+            .filter_map(|(x, y)| map.level_at(x, y))
+            .map(level_key)
+            .collect();
         if self.here.as_ref().map(|(k, _)| k) != Some(&key) {
             self.here = Some((key, cell));
             self.tried.clear();
@@ -263,7 +296,11 @@ pub const BOARD_HOLD: std::time::Duration = std::time::Duration::from_millis(100
 /// a frame or more at every edge crossing. After [`BOARD_HOLD`] the frame is
 /// drawn whatever is there, so a level that never comes does not freeze
 /// the window.
-pub fn hold_frame_for_board(big_map: bool, level_loaded: bool, waited: Option<std::time::Duration>) -> bool {
+pub fn hold_frame_for_board(
+    big_map: bool,
+    level_loaded: bool,
+    waited: Option<std::time::Duration>,
+) -> bool {
     big_map && !level_loaded && waited.is_some_and(|w| w < BOARD_HOLD)
 }
 
@@ -339,7 +376,8 @@ impl Gmap {
                         if row.trim() == "LOADATSTARTEND" {
                             break;
                         }
-                        g.load_at_start.extend(split_row(row).into_iter().filter(|n| !n.is_empty()));
+                        g.load_at_start
+                            .extend(split_row(row).into_iter().filter(|n| !n.is_empty()));
                     }
                 }
                 _ => {}
@@ -364,8 +402,17 @@ impl Gmap {
     /// names, comma-separated and quoted, with no header. The grid is as
     /// wide as the longest row. `None` when no row names a level.
     pub fn parse_grid(text: &str) -> Option<Self> {
-        let rows: Vec<Vec<String>> = text.lines().map(|l| l.trim_end_matches('\r')).filter(|l| !l.trim().is_empty()).map(split_row).collect();
-        let mut g = Gmap { width: rows.iter().map(Vec::len).max().unwrap_or(0), height: rows.len(), ..Gmap::default() };
+        let rows: Vec<Vec<String>> = text
+            .lines()
+            .map(|l| l.trim_end_matches('\r'))
+            .filter(|l| !l.trim().is_empty())
+            .map(split_row)
+            .collect();
+        let mut g = Gmap {
+            width: rows.iter().map(Vec::len).max().unwrap_or(0),
+            height: rows.len(),
+            ..Gmap::default()
+        };
         if g.width == 0 || g.width > 255 || g.height > 255 {
             return None;
         }
@@ -399,12 +446,18 @@ impl Gmap {
     /// client's list order and de-duplication are not traced, so only
     /// "not in the list" and "first in the list" can be relied on.
     pub fn list_index(&self, level: &str) -> Option<usize> {
-        self.names.iter().filter(|n| !n.is_empty()).position(|n| n.eq_ignore_ascii_case(level))
+        self.names
+            .iter()
+            .filter(|n| !n.is_empty())
+            .position(|n| n.eq_ignore_ascii_case(level))
     }
 
     /// The cell a level is in (case-insensitive; the first match).
     pub fn cell_of(&self, level: &str) -> Option<(i32, i32)> {
-        let i = self.names.iter().position(|n| !n.is_empty() && n.eq_ignore_ascii_case(level))?;
+        let i = self
+            .names
+            .iter()
+            .position(|n| !n.is_empty() && n.eq_ignore_ascii_case(level))?;
         Some(((i % self.width) as i32, (i / self.width) as i32))
     }
 
@@ -423,8 +476,20 @@ impl Gmap {
     pub fn neighbours_within(&self, here: &str, x: f32, y: f32, near: (f32, f32)) -> Vec<&str> {
         // The middle of the player's body, as the edge links test it.
         let (fx, fy) = (x + 1.5, y + 2.0);
-        let dx = if fx < near.0 { -1 } else if fx >= 64.0 - near.0 { 1 } else { 0 };
-        let dy = if fy < near.1 { -1 } else if fy >= 64.0 - near.1 { 1 } else { 0 };
+        let dx = if fx < near.0 {
+            -1
+        } else if fx >= 64.0 - near.0 {
+            1
+        } else {
+            0
+        };
+        let dy = if fy < near.1 {
+            -1
+        } else if fy >= 64.0 - near.1 {
+            1
+        } else {
+            0
+        };
         let mut v = Vec::new();
         for (ox, oy) in [(dx, 0), (0, dy), (dx, dy)] {
             if (ox, oy) == (0, 0) {
@@ -446,18 +511,37 @@ impl Gmap {
     /// the same tick; a link on that edge fires only some steps later, at the
     /// edge itself, so the level is asked for before the link is walked
     /// (laundry item 9, `documentation/bigmap-neighbours.md`).
-    pub fn big_map_ahead(&self, here: &str, x: f32, y: f32, asked: &mut HashSet<String>) -> Vec<String> {
+    pub fn big_map_ahead(
+        &self,
+        here: &str,
+        x: f32,
+        y: f32,
+        asked: &mut HashSet<String>,
+    ) -> Vec<String> {
         self.big_map_ahead_within(here, x, y, (BIGMAP_NEAR_EDGE, BIGMAP_NEAR_EDGE), asked)
     }
 
     /// [`Self::big_map_ahead`] with the distance per axis. The main loop
     /// passes [`big_map_ahead_distance`] for its view, so the level next
     /// door is asked for by the time its edge comes into view.
-    pub fn big_map_ahead_within(&self, here: &str, x: f32, y: f32, near: (f32, f32), asked: &mut HashSet<String>) -> Vec<String> {
+    pub fn big_map_ahead_within(
+        &self,
+        here: &str,
+        x: f32,
+        y: f32,
+        near: (f32, f32),
+        asked: &mut HashSet<String>,
+    ) -> Vec<String> {
         self.neighbours_within(here, x, y, near)
             .into_iter()
             .filter(|n| asked.insert(format!("near:{}", n.to_ascii_lowercase())))
-            .map(|n| if n.contains('.') { n.to_string() } else { format!("{n}.nw") })
+            .map(|n| {
+                if n.contains('.') {
+                    n.to_string()
+                } else {
+                    format!("{n}.nw")
+                }
+            })
             .collect()
     }
 
@@ -488,7 +572,12 @@ impl Gmap {
         if self.level_at(nx, ny).is_none() {
             return Resolved::NoLevel;
         }
-        Resolved::Crossed(Crossing { from: cell, to, local_x: lx, local_y: ly })
+        Resolved::Crossed(Crossing {
+            from: cell,
+            to,
+            local_x: lx,
+            local_y: ly,
+        })
     }
 }
 
@@ -496,12 +585,20 @@ impl Gmap {
 fn wrap(cell: (i32, i32), (x, y): (f32, f32)) -> (i32, i32, f32, f32) {
     let side = CELL_TILES as f32;
     let (kx, ky) = ((x / side).floor(), (y / side).floor());
-    (cell.0 + kx as i32, cell.1 + ky as i32, x - kx * side, y - ky * side)
+    (
+        cell.0 + kx as i32,
+        cell.1 + ky as i32,
+        x - kx * side,
+        y - ky * side,
+    )
 }
 
 /// The global position (tiles) of a cell-local one.
 pub fn to_global(cell: (i32, i32), (x, y): (f32, f32)) -> (f32, f32) {
-    (x + (cell.0 * CELL_TILES) as f32, y + (cell.1 * CELL_TILES) as f32)
+    (
+        x + (cell.0 * CELL_TILES) as f32,
+        y + (cell.1 * CELL_TILES) as f32,
+    )
 }
 
 /// The cell and cell-local position of a global one.
@@ -573,16 +670,25 @@ pub fn crossing_props_message(rules: &GmapRules, c: &Crossing) -> Vec<u8> {
             b.extend_from_slice(&gshort(encode_pos_precise(v)));
             (precise, b)
         } else {
-            (classic, vec![classic + 0x20, encode_pos_classic(v).wrapping_add(0x20)])
+            (
+                classic,
+                vec![classic + 0x20, encode_pos_classic(v).wrapping_add(0x20)],
+            )
         }
     };
     if c.x_changed() {
-        add(PROP_GMAPLEVELX, vec![PROP_GMAPLEVELX + 0x20, c.to.0 as u8 + 0x20]);
+        add(
+            PROP_GMAPLEVELX,
+            vec![PROP_GMAPLEVELX + 0x20, c.to.0 as u8 + 0x20],
+        );
         let (id, b) = coord(PROP_X, PROP_X2, c.local_x);
         add(id, b);
     }
     if c.y_changed() {
-        add(PROP_GMAPLEVELY, vec![PROP_GMAPLEVELY + 0x20, c.to.1 as u8 + 0x20]);
+        add(
+            PROP_GMAPLEVELY,
+            vec![PROP_GMAPLEVELY + 0x20, c.to.1 as u8 + 0x20],
+        );
         let (id, b) = coord(PROP_Y, PROP_Y2, c.local_y);
         add(id, b);
     }
@@ -650,7 +756,11 @@ pub fn adjacent_level_message(mod_time: u32, level: &str) -> Vec<u8> {
     for shift in [28, 21, 14, 7, 0] {
         m.push(((mod_time >> shift) as u8 & 0x7F) + 0x20);
     }
-    m.extend(level.chars().map(|c| if (c as u32) < 256 { c as u8 } else { b'?' }));
+    m.extend(
+        level
+            .chars()
+            .map(|c| if (c as u32) < 256 { c as u8 } else { b'?' }),
+    );
     m.push(b'\n');
     m
 }
@@ -760,7 +870,10 @@ pub fn sync_world(
         return req;
     };
     // The client clamps the cell a 49 gives to the grid.
-    let cell = (g.cell.0.clamp(0, map.width as i32 - 1), g.cell.1.clamp(0, map.height as i32 - 1));
+    let cell = (
+        g.cell.0.clamp(0, map.width as i32 - 1),
+        g.cell.1.clamp(0, map.height as i32 - 1),
+    );
     let moved = cell != g.cell;
     match session.gmap.as_mut() {
         Some(w) if w.name.eq_ignore_ascii_case(&g.name) => {
@@ -780,7 +893,9 @@ pub fn sync_world(
     let w = session.gmap.as_mut().expect("just set");
     w.levels.retain(|c, _| around.contains(c));
     for c in w.missing() {
-        let Some(name) = map.level_at(c.0, c.1) else { continue };
+        let Some(name) = map.level_at(c.0, c.1) else {
+            continue;
+        };
         // The server's board first, as the real client draws it; a local
         // file only as the loader allows.
         let level = net
@@ -793,8 +908,12 @@ pub fn sync_world(
     }
     if rules.adjacent {
         for &(x, y) in &around {
-            let Some(name) = map.level_at(x, y) else { continue };
-            if net.board_of(name).is_none() && asked.insert(format!("adj:{}", name.to_ascii_lowercase())) {
+            let Some(name) = map.level_at(x, y) else {
+                continue;
+            };
+            if net.board_of(name).is_none()
+                && asked.insert(format!("adj:{}", name.to_ascii_lowercase()))
+            {
                 req.messages.push(adjacent_level_message(0, name));
             }
         }
@@ -811,7 +930,8 @@ mod tests {
     #[test]
     fn the_big_map_view_follows_the_player() {
         use super::{BigMapView, Level};
-        let g = super::Gmap::parse_grid("\"a\",\"b\",\"c\",\"d\"\n\"e\",\"f\",\"g\",\"h\"\n").unwrap();
+        let g =
+            super::Gmap::parse_grid("\"a\",\"b\",\"c\",\"d\"\n\"e\",\"f\",\"g\",\"h\"\n").unwrap();
         let asked = std::cell::RefCell::new(Vec::new());
         let mut have = vec!["a.nw", "c.nw", "e.nw", "g.nw"];
         let mut v = BigMapView::default();
@@ -820,7 +940,11 @@ mod tests {
             have.contains(&n).then(|| Level::from_board(&[1u16; 4096]))
         };
         assert!(v.sync(Some(&g), Some("B.nw"), &mut load));
-        assert_eq!(*asked.borrow(), ["a.nw", "e.nw", "f.nw", "c.nw", "g.nw"], "columns first, as `neighbours`");
+        assert_eq!(
+            *asked.borrow(),
+            ["a.nw", "e.nw", "f.nw", "c.nw", "g.nw"],
+            "columns first, as `neighbours`"
+        );
         assert!(v.at(&g, -1, 0).is_some() && v.at(&g, 1, 1).is_some() && v.at(&g, 0, 1).is_none());
         // Nothing new: nothing asked.
         assert!(!v.sync(Some(&g), Some("b"), &mut load));
@@ -849,11 +973,22 @@ mod tests {
         let g = super::Gmap::parse_grid("\"w\",\"mid\",\"e\"\n").unwrap();
         let near = super::big_map_ahead_distance(40, 30);
         assert_eq!(near, (24.0, 19.0));
-        assert_eq!(super::big_map_ahead_distance(8, 8), (10.0, 10.0), "never under 10");
+        assert_eq!(
+            super::big_map_ahead_distance(8, 8),
+            (10.0, 10.0),
+            "never under 10"
+        );
         let mut asked = std::collections::HashSet::new();
         // Body middle at 41.5: 22.5 tiles from the east edge.
-        assert_eq!(g.big_map_ahead_within("mid", 40.0, 30.0, near, &mut asked), ["e.nw"]);
-        assert!(g.big_map_ahead("mid", 40.0, 30.0, &mut std::collections::HashSet::new()).is_empty(), "the old 10 tiles");
+        assert_eq!(
+            g.big_map_ahead_within("mid", 40.0, 30.0, near, &mut asked),
+            ["e.nw"]
+        );
+        assert!(
+            g.big_map_ahead("mid", 40.0, 30.0, &mut std::collections::HashSet::new())
+                .is_empty(),
+            "the old 10 tiles"
+        );
     }
 
     #[test]
@@ -876,9 +1011,15 @@ mod tests {
         // Near the east edge: east only.
         assert_eq!(g.neighbours_near_edge("MID.nw", 55.0, 30.0), ["e.nw"]);
         // Near the north-west corner: west, north and the corner.
-        assert_eq!(g.neighbours_near_edge("mid.nw", 2.0, 1.0), ["w.nw", "n.nw", "nw.nw"]);
+        assert_eq!(
+            g.neighbours_near_edge("mid.nw", 2.0, 1.0),
+            ["w.nw", "n.nw", "nw.nw"]
+        );
         // South: a hole below, so only the corner to the south-east.
-        assert_eq!(g.neighbours_near_edge("mid.nw", 60.0, 60.0), ["e.nw", "se.nw"]);
+        assert_eq!(
+            g.neighbours_near_edge("mid.nw", 60.0, 60.0),
+            ["e.nw", "se.nw"]
+        );
         // At the grid's edge there is nothing beyond.
         assert!(g.neighbours_near_edge("n.nw", 30.0, 0.0).is_empty());
         // A level not on the big map.
@@ -920,7 +1061,9 @@ mod tests {
 
     #[test]
     fn size_comes_from_the_rows_without_width_and_height() {
-        let g = Gmap::parse("GRMAP001\nLEVELNAMES\na.nw,b.nw,c.nw\nd.nw,e.nw,f.nw\nLEVELNAMESEND\n").unwrap();
+        let g =
+            Gmap::parse("GRMAP001\nLEVELNAMES\na.nw,b.nw,c.nw\nd.nw,e.nw,f.nw\nLEVELNAMESEND\n")
+                .unwrap();
         assert_eq!((g.width, g.height), (3, 2));
         assert_eq!(g.level_at(2, 1), Some("f.nw"));
     }
@@ -948,7 +1091,10 @@ mod tests {
     #[test]
     fn bad_signature_or_empty_grid_is_none() {
         assert!(Gmap::parse("GLEVNW01\nWIDTH 1\n").is_none());
-        assert!(Gmap::parse("GRMAP001\nWIDTH 2\nHEIGHT 2\n").is_some(), "declared size, all holes");
+        assert!(
+            Gmap::parse("GRMAP001\nWIDTH 2\nHEIGHT 2\n").is_some(),
+            "declared size, all holes"
+        );
         assert!(Gmap::parse("GRMAP001\n").is_none());
         assert!(Gmap::parse("").is_none());
     }
@@ -980,17 +1126,25 @@ mod tests {
         let g = map();
         // East: global x reaches 64.0.
         assert_eq!(g.resolve((0, 0), (63.5, 30.5)), Resolved::Inside);
-        let Resolved::Crossed(c) = g.resolve((0, 0), (64.0, 30.5)) else { panic!() };
+        let Resolved::Crossed(c) = g.resolve((0, 0), (64.0, 30.5)) else {
+            panic!()
+        };
         assert_eq!((c.to, c.local_x, c.local_y), ((1, 0), 0.0, 30.5));
         assert!(c.x_changed() && !c.y_changed());
         // West: from cell 1 at local 0.0, one half-step back.
-        let Resolved::Crossed(c) = g.resolve((1, 0), (-0.5, 30.5)) else { panic!() };
+        let Resolved::Crossed(c) = g.resolve((1, 0), (-0.5, 30.5)) else {
+            panic!()
+        };
         assert_eq!((c.to, c.local_x), ((0, 0), 63.5));
         // South and north.
-        let Resolved::Crossed(c) = g.resolve((0, 0), (10.0, 64.0)) else { panic!() };
+        let Resolved::Crossed(c) = g.resolve((0, 0), (10.0, 64.0)) else {
+            panic!()
+        };
         assert_eq!((c.to, c.local_y), ((0, 1), 0.0));
         assert!(c.y_changed() && !c.x_changed());
-        let Resolved::Crossed(c) = g.resolve((0, 1), (10.0, -0.5)) else { panic!() };
+        let Resolved::Crossed(c) = g.resolve((0, 1), (10.0, -0.5)) else {
+            panic!()
+        };
         assert_eq!((c.to, c.local_y), ((0, 0), 63.5));
     }
 
@@ -999,14 +1153,18 @@ mod tests {
         let g = map();
         assert_eq!(g.resolve((0, 0), (-0.5, 5.0)), Resolved::NoLevel);
         assert_eq!(g.resolve((1, 1), (64.0, 5.0)), Resolved::NoLevel);
-        let holey = Gmap::parse("GRMAP001\nWIDTH 2\nHEIGHT 1\nLEVELNAMES\n\"a.nw\",\"\"\nLEVELNAMESEND\n").unwrap();
+        let holey =
+            Gmap::parse("GRMAP001\nWIDTH 2\nHEIGHT 1\nLEVELNAMES\n\"a.nw\",\"\"\nLEVELNAMESEND\n")
+                .unwrap();
         assert_eq!(holey.resolve((0, 0), (64.0, 5.0)), Resolved::NoLevel);
     }
 
     #[test]
     fn diagonal_crossing_changes_both_axes() {
         let g = map();
-        let Resolved::Crossed(c) = g.resolve((0, 0), (64.0, 64.0)) else { panic!() };
+        let Resolved::Crossed(c) = g.resolve((0, 0), (64.0, 64.0)) else {
+            panic!()
+        };
         assert_eq!(c.to, (1, 1));
         assert!(c.x_changed() && c.y_changed());
     }
@@ -1027,7 +1185,12 @@ mod tests {
     }
 
     fn cross(from: (i32, i32), to: (i32, i32), lx: f32, ly: f32) -> Crossing {
-        Crossing { from, to, local_x: lx, local_y: ly }
+        Crossing {
+            from,
+            to,
+            local_x: lx,
+            local_y: ly,
+        }
     }
 
     /// The four props messages a real 2.31 sent in the lab (the id byte is
@@ -1037,13 +1200,25 @@ mod tests {
     fn props_message_matches_the_real_231_bytes() {
         let r = GmapRules::for_version(ClientVersion::V231);
         let east = crossing_props_message(&r, &cross((0, 0), (1, 0), 0.0, 30.5));
-        assert_eq!(east, [&[0x22, 0x4b, 0x21, 0x6e, 0x20, 0x20][..], b"\n"].concat());
+        assert_eq!(
+            east,
+            [&[0x22, 0x4b, 0x21, 0x6e, 0x20, 0x20][..], b"\n"].concat()
+        );
         let west = crossing_props_message(&r, &cross((1, 0), (0, 0), 63.5, 30.5));
-        assert_eq!(west, [&[0x22, 0x4b, 0x20, 0x6e, 0x2f, 0x90][..], b"\n"].concat());
+        assert_eq!(
+            west,
+            [&[0x22, 0x4b, 0x20, 0x6e, 0x2f, 0x90][..], b"\n"].concat()
+        );
         let south = crossing_props_message(&r, &cross((0, 0), (0, 1), 10.0, 0.0));
-        assert_eq!(south, [&[0x22, 0x4c, 0x21, 0x6f, 0x20, 0x20][..], b"\n"].concat());
+        assert_eq!(
+            south,
+            [&[0x22, 0x4c, 0x21, 0x6f, 0x20, 0x20][..], b"\n"].concat()
+        );
         let north = crossing_props_message(&r, &cross((0, 1), (0, 0), 10.0, 63.5));
-        assert_eq!(north, [&[0x22, 0x4c, 0x20, 0x6f, 0x2f, 0x90][..], b"\n"].concat());
+        assert_eq!(
+            north,
+            [&[0x22, 0x4c, 0x20, 0x6f, 0x2f, 0x90][..], b"\n"].concat()
+        );
     }
 
     /// A profile without precise positions writes the classic X/Y (x2 as a
@@ -1054,7 +1229,10 @@ mod tests {
         let east = crossing_props_message(&r, &cross((0, 0), (1, 0), 0.0, 30.5));
         assert_eq!(east, [&[0x22, 0x2f, 0x20, 0x4b, 0x21][..], b"\n"].concat());
         let west = crossing_props_message(&r, &cross((1, 0), (0, 0), 63.5, 30.5));
-        assert_eq!(west, [&[0x22, 0x2f, 127 + 0x20, 0x4b, 0x20][..], b"\n"].concat());
+        assert_eq!(
+            west,
+            [&[0x22, 0x2f, 127 + 0x20, 0x4b, 0x20][..], b"\n"].concat()
+        );
         let south = crossing_props_message(&r, &cross((0, 0), (0, 1), 10.0, 0.5));
         assert_eq!(south, [&[0x22, 0x30, 0x21, 0x4c, 0x21][..], b"\n"].concat());
     }
@@ -1063,7 +1241,10 @@ mod tests {
     fn diagonal_props_message_writes_the_props_in_id_order() {
         let r = GmapRules::for_version(ClientVersion::V231);
         let m = crossing_props_message(&r, &cross((0, 0), (1, 1), 0.0, 0.0));
-        let ids: Vec<u8> = crate::protocol::parse_player_props(&m[1..m.len() - 1]).iter().map(|p| p.id).collect();
+        let ids: Vec<u8> = crate::protocol::parse_player_props(&m[1..m.len() - 1])
+            .iter()
+            .map(|p| p.id)
+            .collect();
         // Inferred: a diagonal step was never captured; ascending ids is the rule
         // both single-axis captures follow.
         assert_eq!(ids, vec![43, 44, 78, 79]);
@@ -1076,7 +1257,11 @@ mod tests {
         let v = ClientVersion::V231;
         let r = GmapRules::for_version(v);
         let own = v.profile().props.own;
-        for (to, lx, ly) in [((1, 0), 0.0, 30.5), ((0, 1), 12.0, 0.0), ((0, 0), 63.5, 1.5)] {
+        for (to, lx, ly) in [
+            ((1, 0), 0.0, 30.5),
+            ((0, 1), 12.0, 0.0),
+            ((0, 0), 63.5, 1.5),
+        ] {
             let from = if to == (0, 0) { (1, 0) } else { (0, 0) };
             let m = crossing_props_message(&r, &cross(from, to, lx, ly));
             let props = parse_player_props_in(&m[1..m.len() - 1], false, Some(&own));
@@ -1113,10 +1298,15 @@ mod tests {
     #[test]
     fn adjacent_level_message_layout() {
         let m = adjacent_level_message(0, "gm_ne.nw");
-        assert_eq!(m, [&[0x43, 0x20, 0x20, 0x20, 0x20, 0x20][..], b"gm_ne.nw\n"].concat());
+        assert_eq!(
+            m,
+            [&[0x43, 0x20, 0x20, 0x20, 0x20, 0x20][..], b"gm_ne.nw\n"].concat()
+        );
         // A mod time round-trips through the GINT5 reader.
         let m = adjacent_level_message(1_781_284_436, "a.nw");
-        let t = m[1..6].iter().fold(0u64, |a, &c| (a << 7) | (c - 0x20) as u64);
+        let t = m[1..6]
+            .iter()
+            .fold(0u64, |a, &c| (a << 7) | (c - 0x20) as u64);
         assert_eq!(t, 1_781_284_436);
     }
 
@@ -1132,9 +1322,15 @@ mod tests {
         let mut have = HashMap::new();
         have.insert("gm_ne.nw".to_string(), 5);
         assert_eq!(adjacent_requests(&r, &g, (0, 0), &have).len(), 2);
-        let off = GmapRules { adjacent: false, ..r };
+        let off = GmapRules {
+            adjacent: false,
+            ..r
+        };
         assert!(adjacent_requests(&off, &g, (0, 0), &none).is_empty());
-        let disabled = GmapRules { enabled: false, ..r };
+        let disabled = GmapRules {
+            enabled: false,
+            ..r
+        };
         assert!(adjacent_requests(&disabled, &g, (0, 0), &none).is_empty());
     }
 
@@ -1159,7 +1355,11 @@ mod tests {
     }
 
     fn login(net: &mut SessionState) {
-        let p = [&[0x20 + 116, 0x20 + 61, 0x20 + 50, 0x20, 0x20][..], b"g.gmap"].concat();
+        let p = [
+            &[0x20 + 116, 0x20 + 61, 0x20 + 50, 0x20, 0x20][..],
+            b"g.gmap",
+        ]
+        .concat();
         net.apply_body(&[msg(49, &p), msg(6, b"gm_nw.nw"), msg(6, b"g.gmap")].concat());
     }
 
@@ -1173,7 +1373,10 @@ mod tests {
         login(&mut net);
         let mut session = OfflineSession::new();
         let rules = GmapRules::for_version(ClientVersion::V222);
-        let files = Files { grid: None, levels: HashMap::new() };
+        let files = Files {
+            grid: None,
+            levels: HashMap::new(),
+        };
         let mut asked = HashSet::new();
         let r = sync_world(&mut session, &mut net, &rules, &files, &mut asked);
         assert_eq!(r.gmap_file.as_deref(), Some("g.gmap"));
@@ -1188,7 +1391,10 @@ mod tests {
         login(&mut net);
         let mut session = OfflineSession::new();
         let rules = GmapRules::for_version(ClientVersion::V222);
-        let files = Files { grid: Some(TWO_BY_TWO.into()), levels: HashMap::new() };
+        let files = Files {
+            grid: Some(TWO_BY_TWO.into()),
+            levels: HashMap::new(),
+        };
         let mut asked = HashSet::new();
         let r = sync_world(&mut session, &mut net, &rules, &files, &mut asked);
         assert_eq!(r.gmap_local.as_deref(), Some("g.gmap"));
@@ -1203,7 +1409,10 @@ mod tests {
         login(&mut net);
         let mut session = OfflineSession::new();
         let rules = GmapRules::for_version(ClientVersion::V222);
-        let mut files = Files { grid: Some(TWO_BY_TWO.into()), levels: HashMap::new() };
+        let mut files = Files {
+            grid: Some(TWO_BY_TWO.into()),
+            levels: HashMap::new(),
+        };
         files.levels.insert("gm_ne.nw".into(), flat(1));
         let mut asked = HashSet::new();
         let r = sync_world(&mut session, &mut net, &rules, &files, &mut asked);
@@ -1216,14 +1425,24 @@ mod tests {
         // 35 for the three neighbours, once.
         assert_eq!(r.messages.len(), 3);
         assert!(r.messages[0].ends_with(b"gm_sw.nw\n"), "sw, ne, se");
-        assert!(sync_world(&mut session, &mut net, &rules, &files, &mut asked).messages.is_empty());
+        assert!(
+            sync_world(&mut session, &mut net, &rules, &files, &mut asked)
+                .messages
+                .is_empty()
+        );
         // The server's answer for gm_sw (name, board, gmap) fills the gap.
         let mut board = vec![100 + 0x20, 0x20, 64 + 0x20, 2 + 0x20, b'\n', 101 + 0x20];
         board.extend((0..64 * 64).flat_map(|_| 7u16.to_le_bytes()));
         board.push(b'\n');
         net.apply_body(&[msg(6, b"gm_sw.nw"), board, msg(6, b"g.gmap")].concat());
         sync_world(&mut session, &mut net, &rules, &files, &mut asked);
-        let sw = session.gmap.as_ref().unwrap().levels.get(&(0, 1)).expect("built from the server board");
+        let sw = session
+            .gmap
+            .as_ref()
+            .unwrap()
+            .levels
+            .get(&(0, 1))
+            .expect("built from the server board");
         assert_eq!(sw.tile_id_at(5, 5), Some(7));
     }
 
@@ -1239,12 +1458,25 @@ mod tests {
         net.apply_body(&[msg(6, b"gm_ne.nw"), board, msg(6, b"g.gmap")].concat());
         let mut session = OfflineSession::new();
         let rules = GmapRules::for_version(ClientVersion::V222);
-        let mut files = Files { grid: Some(TWO_BY_TWO.into()), levels: HashMap::new() };
+        let mut files = Files {
+            grid: Some(TWO_BY_TWO.into()),
+            levels: HashMap::new(),
+        };
         files.levels.insert("gm_ne.nw".into(), flat(1));
         let mut asked = HashSet::new();
         sync_world(&mut session, &mut net, &rules, &files, &mut asked);
-        let ne = session.gmap.as_ref().unwrap().levels.get(&(1, 0)).expect("gm_ne is drawn");
-        assert_eq!(ne.tile_id_at(5, 5), Some(7), "the server's board, not the local file");
+        let ne = session
+            .gmap
+            .as_ref()
+            .unwrap()
+            .levels
+            .get(&(1, 0))
+            .expect("gm_ne is drawn");
+        assert_eq!(
+            ne.tile_id_at(5, 5),
+            Some(7),
+            "the server's board, not the local file"
+        );
     }
 
     #[test]
@@ -1253,7 +1485,10 @@ mod tests {
         login(&mut net);
         let mut session = OfflineSession::new();
         let rules = GmapRules::for_version(ClientVersion::V231);
-        let mut files = Files { grid: Some(TWO_BY_TWO.into()), levels: HashMap::new() };
+        let mut files = Files {
+            grid: Some(TWO_BY_TWO.into()),
+            levels: HashMap::new(),
+        };
         for n in ["gm_nw.nw", "gm_ne.nw", "gm_sw.nw", "gm_se.nw"] {
             files.levels.insert(n.into(), flat(2));
         }
@@ -1271,7 +1506,11 @@ mod tests {
         assert_eq!(net.current_level_name().as_deref(), Some("gm_ne.nw"));
         let w = session.gmap.as_ref().unwrap();
         assert_eq!(w.cell, (1, 0));
-        assert!(w.levels.contains_key(&(0, 0)) && w.levels.contains_key(&(0, 1)) && w.levels.contains_key(&(1, 1)));
+        assert!(
+            w.levels.contains_key(&(0, 0))
+                && w.levels.contains_key(&(0, 1))
+                && w.levels.contains_key(&(1, 1))
+        );
         assert_eq!(w.levels.len(), 3);
     }
 
@@ -1280,16 +1519,25 @@ mod tests {
         let mut net = SessionState::for_version(ClientVersion::V222);
         login(&mut net);
         let mut session = OfflineSession::new();
-        let files = Files { grid: Some(TWO_BY_TWO.into()), levels: HashMap::new() };
+        let files = Files {
+            grid: Some(TWO_BY_TWO.into()),
+            levels: HashMap::new(),
+        };
         let mut asked = HashSet::new();
         let rules = GmapRules::for_version(ClientVersion::V222);
         sync_world(&mut session, &mut net, &rules, &files, &mut asked);
         assert!(session.gmap.is_some());
-        let off = GmapRules { enabled: false, ..rules };
+        let off = GmapRules {
+            enabled: false,
+            ..rules
+        };
         sync_world(&mut session, &mut net, &off, &files, &mut asked);
         assert!(session.gmap.is_none());
         sync_world(&mut session, &mut net, &rules, &files, &mut asked);
-        net.apply_body(&msg(49, &[&[0x20 + 2, 0x20 + 4, 0x20 + 50, 0x20, 0x20][..], b"b.nw"].concat()));
+        net.apply_body(&msg(
+            49,
+            &[&[0x20 + 2, 0x20 + 4, 0x20 + 50, 0x20, 0x20][..], b"b.nw"].concat(),
+        ));
         sync_world(&mut session, &mut net, &rules, &files, &mut asked);
         assert!(session.gmap.is_none(), "a plain 49 leaves the gmap");
     }
@@ -1301,7 +1549,10 @@ mod tests {
         login(&mut net);
         let mut session = OfflineSession::new();
         let rules = GmapRules::for_version(ClientVersion::V222);
-        let mut files = Files { grid: Some(TWO_BY_TWO.into()), levels: HashMap::new() };
+        let mut files = Files {
+            grid: Some(TWO_BY_TWO.into()),
+            levels: HashMap::new(),
+        };
         files.levels.insert("gm_ne.nw".into(), flat(1));
         session.current_level = Some(flat(1));
         let mut asked = HashSet::new();
@@ -1316,9 +1567,19 @@ mod tests {
         net.apply_body(&[block(0), block(1)].concat());
         apply_board_mods(&mut session, &mut net);
         let own = session.current_level.as_ref().unwrap();
-        assert_eq!((own.tile_id_at(61, 2), own.tile_id_at(62, 2), own.tile_id_at(63, 2)), (Some(1), Some(9), Some(9)));
+        assert_eq!(
+            (
+                own.tile_id_at(61, 2),
+                own.tile_id_at(62, 2),
+                own.tile_id_at(63, 2)
+            ),
+            (Some(1), Some(9), Some(9))
+        );
         let ne = session.gmap.as_ref().unwrap().levels.get(&(1, 0)).unwrap();
-        assert_eq!((ne.tile_id_at(62, 2), ne.tile_id_at(0, 3)), (Some(9), Some(1)));
+        assert_eq!(
+            (ne.tile_id_at(62, 2), ne.tile_id_at(0, 3)),
+            (Some(9), Some(1))
+        );
     }
 
     /// A 49 whose cell is outside the grid is clamped to it, as the real
@@ -1326,11 +1587,18 @@ mod tests {
     #[test]
     fn a_cell_outside_the_grid_is_clamped() {
         let mut net = SessionState::for_version(ClientVersion::V222);
-        let p = [&[0x20 + 116, 0x20 + 61, 0x20 + 50, 0x20 + 5, 0x20 + 9][..], b"g.gmap"].concat();
+        let p = [
+            &[0x20 + 116, 0x20 + 61, 0x20 + 50, 0x20 + 5, 0x20 + 9][..],
+            b"g.gmap",
+        ]
+        .concat();
         net.apply_body(&[msg(49, &p), msg(6, b"gm_se.nw"), msg(6, b"g.gmap")].concat());
         let mut session = OfflineSession::new();
         let rules = GmapRules::for_version(ClientVersion::V222);
-        let files = Files { grid: Some(TWO_BY_TWO.into()), levels: HashMap::new() };
+        let files = Files {
+            grid: Some(TWO_BY_TWO.into()),
+            levels: HashMap::new(),
+        };
         sync_world(&mut session, &mut net, &rules, &files, &mut HashSet::new());
         assert_eq!(net.gmap.as_ref().unwrap().cell, (1, 1));
         assert_eq!(session.gmap.as_ref().unwrap().cell, (1, 1));

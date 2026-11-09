@@ -34,13 +34,17 @@ pub const DARTS: u8 = 4;
 pub const HEART: u8 = 5;
 
 /// The sprite each item is drawn with (2.05 rev 2 table).
-pub const ITEM_SPRITES: [u16; 25] =
-    [136, 137, 138, 67, 143, 139, 145, 351, 65, 350, 314, 315, 321, 323, 322, 324, 325, 328, 329, 330, 331, 332, 333, 334, 349];
+pub const ITEM_SPRITES: [u16; 25] = [
+    136, 137, 138, 67, 143, 139, 145, 351, 65, 350, 314, 315, 321, 323, 322, 324, 325, 328, 329,
+    330, 331, 332, 333, 334, 349,
+];
 
 /// Items that lie on the floor as a pickup (2.05 rev 2 table). The others
 /// (weapons, swords, shields) are not put down by `PLO_ITEMADD`.
-pub const FLOOR_ITEMS: [bool; 25] =
-    [true, true, true, true, true, true, false, true, true, false, false, false, false, false, false, false, false, false, false, true, false, false, false, false, true];
+pub const FLOOR_ITEMS: [bool; 25] = [
+    true, true, true, true, true, true, false, true, true, false, false, false, false, false,
+    false, false, false, false, false, true, false, false, false, false, true,
+];
 
 /// Delphi's `Random`, which the 1.x clients roll drops with: a 32-bit
 /// linear congruential generator, `seed = seed * 0x08088405 + 1`, and
@@ -57,7 +61,10 @@ impl DelphiRandom {
 
     /// Seeded from the clock, as `Randomize` does.
     pub fn from_clock() -> Self {
-        let ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u32).unwrap_or(0);
+        let ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u32)
+            .unwrap_or(0);
         Self::new(ms)
     }
 
@@ -111,7 +118,12 @@ pub enum ItemEvent {
 
 impl FloorItem {
     pub fn new(item: u8, x: f32, y: f32) -> Self {
-        Self { item, x, y, life: ITEM_LIFE }
+        Self {
+            item,
+            x,
+            y,
+            life: ITEM_LIFE,
+        }
     }
 
     /// The sprite it is drawn with.
@@ -141,7 +153,9 @@ impl FloorItem {
     /// item's middle `(x + 1, y + 1)`, measured from `(px + 1.5, py + 2)`,
     /// and not in its first ticks.
     pub fn taken_by(&self, px: f32, py: f32) -> bool {
-        self.life < TAKE_BELOW && ((px + 1.5) - (self.x + 1.0)).abs() < 2.0 && ((py + 2.0) - (self.y + 1.0)).abs() < 2.0
+        self.life < TAKE_BELOW
+            && ((px + 1.5) - (self.x + 1.0)).abs() < 2.0
+            && ((py + 2.0) - (self.y + 1.0)).abs() < 2.0
     }
 }
 
@@ -153,7 +167,11 @@ pub fn tick(items: &mut Vec<FloorItem>, px: f32, py: f32, can_take: bool) -> Vec
     items.retain_mut(|it| {
         it.life -= 1;
         if can_take && it.taken_by(px, py) {
-            out.push(ItemEvent::Taken { item: it.item, x: it.x, y: it.y });
+            out.push(ItemEvent::Taken {
+                item: it.item,
+                x: it.x,
+                y: it.y,
+            });
             return false;
         }
         if it.life < 0 {
@@ -168,18 +186,27 @@ pub fn tick(items: &mut Vec<FloorItem>, px: f32, py: f32, can_take: bool) -> Vec
 /// `PLO_ITEMADD` (22): `GCHAR x*2, GCHAR y*2, GCHAR item`. Only floor items
 /// are kept, as the 2.05 handler does.
 pub fn parse_item_add(payload: &[u8]) -> Option<FloorItem> {
-    let [x, y, item, ..] = payload else { return None };
+    let [x, y, item, ..] = payload else {
+        return None;
+    };
     let item = item.wrapping_sub(0x20);
     if !FLOOR_ITEMS.get(usize::from(item)).copied().unwrap_or(false) {
         return None;
     }
-    Some(FloorItem::new(item, f32::from(x.wrapping_sub(0x20)) / 2.0, f32::from(y.wrapping_sub(0x20)) / 2.0))
+    Some(FloorItem::new(
+        item,
+        f32::from(x.wrapping_sub(0x20)) / 2.0,
+        f32::from(y.wrapping_sub(0x20)) / 2.0,
+    ))
 }
 
 /// `PLO_ITEMDEL` (23): `GCHAR x*2, GCHAR y*2`.
 pub fn parse_item_del(payload: &[u8]) -> Option<(f32, f32)> {
     let [x, y, ..] = payload else { return None };
-    Some((f32::from(x.wrapping_sub(0x20)) / 2.0, f32::from(y.wrapping_sub(0x20)) / 2.0))
+    Some((
+        f32::from(x.wrapping_sub(0x20)) / 2.0,
+        f32::from(y.wrapping_sub(0x20)) / 2.0,
+    ))
 }
 
 fn half(v: f32) -> u8 {
@@ -224,7 +251,11 @@ mod tests {
             }
             c
         });
-        assert_eq!(counts, [25, 2, 0, 5, 0, 5], "green 25 %, blue 2 %, bombs 5 %, heart 5 %, never red or arrows");
+        assert_eq!(
+            counts,
+            [25, 2, 0, 5, 0, 5],
+            "green 25 %, blue 2 %, bombs 5 %, heart 5 %, never red or arrows"
+        );
         assert_eq!(bush_drop(37), None);
     }
 
@@ -244,7 +275,10 @@ mod tests {
         for _ in 0..164 {
             assert!(tick(&mut v, 40.0, 40.0, true).is_empty());
         }
-        assert_eq!(tick(&mut v, 40.0, 40.0, true), vec![ItemEvent::Expired { x: 10.0, y: 10.0 }]);
+        assert_eq!(
+            tick(&mut v, 40.0, 40.0, true),
+            vec![ItemEvent::Expired { x: 10.0, y: 10.0 }]
+        );
         assert!(v.is_empty());
     }
 
@@ -253,10 +287,23 @@ mod tests {
         let mut v = vec![FloorItem::new(HEART, 31.0, 34.0)];
         // Standing on it: (30, 33.5) has its test point at (31.5, 35.5).
         for _ in 0..4 {
-            assert!(tick(&mut v, 30.0, 33.5, true).is_empty(), "not in the first four ticks");
+            assert!(
+                tick(&mut v, 30.0, 33.5, true).is_empty(),
+                "not in the first four ticks"
+            );
         }
-        assert_eq!(tick(&mut v, 30.0, 33.5, true), vec![ItemEvent::Taken { item: HEART, x: 31.0, y: 34.0 }]);
-        let it = FloorItem { life: 100, ..FloorItem::new(HEART, 31.0, 34.0) };
+        assert_eq!(
+            tick(&mut v, 30.0, 33.5, true),
+            vec![ItemEvent::Taken {
+                item: HEART,
+                x: 31.0,
+                y: 34.0
+            }]
+        );
+        let it = FloorItem {
+            life: 100,
+            ..FloorItem::new(HEART, 31.0, 34.0)
+        };
         // The test point (px + 1.5, py + 2) against the middle (32, 35).
         assert!(it.taken_by(30.0, 31.1), "1.9 tiles above");
         assert!(!it.taken_by(30.0, 31.0), "2 tiles is out");
@@ -286,8 +333,15 @@ mod tests {
     #[test]
     fn server_items_and_the_messages_match_the_lab_capture() {
         // 2.05 against GServer-v2: S>C 22 `^d"` is a red rupee at (31, 34).
-        assert_eq!(parse_item_add(b"^d\""), Some(FloorItem::new(REDRUPEE, 31.0, 34.0)));
-        assert_eq!(parse_item_add(&[0x20, 0x20, 0x20 + 9]), None, "a shield is not a floor item");
+        assert_eq!(
+            parse_item_add(b"^d\""),
+            Some(FloorItem::new(REDRUPEE, 31.0, 34.0))
+        );
+        assert_eq!(
+            parse_item_add(&[0x20, 0x20, 0x20 + 9]),
+            None,
+            "a shield is not a floor item"
+        );
         assert_eq!(parse_item_del(b"^d"), Some((31.0, 34.0)));
         // The pickup that followed: C>S 32 `^d!`; the timeout: C>S 13 `^d`.
         assert_eq!(item_take_message(BLUERUPEE, 31.0, 34.0), b"@^d!\n");

@@ -35,7 +35,10 @@ pub fn parse(src: &str, era: Era) -> Script {
             }
         }
     }
-    Script { body, diagnostics: p.diags }
+    Script {
+        body,
+        diagnostics: p.diags,
+    }
 }
 
 /// Parse one expression (the inside of `#v(...)`). `None` if it is not
@@ -78,7 +81,15 @@ impl<'a> Parser<'a> {
                 _ => after_function = false,
             }
         }
-        Parser { lx: Lexer::new(src), peeked: None, era, diags: Vec::new(), depth: 0, len: src.len(), funcs }
+        Parser {
+            lx: Lexer::new(src),
+            peeked: None,
+            era,
+            diags: Vec::new(),
+            depth: 0,
+            len: src.len(),
+            funcs,
+        }
     }
 
     fn peek(&mut self) -> &Spanned {
@@ -120,7 +131,10 @@ impl<'a> Parser<'a> {
 
     fn diag(&mut self, msg: &str) {
         let line = self.line();
-        self.diags.push(Diag { line, msg: msg.to_string() });
+        self.diags.push(Diag {
+            line,
+            msg: msg.to_string(),
+        });
     }
 
     fn is_op(&mut self, op: &str) -> bool {
@@ -275,14 +289,18 @@ impl<'a> Parser<'a> {
                 self.expect_op(")");
                 let then = Box::new(self.stmt().unwrap_or(Stmt::Block(Vec::new())));
                 self.skip_semis_before_else();
-                let els = if matches!(&self.peek().tok, Tok::Ident(e) if e == "else" || e == "elseif") {
+                let els = if matches!(&self.peek().tok, Tok::Ident(e) if e == "else" || e == "elseif")
+                {
                     let is_elseif = matches!(&self.peek().tok, Tok::Ident(e) if e == "elseif");
                     self.next();
                     if is_elseif {
                         // `elseif` is `else if`: the client matches command
                         // names by prefix, as with `hurt1`.
                         let t = self.peek().clone();
-                        Some(Box::new(self.ident_stmt("if".into(), t.line, t.start).unwrap_or(Stmt::Block(Vec::new()))))
+                        Some(Box::new(
+                            self.ident_stmt("if".into(), t.line, t.start)
+                                .unwrap_or(Stmt::Block(Vec::new())),
+                        ))
                     } else {
                         Some(Box::new(self.stmt().unwrap_or(Stmt::Block(Vec::new()))))
                     }
@@ -308,14 +326,23 @@ impl<'a> Parser<'a> {
                 }
                 let init = self.simple_stmt().map(Box::new);
                 self.expect_op(";");
-                let cond = if self.is_op(";") { None } else { Some(self.expr()) };
+                let cond = if self.is_op(";") {
+                    None
+                } else {
+                    Some(self.expr())
+                };
                 self.expect_op(";");
                 let step = self.simple_stmt().map(Box::new);
                 // `for (i=0;i<3;i++;)`: a `;` after the step is let through.
                 self.eat_op(";");
                 self.expect_op(")");
                 let body = Box::new(self.stmt().unwrap_or(Stmt::Block(Vec::new())));
-                Some(Stmt::For { init, cond, step, body })
+                Some(Stmt::For {
+                    init,
+                    cond,
+                    step,
+                    body,
+                })
             }
             "function" => {
                 let name = match self.peek().tok.clone() {
@@ -349,7 +376,11 @@ impl<'a> Parser<'a> {
                 Some(Stmt::Function { name, params, body })
             }
             "return" => {
-                let v = if self.at_stmt_end() { None } else { Some(self.expr()) };
+                let v = if self.at_stmt_end() {
+                    None
+                } else {
+                    Some(self.expr())
+                };
                 self.end_stmt();
                 Some(Stmt::Return(v))
             }
@@ -361,7 +392,11 @@ impl<'a> Parser<'a> {
                     self.next();
                 }
                 self.end_stmt();
-                Some(if w == "break" { Stmt::Break } else { Stmt::Continue })
+                Some(if w == "break" {
+                    Stmt::Break
+                } else {
+                    Stmt::Continue
+                })
             }
             "elseif" => {
                 // `elseif` at statement start is an `if`.
@@ -372,7 +407,11 @@ impl<'a> Parser<'a> {
                 let cond = self.expr();
                 self.expect_op(")");
                 let then = Box::new(self.stmt().unwrap_or(Stmt::Block(Vec::new())));
-                Some(Stmt::If { cond, then, els: None })
+                Some(Stmt::If {
+                    cond,
+                    then,
+                    els: None,
+                })
             }
             // `with (target) body`: from the 2.1 clients (the word first
             // appears in 2.17) and the NPC server.
@@ -396,7 +435,10 @@ impl<'a> Parser<'a> {
     /// command, an assignment, a call, or something unknown.
     fn name_stmt(&mut self, w: String, line: u32, start: usize) -> Option<Stmt> {
         let nxt = self.peek().tok.clone();
-        let assigns = matches!(nxt, Tok::Op("=" | ":=" | "+=" | "-=" | "*=" | "/=" | "++" | "--" | "["));
+        let assigns = matches!(
+            nxt,
+            Tok::Op("=" | ":=" | "+=" | "-=" | "*=" | "/=" | "++" | "--" | "[")
+        );
         let paren = matches!(nxt, Tok::Op("("));
         // `name(...)` calls the script's own function of that name, even
         // one named like a command (`move();`, `hurt();` in baddy scripts).
@@ -409,7 +451,11 @@ impl<'a> Parser<'a> {
                     self.next();
                     self.next();
                     self.end_stmt();
-                    return Some(Stmt::Command { name: cmd.name.to_string(), args: Vec::new(), line });
+                    return Some(Stmt::Command {
+                        name: cmd.name.to_string(),
+                        args: Vec::new(),
+                        line,
+                    });
                 }
                 return Some(self.command(cmd, line));
             }
@@ -419,7 +465,13 @@ impl<'a> Parser<'a> {
             let s = self.assign_tail(target);
             // `this.a = {1,2,3}` with no `;` after the `}` (the hookshot
             // and Q-menu weapons): the list's `}` ends the statement.
-            let list = matches!(&s, Stmt::Assign { value: Expr::List(_), .. });
+            let list = matches!(
+                &s,
+                Stmt::Assign {
+                    value: Expr::List(_),
+                    ..
+                }
+            );
             if !(list && !self.is_op(";")) {
                 self.end_stmt();
             }
@@ -453,8 +505,17 @@ impl<'a> Parser<'a> {
         self.unpeek();
         let raw = self.lx.raw_arg_braced(b";}");
         self.end_stmt();
-        let reason = if vocab::command(&w).is_some() { "not available in this version" } else { "unknown command" };
-        Some(Stmt::Unknown { name: w, raw, reason, line })
+        let reason = if vocab::command(&w).is_some() {
+            "not available in this version"
+        } else {
+            "unknown command"
+        };
+        Some(Stmt::Unknown {
+            name: w,
+            raw,
+            reason,
+            line,
+        })
     }
 
     /// The longest command in this era that `w` starts with, if what
@@ -497,7 +558,11 @@ impl<'a> Parser<'a> {
             }
         }
         self.end_stmt();
-        Stmt::Command { name: cmd.name.to_string(), args, line }
+        Stmt::Command {
+            name: cmd.name.to_string(),
+            args,
+            line,
+        }
     }
 
     /// A number argument. For `D C I B L` a bare name from the matching
@@ -552,7 +617,10 @@ impl<'a> Parser<'a> {
             }
             Tok::Op("--") => {
                 self.next();
-                return Stmt::IncDec { target, delta: -1.0 };
+                return Stmt::IncDec {
+                    target,
+                    delta: -1.0,
+                };
             }
             _ => {
                 self.diag("expected an assignment");
@@ -590,7 +658,11 @@ impl<'a> Parser<'a> {
             let then = self.expr();
             self.expect_op(":");
             let els = self.expr();
-            e = Expr::Cond { cond: Box::new(e), then: Box::new(then), els: Box::new(els) };
+            e = Expr::Cond {
+                cond: Box::new(e),
+                then: Box::new(then),
+                els: Box::new(els),
+            };
         }
         self.leave();
         e
@@ -685,8 +757,16 @@ impl<'a> Parser<'a> {
             self.next();
             if self.is_op("|") {
                 if let Expr::InRange { e, lo, hi } = self.in_tail(second) {
-                    let a = Expr::InRange { e: Box::new(first.clone()), lo: lo.clone(), hi: hi.clone() };
-                    return Some(Expr::Bin(BinOp::And, Box::new(a), Box::new(Expr::InRange { e, lo, hi })));
+                    let a = Expr::InRange {
+                        e: Box::new(first.clone()),
+                        lo: lo.clone(),
+                        hi: hi.clone(),
+                    };
+                    return Some(Expr::Bin(
+                        BinOp::And,
+                        Box::new(a),
+                        Box::new(Expr::InRange { e, lo, hi }),
+                    ));
                 }
             }
         }
@@ -733,7 +813,10 @@ impl<'a> Parser<'a> {
             Expr::InArray { e, name }
         } else {
             self.diag("`in` needs |lo,hi| or {list}");
-            Expr::InList { e, list: Vec::new() }
+            Expr::InList {
+                e,
+                list: Vec::new(),
+            }
         }
     }
 
@@ -782,7 +865,11 @@ impl<'a> Parser<'a> {
                 let mut list = Vec::new();
                 while !self.is_op("}") && !matches!(self.peek().tok, Tok::Eof) {
                     // `{0x2, ,0x2A5}`: an empty entry is 0 and keeps its place.
-                    list.push(if self.is_op(",") { Expr::Num(0.0) } else { self.expr() });
+                    list.push(if self.is_op(",") {
+                        Expr::Num(0.0)
+                    } else {
+                        self.expr()
+                    });
                     if !self.eat_op(",") {
                         break;
                     }
@@ -815,7 +902,10 @@ impl<'a> Parser<'a> {
     /// arguments raw.
     fn call_args(&mut self, name: &str) -> Vec<Expr> {
         self.next(); // `(`
-        let kinds: &[ArgKind] = vocab::BUILTINS.iter().find(|b| b.name == name).map_or(&[], |b| b.args);
+        let kinds: &[ArgKind] = vocab::BUILTINS
+            .iter()
+            .find(|b| b.name == name)
+            .map_or(&[], |b| b.args);
         let mut args = Vec::new();
         if self.eat_op(")") {
             return args;
@@ -851,13 +941,23 @@ const SCOPES: &[&str] = &["this.", "client.", "server.", "level.", "local."];
 /// A text argument of a built-in: a plain scope-prefixed variable is read
 /// as that variable; anything else is text.
 fn text_arg(raw: &str, quoted: bool, era: Era) -> Expr {
-    let plain_name = |s: &str| s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.');
+    let plain_name = |s: &str| {
+        s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+    };
     let lower = raw.to_ascii_lowercase();
     if !quoted && SCOPES.iter().any(|s| lower.starts_with(s)) && plain_name(&lower) {
-        return Expr::Var(VarRef { name: lower, index: Vec::new() });
+        return Expr::Var(VarRef {
+            name: lower,
+            index: Vec::new(),
+        });
     }
     // `this.a[3]` indexed form.
-    if !quoted && SCOPES.iter().any(|s| lower.starts_with(s)) && lower.ends_with(']') && lower.contains('[') {
+    if !quoted
+        && SCOPES.iter().any(|s| lower.starts_with(s))
+        && lower.ends_with(']')
+        && lower.contains('[')
+    {
         let mut p = Parser::new(&lower, era);
         let e = p.primary();
         if p.diags.is_empty() {
@@ -887,7 +987,9 @@ mod tests {
         // 2gta's *Quiver weapon, line 322.
         let s = g("if (a>4) b=a-4;;\nelse b=0;");
         assert_eq!(s, g("if (a>4) b=a-4; else b=0;"));
-        assert!(parse("if (a) b=1;; else b=2;", Era::V205).diagnostics.is_empty());
+        assert!(parse("if (a) b=1;; else b=2;", Era::V205)
+            .diagnostics
+            .is_empty());
     }
 
     #[test]
@@ -902,17 +1004,32 @@ mod tests {
 
     #[test]
     fn text_arguments_are_raw_and_split_on_commas() {
-        assert_eq!(g("message Hello, world :);"), "(cmd message \"Hello, world :)\")\n");
-        assert_eq!(g("setplayerprop #c,Hi #v(this.n) there;"), "(cmd setplayerprop \"#c\" \"Hi #v(this.n) there\")\n");
-        assert_eq!(g("message \"quoted, text\";"), "(cmd message \"quoted, text\")\n");
+        assert_eq!(
+            g("message Hello, world :);"),
+            "(cmd message \"Hello, world :)\")\n"
+        );
+        assert_eq!(
+            g("setplayerprop #c,Hi #v(this.n) there;"),
+            "(cmd setplayerprop \"#c\" \"Hi #v(this.n) there\")\n"
+        );
+        assert_eq!(
+            g("message \"quoted, text\";"),
+            "(cmd message \"quoted, text\")\n"
+        );
     }
 
     #[test]
     fn precedence_and_associativity() {
         assert_eq!(g("x = 1 + 2 * 3;"), "(= x (+ 1 (* 2 3)))\n");
         // Chained index and no-space if.
-        assert_eq!(g("if(npcs[this.i].save[5]==38) x=1;"), "(if (== (idx npcs.save this.i 5) 38) (= x 1))\n");
-        assert_eq!(g("if (this.i>0&&players[this.i].hearts>0) x=1;"), "(if (&& (> this.i 0) (> (idx players.hearts this.i) 0)) (= x 1))\n");
+        assert_eq!(
+            g("if(npcs[this.i].save[5]==38) x=1;"),
+            "(if (== (idx npcs.save this.i 5) 38) (= x 1))\n"
+        );
+        assert_eq!(
+            g("if (this.i>0&&players[this.i].hearts>0) x=1;"),
+            "(if (&& (> this.i 0) (> (idx players.hearts this.i) 0)) (= x 1))\n"
+        );
         assert_eq!(g("x = (1 + 2) * 3;"), "(= x (* (+ 1 2) 3))\n");
         assert_eq!(g("x = 2 ^ 3 ^ 2;"), "(= x (^ 2 (^ 3 2)))\n");
         assert_eq!(g("x = a < b && c || d;"), "(= x (|| (&& (< a b) c) d))\n");
@@ -930,16 +1047,28 @@ mod tests {
 
     #[test]
     fn arrays_and_indices() {
-        assert_eq!(g("this.a[3] = 7; board[x,y] = 1; setarray this.list,5;"), "(= (idx this.a 3) 7)\n(= (idx board x y) 1)\n(cmd setarray \"this.list\" 5)\n");
+        assert_eq!(
+            g("this.a[3] = 7; board[x,y] = 1; setarray this.list,5;"),
+            "(= (idx this.a 3) 7)\n(= (idx board x y) 1)\n(cmd setarray \"this.list\" 5)\n"
+        );
         assert_eq!(g("x = this.a[i+1];"), "(= x (idx this.a (+ i 1)))\n");
     }
 
     #[test]
     fn control_flow() {
-        assert_eq!(g("if (a) hide; else show;"), "(if a (cmd hide) (cmd show))\n");
-        assert_eq!(g("if (a) { x=1; } else if (b) { x=2; } else { x=3; }"), "(if a (block (= x 1)) (if b (block (= x 2)) (block (= x 3))))\n");
+        assert_eq!(
+            g("if (a) hide; else show;"),
+            "(if a (cmd hide) (cmd show))\n"
+        );
+        assert_eq!(
+            g("if (a) { x=1; } else if (b) { x=2; } else { x=3; }"),
+            "(if a (block (= x 1)) (if b (block (= x 2)) (block (= x 3))))\n"
+        );
         assert_eq!(g("while (i < 3) i++;"), "(while (< i 3) (++ i))\n");
-        assert_eq!(g("for (i = 0; i < 3; i++) { x += i; }"), "(for (= i 0) (< i 3) (++ i) (block (+= x i)))\n");
+        assert_eq!(
+            g("for (i = 0; i < 3; i++) { x += i; }"),
+            "(for (= i 0) (< i 3) (++ i) (block (+= x i)))\n"
+        );
         assert_eq!(g("for (;;) break;"), "(for _ _ _ (break))\n");
     }
 
@@ -954,26 +1083,50 @@ mod tests {
 
     #[test]
     fn in_ranges_and_lists() {
-        assert_eq!(g("if (x in |0,64|) hide;"), "(if (in x range 0 64) (cmd hide))\n");
-        assert_eq!(g("if (2 in {1,2,3}) hide;"), "(if (in 2 list 1 2 3) (cmd hide))\n");
+        assert_eq!(
+            g("if (x in |0,64|) hide;"),
+            "(if (in x range 0 64) (cmd hide))\n"
+        );
+        assert_eq!(
+            g("if (2 in {1,2,3}) hide;"),
+            "(if (in 2 list 1 2 3) (cmd hide))\n"
+        );
         // Closed with `>`.
-        assert_eq!(g("if (x in |1,5>) hide;"), "(if (in x range 1 5) (cmd hide))\n");
-        assert_eq!(g("if (x in |a,b+1> && y) hide;"), "(if (&& (in x range a (+ b 1)) y) (cmd hide))\n");
+        assert_eq!(
+            g("if (x in |1,5>) hide;"),
+            "(if (in x range 1 5) (cmd hide))\n"
+        );
+        assert_eq!(
+            g("if (x in |a,b+1> && y) hide;"),
+            "(if (&& (in x range a (+ b 1)) y) (cmd hide))\n"
+        );
         // A list inside a larger condition.
-        assert_eq!(g("if (a==1 && x in {1,2}) hide;"), "(if (&& (== a 1) (in x list 1 2)) (cmd hide))\n");
+        assert_eq!(
+            g("if (a==1 && x in {1,2}) hide;"),
+            "(if (&& (== a 1) (in x list 1 2)) (cmd hide))\n"
+        );
     }
 
     #[test]
     fn forms_from_2_1() {
         assert_eq!(g("this.a = {1, x+1};"), "(= this.a (list 1 (+ x 1)))\n");
         assert_eq!(g("x = (a>1)?2:3;"), "(= x (? (> a 1) 2 3))\n");
-        assert_eq!(g("changeimgvis 300+i,(i==0)?4:5;"), "(cmd changeimgvis (+ 300 i) (? (== i 0) 4 5))\n");
-        assert_eq!(g("with (getnpc(db)) { x = 1; }"), "(with (call getnpc \"db\") (block (= x 1)))\n");
+        assert_eq!(
+            g("changeimgvis 300+i,(i==0)?4:5;"),
+            "(cmd changeimgvis (+ 300 i) (? (== i 0) 4 5))\n"
+        );
+        assert_eq!(
+            g("with (getnpc(db)) { x = 1; }"),
+            "(with (call getnpc \"db\") (block (= x 1)))\n"
+        );
         // An empty number argument is 0, in every version.
         assert_eq!(g("seteffect ,,,;"), "(cmd seteffect 0 0 0)\n");
         assert!(parse("seteffect ,,,;", Era::V205).diagnostics.is_empty());
         // A code with digits keeps its argument whole inside a call.
-        assert_eq!(g("x = strtofloat(#P1(-1));"), "(= x (call strtofloat \"#P1(-1)\"))\n");
+        assert_eq!(
+            g("x = strtofloat(#P1(-1));"),
+            "(= x (call strtofloat \"#P1(-1)\"))\n"
+        );
     }
 
     #[test]
@@ -989,7 +1142,10 @@ mod tests {
         assert_eq!(g("players[i].x = 3;"), "(= (idx players.x i) 3)\n");
         // The 2.05 comparison table's other spellings.
         assert_eq!(g("if (a <> b) hide;"), "(if (!= a b) (cmd hide))\n");
-        assert_eq!(g("if (a => b && c =< d) hide;"), "(if (&& (>= a b) (<= c d)) (cmd hide))\n");
+        assert_eq!(
+            g("if (a => b && c =< d) hide;"),
+            "(if (&& (>= a b) (<= c d)) (cmd hide))\n"
+        );
     }
 
     #[test]
@@ -997,35 +1153,78 @@ mod tests {
         // A command with empty parentheses is the command; a script's own
         // function of that name is called instead.
         assert_eq!(g("hideimgs();"), "(cmd hideimgs)\n");
-        assert_eq!(g("function move() { x = 1; }\nmove();"), "(fn move () (= x 1))\n(call move)\n");
-        assert_eq!(g("move();\nfunction move() { }"), "(call move)\n(fn move ())\n");
+        assert_eq!(
+            g("function move() { x = 1; }\nmove();"),
+            "(fn move () (= x 1))\n(call move)\n"
+        );
+        assert_eq!(
+            g("move();\nfunction move() { }"),
+            "(call move)\n(fn move ())\n"
+        );
         // `in <lo,hi>` (2.1 and later), the same range as `|lo,hi|`.
-        assert_eq!(g("if (x in <1,a+2> && y) hide;"), "(if (&& (in x range 1 (+ a 2)) y) (cmd hide))\n");
-        assert!(!parse("if (x in <1,2>) hide;", Era::V205).diagnostics.is_empty());
+        assert_eq!(
+            g("if (x in <1,a+2> && y) hide;"),
+            "(if (&& (in x range 1 (+ a 2)) y) (cmd hide))\n"
+        );
+        assert!(!parse("if (x in <1,2>) hide;", Era::V205)
+            .diagnostics
+            .is_empty());
         // Empty entries of a list keep their place; a list's `}` ends its
         // statement.
         assert_eq!(g("a = {1, ,2};"), "(= a (list 1 0 2))\n");
-        assert_eq!(g("a = {1,2}\nfunction f() { }"), "(= a (list 1 2))\n(fn f ())\n");
+        assert_eq!(
+            g("a = {1,2}\nfunction f() { }"),
+            "(= a (list 1 2))\n(fn f ())\n"
+        );
         // An empty argument of a call is 0; a last text argument keeps its commas.
-        assert_eq!(g("w = textwidth(1,arial,,x);"), "(= w (call textwidth 1 arial 0 x))\n");
-        assert_eq!(g("if (playersays(0,buy tank1)) hide;"), "(if (call playersays \"0,buy tank1\") (cmd hide))\n");
+        assert_eq!(
+            g("w = textwidth(1,arial,,x);"),
+            "(= w (call textwidth 1 arial 0 x))\n"
+        );
+        assert_eq!(
+            g("if (playersays(0,buy tank1)) hide;"),
+            "(if (call playersays \"0,buy tank1\") (cmd hide))\n"
+        );
         // `with` targets read their name as text.
-        assert_eq!(g("with (getnpc(House-Control#v(h))) { }"), "(with (call getnpc \"House-Control#v(h)\") (block))\n");
+        assert_eq!(
+            g("with (getnpc(House-Control#v(h))) { }"),
+            "(with (call getnpc \"House-Control#v(h)\") (block))\n"
+        );
         // `a ++ b` between two values.
         assert_eq!(g("x = 300++i;"), "(= x (+ 300 i))\n");
         // A comma inside plain parentheses stays in the text.
-        assert_eq!(g("showimg 5,@a@#s(l) (#v(x), #v(y)),1,2;"), "(cmd showimg 5 \"@a@#s(l) (#v(x), #v(y))\" 1 2)\n");
+        assert_eq!(
+            g("showimg 5,@a@#s(l) (#v(x), #v(y)),1,2;"),
+            "(cmd showimg 5 \"@a@#s(l) (#v(x), #v(y))\" 1 2)\n"
+        );
         // An unknown command whose text starts with `(`.
-        assert!(parse("addguildmember (g),#t(1),#t(2);", Era::V21).diagnostics.is_empty());
+        assert!(parse("addguildmember (g),#t(1),#t(2);", Era::V21)
+            .diagnostics
+            .is_empty());
     }
 
     #[test]
     fn builtin_text_arguments() {
-        assert_eq!(g("if (strequals(#c,hello)) hide;"), "(if (call strequals \"#c\" \"hello\") (cmd hide))\n");
-        assert_eq!(g("if (strequals(this.mode,fight)) hide;"), "(if (call strequals this.mode \"fight\") (cmd hide))\n");
-        assert_eq!(g("if (strequals(\"this.mode\",x)) hide;"), "(if (call strequals \"this.mode\" \"x\") (cmd hide))\n");
-        assert_eq!(g("x = strlen(#v(this.a));"), "(= x (call strlen \"#v(this.a)\"))\n");
-        assert_eq!(g("x = random(1, 6) + abs(-2);"), "(= x (+ (call random 1 6) (call abs -2)))\n");
+        assert_eq!(
+            g("if (strequals(#c,hello)) hide;"),
+            "(if (call strequals \"#c\" \"hello\") (cmd hide))\n"
+        );
+        assert_eq!(
+            g("if (strequals(this.mode,fight)) hide;"),
+            "(if (call strequals this.mode \"fight\") (cmd hide))\n"
+        );
+        assert_eq!(
+            g("if (strequals(\"this.mode\",x)) hide;"),
+            "(if (call strequals \"this.mode\" \"x\") (cmd hide))\n"
+        );
+        assert_eq!(
+            g("x = strlen(#v(this.a));"),
+            "(= x (call strlen \"#v(this.a)\"))\n"
+        );
+        assert_eq!(
+            g("x = random(1, 6) + abs(-2);"),
+            "(= x (+ (call random 1 6) (call abs -2)))\n"
+        );
     }
 
     #[test]
@@ -1040,7 +1239,10 @@ mod tests {
 
     #[test]
     fn expression_only_parsing() {
-        assert_eq!(parse_expr("this.a + 1", Era::V21).unwrap().to_string(), "(+ this.a 1)");
+        assert_eq!(
+            parse_expr("this.a + 1", Era::V21).unwrap().to_string(),
+            "(+ this.a 1)"
+        );
         assert!(parse_expr("1 +", Era::V21).is_none());
         assert!(parse_expr("1 2", Era::V21).is_none());
     }
@@ -1060,25 +1262,37 @@ mod tests {
 
     #[test]
     fn a_single_equals_in_a_condition_compares() {
-        assert_eq!(g("if (a && this.d=0) hide;"), "(if (&& a (== this.d 0)) (cmd hide))\n");
+        assert_eq!(
+            g("if (a && this.d=0) hide;"),
+            "(if (&& a (== this.d 0)) (cmd hide))\n"
+        );
         assert_eq!(g("x = 1;"), "(= x 1)\n");
     }
 
     #[test]
     fn comments_and_case() {
-        assert_eq!(g("// c\nIF (Created) { /* x */ HIDE; }"), "(if created (block (cmd hide)))\n");
+        assert_eq!(
+            g("// c\nIF (Created) { /* x */ HIDE; }"),
+            "(if created (block (cmd hide)))\n"
+        );
     }
 
     #[test]
     fn unknown_and_gated_commands_are_kept_not_fatal() {
-        assert_eq!(g("frobnicate 1,2;"), "(unknown frobnicate \"1,2\" unknown command)\n");
+        assert_eq!(
+            g("frobnicate 1,2;"),
+            "(unknown frobnicate \"1,2\" unknown command)\n"
+        );
         let s = parse("hitobjects 1,2,3; tokenize2 a,b;", Era::V200);
         assert_eq!(
             s.to_string(),
             "(unknown hitobjects \"1,2,3\" not available in this version)\n(unknown tokenize2 \"a,b\" not available in this version)\n"
         );
         assert!(s.diagnostics.is_empty());
-        assert_eq!(parse("hitobjects 1,2,3;", Era::V201).to_string(), "(cmd hitobjects 1 2 3)\n");
+        assert_eq!(
+            parse("hitobjects 1,2,3;", Era::V201).to_string(),
+            "(cmd hitobjects 1 2 3)\n"
+        );
     }
 
     #[test]
@@ -1115,7 +1329,26 @@ mod tests {
 
     #[test]
     fn garbage_never_panics() {
-        for src in ["", ";;;", "{", "}", "(((", "if", "if (", "for (", "function", "x = ", "x[", "message", "a b c d", "\"unterminated", "#", "@@@", "x in |", "x = a in {1,"] {
+        for src in [
+            "",
+            ";;;",
+            "{",
+            "}",
+            "(((",
+            "if",
+            "if (",
+            "for (",
+            "function",
+            "x = ",
+            "x[",
+            "message",
+            "a b c d",
+            "\"unterminated",
+            "#",
+            "@@@",
+            "x in |",
+            "x = a in {1,",
+        ] {
             let _ = parse(src, Era::V21);
             let _ = parse(src, Era::V200);
         }
@@ -1152,7 +1385,10 @@ mod twogta_recovery {
     /// A bad statement with a block inside an `if` does not close the `if`.
     #[test]
     fn a_bad_block_inside_an_if_keeps_the_if() {
-        assert_eq!(g("if (created) { *bad{x;} this.a = 1; }\nthis.b = 2;"), "(if created (block (block) (= this.a 1)))\n(= this.b 2)\n");
+        assert_eq!(
+            g("if (created) { *bad{x;} this.a = 1; }\nthis.b = 2;"),
+            "(if created (block (block) (= this.a 1)))\n(= this.b 2)\n"
+        );
     }
 
     #[test]
@@ -1164,11 +1400,19 @@ mod twogta_recovery {
 
     #[test]
     fn break_and_continue_written_as_calls() {
-        let s = parse("while (1) { if (a) continue(); break(); }\nthis.b = 1;", Era::V21);
+        let s = parse(
+            "while (1) { if (a) continue(); break(); }\nthis.b = 1;",
+            Era::V21,
+        );
         assert!(s.diagnostics.is_empty(), "{:?}", s.diagnostics);
-        assert_eq!(s.to_string(), "(while 1 (block (if a (continue)) (break)))\n(= this.b 1)\n");
+        assert_eq!(
+            s.to_string(),
+            "(while 1 (block (if a (continue)) (break)))\n(= this.b 1)\n"
+        );
         // Anything inside the parentheses is still an error.
-        assert!(!parse("while (1) { break(1); }", Era::V21).diagnostics.is_empty());
+        assert!(!parse("while (1) { break(1); }", Era::V21)
+            .diagnostics
+            .is_empty());
     }
 
     #[test]

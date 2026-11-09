@@ -54,7 +54,10 @@ impl Val {
             Val::Num(n) => *n != 0.0,
             Val::Str(s) => {
                 let t = s.trim();
-                let numeric_start = t.chars().next().is_some_and(|c| c.is_ascii_digit() || c == '-' || c == '.' || c == '+');
+                let numeric_start = t
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_digit() || c == '-' || c == '.' || c == '+');
                 !t.is_empty() && (!numeric_start || parse_leading_number(t) != 0.0)
             }
         }

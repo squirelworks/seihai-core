@@ -13,7 +13,8 @@ use std::path::Path;
 const EDGE: u16 = 158;
 
 fn new3() -> Level {
-    Level::load(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/levels/new3.nw")).unwrap()
+    Level::load(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/levels/new3.nw"))
+        .unwrap()
 }
 
 /// `new3.nw` with one NPC whose `playerenters` runs `body`, for `version`.
@@ -21,7 +22,12 @@ fn new3() -> Level {
 fn read(version: ClientVersion, body: &str) -> String {
     let mut s = OfflineSession::new();
     let mut level = new3();
-    let npc = Level::parse(&format!("GLEVNW01\nNPC - 1 1\nif (playerenters) {{ {body} }}\nNPCEND\n")).unwrap().npcs.remove(0);
+    let npc = Level::parse(&format!(
+        "GLEVNW01\nNPC - 1 1\nif (playerenters) {{ {body} }}\nNPCEND\n"
+    ))
+    .unwrap()
+    .npcs
+    .remove(0);
     level.npcs.push(npc);
     s.current_level = Some(level);
     let mut sc = SessionScripts::new(version);
@@ -31,42 +37,88 @@ fn read(version: ClientVersion, body: &str) -> String {
 
 #[test]
 fn board_reads_the_tile_at_x_plus_64_y() {
-    assert_eq!(read(ClientVersion::V205, "message #v(board[21+64*10]),#v(board[23+64*10]),#v(board[20+64*10]);"), format!("{EDGE},159,0"));
-    assert_eq!(read(ClientVersion::V222, "message #v(board[21+64*10]);"), EDGE.to_string());
+    assert_eq!(
+        read(
+            ClientVersion::V205,
+            "message #v(board[21+64*10]),#v(board[23+64*10]),#v(board[20+64*10]);"
+        ),
+        format!("{EDGE},159,0")
+    );
+    assert_eq!(
+        read(ClientVersion::V222, "message #v(board[21+64*10]);"),
+        EDGE.to_string()
+    );
 }
 
 #[test]
 fn board_indexes_are_rounded_down_with_the_clients_small_margin() {
     // floor(i + 0.0001): 660.99995 is 661, 660.9 is 660.
-    assert_eq!(read(ClientVersion::V205, "message #v(board[660.99995]),#v(board[660.9]);"), format!("{EDGE},0"));
+    assert_eq!(
+        read(
+            ClientVersion::V205,
+            "message #v(board[660.99995]),#v(board[660.9]);"
+        ),
+        format!("{EDGE},0")
+    );
 }
 
 #[test]
 fn board_outside_0_to_4095_reads_0() {
-    assert_eq!(read(ClientVersion::V205, "message #v(board[-1]),#v(board[4096]);"), "0,0");
+    assert_eq!(
+        read(
+            ClientVersion::V205,
+            "message #v(board[-1]),#v(board[4096]);"
+        ),
+        "0,0"
+    );
 }
 
 #[test]
 fn tiles_reads_the_tile_at_x_y_from_2_1() {
-    assert_eq!(read(ClientVersion::V222, "message #v(tiles[21,10]),#v(tiles[23,10]);"), format!("{EDGE},159"));
+    assert_eq!(
+        read(
+            ClientVersion::V222,
+            "message #v(tiles[21,10]),#v(tiles[23,10]);"
+        ),
+        format!("{EDGE},159")
+    );
 }
 
 #[test]
 fn tiles_off_the_level_reads_tile_632() {
-    assert_eq!(read(ClientVersion::V222, "message #v(tiles[64,10]),#v(tiles[21,-1]);"), "632,632");
+    assert_eq!(
+        read(
+            ClientVersion::V222,
+            "message #v(tiles[64,10]),#v(tiles[21,-1]);"
+        ),
+        "632,632"
+    );
 }
 
 #[test]
 fn before_2_1_tiles_is_a_plain_variable() {
     assert_eq!(read(ClientVersion::V205, "message #v(tiles[21,10]);"), "0");
-    assert_eq!(read(ClientVersion::V205, "tiles[21,10] = 5; message #v(tiles[21,10]);"), "5");
+    assert_eq!(
+        read(
+            ClientVersion::V205,
+            "tiles[21,10] = 5; message #v(tiles[21,10]);"
+        ),
+        "5"
+    );
 }
 
 #[test]
 fn with_no_level_both_read_0() {
     let mut s = OfflineSession::new();
     let mut sc = SessionScripts::new(ClientVersion::V222);
-    sc.sync_weapons(&mut s, &[WeaponScript { name: "W", image: "", script: "if (weaponfired) { message #v(board[0]),#v(tiles[0,0]); }" }]);
+    sc.sync_weapons(
+        &mut s,
+        &[WeaponScript {
+            name: "W",
+            image: "",
+            script: "if (weaponfired) { message #v(board[0]),#v(tiles[0,0]); }",
+        }],
+    );
     sc.sync_player(&s);
     sc.world.weapon_fired("W");
     sc.apply(&mut s);
@@ -88,10 +140,13 @@ fn dig(s: &mut OfflineSession, sc: &mut SessionScripts) -> Vec<Vec<Val>> {
     sc.sync_player(s);
     sc.world.weapon_fired("Shovel");
     sc.apply(s);
-    sc.unhandled.iter().filter_map(|e| match e {
-        Effect::Command { name, args, .. } if name == "putobject" => Some(args.clone()),
-        _ => None,
-    }).collect()
+    sc.unhandled
+        .iter()
+        .filter_map(|e| match e {
+            Effect::Command { name, args, .. } if name == "putobject" => Some(args.clone()),
+            _ => None,
+        })
+        .collect()
 }
 
 #[test]
@@ -99,16 +154,38 @@ fn the_real_shovel_digs_only_where_board_shows_the_dig_tiles() {
     let mut s = OfflineSession::new();
     s.current_level = Some(new3());
     let mut sc = SessionScripts::new(ClientVersion::V205);
-    sc.sync_weapons(&mut s, &[WeaponScript { name: "Shovel", image: "", script: SHOVEL }]);
+    sc.sync_weapons(
+        &mut s,
+        &[WeaponScript {
+            name: "Shovel",
+            image: "",
+            script: SHOVEL,
+        }],
+    );
     sc.load_level(&mut s, "new3.nw");
-    assert!(dig(&mut s, &mut sc).is_empty(), "grass (tile 0) at (32..33, 30..31): no hole");
+    assert!(
+        dig(&mut s, &mut sc).is_empty(),
+        "grass (tile 0) at (32..33, 30..31): no hole"
+    );
     // The server changes those four tiles to 15 + 31*16 = 511 ("H/").
-    s.apply_board_update(&BoardModify { x: 32, y: 30, width: 2, height: 2, tiles: b"H/H/H/H/".to_vec() });
+    s.apply_board_update(&BoardModify {
+        x: 32,
+        y: 30,
+        width: 2,
+        height: 2,
+        tiles: b"H/H/H/H/".to_vec(),
+    });
     let holes = dig(&mut s, &mut sc);
     assert_eq!(holes.len(), 1, "the board read sees the new tiles");
     let a: Vec<String> = holes[0].iter().map(|v| v.text()).collect();
     assert_eq!(a, ["Hole", "32", "30"]);
     // One tile back to grass: no hole again.
-    s.apply_board_update(&BoardModify { x: 33, y: 31, width: 1, height: 1, tiles: b"AA".to_vec() });
+    s.apply_board_update(&BoardModify {
+        x: 33,
+        y: 31,
+        width: 1,
+        height: 1,
+        tiles: b"AA".to_vec(),
+    });
     assert!(dig(&mut s, &mut sc).is_empty());
 }

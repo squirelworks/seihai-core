@@ -75,15 +75,32 @@ pub enum Expr {
     Unary(UnOp, Box<Expr>),
     Bin(BinOp, Box<Expr>, Box<Expr>),
     /// A built-in or script-defined function.
-    Call { name: String, args: Vec<Expr> },
+    Call {
+        name: String,
+        args: Vec<Expr>,
+    },
     /// `x in |lo,hi|`
-    InRange { e: Box<Expr>, lo: Box<Expr>, hi: Box<Expr> },
+    InRange {
+        e: Box<Expr>,
+        lo: Box<Expr>,
+        hi: Box<Expr>,
+    },
     /// `x in {a,b,c}`
-    InList { e: Box<Expr>, list: Vec<Expr> },
+    InList {
+        e: Box<Expr>,
+        list: Vec<Expr>,
+    },
     /// `x in this.list`: one of the values of an array (2.1 and later).
-    InArray { e: Box<Expr>, name: String },
+    InArray {
+        e: Box<Expr>,
+        name: String,
+    },
     /// `cond ? a : b` (2.1 and later).
-    Cond { cond: Box<Expr>, then: Box<Expr>, els: Box<Expr> },
+    Cond {
+        cond: Box<Expr>,
+        then: Box<Expr>,
+        els: Box<Expr>,
+    },
     /// `{a,b,c}`, the right side of an assignment (2.1 and later): fills
     /// the variable as an array.
     List(Vec<Expr>),
@@ -120,26 +137,65 @@ pub enum Arg {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Block(Vec<Stmt>),
-    If { cond: Expr, then: Box<Stmt>, els: Option<Box<Stmt>> },
-    While { cond: Expr, body: Box<Stmt> },
-    For { init: Option<Box<Stmt>>, cond: Option<Expr>, step: Option<Box<Stmt>>, body: Box<Stmt> },
-    Function { name: String, params: Vec<String>, body: Vec<Stmt> },
+    If {
+        cond: Expr,
+        then: Box<Stmt>,
+        els: Option<Box<Stmt>>,
+    },
+    While {
+        cond: Expr,
+        body: Box<Stmt>,
+    },
+    For {
+        init: Option<Box<Stmt>>,
+        cond: Option<Expr>,
+        step: Option<Box<Stmt>>,
+        body: Box<Stmt>,
+    },
+    Function {
+        name: String,
+        params: Vec<String>,
+        body: Vec<Stmt>,
+    },
     Return(Option<Expr>),
     Break,
     Continue,
-    Assign { target: VarRef, op: AssignOp, value: Expr },
+    Assign {
+        target: VarRef,
+        op: AssignOp,
+        value: Expr,
+    },
     /// `x++` (`delta` 1) and `x--` (`delta` -1).
-    IncDec { target: VarRef, delta: f64 },
+    IncDec {
+        target: VarRef,
+        delta: f64,
+    },
     /// A function call used as a statement.
-    Call { name: String, args: Vec<Expr> },
-    Command { name: String, args: Vec<Arg>, line: u32 },
+    Call {
+        name: String,
+        args: Vec<Expr>,
+    },
+    Command {
+        name: String,
+        args: Vec<Arg>,
+        line: u32,
+    },
     /// `with (target) body` (2.1 and later): the body runs as the player or
     /// NPC `target` names. Seihai does not switch objects, so the body is
     /// skipped and the skip logged.
-    With { target: Expr, body: Box<Stmt>, line: u32 },
+    With {
+        target: Expr,
+        body: Box<Stmt>,
+        line: u32,
+    },
     /// A name that is not a command in this era, with its raw arguments.
     /// Logged and ignored when run.
-    Unknown { name: String, raw: String, reason: &'static str, line: u32 },
+    Unknown {
+        name: String,
+        raw: String,
+        reason: &'static str,
+        line: u32,
+    },
 }
 
 /// A problem found while parsing. The script still runs.
@@ -246,8 +302,14 @@ impl fmt::Display for Stmt {
                 None => write!(f, "(if {cond} {then})"),
             },
             Stmt::While { cond, body } => write!(f, "(while {cond} {body})"),
-            Stmt::For { init, cond, step, body } => {
-                let o = |s: &Option<Box<Stmt>>| s.as_ref().map_or("_".to_string(), |s| s.to_string());
+            Stmt::For {
+                init,
+                cond,
+                step,
+                body,
+            } => {
+                let o =
+                    |s: &Option<Box<Stmt>>| s.as_ref().map_or("_".to_string(), |s| s.to_string());
                 let c = cond.as_ref().map_or("_".to_string(), |c| c.to_string());
                 write!(f, "(for {} {c} {} {body})", o(init), o(step))
             }
@@ -263,7 +325,9 @@ impl fmt::Display for Stmt {
             Stmt::Break => write!(f, "(break)"),
             Stmt::Continue => write!(f, "(continue)"),
             Stmt::Assign { target, op, value } => write!(f, "({} {target} {value})", op.symbol()),
-            Stmt::IncDec { target, delta } => write!(f, "({} {target})", if *delta > 0.0 { "++" } else { "--" }),
+            Stmt::IncDec { target, delta } => {
+                write!(f, "({} {target})", if *delta > 0.0 { "++" } else { "--" })
+            }
             Stmt::Call { name, args } => {
                 write!(f, "(call {name}")?;
                 for a in args {
@@ -279,7 +343,9 @@ impl fmt::Display for Stmt {
                 write!(f, ")")
             }
             Stmt::With { target, body, .. } => write!(f, "(with {target} {body})"),
-            Stmt::Unknown { name, raw, reason, .. } => write!(f, "(unknown {name} {raw:?} {reason})"),
+            Stmt::Unknown {
+                name, raw, reason, ..
+            } => write!(f, "(unknown {name} {raw:?} {reason})"),
         }
     }
 }

@@ -27,9 +27,9 @@
 use super::lobby::Lobby;
 use super::login::LoginInfo;
 use super::showimg::ShowImgInfo;
-use std::time::Duration;
 use super::tampercheck::{TamperInfo, TamperResend, TamperWords};
 use super::version::{ClientVersion, EncryptionGen};
+use std::time::Duration;
 
 /// A set of message or prop ids (0 to 255).
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -271,9 +271,15 @@ pub struct BuiltIn {
 }
 
 /// What the 2.00 to 2.05 builds carry (DES-hidden): `www.graalonline.com:14921`.
-pub const BUILT_IN_14921: BuiltIn = BuiltIn { host: "www.graalonline.com", port: 14921 };
+pub const BUILT_IN_14921: BuiltIn = BuiltIn {
+    host: "www.graalonline.com",
+    port: 14921,
+};
 /// What the 2.1 test builds carry: `www.graalonline.com:14922`.
-pub const BUILT_IN_14922: BuiltIn = BuiltIn { host: "www.graalonline.com", port: 14922 };
+pub const BUILT_IN_14922: BuiltIn = BuiltIn {
+    host: "www.graalonline.com",
+    port: 14922,
+};
 
 /// Listserver login.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -300,12 +306,26 @@ impl Listserver {
     /// shape B with an unknown basis (what Seihai sent before the lab
     /// captures), gen-5 is shape C, captured. Use [`Self::shape`] to set
     /// another.
-    pub const fn new(kind: ListKind, status: PortStatus, built_in: Option<BuiltIn>, token: Option<&'static str>) -> Self {
+    pub const fn new(
+        kind: ListKind,
+        status: PortStatus,
+        built_in: Option<BuiltIn>,
+        token: Option<&'static str>,
+    ) -> Self {
         let (shape, shape_basis) = match kind {
             ListKind::Legacy => (LoginShape::NewmainAccount, ShapeBasis::Unknown),
             ListKind::Supported => (LoginShape::Gen5, ShapeBasis::Captured),
         };
-        Self { host: LISTSERVER_HOST, port: kind.port(), kind, status, built_in, token, shape, shape_basis }
+        Self {
+            host: LISTSERVER_HOST,
+            port: kind.port(),
+            kind,
+            status,
+            built_in,
+            token,
+            shape,
+            shape_basis,
+        }
     }
 
     /// The same entry with another login shape and basis.
@@ -583,7 +603,10 @@ pub const DEATH_205: DeathRules = DeathRules {
 /// no longer has the name-group test (the delimiter set is not in those
 /// binaries; the 2.17.1, 2.22 and 2.31 entry code was read, the 2.1 tests'
 /// was inferred from the missing constant).
-pub const DEATH_21: DeathRules = DeathRules { entry_name_group: false, ..DEATH_205 };
+pub const DEATH_21: DeathRules = DeathRules {
+    entry_name_group: false,
+    ..DEATH_205
+};
 
 /// 1.39. The timer, the input lock, the dead bit and the online default
 /// spot match 2.05. Respawn hearts are the maximum: both AP thresholds are
@@ -703,18 +726,28 @@ pub const COMBAT_205: CombatRules = CombatRules {
 /// The sword box is the same as 2.05 (0 to 4 tiles ahead, under 2 sideways),
 /// traced in Graal_analysis `version-profiles/matrix/rules-139.md`. Sword
 /// power, AP immunity and the hurt sprite are still the 2.05 template.
-pub const COMBAT_139: CombatRules = CombatRules { swing_step_ticks: 1, ..COMBAT_205 };
+pub const COMBAT_139: CombatRules = CombatRules {
+    swing_step_ticks: 1,
+    ..COMBAT_205
+};
 
 /// 2.01 and 2.02: as 2.05, but the sword power is stored without the offset
 /// and limit. (Their kick test and the no-kill flag on the player, not the
 /// level, change nothing Seihai checks.)
-pub const COMBAT_201: CombatRules = CombatRules { sword_power_store: PowerStore::Raw6Bit, ..COMBAT_205 };
+pub const COMBAT_201: CombatRules = CombatRules {
+    sword_power_store: PowerStore::Raw6Bit,
+    ..COMBAT_205
+};
 
 /// 2.00: as 2.01, and the hurt packet has only the hurtable, guild and range
 /// gates: no AP 100 immunity, no no-kill test and no once-a-second limit.
 /// The sword judge has no once-a-second stamp either (no build read has one
 /// there), so `judge_throttle` is off.
-pub const COMBAT_200: CombatRules = CombatRules { judge_throttle: false, packet_victim_gates: false, ..COMBAT_201 };
+pub const COMBAT_200: CombatRules = CombatRules {
+    judge_throttle: false,
+    packet_victim_gates: false,
+    ..COMBAT_201
+};
 
 /// Health, death and combat.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -779,16 +812,34 @@ pub struct Mannerisms {
 }
 
 /// 1.39 (video and memory read).
-pub const MANNER_139: Mannerisms =
-    Mannerisms { blink: Blink::AfterHurtPose, hide: HidePose::Carry, pull_release: PullRelease::StaysPull, swim_still: SwimStill::Animates, knockback_ticks: 5 };
+pub const MANNER_139: Mannerisms = Mannerisms {
+    blink: Blink::AfterHurtPose,
+    hide: HidePose::Carry,
+    pull_release: PullRelease::StaysPull,
+    swim_still: SwimStill::Animates,
+    knockback_ticks: 5,
+};
 /// NewMain 1.41.1, the first gani client.
-pub const MANNER_141: Mannerisms =
-    Mannerisms { blink: Blink::FromHit, hide: HidePose::Carry, pull_release: PullRelease::BackToGrab, swim_still: SwimStill::Freezes, knockback_ticks: 5 };
+pub const MANNER_141: Mannerisms = Mannerisms {
+    blink: Blink::FromHit,
+    hide: HidePose::Carry,
+    pull_release: PullRelease::BackToGrab,
+    swim_still: SwimStill::Freezes,
+    knockback_ticks: 5,
+};
 /// 2.05 rev 2.
-pub const MANNER_205: Mannerisms =
-    Mannerisms { blink: Blink::FromHit, hide: HidePose::Hidden, pull_release: PullRelease::StaysPull, swim_still: SwimStill::Animates, knockback_ticks: 5 };
+pub const MANNER_205: Mannerisms = Mannerisms {
+    blink: Blink::FromHit,
+    hide: HidePose::Hidden,
+    pull_release: PullRelease::StaysPull,
+    swim_still: SwimStill::Animates,
+    knockback_ticks: 5,
+};
 /// 2.22.
-pub const MANNER_222: Mannerisms = Mannerisms { swim_still: SwimStill::Restarts, ..MANNER_205 };
+pub const MANNER_222: Mannerisms = Mannerisms {
+    swim_still: SwimStill::Restarts,
+    ..MANNER_205
+};
 
 /// Who puts down the items a bush or a pot leaves, and what the client
 /// tells the server about floor items (Graal_analysis
@@ -811,11 +862,26 @@ pub struct ItemDrops {
 }
 
 /// 1.33 to 1.37.
-pub const DROPS_133: ItemDrops = ItemDrops { client_roll: true, add_to_server: false, server_take: false, del_on_expiry: false };
+pub const DROPS_133: ItemDrops = ItemDrops {
+    client_roll: true,
+    add_to_server: false,
+    server_take: false,
+    del_on_expiry: false,
+};
 /// 1.38 to 1.41.
-pub const DROPS_138: ItemDrops = ItemDrops { client_roll: true, add_to_server: true, server_take: true, del_on_expiry: true };
+pub const DROPS_138: ItemDrops = ItemDrops {
+    client_roll: true,
+    add_to_server: true,
+    server_take: true,
+    del_on_expiry: true,
+};
 /// 1.42 on: the server drops.
-pub const DROPS_142: ItemDrops = ItemDrops { client_roll: false, add_to_server: false, server_take: true, del_on_expiry: true };
+pub const DROPS_142: ItemDrops = ItemDrops {
+    client_roll: false,
+    add_to_server: false,
+    server_take: true,
+    del_on_expiry: true,
+};
 
 /// Everything that makes one client version itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -842,7 +908,9 @@ impl VersionProfile {
     /// Window title the way this version shows it.
     pub fn window_title(&self, server: Option<&str>) -> String {
         match server {
-            Some(s) if self.ui.server_in_title && !s.is_empty() => format!("Graal {} - {s}", self.label),
+            Some(s) if self.ui.server_in_title && !s.is_empty() => {
+                format!("Graal {} - {s}", self.label)
+            }
             _ => format!("Graal {}", self.label),
         }
     }
@@ -894,31 +962,55 @@ impl VersionProfile {
 // Tamper-check constants (CRC words A and B), from the 2026-10-24 decompile
 // reading; the encoded bytes match the lab captures of the real clients.
 pub(super) const TAMPER_217: TamperInfo = TamperInfo {
-    words: Some(TamperWords { a: 0xab63_7cbe, b: 0x3e48_dc0c }),
+    words: Some(TamperWords {
+        a: 0xab63_7cbe,
+        b: 0x3e48_dc0c,
+    }),
     resend: TamperResend::Never,
 };
 pub(super) const TAMPER_222: TamperInfo = TamperInfo {
-    words: Some(TamperWords { a: 0x5dcb_77f6, b: 0xbc73_6311 }),
+    words: Some(TamperWords {
+        a: 0x5dcb_77f6,
+        b: 0xbc73_6311,
+    }),
     resend: TamperResend::OnLevelChange,
 };
 pub(super) const TAMPER_231: TamperInfo = TamperInfo {
-    words: Some(TamperWords { a: 0x9ecd_4bc0, b: 0xecea_65e2 }),
+    words: Some(TamperWords {
+        a: 0x9ecd_4bc0,
+        b: 0xecea_65e2,
+    }),
     resend: TamperResend::Timer,
 };
 /// 2.3: no binary, so no constant; it is taken to re-send like 2.31.
-pub(super) const TAMPER_230: TamperInfo = TamperInfo { words: None, resend: TamperResend::Timer };
+pub(super) const TAMPER_230: TamperInfo = TamperInfo {
+    words: None,
+    resend: TamperResend::Timer,
+};
 
 // Id 24 (lab, real clients, 2026-10-24): 2.22 about every 5.1 s while another
 // player is in the level, 2.31 every 5.13 s always.
-pub(super) const SHOWIMG_222: ShowImgInfo = ShowImgInfo { period: Duration::from_millis(5100), needs_others: true };
-pub(super) const SHOWIMG_231: ShowImgInfo = ShowImgInfo { period: Duration::from_millis(5130), needs_others: false };
+pub(super) const SHOWIMG_222: ShowImgInfo = ShowImgInfo {
+    period: Duration::from_millis(5100),
+    needs_others: true,
+};
+pub(super) const SHOWIMG_231: ShowImgInfo = ShowImgInfo {
+    period: Duration::from_millis(5130),
+    needs_others: false,
+};
 /// The real 4.04r2 (lab, 2026-10-31): alone in the level, 5.142 to 5.151 s
 /// apart, the first at the end of the after-burst frames.
-pub(super) const SHOWIMG_404: ShowImgInfo = ShowImgInfo { period: Duration::from_millis(5145), needs_others: false };
+pub(super) const SHOWIMG_404: ShowImgInfo = ShowImgInfo {
+    period: Duration::from_millis(5145),
+    needs_others: false,
+};
 // 2.17.1 (lab, 2026-10-30, `documentation/difftest-217.md` item 3): alone in the
 // level on both lab servers, the first one in the post-login frame, then 5.07
 // to 5.11 s apart while idle (median 5.10 s over the five runs).
-pub(super) const SHOWIMG_217: ShowImgInfo = ShowImgInfo { period: Duration::from_millis(5100), needs_others: false };
+pub(super) const SHOWIMG_217: ShowImgInfo = ShowImgInfo {
+    period: Duration::from_millis(5100),
+    needs_others: false,
+};
 
 /// Every version Seihai can present as, oldest first. Resolved from
 /// [`super::chain::CHAIN`]: each row is the row before it plus that build's
@@ -945,7 +1037,11 @@ mod tests {
     #[test]
     fn every_version_has_one_row() {
         for v in ClientVersion::all_versions() {
-            assert_eq!(PROFILES.iter().filter(|p| p.version == *v).count(), 1, "{v:?}");
+            assert_eq!(
+                PROFILES.iter().filter(|p| p.version == *v).count(),
+                1,
+                "{v:?}"
+            );
         }
         assert_eq!(PROFILES.len(), ClientVersion::all_versions().len());
     }
@@ -955,7 +1051,13 @@ mod tests {
         for p in PROFILES {
             assert_eq!(p.token.len(), 8, "{}", p.label);
             // GSERV before 1.33, GNW for the later 2D builds, G3D for the 3.x ones.
-            assert!(p.token.starts_with("GNW") || p.token.starts_with("G3D") || p.token.starts_with("GSERV"), "{}", p.label);
+            assert!(
+                p.token.starts_with("GNW")
+                    || p.token.starts_with("G3D")
+                    || p.token.starts_with("GSERV"),
+                "{}",
+                p.label
+            );
         }
         let mut labels: Vec<_> = PROFILES.iter().map(|p| p.label).collect();
         labels.dedup();
@@ -1032,13 +1134,23 @@ mod tests {
     #[test]
     fn language_needs_pli_37() {
         for p in PROFILES {
-            assert_eq!(p.protocol.sends_language, p.protocol.pli.contains(37), "{}", p.label);
+            assert_eq!(
+                p.protocol.sends_language,
+                p.protocol.pli.contains(37),
+                "{}",
+                p.label
+            );
             if p.protocol.tampercheck {
                 assert!(p.protocol.pli.contains(39), "{}", p.label);
             }
             // The tamper-check record exists exactly where the build sends it,
             // and every build that was read from a binary carries its words.
-            assert_eq!(p.protocol.tamper.is_some(), p.protocol.tampercheck, "{}", p.label);
+            assert_eq!(
+                p.protocol.tamper.is_some(),
+                p.protocol.tampercheck,
+                "{}",
+                p.label
+            );
             if p.protocol.tampercheck && p.basis == Basis::Binary {
                 assert!(p.protocol.tamper.unwrap().words.is_some(), "{}", p.label);
             }
@@ -1136,19 +1248,35 @@ mod tests {
             check("plo", p.protocol.plo == t.plo);
             if t.pli_lower_bound {
                 // Only the constant send ids are listed: they must all be in the set.
-                check("pli covers the listed ids", (0..=255u8).all(|id| !t.pli.contains(id) || p.protocol.pli.contains(id)));
+                check(
+                    "pli covers the listed ids",
+                    (0..=255u8).all(|id| !t.pli.contains(id) || p.protocol.pli.contains(id)),
+                );
             } else {
                 check("pli", p.protocol.pli == t.pli);
             }
             check("npc_max", t.npc_max.is_none_or(|n| p.props.npc_max == n));
             check("tampercheck", p.protocol.tampercheck == t.tampercheck);
-            check("sends_language == pli has 37", p.protocol.sends_language == t.pli.contains(37));
+            check(
+                "sends_language == pli has 37",
+                p.protocol.sends_language == t.pli.contains(37),
+            );
             let ls = p.protocol.listserver;
             check("listserver port", ls.map(|l| l.port) == t.list_port);
-            check("listserver host", ls.map(|l| l.host.to_string()) == t.list_host);
+            check(
+                "listserver host",
+                ls.map(|l| l.host.to_string()) == t.list_host,
+            );
             check(
                 "listserver kind",
-                ls.map(|l| if l.kind == ListKind::Legacy { "legacy" } else { "supported" }.to_string()) == t.list_kind,
+                ls.map(|l| {
+                    if l.kind == ListKind::Legacy {
+                        "legacy"
+                    } else {
+                        "supported"
+                    }
+                    .to_string()
+                }) == t.list_kind,
             );
             // The TOML records the matrix run of 2026-10-25, which sent Seihai's older
             // classic login (shape B). A profile that now sends shape A has not been run
@@ -1159,14 +1287,31 @@ mod tests {
             };
             check(
                 "listserver port status",
-                ls.map(|l| if l.status == PortStatus::Confirmed { "confirmed" } else { "assumed" }.to_string()) == want_status,
+                ls.map(|l| {
+                    if l.status == PortStatus::Confirmed {
+                        "confirmed"
+                    } else {
+                        "assumed"
+                    }
+                    .to_string()
+                }) == want_status,
             );
-            check("built-in host", ls.and_then(|l| l.built_in).map(|b| b.host.to_string()) == t.built_in_host);
-            check("built-in port", ls.and_then(|l| l.built_in).map(|b| b.port) == t.built_in_port);
+            check(
+                "built-in host",
+                ls.and_then(|l| l.built_in).map(|b| b.host.to_string()) == t.built_in_host,
+            );
+            check(
+                "built-in port",
+                ls.and_then(|l| l.built_in).map(|b| b.port) == t.built_in_port,
+            );
             // 2.16: its TOML entry keeps the 2.15 prop limit but notes that
             // 54-74 arrive in 2.16; the row follows the note.
             if t.label != "2.16" {
-                check("own_max", t.own_max.is_none_or(|n| p.props.own.iter().max() == Some(n)));
+                check(
+                    "own_max",
+                    t.own_max
+                        .is_none_or(|n| p.props.own.iter().max() == Some(n)),
+                );
                 if let Some(o) = t.other {
                     check("other props", p.props.other == o);
                 }
@@ -1223,8 +1368,14 @@ mod tests {
         }
         // The dead port is still recorded as history: the 2.00 to 2.05 builds carry it.
         let built_in = |v: ClientVersion| profile(v).protocol.listserver.and_then(|l| l.built_in);
-        assert_eq!(built_in(ClientVersion::V200).map(|b| b.port), Some(DEAD_LIST_PORT));
-        assert_eq!(built_in(ClientVersion::V205).map(|b| b.port), Some(DEAD_LIST_PORT));
+        assert_eq!(
+            built_in(ClientVersion::V200).map(|b| b.port),
+            Some(DEAD_LIST_PORT)
+        );
+        assert_eq!(
+            built_in(ClientVersion::V205).map(|b| b.port),
+            Some(DEAD_LIST_PORT)
+        );
     }
 
     /// Every profile with a listserver, and every version through
@@ -1235,7 +1386,12 @@ mod tests {
             if let Some(l) = p.protocol.listserver {
                 assert_eq!(l.host, "listserver.graal.in", "{}", p.label);
             }
-            assert_eq!(p.version.listserver_host(), "listserver.graal.in", "{}", p.label);
+            assert_eq!(
+                p.version.listserver_host(),
+                "listserver.graal.in",
+                "{}",
+                p.label
+            );
             assert_eq!(
                 p.version.listserver_addr(),
                 format!("listserver.graal.in:{}", p.version.listserver_port()),
@@ -1254,8 +1410,22 @@ mod tests {
     #[test]
     fn login_type_decides_the_default_port() {
         let classic = [
-            "1.41", "1.42", "2.00", "2.01", "2.02", "2.02 rev2", "2.03", "2.04", "2.05", "2.1", "2.12", "2.13", "2.14",
-            "2.15", "2.16", "2.17",
+            "1.41",
+            "1.42",
+            "2.00",
+            "2.01",
+            "2.02",
+            "2.02 rev2",
+            "2.03",
+            "2.04",
+            "2.05",
+            "2.1",
+            "2.12",
+            "2.13",
+            "2.14",
+            "2.15",
+            "2.16",
+            "2.17",
         ];
         let gen5 = ["2.22", "2.3", "2.31", "3.04", "3.153"];
         let mut seen = 0;
@@ -1266,7 +1436,11 @@ mod tests {
                 // scripted GUI on the `Login` game server.
                 None if p.protocol.lobby.is_some() => lobby += 1,
                 None => {
-                    assert!(p.label.starts_with("1.2") || p.label.starts_with("1.3"), "{} has no listserver", p.label);
+                    assert!(
+                        p.label.starts_with("1.2") || p.label.starts_with("1.3"),
+                        "{} has no listserver",
+                        p.label
+                    );
                     assert_eq!(p.version.listserver_port(), 14923, "{}", p.label);
                 }
                 Some(l) => {
@@ -1278,7 +1452,16 @@ mod tests {
                         ListKind::Supported
                     };
                     assert_eq!(l.kind, want, "{}", p.label);
-                    assert_eq!(l.port, if want == ListKind::Legacy { 14923 } else { 14922 }, "{}", p.label);
+                    assert_eq!(
+                        l.port,
+                        if want == ListKind::Legacy {
+                            14923
+                        } else {
+                            14922
+                        },
+                        "{}",
+                        p.label
+                    );
                     assert_eq!(l.port, l.kind.port(), "{}", p.label);
                     assert_ne!(l.port, DEAD_LIST_PORT, "{}", p.label);
                     // The kind is the login the code sends: gen-5 only for a gen-5 profile.
@@ -1345,19 +1528,37 @@ mod tests {
     fn port_status_confirmed_versus_assumed() {
         let confirmed: Vec<&str> = PROFILES
             .iter()
-            .filter(|p| p.protocol.listserver.is_some_and(|l| l.status == PortStatus::Confirmed))
+            .filter(|p| {
+                p.protocol
+                    .listserver
+                    .is_some_and(|l| l.status == PortStatus::Confirmed)
+            })
             .map(|p| p.label)
             .collect();
         assert_eq!(
             confirmed,
             [
-                "1.41", "2.1", "2.12", "2.13", "2.14", "2.15", "2.16", "2.17", "2.22", "2.3", "2.31"
+                "1.41", "2.1", "2.12", "2.13", "2.14", "2.15", "2.16", "2.17", "2.22", "2.3",
+                "2.31"
             ]
         );
         // The profiles that now send shape A (real 2.00 and 2.05, and the
         // inferred 1.42 and 2.01 to 2.04) were not run with it.
-        for l in ["1.42", "2.00", "2.01", "2.02", "2.02 rev2", "2.03", "2.04", "2.05"] {
-            assert_eq!(by_label(l).unwrap().protocol.listserver.unwrap().status, PortStatus::Assumed, "{l}");
+        for l in [
+            "1.42",
+            "2.00",
+            "2.01",
+            "2.02",
+            "2.02 rev2",
+            "2.03",
+            "2.04",
+            "2.05",
+        ] {
+            assert_eq!(
+                by_label(l).unwrap().protocol.listserver.unwrap().status,
+                PortStatus::Assumed,
+                "{l}"
+            );
         }
         assert_eq!(ClientVersion::V205.listserver().status, PortStatus::Assumed);
     }
@@ -1367,10 +1568,22 @@ mod tests {
     #[test]
     fn command_line_address_wins() {
         let v = ClientVersion::V200;
-        assert_eq!(v.complete_list_addr("listserver.graal.in:14922"), "listserver.graal.in:14922");
-        assert_eq!(v.complete_list_addr("example.org:14921"), "example.org:14921");
-        assert_eq!(v.complete_list_addr("listserver.graal.in"), "listserver.graal.in:14923");
-        assert_eq!(ClientVersion::V222.complete_list_addr("listserver.graal.in"), "listserver.graal.in:14922");
+        assert_eq!(
+            v.complete_list_addr("listserver.graal.in:14922"),
+            "listserver.graal.in:14922"
+        );
+        assert_eq!(
+            v.complete_list_addr("example.org:14921"),
+            "example.org:14921"
+        );
+        assert_eq!(
+            v.complete_list_addr("listserver.graal.in"),
+            "listserver.graal.in:14923"
+        );
+        assert_eq!(
+            ClientVersion::V222.complete_list_addr("listserver.graal.in"),
+            "listserver.graal.in:14922"
+        );
         assert_eq!(v.complete_list_addr("10.0.0.5"), "10.0.0.5");
     }
 
@@ -1381,14 +1594,28 @@ mod tests {
     fn cached_links_by_profile() {
         for p in PROFILES {
             if p.levels.cached_links {
-                assert!(p.protocol.pli.contains(crate::net::PLI_LEVELWARPMOD), "{}", p.label);
+                assert!(
+                    p.protocol.pli.contains(crate::net::PLI_LEVELWARPMOD),
+                    "{}",
+                    p.label
+                );
                 assert!(p.levels.nw, "{}: cached levels need .nw support", p.label);
             }
         }
-        for v in [ClientVersion::V205, ClientVersion::V217, ClientVersion::V222, ClientVersion::V231] {
+        for v in [
+            ClientVersion::V205,
+            ClientVersion::V217,
+            ClientVersion::V222,
+            ClientVersion::V231,
+        ] {
             assert!(v.sends_cached_links(), "{}", v.label());
         }
-        for v in [ClientVersion::V133, ClientVersion::V139, ClientVersion::V200, ClientVersion::V204] {
+        for v in [
+            ClientVersion::V133,
+            ClientVersion::V139,
+            ClientVersion::V200,
+            ClientVersion::V204,
+        ] {
             assert!(!v.sends_cached_links(), "{}", v.label());
         }
     }
@@ -1409,7 +1636,10 @@ mod tests {
         assert!(c.protocol.plo.contains(26) && !d.protocol.plo.contains(26));
         assert!(d.protocol.plo.contains(166) && !c.protocol.plo.contains(166));
         assert!(d.props.own.contains(42) && !c.props.own.contains(42));
-        assert_eq!((a.token, b.token, c.token, d.token), ("GNW15041", "GNW20041", "GNW06051", "GNW24061"));
+        assert_eq!(
+            (a.token, b.token, c.token, d.token),
+            ("GNW15041", "GNW20041", "GNW06051", "GNW24061")
+        );
         // .nw levels: 1.41 and 1.42 have the loader, 2.00 to 2.04 drop it,
         // 2.05 brings it back. 2.05 is also the first with the server name in
         // the title.
@@ -1417,25 +1647,37 @@ mod tests {
         assert!(!p(ClientVersion::V200).levels.nw && !a.levels.nw && !d.levels.nw);
         assert!(p(ClientVersion::V205).levels.nw);
         assert_eq!(b.window_title(Some("X")), "Graal 2.02 rev2");
-        assert_eq!(by_label("2.02 rev2").unwrap().version, ClientVersion::V202R2);
+        assert_eq!(
+            by_label("2.02 rev2").unwrap().version,
+            ClientVersion::V202R2
+        );
     }
 
     #[test]
     fn ui_switches() {
-        assert!(matches!(profile(ClientVersion::V139).ui.server_list, ServerList::Direct { .. }));
+        assert!(matches!(
+            profile(ClientVersion::V139).ui.server_list,
+            ServerList::Direct { .. }
+        ));
         assert!(profile(ClientVersion::V139).ui.chat_recall);
         assert!(!profile(ClientVersion::V138).ui.chat_recall);
         assert!(!profile(ClientVersion::V205).ui.minimap);
         assert!(profile(ClientVersion::V217).ui.minimap);
         assert!(!profile(ClientVersion::V231).ui.editor);
-        assert_eq!(profile(ClientVersion::V139).level_extensions(), vec![".graal", ".zelda"]);
+        assert_eq!(
+            profile(ClientVersion::V139).level_extensions(),
+            vec![".graal", ".zelda"]
+        );
         // Every build reads Z3-V1 by magic (strings of every client binary).
         assert!(PROFILES.iter().all(|p| p.levels.zelda));
         assert_eq!(
             profile(ClientVersion::V205).window_title(Some("Classic")),
             "Graal 2.05 - Classic"
         );
-        assert_eq!(profile(ClientVersion::V139).window_title(Some("Classic")), "Graal 1.39");
+        assert_eq!(
+            profile(ClientVersion::V139).window_title(Some("Classic")),
+            "Graal 1.39"
+        );
     }
 
     /// Outer size of the main form. The playfield stays 640 by 480.
@@ -1444,7 +1686,10 @@ mod tests {
     #[test]
     fn main_form_outer_size() {
         let wh = |v: ClientVersion| profile(v).ui.window;
-        let size = |w, h| WindowPx { width: w, height: h };
+        let size = |w, h| WindowPx {
+            width: w,
+            height: h,
+        };
         assert_eq!(wh(ClientVersion::V121), size(648, 509));
         for v in [
             ClientVersion::V128B2,

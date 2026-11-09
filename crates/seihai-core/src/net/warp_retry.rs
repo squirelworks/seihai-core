@@ -52,7 +52,12 @@ pub struct WarpRetry {
 impl WarpRetry {
     /// A warp's first login was just made at `now`.
     pub fn new(warp: ServerWarp, now: Instant) -> Self {
-        Self { warp, retries: 0, login_at: now, due: None }
+        Self {
+            warp,
+            retries: 0,
+            login_at: now,
+            due: None,
+        }
     }
 
     /// The warp being followed.
@@ -108,7 +113,11 @@ mod tests {
     use super::*;
 
     fn warp() -> ServerWarp {
-        ServerWarp { name: "Lab Server".into(), host: "127.0.0.1".into(), port: "14802".into() }
+        ServerWarp {
+            name: "Lab Server".into(),
+            host: "127.0.0.1".into(),
+            port: "14802".into(),
+        }
     }
 
     #[test]
@@ -116,8 +125,12 @@ mod tests {
         assert!(is_account_in_use("Account is already in use."));
         assert!(is_account_in_use("double login"));
         assert!(is_account_in_use("ACCOUNT IN USE"));
-        assert!(!is_account_in_use("Someone else has logged into your account."));
-        assert!(!is_account_in_use("Your client version is not allowed on this server."));
+        assert!(!is_account_in_use(
+            "Someone else has logged into your account."
+        ));
+        assert!(!is_account_in_use(
+            "Your client version is not allowed on this server."
+        ));
         assert!(!is_account_in_use(""));
     }
 
@@ -128,7 +141,11 @@ mod tests {
         let mut now = t0;
         for (i, &d) in RETRY_DELAYS.iter().enumerate() {
             now += Duration::from_millis(50);
-            assert_eq!(r.on_closed(now, Some("Account is already in use.")), Some(d), "retry {i}");
+            assert_eq!(
+                r.on_closed(now, Some("Account is already in use.")),
+                Some(d),
+                "retry {i}"
+            );
             assert!(r.pending());
             assert_eq!(r.take_due(now + d - Duration::from_millis(1)), None);
             now += d;
@@ -139,7 +156,10 @@ mod tests {
         now += Duration::from_millis(50);
         assert_eq!(r.on_closed(now, Some("Account is already in use.")), None);
         let total: Duration = RETRY_DELAYS.iter().sum();
-        assert!(total > Duration::from_secs(30), "the schedule must pass GServer-v2's 30 s idle rule");
+        assert!(
+            total > Duration::from_secs(30),
+            "the schedule must pass GServer-v2's 30 s idle rule"
+        );
     }
 
     #[test]
@@ -147,7 +167,13 @@ mod tests {
         let t0 = Instant::now();
         let mut r = WarpRetry::new(warp(), t0);
         assert_eq!(r.on_closed(t0, None), None);
-        assert_eq!(r.on_closed(t0, Some("Your client version is not allowed on this server.")), None);
+        assert_eq!(
+            r.on_closed(
+                t0,
+                Some("Your client version is not allowed on this server.")
+            ),
+            None
+        );
         assert!(!r.pending());
     }
 
@@ -155,13 +181,24 @@ mod tests {
     fn a_late_refusal_is_not_retried() {
         let t0 = Instant::now();
         let mut r = WarpRetry::new(warp(), t0);
-        assert_eq!(r.on_closed(t0 + REFUSAL_WINDOW + Duration::from_millis(1), Some("Account is already in use.")), None);
+        assert_eq!(
+            r.on_closed(
+                t0 + REFUSAL_WINDOW + Duration::from_millis(1),
+                Some("Account is already in use.")
+            ),
+            None
+        );
         // The window starts again at each retry's login.
         let mut r = WarpRetry::new(warp(), t0);
         let d = r.on_closed(t0, Some("Account is already in use.")).unwrap();
         let t1 = t0 + d + Duration::from_secs(20);
         assert!(r.take_due(t1).is_some());
-        assert!(r.on_closed(t1 + Duration::from_secs(1), Some("Account is already in use.")).is_some());
+        assert!(r
+            .on_closed(
+                t1 + Duration::from_secs(1),
+                Some("Account is already in use.")
+            )
+            .is_some());
     }
 
     #[test]

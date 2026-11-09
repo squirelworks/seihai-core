@@ -64,12 +64,16 @@ fn gstring_len(data: &[u8]) -> Option<usize> {
 /// (`carrystill`) still reads as a bow image; none of the swing names is that
 /// long.
 pub fn bow_slot_holds_gani(data: &[u8]) -> bool {
-    let Some(&first) = data.first() else { return false };
+    let Some(&first) = data.first() else {
+        return false;
+    };
     let n = usize::from(first.wrapping_sub(0x20));
     if !(1..10).contains(&n) {
         return false;
     }
-    let Some(name) = data.get(1..1 + n) else { return false };
+    let Some(name) = data.get(1..1 + n) else {
+        return false;
+    };
     let gani_byte = |b: &u8| b.is_ascii_lowercase() || b.is_ascii_digit() || b"_-.[]".contains(b);
     let next_ok = data.get(1 + n).is_none_or(|b| b.wrapping_sub(0x20) < 83);
     name[0].is_ascii_lowercase() && name.iter().all(gani_byte) && next_ok
@@ -96,7 +100,9 @@ fn prop_len(id: u8, data: &[u8], bow_prop10: bool) -> Option<usize> {
         // str
         // 10 is listed as the pre-2.1 bow slot for 2.05, but GServer-v2
         // sends a plain gani name ("idle") to a 2.05 login.
-        0 | 10 | 12 | 20 | 21 | 34 | 35 | 37..=41 | 46..=49 | 52 | 54..=75 | 82 => gstring_len(data)?,
+        0 | 10 | 12 | 20 | 21 | 34 | 35 | 37..=41 | 46..=49 | 52 | 54..=75 | 82 => {
+            gstring_len(data)?
+        }
         // c
         1 | 2 | 4..=7 | 15..=19 | 22 | 23 | 26 | 32 | 33 | 43..=45 | 50 | 53 | 81 => 1,
         // i3
@@ -177,7 +183,9 @@ pub fn parse_player_props_in(
             break;
         }
         let rest = &payload[i + 1..];
-        let Some(n) = prop_len(id, rest, bow_prop10) else { break };
+        let Some(n) = prop_len(id, rest, bow_prop10) else {
+            break;
+        };
         out.push(PlayerProp {
             id,
             raw: rest[..n].to_vec(),
@@ -195,7 +203,10 @@ mod tests {
     fn bow_slot_for_old_clients() {
         // Prop 10 as bow power 0, then X = 30, SPRITE dir 2.
         let p = [0x2a, 0x20, 0x2f, 0x20 + 60, 0x31, 0x22];
-        let ids: Vec<u8> = parse_player_props_with(&p, true).iter().map(|p| p.id).collect();
+        let ids: Vec<u8> = parse_player_props_with(&p, true)
+            .iter()
+            .map(|p| p.id)
+            .collect();
         assert_eq!(ids, vec![10, 15, 17]);
         // Bow image "b.gif": c(10 + 5) + name.
         let p = [&[0x2a, 0x20 + 15][..], b"b.gif", &[0x31, 0x22]].concat();
@@ -244,7 +255,10 @@ mod tests {
             .collect();
         let props = parse_player_props(&p);
         let ids: Vec<u8> = props.iter().map(|p| p.id).collect();
-        assert_eq!(ids, vec![1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 13, 17, 18, 21, 22, 23, 25]);
+        assert_eq!(
+            ids,
+            vec![1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 13, 17, 18, 21, 22, 23, 25]
+        );
         assert_eq!(&props[8].raw[1..], b"idle");
         assert_eq!(props[11].gchar(), Some(2));
         // APCOUNTER is a GSHORT: 61 - 1 = 60 s
@@ -257,10 +271,23 @@ mod tests {
     fn prop_sets_per_version() {
         use crate::protocol::ClientVersion;
         // X = 30, prop 34 ACCOUNTNAME "a", prop 43 GMAPLEVELX 1, Y = 12.
-        let p = [0x2f, 0x20 + 60, 0x20 + 34, 0x21, b'a', 0x20 + 43, 0x21, 0x30, 0x20 + 24];
+        let p = [
+            0x2f,
+            0x20 + 60,
+            0x20 + 34,
+            0x21,
+            b'a',
+            0x20 + 43,
+            0x21,
+            0x30,
+            0x20 + 24,
+        ];
         let ids = |v: ClientVersion| -> Vec<u8> {
             let pr = v.profile().props;
-            parse_player_props_in(&p, false, Some(&pr.own)).iter().map(|p| p.id).collect()
+            parse_player_props_in(&p, false, Some(&pr.own))
+                .iter()
+                .map(|p| p.id)
+                .collect()
         };
         assert_eq!(ids(ClientVersion::V138), vec![15]);
         assert_eq!(ids(ClientVersion::V139), vec![15, 34]);
@@ -273,9 +300,16 @@ mod tests {
     fn other_player_stops_at_maxpower() {
         use crate::protocol::ClientVersion;
         let p = [0x2f, 0x20 + 60, 0x21, 0x23, 0x30, 0x20 + 24];
-        for v in [ClientVersion::V205, ClientVersion::V222, ClientVersion::V231] {
+        for v in [
+            ClientVersion::V205,
+            ClientVersion::V222,
+            ClientVersion::V231,
+        ] {
             let other = v.profile().props.other;
-            let ids: Vec<u8> = parse_player_props_in(&p, false, Some(&other)).iter().map(|p| p.id).collect();
+            let ids: Vec<u8> = parse_player_props_in(&p, false, Some(&other))
+                .iter()
+                .map(|p| p.id)
+                .collect();
             assert_eq!(ids, vec![15], "{v:?}");
         }
     }

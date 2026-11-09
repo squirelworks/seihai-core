@@ -45,29 +45,55 @@ pub struct Lobby {
 
 /// 4.04r2, 4.20r8 and 5.00r7: four fields (`win` and three MD5s, read in
 /// the 4.x engines; `win,<md5>,"",<md5>` in the 5.00r7 lab capture).
-pub const LOBBY_404: Lobby = Lobby { first_server: "Login", platform: "win", os_version: None, after_login: Some(LOBBY_LOGIN_4X), login_tiles: true };
+pub const LOBBY_404: Lobby = Lobby {
+    first_server: "Login",
+    platform: "win",
+    os_version: None,
+    after_login: Some(LOBBY_LOGIN_4X),
+    login_tiles: true,
+};
 /// The Mac 4.20r6: `mac`, a hash of the Ethernet MAC, a hash of
 /// `stat("/etc")` and an empty fourth field (read in the binary; the lab run
 /// on Mac OS X 10.4 sent `mac,"",<32 hex>,""`). Its after-login messages are
 /// taken from the Windows 4.x engines, with `OSTYPE` `mac` and
 /// `TEXTCODEPAGE` 0, as the real client sent them in both Tiger lab runs
 /// (Graal_analysis `version-profiles/lab-mac-tiger-2026-10-31.md`).
-pub const LOBBY_420_MAC: Lobby = Lobby { platform: "mac", after_login: Some(LobbyLogin { os_props: ("mac", 0), ..LOBBY_LOGIN_4X }), ..LOBBY_404 };
+pub const LOBBY_420_MAC: Lobby = Lobby {
+    platform: "mac",
+    after_login: Some(LobbyLogin {
+        os_props: ("mac", 0),
+        ..LOBBY_LOGIN_4X
+    }),
+    ..LOBBY_404
+};
 /// 5.00r7: the same login line as 4.x. Its after-login messages were not
 /// recorded.
-pub const LOBBY_500: Lobby = Lobby { after_login: None, ..LOBBY_404 };
+pub const LOBBY_500: Lobby = Lobby {
+    after_login: None,
+    ..LOBBY_404
+};
 /// 5.12 to 6.03r7: the quoted Windows version as a fifth field.
-pub const LOBBY_512: Lobby = Lobby { os_version: Some("\"6.2 9200 \""), ..LOBBY_500 };
+pub const LOBBY_512: Lobby = Lobby {
+    os_version: Some("\"6.2 9200 \""),
+    ..LOBBY_500
+};
 /// 5.31r4 and 6.03r7: 5.12's login, and no tiles in Login mode (lab
 /// screenshots, Graal_analysis `protocol/v5v6-lab-play.md`).
-pub const LOBBY_531: Lobby = Lobby { login_tiles: false, ..LOBBY_512 };
+pub const LOBBY_531: Lobby = Lobby {
+    login_tiles: false,
+    ..LOBBY_512
+};
 
 /// The Linux 6.03r7: `linux`, then four machine ids (MD5 hex of the `eth0`
 /// MAC, MD5 hex of the inode of `/etc`, an empty field, and the kernel
 /// release and version), read in the binary (Graal_analysis
 /// `protocol/v6x-clients.md`), never captured. Seihai sends all four as
 /// `""`, as it does the Windows hashes; the kernel string is not invented.
-pub const LOBBY_603_LINUX: Lobby = Lobby { platform: "linux", os_version: Some(EMPTY_MACHINE_FIELD), ..LOBBY_531 };
+pub const LOBBY_603_LINUX: Lobby = Lobby {
+    platform: "linux",
+    os_version: Some(EMPTY_MACHINE_FIELD),
+    ..LOBBY_531
+};
 
 /// The machine field Seihai sends for each of the three hashes.
 pub const EMPTY_MACHINE_FIELD: &str = "\"\"";
@@ -93,7 +119,10 @@ impl Lobby {
 /// name: the name starts with "login", in any case (the draw-layer test read
 /// in 4.04 and 5.x).
 pub fn is_login_mode(server_name: &str) -> bool {
-    server_name.as_bytes().get(..5).is_some_and(|p| p.eq_ignore_ascii_case(b"login"))
+    server_name
+        .as_bytes()
+        .get(..5)
+        .is_some_and(|p| p.eq_ignore_ascii_case(b"login"))
 }
 
 /// The name a lobby build starts under. The real clients always reach the
@@ -172,14 +201,18 @@ pub const LOBBY_LOGIN_4X: LobbyLogin = LobbyLogin {
     texts: &[
         (PLI_REQUESTTEXT, "GraalEngine,pmguilds,\"\""),
         (PLI_REQUESTTEXT, "GraalEngine,pmservers,\"\""),
-        (PLI_SENDTEXT, "GraalEngine,lister,options,globalpms=true,buddytracking=true,showbuddies=true"),
+        (
+            PLI_SENDTEXT,
+            "GraalEngine,lister,options,globalpms=true,buddytracking=true,showbuddies=true",
+        ),
         (PLI_SENDTEXT, "GraalEngine,lister,verifybuddies,1,0"),
     ],
     os_props: ("win", 1252),
 };
 
 fn latin1(text: &str) -> impl Iterator<Item = u8> + '_ {
-    text.chars().map(|c| if (c as u32) < 0x100 { c as u8 } else { b'?' })
+    text.chars()
+        .map(|c| if (c as u32) < 0x100 { c as u8 } else { b'?' })
 }
 
 fn gstring(out: &mut Vec<u8>, text: &str) {
@@ -252,12 +285,24 @@ pub fn window_list_message(titles: &[&str]) -> Vec<u8> {
 /// (33) 0, `PLANGUAGE` (52), `OSTYPE` (75) and `TEXTCODEPAGE` (76). The
 /// real clients sent `Real404` (the start screen's nickname field), STATUS
 /// 20, UDPPORT 0, `English`, `win` and 1252; no head, colours or body.
-pub fn lobby_props_message(info: &LobbyLogin, own_props: &[u8], nickname: &str, accepted: Option<&super::IdSet>) -> Vec<u8> {
+pub fn lobby_props_message(
+    info: &LobbyLogin,
+    own_props: &[u8],
+    nickname: &str,
+    accepted: Option<&super::IdSet>,
+) -> Vec<u8> {
     let props = super::props::parse_player_props_in(own_props, false, accepted);
     let mut m = vec![2 + 0x20, 0x20];
     gstring(&mut m, nickname);
-    if let Some(b) = props.iter().find(|p| p.id == crate::life::PLPROP_STATUS).and_then(|p| p.raw.first()) {
-        m.extend([18 + 0x20, crate::offline::server_status_base(b.saturating_sub(0x20)) + 0x20]);
+    if let Some(b) = props
+        .iter()
+        .find(|p| p.id == crate::life::PLPROP_STATUS)
+        .and_then(|p| p.raw.first())
+    {
+        m.extend([
+            18 + 0x20,
+            crate::offline::server_status_base(b.saturating_sub(0x20)) + 0x20,
+        ]);
     }
     m.extend([31 + 0x20, 0x20, 0x20, 0x20]);
     m.extend([33 + 0x20, 0x20]);
@@ -267,7 +312,11 @@ pub fn lobby_props_message(info: &LobbyLogin, own_props: &[u8], nickname: &str, 
     m.push(75 + 0x20);
     gstring(&mut m, os);
     m.push(76 + 0x20);
-    m.extend([((cp >> 14) & 0x7F) as u8 + 0x20, ((cp >> 7) & 0x7F) as u8 + 0x20, (cp & 0x7F) as u8 + 0x20]);
+    m.extend([
+        ((cp >> 14) & 0x7F) as u8 + 0x20,
+        ((cp >> 7) & 0x7F) as u8 + 0x20,
+        (cp & 0x7F) as u8 + 0x20,
+    ]);
     m.push(b'\n');
     m
 }
@@ -288,7 +337,11 @@ impl LobbyBurst {
     pub fn for_version(version: super::ClientVersion) -> Option<Self> {
         let p = version.profile();
         let info = p.protocol.lobby?.after_login?;
-        p.protocol.pli.contains(2).then_some(Self { info, sent: false, level_at: None })
+        p.protocol.pli.contains(2).then_some(Self {
+            info,
+            sent: false,
+            level_at: None,
+        })
     }
 
     pub fn info(&self) -> LobbyLogin {
@@ -309,7 +362,9 @@ impl LobbyBurst {
     pub fn due_at(&self, state: &super::SessionState, now: std::time::Instant) -> bool {
         !self.sent
             && (state.process_list_requests > 0
-                || self.level_at.is_some_and(|t| now.saturating_duration_since(t) >= super::login::FRAME_AFTER_LEVEL))
+                || self.level_at.is_some_and(|t| {
+                    now.saturating_duration_since(t) >= super::login::FRAME_AFTER_LEVEL
+                }))
     }
 
     /// The four frames, once, when due (empty frames left out). `check`
@@ -330,7 +385,10 @@ impl LobbyBurst {
         }
         self.sent = true;
         let mut frames = vec![check("idle.gani")];
-        let mut setup: Vec<Vec<u8>> = super::login::head_image(&state.player_props, state.own_prop_ids.as_ref()).map(|h| check(&h)).unwrap_or_default();
+        let mut setup: Vec<Vec<u8>> =
+            super::login::head_image(&state.player_props, state.own_prop_ids.as_ref())
+                .map(|h| check(&h))
+                .unwrap_or_default();
         setup.extend(self.info.texts.iter().map(|&(id, t)| text_message(id, t)));
         frames.push(setup);
         frames.push(enter_level());
@@ -339,7 +397,11 @@ impl LobbyBurst {
             last.push(window_list_message(windows));
         }
         let mut images: Vec<&str> = Vec::new();
-        for n in state.default_weapons.iter().filter_map(|&id| super::login::default_weapon_image(id)) {
+        for n in state
+            .default_weapons
+            .iter()
+            .filter_map(|&id| super::login::default_weapon_image(id))
+        {
             if !images.contains(&n) {
                 images.push(n);
             }
@@ -347,7 +409,12 @@ impl LobbyBurst {
         for n in images {
             last.extend(check(n));
         }
-        last.push(lobby_props_message(&self.info, &state.player_props, nickname, state.own_prop_ids.as_ref()));
+        last.push(lobby_props_message(
+            &self.info,
+            &state.player_props,
+            nickname,
+            state.own_prop_ids.as_ref(),
+        ));
         frames.push(last);
         frames.retain(|f| !f.is_empty());
         frames
@@ -385,16 +452,33 @@ mod tests {
     fn login_tiles_follow_the_lab() {
         use crate::protocol::ClientVersion::*;
         for v in [V531R4, V603R7, V603R7Linux] {
-            assert!(!v.profile().protocol.lobby.unwrap().login_tiles, "{}", v.label());
+            assert!(
+                !v.profile().protocol.lobby.unwrap().login_tiles,
+                "{}",
+                v.label()
+            );
         }
-        for v in [V404R2, V420R6, V420R8, V500R7, V512, V524R4, V530R3, V600R2, V6015, V6034] {
-            assert!(v.profile().protocol.lobby.unwrap().login_tiles, "{}", v.label());
+        for v in [
+            V404R2, V420R6, V420R8, V500R7, V512, V524R4, V530R3, V600R2, V6015, V6034,
+        ] {
+            assert!(
+                v.profile().protocol.lobby.unwrap().login_tiles,
+                "{}",
+                v.label()
+            );
         }
     }
 
     #[test]
     fn a_picked_game_server_is_not_login_mode() {
-        for lobby in [LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_531, LOBBY_603_LINUX] {
+        for lobby in [
+            LOBBY_404,
+            LOBBY_420_MAC,
+            LOBBY_500,
+            LOBBY_512,
+            LOBBY_531,
+            LOBBY_603_LINUX,
+        ] {
             for name in ["GServer-RS", "Zelda-A-Link-to-the-Past"] {
                 let first = first_server_name(&lobby, Some(name));
                 assert_eq!(first, name);
@@ -404,7 +488,10 @@ mod tests {
             assert!(is_login_mode(&first_server_name(&lobby, None)));
             assert!(is_login_mode(&first_server_name(&lobby, Some("  "))));
             // A list entry that is a Login server stays in Login mode.
-            assert!(is_login_mode(&first_server_name(&lobby, Some("Login Server"))));
+            assert!(is_login_mode(&first_server_name(
+                &lobby,
+                Some("Login Server")
+            )));
         }
     }
 
@@ -427,7 +514,10 @@ mod tests {
         assert_eq!(m, b"\x22 'Real40424?   A T'Englishk#winl )\x84\n");
         // The server's paused and dead bits do not go back.
         let own = [18 + 0x20, 29 + 0x20];
-        assert_eq!(lobby_props_message(&LOBBY_LOGIN_4X, &own, "Real404", None), m);
+        assert_eq!(
+            lobby_props_message(&LOBBY_LOGIN_4X, &own, "Real404", None),
+            m
+        );
     }
 
     /// The real Mac 4.20r6's own props (Tiger lab, 2026-10-31, the first
@@ -443,25 +533,62 @@ mod tests {
 
     #[test]
     fn text_gani_and_window_messages() {
-        assert_eq!(text_message(PLI_REQUESTTEXT, "GraalEngine,pmguilds,\"\""), b"\xb8GraalEngine,pmguilds,\"\"\n");
-        assert_eq!(text_message(PLI_SENDTEXT, "GraalEngine,lister,verifybuddies,1,0"), b"\xbaGraalEngine,lister,verifybuddies,1,0\n");
+        assert_eq!(
+            text_message(PLI_REQUESTTEXT, "GraalEngine,pmguilds,\"\""),
+            b"\xb8GraalEngine,pmguilds,\"\"\n"
+        );
+        assert_eq!(
+            text_message(PLI_SENDTEXT, "GraalEngine,lister,verifybuddies,1,0"),
+            b"\xbaGraalEngine,lister,verifybuddies,1,0\n"
+        );
         assert_eq!(update_gani_message("idle.gani"), b"\xbd     idle\n");
         assert_eq!(update_gani_message("walk"), b"\xbd     walk\n");
         let msgs = with_gani_updates(vec![b"7steps.wav\n".to_vec(), b"7walk.gani\n".to_vec()]);
-        assert_eq!(msgs, [b"7steps.wav\n".to_vec(), b"7walk.gani\n".to_vec(), b"\xbd     walk\n".to_vec()]);
-        assert_eq!(window_list_message(&["Message", "Open URL", "Graal 4.04r2 - Login"]), b"LMessage,Open URL,Graal 4.04r2 - Login\n");
+        assert_eq!(
+            msgs,
+            [
+                b"7steps.wav\n".to_vec(),
+                b"7walk.gani\n".to_vec(),
+                b"\xbd     walk\n".to_vec()
+            ]
+        );
+        assert_eq!(
+            window_list_message(&["Message", "Open URL", "Graal 4.04r2 - Login"]),
+            b"LMessage,Open URL,Graal 4.04r2 - Login\n"
+        );
         assert_eq!(window_list_message(&["a,b"]), b"L\"a,b\"\n");
     }
 
     #[test]
     fn which_builds_have_it() {
-        for v in [ClientVersion::V404R2, ClientVersion::V420R6, ClientVersion::V420R8] {
+        for v in [
+            ClientVersion::V404R2,
+            ClientVersion::V420R6,
+            ClientVersion::V420R8,
+        ] {
             let b = LobbyBurst::for_version(v).unwrap_or_else(|| panic!("{}", v.label()));
             let pli = &v.profile().protocol.pli;
-            for id in [2, 23, 24, 44, 46, 47, PLI_REQUESTTEXT, PLI_SENDTEXT, PLI_UPDATEGANI] {
+            for id in [
+                2,
+                23,
+                24,
+                44,
+                46,
+                47,
+                PLI_REQUESTTEXT,
+                PLI_SENDTEXT,
+                PLI_UPDATEGANI,
+            ] {
                 assert!(pli.contains(id), "{} {id}", v.label());
             }
-            assert_eq!(b.info().os_props.0, if v == ClientVersion::V420R6 { "mac" } else { "win" });
+            assert_eq!(
+                b.info().os_props.0,
+                if v == ClientVersion::V420R6 {
+                    "mac"
+                } else {
+                    "win"
+                }
+            );
         }
         assert!(LobbyBurst::for_version(ClientVersion::V500R7).is_none());
         assert!(LobbyBurst::for_version(ClientVersion::V603R7).is_none());
@@ -476,11 +603,23 @@ mod tests {
         let now = Instant::now();
         let none = |_: &str| -> Vec<Vec<u8>> { unreachable!() };
         assert!(b.take(&st, "n", now, none, Vec::new, &[]).is_empty());
-        st.player_props = [&[11 + 0x20, 9 + 100 + 0x20][..], b"head0.png", &[18 + 0x20, 20 + 0x20]].concat();
+        st.player_props = [
+            &[11 + 0x20, 9 + 100 + 0x20][..],
+            b"head0.png",
+            &[18 + 0x20, 20 + 0x20],
+        ]
+        .concat();
         st.default_weapons = vec![8, 7];
         st.process_list_requests = 1;
         let check = |n: &str| with_gani_updates(vec![crate::net::wantfile_message(n)]);
-        let f = b.take(&st, "SeihaiNick", now, check, || vec![b"N!\n".to_vec()], &["Graal 4.04r2 - Login"]);
+        let f = b.take(
+            &st,
+            "SeihaiNick",
+            now,
+            check,
+            || vec![b"N!\n".to_vec()],
+            &["Graal 4.04r2 - Login"],
+        );
         let text = |m: &Vec<u8>| String::from_utf8_lossy(m).into_owned();
         let f: Vec<Vec<String>> = f.iter().map(|fr| fr.iter().map(text).collect()).collect();
         assert_eq!(f[0], ["7idle.gani\n", "\u{fffd}     idle\n"]);
@@ -492,7 +631,9 @@ mod tests {
         assert_eq!(f[3][1..3], ["7wbomb1.png\n", "7wbowi1.png\n"]);
         assert!(f[3][3].starts_with("\" *SeihaiNick24?   A T"));
         assert!(!b.pending());
-        assert!(b.take(&st, "n", now, |_: &str| Vec::new(), Vec::new, &[]).is_empty());
+        assert!(b
+            .take(&st, "n", now, |_: &str| Vec::new(), Vec::new, &[])
+            .is_empty());
     }
 
     /// No 182: the frames go 240 ms after the level, without the window list.
@@ -503,7 +644,14 @@ mod tests {
         let t0 = Instant::now();
         b.note_level(t0);
         assert!(!b.due_at(&st, t0 + Duration::from_millis(100)));
-        let f = b.take(&st, "x", t0 + Duration::from_millis(250), |_: &str| Vec::new(), Vec::new, &["w"]);
+        let f = b.take(
+            &st,
+            "x",
+            t0 + Duration::from_millis(250),
+            |_: &str| Vec::new(),
+            Vec::new,
+            &["w"],
+        );
         assert_eq!(f.len(), 2);
         assert_eq!(f[1].len(), 1);
         assert_eq!(f[1][0][0], 2 + 0x20);

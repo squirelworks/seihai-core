@@ -116,7 +116,9 @@ impl ZeldaLink {
     /// Does any of x, y, width, height have a fractional part? None did in
     /// the Drive set; [`Link`] holds whole tiles.
     pub fn fractional_geometry(&self) -> bool {
-        [self.x, self.y, self.width, self.height].iter().any(|v| v.fract() != 0.0)
+        [self.x, self.y, self.width, self.height]
+            .iter()
+            .any(|v| v.fract() != 0.0)
     }
 
     /// As the level's [`Link`]: geometry in whole tiles (rounded down), a
@@ -154,7 +156,10 @@ impl ZeldaLink {
     }
 
     fn write(&self) -> String {
-        format!("{} {:?} {:?} {:?} {:?} {:?} {:?}", self.dest, self.x, self.y, self.width, self.height, self.new_x, self.new_y)
+        format!(
+            "{} {:?} {:?} {:?} {:?} {:?} {:?}",
+            self.dest, self.x, self.y, self.width, self.height, self.new_x, self.new_y
+        )
     }
 }
 
@@ -259,7 +264,10 @@ impl ZeldaLayout {
     pub fn summary(&self) -> String {
         let span = |r: (usize, usize)| format!("{}..{} ({} bytes)", r.0, r.1, r.1 - r.0);
         let mut o = String::new();
-        o.push_str(&format!("magic {}  code bits {}  file {} bytes  (Z3-V1: no npcs, no chests)\n", self.magic, self.code_bits, self.file_len));
+        o.push_str(&format!(
+            "magic {}  code bits {}  file {} bytes  (Z3-V1: no npcs, no chests)\n",
+            self.magic, self.code_bits, self.file_len
+        ));
         o.push_str(&format!(
             "board: {} tiles from {} codes ({} single runs, {} double runs, longest run {}), ends at byte {}, highest tile {}\n",
             self.tiles_decoded, self.codes, self.single_runs, self.double_runs, self.max_run, self.board_end, self.max_tile
@@ -273,16 +281,32 @@ impl ZeldaLayout {
             self.link_keep_y,
             self.link_fractional_numbers
         ));
-        let kinds: Vec<String> = self.computer_kinds.iter().map(|(k, n)| format!("type {k} x{n}")).collect();
+        let kinds: Vec<String> = self
+            .computer_kinds
+            .iter()
+            .map(|(k, n)| format!("type {k} x{n}"))
+            .collect();
         o.push_str(&format!(
             "computers {}: {} records ({}), {} with text, terminator {}\n",
             span(self.computers),
             self.computer_records,
-            if kinds.is_empty() { "none".to_string() } else { kinds.join(", ") },
+            if kinds.is_empty() {
+                "none".to_string()
+            } else {
+                kinds.join(", ")
+            },
             self.computer_extra,
-            if self.computer_terminator { "found" } else { "missing" }
+            if self.computer_terminator {
+                "found"
+            } else {
+                "missing"
+            }
         ));
-        o.push_str(&format!("signs     {}: {} records\n", span(self.signs), self.sign_records));
+        o.push_str(&format!(
+            "signs     {}: {} records\n",
+            span(self.signs),
+            self.sign_records
+        ));
         o.push_str(&format!("unread tail: {} bytes\n", self.unread_tail));
         if self.anomalies.is_empty() {
             o.push_str("anomalies: none\n");
@@ -372,7 +396,12 @@ struct Board {
 /// low byte is a count and whose 0x100 bit asks for a double run. The
 /// double-run flag stays set until a double run completes (Java and both
 /// Delphi clients agree), which the `.graal` reader does not model.
-fn decode_board(data: &[u8], start: usize, bits: u32, lay: &mut ZeldaLayout) -> Result<Board, String> {
+fn decode_board(
+    data: &[u8],
+    start: usize,
+    bits: u32,
+    lay: &mut ZeldaLayout,
+) -> Result<Board, String> {
     let flag = 1u32 << (bits - 1);
     let mask = (1u32 << bits) - 1;
     let mut tiles = vec![0u16; BOARD_TILES];
@@ -382,7 +411,9 @@ fn decode_board(data: &[u8], start: usize, bits: u32, lay: &mut ZeldaLayout) -> 
     while n < BOARD_TILES {
         while have < bits {
             let Some(&b) = data.get(pos) else {
-                return Err(format!("board stream ends after {n} of {BOARD_TILES} tiles"));
+                return Err(format!(
+                    "board stream ends after {n} of {BOARD_TILES} tiles"
+                ));
             };
             buf |= u32::from(b) << have;
             have += 8;
@@ -457,7 +488,10 @@ impl ZeldaLevel {
             ..ZeldaLayout::default()
         };
         let board = decode_board(data, 8, magic.code_bits(), &mut lay)?;
-        let mut s = Lines { data, pos: board.end };
+        let mut s = Lines {
+            data,
+            pos: board.end,
+        };
 
         // Links: lines up to "#" or an empty line.
         let start = s.pos;
@@ -474,12 +508,20 @@ impl ZeldaLevel {
             lay.link_lines += 1;
             match ZeldaLink::parse(&latin1(l)) {
                 Some(link) => {
-                    let tail: Vec<&[u8]> = l.rsplit(|&b| b == b' ').filter(|t| !t.is_empty()).take(6).collect();
-                    lay.link_fractional_numbers += tail.iter().filter(|t| t.contains(&b'.') && !t.ends_with(b".0")).count();
+                    let tail: Vec<&[u8]> = l
+                        .rsplit(|&b| b == b' ')
+                        .filter(|t| !t.is_empty())
+                        .take(6)
+                        .collect();
+                    lay.link_fractional_numbers += tail
+                        .iter()
+                        .filter(|t| t.contains(&b'.') && !t.ends_with(b".0"))
+                        .count();
                     lay.link_keep_x += usize::from(link.keeps_x());
                     lay.link_keep_y += usize::from(link.keeps_y());
                     if link.fractional_geometry() {
-                        lay.anomalies.push("a link has a fractional x, y, width or height".into());
+                        lay.anomalies
+                            .push("a link has a fractional x, y, width or height".into());
                     }
                     links.push(link);
                 }
@@ -488,10 +530,13 @@ impl ZeldaLevel {
         }
         lay.links = (start, s.pos);
         if bad_links > 0 {
-            lay.anomalies.push(format!("{bad_links} link line(s) do not read as `dest x y w h newx newy`"));
+            lay.anomalies.push(format!(
+                "{bad_links} link line(s) do not read as `dest x y w h newx newy`"
+            ));
         }
         if !lay.link_hash_end {
-            lay.anomalies.push("the links section has no `#` line".into());
+            lay.anomalies
+                .push("the links section has no `#` line".into());
         }
 
         // Computers: three raw bytes and the rest of the line. A first byte
@@ -503,7 +548,8 @@ impl ZeldaLevel {
             let rest = &data[s.pos.min(data.len())..];
             if rest.len() < 3 {
                 s.pos = data.len();
-                lay.anomalies.push("the computers section ends before its terminator".into());
+                lay.anomalies
+                    .push("the computers section ends before its terminator".into());
                 break;
             }
             let end = rest[3..].iter().position(|&b| b == b'\n').map(|i| i + 3);
@@ -512,22 +558,30 @@ impl ZeldaLevel {
                 None => (&rest[3..], rest.len()),
             };
             if end.is_none() {
-                lay.anomalies.push("a computer record has no line end".into());
+                lay.anomalies
+                    .push("a computer record has no line end".into());
             }
             s.pos += used;
             if rest[0] >= 0x80 {
                 lay.computer_terminator = true;
                 if rest[..3] != [0xFF, 0xFF, 0xFF] || !extra.is_empty() {
-                    lay.anomalies.push("the computers terminator is not `FF FF FF` and a line end".into());
+                    lay.anomalies
+                        .push("the computers terminator is not `FF FF FF` and a line end".into());
                 }
                 break;
             }
             if !extra.is_empty() && !magic.has_verses() {
-                lay.anomalies.push("a Z3-V1.03 computer record has text after its type".into());
+                lay.anomalies
+                    .push("a Z3-V1.03 computer record has text after its type".into());
             }
             *lay.computer_kinds.entry(rest[2]).or_insert(0) += 1;
             lay.computer_extra += usize::from(!extra.is_empty());
-            computers.push(Computer { x: rest[0], y: rest[1], kind: rest[2], extra: extra.to_vec() });
+            computers.push(Computer {
+                x: rest[0],
+                y: rest[1],
+                kind: rest[2],
+                extra: extra.to_vec(),
+            });
         }
         lay.computer_records = computers.len();
         lay.computers = (start, s.pos);
@@ -540,19 +594,36 @@ impl ZeldaLevel {
                 break;
             }
             match decode_sign_record(l) {
-                Some((x, y, text)) => signs.push(ZeldaSign { x, y, raw: l[2..].to_vec(), text }),
-                None => lay.anomalies.push("a sign line is shorter than its two coordinate bytes".into()),
+                Some((x, y, text)) => signs.push(ZeldaSign {
+                    x,
+                    y,
+                    raw: l[2..].to_vec(),
+                    text,
+                }),
+                None => lay
+                    .anomalies
+                    .push("a sign line is shorter than its two coordinate bytes".into()),
             }
         }
         lay.sign_records = signs.len();
         lay.signs = (start, s.pos);
         lay.unread_tail = data.len() - s.pos;
         if lay.unread_tail > 0 {
-            lay.anomalies.push(format!("{} byte(s) follow the signs section", lay.unread_tail));
+            lay.anomalies.push(format!(
+                "{} byte(s) follow the signs section",
+                lay.unread_tail
+            ));
         }
         lay.anomalies.dedup();
 
-        Ok(ZeldaLevel { magic, board: board.tiles, links, computers, signs, layout: lay })
+        Ok(ZeldaLevel {
+            magic,
+            board: board.tiles,
+            links,
+            computers,
+            signs,
+            layout: lay,
+        })
     }
 
     /// The level as the engine holds it: board runs for layer 0, links,
@@ -562,7 +633,15 @@ impl ZeldaLevel {
             boards: board_runs(&self.board),
             npcs: Vec::new(),
             links: self.links.iter().map(ZeldaLink::to_link).collect(),
-            signs: self.signs.iter().map(|s| Sign { x: s.x, y: s.y, text: s.text.clone() }).collect(),
+            signs: self
+                .signs
+                .iter()
+                .map(|s| Sign {
+                    x: s.x,
+                    y: s.y,
+                    text: s.text.clone(),
+                })
+                .collect(),
             baddies: self
                 .computers
                 .iter()
@@ -616,10 +695,18 @@ fn encode_board(tiles: &[u16], bits: u32) -> Result<Vec<u8>, String> {
     let mut codes: Vec<u32> = Vec::new();
     let mut i = 0;
     while i < tiles.len() {
-        let same = tiles[i..].iter().take(255).take_while(|&&t| t == tiles[i]).count();
+        let same = tiles[i..]
+            .iter()
+            .take(255)
+            .take_while(|&&t| t == tiles[i])
+            .count();
         let pairs = if i + 3 < tiles.len() {
             let mut n = 0;
-            while n < 255 && i + 2 * n + 1 < tiles.len() && tiles[i + 2 * n] == tiles[i] && tiles[i + 2 * n + 1] == tiles[i + 1] {
+            while n < 255
+                && i + 2 * n + 1 < tiles.len()
+                && tiles[i + 2 * n] == tiles[i]
+                && tiles[i + 2 * n + 1] == tiles[i + 1]
+            {
                 n += 1;
             }
             n
@@ -684,7 +771,10 @@ mod tests {
     fn file(magic: &str, tail: &[u8]) -> Vec<u8> {
         let bits = if magic == "Z3-V1.02" { 11 } else { 12 };
         let mut d = magic.as_bytes().to_vec();
-        let b: Vec<u16> = board().iter().map(|&t| if bits == 11 { t & 0x3FF } else { t }).collect();
+        let b: Vec<u16> = board()
+            .iter()
+            .map(|&t| if bits == 11 { t & 0x3FF } else { t })
+            .collect();
         d.extend(encode_board(&b, bits).unwrap());
         d.extend_from_slice(tail);
         d
@@ -693,7 +783,10 @@ mod tests {
     #[test]
     fn board_round_trips_at_both_widths() {
         for (m, bits) in [("Z3-V1.02", 11u32), ("Z3-V1.03", 12), ("Z3-V1.04", 12)] {
-            let want: Vec<u16> = board().iter().map(|&t| if bits == 11 { t & 0x3FF } else { t }).collect();
+            let want: Vec<u16> = board()
+                .iter()
+                .map(|&t| if bits == 11 { t & 0x3FF } else { t })
+                .collect();
             let d = file(m, b"#\n\xff\xff\xff\n");
             let z = ZeldaLevel::parse(&d).unwrap();
             assert_eq!(z.board, want, "{m}");
@@ -710,8 +803,14 @@ mod tests {
         let d = file("Z3-V1.03", b"#\n\x17\x27\x04\n\x05\x0a\x02\n\xff\xff\xff\n");
         let z = ZeldaLevel::parse(&d).unwrap();
         assert_eq!(z.computers.len(), 2);
-        assert_eq!((z.computers[0].x, z.computers[0].y, z.computers[0].kind), (23, 39, 4));
-        assert_eq!((z.computers[1].x, z.computers[1].y, z.computers[1].kind), (5, 10, 2));
+        assert_eq!(
+            (z.computers[0].x, z.computers[0].y, z.computers[0].kind),
+            (23, 39, 4)
+        );
+        assert_eq!(
+            (z.computers[1].x, z.computers[1].y, z.computers[1].kind),
+            (5, 10, 2)
+        );
         assert!(z.computers.iter().all(|c| c.extra.is_empty()));
         assert!(z.layout.computer_terminator && z.layout.is_clean());
         assert_eq!(z.layout.computer_kinds.get(&4), Some(&1));
@@ -720,7 +819,10 @@ mod tests {
 
     #[test]
     fn z3_104_computers_carry_verses() {
-        let d = file("Z3-V1.04", b"#\n\x0a\x0b\x01Hi!\\Oh no!\\Need help\n\x01\x02\x00\\\\\n\xff\xff\xff\n");
+        let d = file(
+            "Z3-V1.04",
+            b"#\n\x0a\x0b\x01Hi!\\Oh no!\\Need help\n\x01\x02\x00\\\\\n\xff\xff\xff\n",
+        );
         let z = ZeldaLevel::parse(&d).unwrap();
         assert_eq!(z.computers.len(), 2);
         assert_eq!(z.computers[0].verses(), ["Hi!", "Oh no!", "Need help"]);
@@ -740,14 +842,28 @@ mod tests {
         let z = ZeldaLevel::parse(&d).unwrap();
         assert_eq!(z.links.len(), 3);
         let l = z.to_level();
-        assert_eq!((l.links[0].x, l.links[0].y, l.links[0].width, l.links[0].height), (31, 42, 2, 1));
-        assert_eq!((l.links[0].new_x, l.links[0].new_y), (Some(43.5), Some(41.0)));
+        assert_eq!(
+            (
+                l.links[0].x,
+                l.links[0].y,
+                l.links[0].width,
+                l.links[0].height
+            ),
+            (31, 42, 2, 1)
+        );
+        assert_eq!(
+            (l.links[0].new_x, l.links[0].new_y),
+            (Some(43.5), Some(41.0))
+        );
         assert_eq!((l.links[1].new_x, l.links[1].new_y), (Some(61.0), None));
         assert_eq!(l.links[2].dest, "big house.zelda");
         assert_eq!((l.links[2].new_x, l.links[2].new_y), (None, None));
         assert_eq!(z.layout.link_keep_x, 1);
         assert_eq!(z.layout.link_keep_y, 2);
-        assert_eq!(z.layout.link_fractional_numbers, 1, "43.5 only; 31.0 is whole");
+        assert_eq!(
+            z.layout.link_fractional_numbers, 1,
+            "43.5 only; 31.0 is whole"
+        );
         assert!(z.layout.is_clean(), "{:?}", z.layout.anomalies);
     }
 
@@ -772,7 +888,11 @@ mod tests {
         let z = ZeldaLevel::parse(&d).unwrap();
         assert!(!z.layout.is_clean());
         assert!(z.layout.anomalies.iter().any(|a| a.contains("no `#`")));
-        assert!(z.layout.anomalies.iter().any(|a| a.contains("before its terminator")));
+        assert!(z
+            .layout
+            .anomalies
+            .iter()
+            .any(|a| a.contains("before its terminator")));
         let d = file("Z3-V1.03", b"#\n\xff\xff\xff\n\n#$'B\n");
         let z = ZeldaLevel::parse(&d).unwrap();
         assert_eq!(z.layout.unread_tail, 5);
@@ -786,11 +906,15 @@ mod tests {
     #[test]
     fn hard_errors() {
         assert!(ZeldaLevel::parse(b"Z3-V1").is_err());
-        assert!(ZeldaLevel::parse(b"Z3-V1.05xxxxxxxx").unwrap_err().contains("unknown Z3-V1 revision"));
+        assert!(ZeldaLevel::parse(b"Z3-V1.05xxxxxxxx")
+            .unwrap_err()
+            .contains("unknown Z3-V1 revision"));
         assert!(ZeldaLevel::parse(b"GR-V1.03xxxxxxxx").is_err());
         let mut d = file("Z3-V1.03", b"");
         d.truncate(100);
-        assert!(ZeldaLevel::parse(&d).unwrap_err().contains("board stream ends"));
+        assert!(ZeldaLevel::parse(&d)
+            .unwrap_err()
+            .contains("board stream ends"));
     }
 
     /// Pack 12-bit codes, least significant bit first.
@@ -867,17 +991,28 @@ mod tests {
         assert!(ZeldaMagic::V103.graal_clients_read() && ZeldaMagic::V104.graal_clients_read());
         assert!(!ZeldaMagic::V102.graal_clients_read());
         assert!(ZeldaMagic::V104.has_verses() && !ZeldaMagic::V103.has_verses());
-        assert_eq!(ZeldaMagic::from_bytes(b"Z3-V1.03zzzz"), Some(ZeldaMagic::V103));
+        assert_eq!(
+            ZeldaMagic::from_bytes(b"Z3-V1.03zzzz"),
+            Some(ZeldaMagic::V103)
+        );
         assert_eq!(Computer::java_type_name(6), Some("octopus"));
         assert_eq!(Computer::java_type_name(7), None);
     }
 
     #[test]
     fn summary_reads_without_content() {
-        let d = file("Z3-V1.03", b"a.zelda 1 2 3 4 5 6\n#\n\x01\x02\x03\n\xff\xff\xff\n");
+        let d = file(
+            "Z3-V1.03",
+            b"a.zelda 1 2 3 4 5 6\n#\n\x01\x02\x03\n\xff\xff\xff\n",
+        );
         let z = ZeldaLevel::parse(&d).unwrap();
         let s = z.layout.summary();
-        assert!(s.contains("magic Z3-V1.03") && s.contains("computers") && s.contains("anomalies: none"), "{s}");
+        assert!(
+            s.contains("magic Z3-V1.03")
+                && s.contains("computers")
+                && s.contains("anomalies: none"),
+            "{s}"
+        );
         assert!(!s.contains("a.zelda"));
     }
 
@@ -897,14 +1032,18 @@ mod tests {
                 let p = e.path();
                 if p.is_dir() {
                     walk(&p, out);
-                } else if p.metadata().is_ok_and(|m| m.len() >= 8 && m.len() < 1_000_000) {
+                } else if p
+                    .metadata()
+                    .is_ok_and(|m| m.len() >= 8 && m.len() < 1_000_000)
+                {
                     out.push(p);
                 }
             }
         }
         let mut all = Vec::new();
         walk(std::path::Path::new(&root), &mut all);
-        let (mut files, mut v102, mut v103, mut v104, mut unique) = (0, 0, 0, 0, std::collections::HashSet::new());
+        let (mut files, mut v102, mut v103, mut v104, mut unique) =
+            (0, 0, 0, 0, std::collections::HashSet::new());
         let (mut links, mut computers, mut signs, mut hash_kept, mut flags_kept) = (0, 0, 0, 0, 0);
         let mut bad = Vec::new();
         for p in &all {
@@ -931,19 +1070,48 @@ mod tests {
             }
             // Derived facts that hold for every file.
             assert_eq!(z.layout.tiles_decoded, BOARD_TILES);
-            assert_eq!(z.layout.board_end + (z.layout.signs.1 - z.layout.links.0), data.len(), "sections tile the file");
+            assert_eq!(
+                z.layout.board_end + (z.layout.signs.1 - z.layout.links.0),
+                data.len(),
+                "sections tile the file"
+            );
             assert!(z.layout.max_tile < 2048, "12-bit codes cannot hold more");
-            assert!(z.computers.iter().all(|c| c.kind <= 6 && c.x < 64 && c.y < 64), "types 0 to 6, positions on the board");
-            assert!(z.signs.iter().all(|s| (0..64).contains(&s.x) && (0..64).contains(&s.y)));
-            assert!(z.links.iter().all(|l| !l.dest.is_empty() && !l.fractional_geometry()));
-            assert_eq!(z.layout.computer_extra > 0, z.magic == ZeldaMagic::V104 && z.computers.iter().any(|c| !c.extra.is_empty()));
+            assert!(
+                z.computers
+                    .iter()
+                    .all(|c| c.kind <= 6 && c.x < 64 && c.y < 64),
+                "types 0 to 6, positions on the board"
+            );
+            assert!(z
+                .signs
+                .iter()
+                .all(|s| (0..64).contains(&s.x) && (0..64).contains(&s.y)));
+            assert!(z
+                .links
+                .iter()
+                .all(|l| !l.dest.is_empty() && !l.fractional_geometry()));
+            assert_eq!(
+                z.layout.computer_extra > 0,
+                z.magic == ZeldaMagic::V104 && z.computers.iter().any(|c| !c.extra.is_empty())
+            );
             if z.magic == ZeldaMagic::V103 {
-                assert_eq!(z.layout.computer_extra, 0, "1.03 records have no text after the type");
+                assert_eq!(
+                    z.layout.computer_extra, 0,
+                    "1.03 records have no text after the type"
+                );
             }
             if first_time {
                 // The structure survives our own writer.
                 let again = ZeldaLevel::parse(&z.to_bytes().unwrap()).unwrap();
-                assert_eq!((again.board, again.links, again.computers, again.signs), (z.board.clone(), z.links.clone(), z.computers.clone(), z.signs.clone()));
+                assert_eq!(
+                    (again.board, again.links, again.computers, again.signs),
+                    (
+                        z.board.clone(),
+                        z.links.clone(),
+                        z.computers.clone(),
+                        z.signs.clone()
+                    )
+                );
                 // Through the engine's level type.
                 let lvl = z.to_level();
                 assert_eq!(lvl.layer0_board(), z.board);
@@ -959,7 +1127,11 @@ mod tests {
             "{files} Z3-V1 files ({} distinct): {v102} 1.02, {v103} 1.03, {v104} 1.04; {links} links, {computers} computers, {signs} signs; {flags_kept} sticky double flags",
             unique.len()
         );
-        assert!(bad.is_empty(), "files that do not parse clean:\n{}", bad.join("\n"));
+        assert!(
+            bad.is_empty(),
+            "files that do not parse clean:\n{}",
+            bad.join("\n")
+        );
         assert_eq!(v102, 0, "no file has Z3-V1.02");
         assert_eq!(hash_kept, files, "every links section ends on `#`");
         assert_eq!(flags_kept, 0, "no real file leaves a double flag set");

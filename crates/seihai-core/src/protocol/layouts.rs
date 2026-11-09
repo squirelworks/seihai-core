@@ -78,7 +78,10 @@ pub fn parse_profile(payload: &[u8]) -> Option<ProfileCard> {
     }
     let mut it = fields.into_iter();
     let account = it.next()?;
-    Some(ProfileCard { account, lines: it.collect() })
+    Some(ProfileCard {
+        account,
+        lines: it.collect(),
+    })
 }
 
 /// `PLO_NPCDEL2` (150): `GCHAR n`, an `n`-character level name, `GINT3` npc id.
@@ -185,8 +188,14 @@ impl ServerWarp {
 
 pub fn parse_server_warp(payload: &[u8]) -> Option<ServerWarp> {
     let f = delphi_comma_text(payload);
-    let [_, name, host, port, ..] = &f[..] else { return None };
-    Some(ServerWarp { name: latin1(name), host: latin1(host), port: latin1(port) })
+    let [_, name, host, port, ..] = &f[..] else {
+        return None;
+    };
+    Some(ServerWarp {
+        name: latin1(name),
+        host: latin1(host),
+        port: latin1(port),
+    })
 }
 
 /// `PLO_SERVERWARP` (178) as the 4.x, 5.x and 6.x lobby builds read it: the same
@@ -196,8 +205,14 @@ pub fn parse_server_warp(payload: &[u8]) -> Option<ServerWarp> {
 /// the 2.x reader.
 pub fn parse_server_warp_lobby(payload: &[u8]) -> Option<ServerWarp> {
     let f = super::lobby::split_warp_fields(payload);
-    let [_, name, host, port, ..] = &f[..] else { return None };
-    Some(ServerWarp { name: latin1(name), host: latin1(host), port: latin1(port) })
+    let [_, name, host, port, ..] = &f[..] else {
+        return None;
+    };
+    Some(ServerWarp {
+        name: latin1(name),
+        host: latin1(host),
+        port: latin1(port),
+    })
 }
 
 /// `PLO_SHOWIMG` (32): `GSHORT` sender id, then the sender's `PLI_SHOWIMGPLAYER`
@@ -252,7 +267,9 @@ pub fn parse_board_heights(payload: &[u8]) -> Option<BoardHeights> {
         width,
         height,
         cells: cells
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|c| (f32::from(gchar(c[0])) - 50.0) + f32::from(gchar(c[1])) / 128.0)
             .collect(),
     })
@@ -290,7 +307,12 @@ pub fn parse_board_modify2(payload: &[u8]) -> Option<BoardModify2> {
         y: gchar(*y),
         width,
         height,
-        tiles: body.chunks_exact(2).map(|c| read_gshort(c).unwrap_or(0)).collect(),
+        tiles: body
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| read_gshort(c).unwrap_or(0))
+            .collect(),
         trailer: rest[2 * width * height..].to_vec(),
     })
 }
@@ -414,23 +436,44 @@ mod tests {
     #[test]
     fn server_warp_lab_text_and_field_order() {
         let w = parse_server_warp(b"labtwo,labtwo,127.0.0.2,14803").unwrap();
-        assert_eq!((w.name.as_str(), w.address().as_deref()), ("labtwo", Some("127.0.0.2:14803")));
+        assert_eq!(
+            (w.name.as_str(), w.address().as_deref()),
+            ("labtwo", Some("127.0.0.2:14803"))
+        );
         // Field 0 is not the host; field 1 is not needed to connect.
         let w = parse_server_warp(b"127.0.0.9,labtwo,127.0.0.2,14803").unwrap();
         assert_eq!(w.address().as_deref(), Some("127.0.0.2:14803"));
         let w = parse_server_warp(b"x,zzznoserver,127.0.0.2,14803").unwrap();
         assert_eq!(w.address().as_deref(), Some("127.0.0.2:14803"));
         // Host and port swapped, or name, host, port order: no address.
-        assert_eq!(parse_server_warp(b"x,labtwo,14803,127.0.0.2").unwrap().address(), None);
-        assert_eq!(parse_server_warp(b"x,127.0.0.2,14803,labtwo").unwrap().address(), None);
+        assert_eq!(
+            parse_server_warp(b"x,labtwo,14803,127.0.0.2")
+                .unwrap()
+                .address(),
+            None
+        );
+        assert_eq!(
+            parse_server_warp(b"x,127.0.0.2,14803,labtwo")
+                .unwrap()
+                .address(),
+            None
+        );
         // Only three fields: ignored completely.
         assert_eq!(parse_server_warp(b"x,labtwo,127.0.0.2"), None);
         // Ports out of range, empty host, trailing newline, extra fields.
         for bad in ["0", "65536", "-1", "", "14803 x"] {
-            let w = ServerWarp { name: "n".into(), host: "h".into(), port: bad.into() };
+            let w = ServerWarp {
+                name: "n".into(),
+                host: "h".into(),
+                port: bad.into(),
+            };
             assert_eq!(w.address(), None, "{bad:?}");
         }
-        let w = ServerWarp { name: "n".into(), host: "".into(), port: "1".into() };
+        let w = ServerWarp {
+            name: "n".into(),
+            host: "".into(),
+            port: "1".into(),
+        };
         assert_eq!(w.address(), None);
         let w = parse_server_warp(b"x,n,host.example,14900\n,extra").unwrap();
         assert_eq!(w.address().as_deref(), Some("host.example:14900"));
@@ -441,10 +484,19 @@ mod tests {
     #[test]
     fn showimg_relay_is_an_id_and_opaque_bytes() {
         // Sender id 2, then the real client's one byte: 9.
-        assert_eq!(parse_showimg_relay(&[0x20, 2 + 0x20, 9 + 0x20]), Some((2, vec![9 + 0x20])));
+        assert_eq!(
+            parse_showimg_relay(&[0x20, 2 + 0x20, 9 + 0x20]),
+            Some((2, vec![9 + 0x20]))
+        );
         // Empty payload, and a long one, are kept as sent.
         assert_eq!(parse_showimg_relay(&[0x20, 3 + 0x20]), Some((3, vec![])));
-        assert_eq!(parse_showimg_relay(&[0x20, 3 + 0x20, 0, 255, b'\n', b'x']).unwrap().1.len(), 4);
+        assert_eq!(
+            parse_showimg_relay(&[0x20, 3 + 0x20, 0, 255, b'\n', b'x'])
+                .unwrap()
+                .1
+                .len(),
+            4
+        );
         // Too short for the id.
         assert_eq!(parse_showimg_relay(&[]), None);
         assert_eq!(parse_showimg_relay(&[0x20]), None);
@@ -453,11 +505,17 @@ mod tests {
     #[test]
     fn server_warp_uses_fields_1_to_3() {
         let w = parse_server_warp(b"x,\"Main Server\",127.0.0.1,14900").unwrap();
-        assert_eq!((w.name.as_str(), w.host.as_str(), w.port.as_str()), ("Main Server", "127.0.0.1", "14900"));
+        assert_eq!(
+            (w.name.as_str(), w.host.as_str(), w.port.as_str()),
+            ("Main Server", "127.0.0.1", "14900")
+        );
         assert_eq!(parse_server_warp(b"a,b,c"), None);
         // Quoted fields may hold commas; a quote is doubled.
         let w = parse_server_warp(b"\"a,b\",\"c, \"\"d\"\"\",e,f,g").unwrap();
-        assert_eq!((w.name.as_str(), w.host.as_str(), w.port.as_str()), ("c, \"d\"", "e", "f"));
+        assert_eq!(
+            (w.name.as_str(), w.host.as_str(), w.port.as_str()),
+            ("c, \"d\"", "e", "f")
+        );
     }
 
     /// The clients read the text with their own comma-text reader: white
@@ -468,14 +526,23 @@ mod tests {
     fn server_warp_splits_like_the_clients_list_reader() {
         // Unquoted "Main Server" becomes two fields: host is "Server".
         let w = parse_server_warp(b"x,Main Server,127.0.0.1,14900").unwrap();
-        assert_eq!((w.name.as_str(), w.host.as_str(), w.port.as_str()), ("Main", "Server", "127.0.0.1"));
+        assert_eq!(
+            (w.name.as_str(), w.host.as_str(), w.port.as_str()),
+            ("Main", "Server", "127.0.0.1")
+        );
         assert_eq!(w.address(), None);
         // White space around items and commas is dropped.
         let w = parse_server_warp(b"  x ,  n  ,  h.example , 14900  \n").unwrap();
-        assert_eq!((w.name.as_str(), w.host.as_str(), w.port.as_str()), ("n", "h.example", "14900"));
+        assert_eq!(
+            (w.name.as_str(), w.host.as_str(), w.port.as_str()),
+            ("n", "h.example", "14900")
+        );
         // An empty item in the middle is kept; a comma at the end adds none.
         let w = parse_server_warp(b"x,,h,1,").unwrap();
-        assert_eq!((w.name.as_str(), w.host.as_str(), w.port.as_str()), ("", "h", "1"));
+        assert_eq!(
+            (w.name.as_str(), w.host.as_str(), w.port.as_str()),
+            ("", "h", "1")
+        );
         assert_eq!(parse_server_warp(b"x,n,h,"), None);
         // A NUL ends the text.
         assert_eq!(parse_server_warp(b"x,n,h\x00,1"), None);
@@ -487,7 +554,14 @@ mod tests {
     /// The two-character type prefix (`P Name`) is dropped from the name.
     #[test]
     fn server_warp_display_name_drops_the_type_prefix() {
-        let n = |s: &str| ServerWarp { name: s.into(), host: "h".into(), port: "1".into() }.display_name();
+        let n = |s: &str| {
+            ServerWarp {
+                name: s.into(),
+                host: "h".into(),
+                port: "1".into(),
+            }
+            .display_name()
+        };
         assert_eq!(n("P Graal Era"), "Graal Era");
         assert_eq!(n("H x"), "x");
         assert_eq!(n("Plain"), "Plain");
@@ -499,7 +573,10 @@ mod tests {
 
     #[test]
     fn screenshot_name_needs_png() {
-        assert_eq!(parse_screenshot_name(b"shot.png"), Some("shot.png".to_string()));
+        assert_eq!(
+            parse_screenshot_name(b"shot.png"),
+            Some("shot.png".to_string())
+        );
         assert_eq!(parse_screenshot_name(b"shot.jpg"), None);
         assert_eq!(parse_screenshot_name(b".png"), None);
         assert_eq!(parse_screenshot_name(b""), None);
@@ -511,7 +588,10 @@ mod tests {
         let mut p = vec![gc(1), gc(0), gc(3), gc(4), gc(1), gc(0)];
         p.extend_from_slice(&[gc(50), gc(0), gc(53), gc(64)]);
         let h = parse_board_heights(&p).unwrap();
-        assert_eq!((h.map_x, h.map_y, h.block_x, h.block_y, h.width, h.height), (1, 0, 3, 4, 2, 1));
+        assert_eq!(
+            (h.map_x, h.map_y, h.block_x, h.block_y, h.width, h.height),
+            (1, 0, 3, 4, 2, 1)
+        );
         assert_eq!(h.cells, vec![0.0, 3.5]);
         // Cells must be present in full.
         assert_eq!(parse_board_heights(&p[..p.len() - 1]), None);
@@ -524,7 +604,10 @@ mod tests {
         p.extend_from_slice(&gs(0x2a5));
         p.extend_from_slice(&gs(7));
         let m = parse_board_modify2(&p).unwrap();
-        assert_eq!((m.map_x, m.map_y, m.x, m.y, m.width, m.height), (0, 1, 10, 11, 2, 1));
+        assert_eq!(
+            (m.map_x, m.map_y, m.x, m.y, m.width, m.height),
+            (0, 1, 10, 11, 2, 1)
+        );
         assert_eq!(m.tiles, vec![0x2a5, 7]);
         assert!(m.trailer.is_empty());
         p.extend_from_slice(b"tail");
@@ -538,9 +621,14 @@ mod tests {
     /// No payload may panic any parser.
     #[test]
     fn parsers_never_panic() {
-        let mut samples: Vec<Vec<u8>> = vec![vec![], vec![0], vec![0xff], vec![0x20; 3], vec![0x7f; 40]];
+        let mut samples: Vec<Vec<u8>> =
+            vec![vec![], vec![0], vec![0xff], vec![0x20; 3], vec![0x7f; 40]];
         for n in 0..14usize {
-            samples.push((0..n as u8).map(|i| i.wrapping_mul(37).wrapping_add(0x1b)).collect());
+            samples.push(
+                (0..n as u8)
+                    .map(|i| i.wrapping_mul(37).wrapping_add(0x1b))
+                    .collect(),
+            );
             samples.push(vec![0xff; n]);
             samples.push(vec![0x20; n]);
         }

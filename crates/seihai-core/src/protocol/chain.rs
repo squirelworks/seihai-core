@@ -21,14 +21,18 @@
 //! printed by `seihai --version-chain` and checked in as
 //! `documentation/version-chain.tsv` (a unit test fails when it is stale).
 
-use super::profile::{
-    Basis, BuiltIn, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, Levels, ListKind, Listserver, LoginShape, PortStatus, Props, Protocol, ServerList, ShapeBasis, Ui, WindowPx,
-    BUILT_IN_14921, BUILT_IN_14922,
-    ItemDrops, Mannerisms, VersionProfile, DROPS_133, DROPS_138, DROPS_142, COMBAT_139, COMBAT_200, COMBAT_201, COMBAT_205, MANNER_139, MANNER_141, MANNER_205, MANNER_222, DEATH_139, DEATH_205, DEATH_21, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222,
-    TAMPER_230, TAMPER_231,
+use super::lobby::{
+    Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_531, LOBBY_603_LINUX,
 };
-use super::lobby::{Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_531, LOBBY_603_LINUX};
 use super::login::{LoginInfo, LOGIN_217, LOGIN_222, LOGIN_231, LOGIN_304, LOGIN_3153};
+use super::profile::{
+    Basis, BuiltIn, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, ItemDrops,
+    Levels, ListKind, Listserver, LoginShape, Mannerisms, PortStatus, Props, Protocol, ServerList,
+    ShapeBasis, Ui, VersionProfile, WindowPx, BUILT_IN_14921, BUILT_IN_14922, COMBAT_139,
+    COMBAT_200, COMBAT_201, COMBAT_205, DEATH_139, DEATH_205, DEATH_21, DROPS_133, DROPS_138,
+    DROPS_142, MANNER_139, MANNER_141, MANNER_205, MANNER_222, SHOWIMG_217, SHOWIMG_222,
+    SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222, TAMPER_230, TAMPER_231,
+};
 use super::showimg::ShowImgInfo;
 use super::tampercheck::TamperInfo;
 use super::version::{ClientVersion, EncryptionGen};
@@ -45,20 +49,35 @@ pub struct IdDelta {
 }
 
 impl IdDelta {
-    pub const NONE: IdDelta = IdDelta { minus: &[], minus_ranges: &[], plus: &[], plus_ranges: &[] };
+    pub const NONE: IdDelta = IdDelta {
+        minus: &[],
+        minus_ranges: &[],
+        plus: &[],
+        plus_ranges: &[],
+    };
 
     /// Ids added.
     pub const fn plus(ids: &'static [u8]) -> IdDelta {
-        IdDelta { plus: ids, ..IdDelta::NONE }
+        IdDelta {
+            plus: ids,
+            ..IdDelta::NONE
+        }
     }
 
     /// Ids added and ids removed.
     pub const fn plus_minus(plus: &'static [u8], minus: &'static [u8]) -> IdDelta {
-        IdDelta { plus, minus, ..IdDelta::NONE }
+        IdDelta {
+            plus,
+            minus,
+            ..IdDelta::NONE
+        }
     }
 
     pub const fn is_none(&self) -> bool {
-        self.minus.is_empty() && self.minus_ranges.is_empty() && self.plus.is_empty() && self.plus_ranges.is_empty()
+        self.minus.is_empty()
+            && self.minus_ranges.is_empty()
+            && self.plus.is_empty()
+            && self.plus_ranges.is_empty()
     }
 
     /// Apply to a set: removals first, then additions.
@@ -90,7 +109,10 @@ impl IdDelta {
             }
             v
         };
-        (expand(self.minus, self.minus_ranges), expand(self.plus, self.plus_ranges))
+        (
+            expand(self.minus, self.minus_ranges),
+            expand(self.plus, self.plus_ranges),
+        )
     }
 }
 
@@ -372,10 +394,22 @@ pub const ORIGIN: VersionProfile = VersionProfile {
         image_ext: ".gif",
         download_maps: false,
     },
-    levels: Levels { graal: true, zelda: true, nw: false, gmap: false, heights: false, cached_links: false },
-    life: Health { death: None, combat: None },
+    levels: Levels {
+        graal: true,
+        zelda: true,
+        nw: false,
+        gmap: false,
+        heights: false,
+        cached_links: false,
+    },
+    life: Health {
+        death: None,
+        combat: None,
+    },
     ui: Ui {
-        server_list: ServerList::Direct { default: "www.graalonline.com:14804" },
+        server_list: ServerList::Direct {
+            default: "www.graalonline.com:14804",
+        },
         chat_recall: false,
         hud: HudArt::Letters,
         minimap: false,
@@ -386,8 +420,14 @@ pub const ORIGIN: VersionProfile = VersionProfile {
         log_window: false,
         ghost_mode: false,
         server_in_title: false,
-        chat_text: ChatText { face: ChatFace::Dialog, height: 28 },
-        window: WindowPx { width: 648, height: 509 },
+        chat_text: ChatText {
+            face: ChatFace::Dialog,
+            height: 28,
+        },
+        window: WindowPx {
+            width: 648,
+            height: 509,
+        },
         gs1_commands: 71,
     },
     // Read in 1.39; 1.33 to 1.38 were not run and take its row.
@@ -1362,7 +1402,7 @@ pub const CHAIN: &[Step] = &[
 ];
 
 /// The resolved rows, one per step.
-pub const RESOLVED: [VersionProfile; CHAIN.len()] = resolve_chain();
+pub static RESOLVED: [VersionProfile; CHAIN.len()] = resolve_chain();
 
 /// Walk the chain from [`ORIGIN`], applying each step to the row before it.
 const fn resolve_chain() -> [VersionProfile; CHAIN.len()] {
@@ -1379,7 +1419,10 @@ const fn resolve_chain() -> [VersionProfile; CHAIN.len()] {
 
 /// The step for a version.
 pub fn step(v: ClientVersion) -> &'static Step {
-    CHAIN.iter().find(|s| s.version == v).expect("every ClientVersion has a step")
+    CHAIN
+        .iter()
+        .find(|s| s.version == v)
+        .expect("every ClientVersion has a step")
 }
 
 /// The version a step follows, if any.
@@ -1446,7 +1489,11 @@ fn set_change(
     if !removed.is_empty() {
         parts.push(ids_text(&removed, name, '-'));
     }
-    out.push(Change { area, field, detail: format!("{} ({} -> {} ids)", parts.join("; "), a.len(), b.len()) });
+    out.push(Change {
+        area,
+        field,
+        detail: format!("{} ({} -> {} ids)", parts.join("; "), a.len(), b.len()),
+    });
 }
 
 fn value_change<T: PartialEq>(
@@ -1458,7 +1505,11 @@ fn value_change<T: PartialEq>(
     show: impl Fn(&T) -> String,
 ) {
     if a != b {
-        out.push(Change { area, field, detail: format!("{} -> {}", show(a), show(b)) });
+        out.push(Change {
+            area,
+            field,
+            detail: format!("{} -> {}", show(a), show(b)),
+        });
     }
 }
 
@@ -1493,7 +1544,11 @@ fn listserver_text(l: &Option<Listserver>) -> String {
             if let Some(tok) = l.token {
                 t.push_str(&format!(", token {tok}"));
             }
-            t.push_str(&format!(", login shape {} ({})", l.shape.letter(), l.shape_basis.text()));
+            t.push_str(&format!(
+                ", login shape {} ({})",
+                l.shape.letter(),
+                l.shape_basis.text()
+            ));
             t
         }
     }
@@ -1504,7 +1559,11 @@ fn tamper_text(t: &Option<TamperInfo>) -> String {
         None => "none".into(),
         Some(t) => format!(
             "{} words, re-send {:?}",
-            if t.words.is_some() { "known" } else { "unknown" },
+            if t.words.is_some() {
+                "known"
+            } else {
+                "unknown"
+            },
             t.resend
         ),
     }
@@ -1513,7 +1572,15 @@ fn tamper_text(t: &Option<TamperInfo>) -> String {
 fn showimg_text(s: &Option<ShowImgInfo>) -> String {
     match s {
         None => "none".into(),
-        Some(s) => format!("every {} ms{}", s.period.as_millis(), if s.needs_others { ", only with others in the level" } else { "" }),
+        Some(s) => format!(
+            "every {} ms{}",
+            s.period.as_millis(),
+            if s.needs_others {
+                ", only with others in the level"
+            } else {
+                ""
+            }
+        ),
     }
 }
 
@@ -1522,14 +1589,26 @@ fn login_text(l: &Option<LoginInfo>) -> String {
         None => "none".into(),
         Some(l) => format!(
             "{}{}{}{}{}{}",
-            if l.full { "files, process list, props" } else { "head and default-weapon files, props without head or colours" },
+            if l.full {
+                "files, process list, props"
+            } else {
+                "head and default-weapon files, props without head or colours"
+            },
             match l.os_props {
                 Some((os, cp)) => format!(" with OS {os} and code page {cp}"),
                 None => String::new(),
             },
-            if l.idle_gani { ", idle.gani at once" } else { "" },
+            if l.idle_gani {
+                ", idle.gani at once"
+            } else {
+                ""
+            },
             if l.status_icons { ", status icons" } else { "" },
-            if l.bundle_login && l.first_frame_files.is_empty() { ", language and tamper check in the login frame" } else { "" },
+            if l.bundle_login && l.first_frame_files.is_empty() {
+                ", language and tamper check in the login frame"
+            } else {
+                ""
+            },
             match l.frame_after_level {
                 Some(d) => format!(", {} ms after the level without 182", d.as_millis()),
                 None => String::new(),
@@ -1597,58 +1676,303 @@ fn list_text(l: &ServerList) -> String {
 pub fn diff(a: &VersionProfile, b: &VersionProfile) -> Vec<Change> {
     let mut o = Vec::new();
     let (pa, pb) = (&a.protocol, &b.protocol);
-    value_change(&mut o, "protocol", "client_type", &pa.client_type, &pb.client_type, dbg);
-    value_change(&mut o, "protocol", "encryption", &pa.encryption, &pb.encryption, dbg);
-    value_change(&mut o, "protocol", "listserver", &pa.listserver, &pb.listserver, listserver_text);
-    set_change(&mut o, "protocol", "plo (server ids handled)", pa.plo, pb.plo, names::plo_name);
-    set_change(&mut o, "protocol", "pli (client ids sent)", pa.pli, pb.pli, names::pli_name);
-    value_change(&mut o, "protocol", "sends_language", &pa.sends_language, &pb.sends_language, yes_no);
-    value_change(&mut o, "protocol", "tampercheck", &pa.tampercheck, &pb.tampercheck, yes_no);
-    value_change(&mut o, "protocol", "tamper", &pa.tamper, &pb.tamper, tamper_text);
-    value_change(&mut o, "protocol", "showimg (id 24)", &pa.showimg, &pb.showimg, showimg_text);
-    value_change(&mut o, "protocol", "login frame", &pa.login, &pb.login, login_text);
-    value_change(&mut o, "protocol", "login lobby", &pa.lobby, &pb.lobby, lobby_text);
-    value_change(&mut o, "protocol", "gen5_round_down", &pa.gen5_round_down, &pb.gen5_round_down, yes_no);
-    value_change(&mut o, "protocol", "gen5_long_frames", &pa.gen5_long_frames, &pb.gen5_long_frames, yes_no);
+    value_change(
+        &mut o,
+        "protocol",
+        "client_type",
+        &pa.client_type,
+        &pb.client_type,
+        dbg,
+    );
+    value_change(
+        &mut o,
+        "protocol",
+        "encryption",
+        &pa.encryption,
+        &pb.encryption,
+        dbg,
+    );
+    value_change(
+        &mut o,
+        "protocol",
+        "listserver",
+        &pa.listserver,
+        &pb.listserver,
+        listserver_text,
+    );
+    set_change(
+        &mut o,
+        "protocol",
+        "plo (server ids handled)",
+        pa.plo,
+        pb.plo,
+        names::plo_name,
+    );
+    set_change(
+        &mut o,
+        "protocol",
+        "pli (client ids sent)",
+        pa.pli,
+        pb.pli,
+        names::pli_name,
+    );
+    value_change(
+        &mut o,
+        "protocol",
+        "sends_language",
+        &pa.sends_language,
+        &pb.sends_language,
+        yes_no,
+    );
+    value_change(
+        &mut o,
+        "protocol",
+        "tampercheck",
+        &pa.tampercheck,
+        &pb.tampercheck,
+        yes_no,
+    );
+    value_change(
+        &mut o,
+        "protocol",
+        "tamper",
+        &pa.tamper,
+        &pb.tamper,
+        tamper_text,
+    );
+    value_change(
+        &mut o,
+        "protocol",
+        "showimg (id 24)",
+        &pa.showimg,
+        &pb.showimg,
+        showimg_text,
+    );
+    value_change(
+        &mut o,
+        "protocol",
+        "login frame",
+        &pa.login,
+        &pb.login,
+        login_text,
+    );
+    value_change(
+        &mut o,
+        "protocol",
+        "login lobby",
+        &pa.lobby,
+        &pb.lobby,
+        lobby_text,
+    );
+    value_change(
+        &mut o,
+        "protocol",
+        "gen5_round_down",
+        &pa.gen5_round_down,
+        &pb.gen5_round_down,
+        yes_no,
+    );
+    value_change(
+        &mut o,
+        "protocol",
+        "gen5_long_frames",
+        &pa.gen5_long_frames,
+        &pb.gen5_long_frames,
+        yes_no,
+    );
     value_change(&mut o, "protocol", "udp", &pa.udp, &pb.udp, yes_no);
-    value_change(&mut o, "protocol", "udp_off_by_default", &pa.udp_off_by_default, &pb.udp_off_by_default, yes_no);
+    value_change(
+        &mut o,
+        "protocol",
+        "udp_off_by_default",
+        &pa.udp_off_by_default,
+        &pb.udp_off_by_default,
+        yes_no,
+    );
     let (ra, rb) = (&a.props, &b.props);
-    set_change(&mut o, "props", "own-player props", ra.own, rb.own, names::prop_name);
-    set_change(&mut o, "props", "other-player props", ra.other, rb.other, names::prop_name);
+    set_change(
+        &mut o,
+        "props",
+        "own-player props",
+        ra.own,
+        rb.own,
+        names::prop_name,
+    );
+    set_change(
+        &mut o,
+        "props",
+        "other-player props",
+        ra.other,
+        rb.other,
+        names::prop_name,
+    );
     value_change(&mut o, "props", "npc_max", &ra.npc_max, &rb.npc_max, dbg);
-    value_change(&mut o, "props", "bow_prop10", &ra.bow_prop10, &rb.bow_prop10, yes_no);
-    value_change(&mut o, "props", "precise_pos", &ra.precise_pos, &rb.precise_pos, yes_no);
+    value_change(
+        &mut o,
+        "props",
+        "bow_prop10",
+        &ra.bow_prop10,
+        &rb.bow_prop10,
+        yes_no,
+    );
+    value_change(
+        &mut o,
+        "props",
+        "precise_pos",
+        &ra.precise_pos,
+        &rb.precise_pos,
+        yes_no,
+    );
     let (fa, fb) = (&a.files, &b.files);
     value_change(&mut o, "files", "modtime", &fa.modtime, &fb.modtime, yes_no);
-    value_change(&mut o, "files", "large_files", &fa.large_files, &fb.large_files, yes_no);
-    value_change(&mut o, "files", "large_file_size", &fa.large_file_size, &fb.large_file_size, yes_no);
-    value_change(&mut o, "files", "image_ext", &fa.image_ext, &fb.image_ext, dbg);
-    value_change(&mut o, "files", "download_maps", &fa.download_maps, &fb.download_maps, yes_no);
+    value_change(
+        &mut o,
+        "files",
+        "large_files",
+        &fa.large_files,
+        &fb.large_files,
+        yes_no,
+    );
+    value_change(
+        &mut o,
+        "files",
+        "large_file_size",
+        &fa.large_file_size,
+        &fb.large_file_size,
+        yes_no,
+    );
+    value_change(
+        &mut o,
+        "files",
+        "image_ext",
+        &fa.image_ext,
+        &fb.image_ext,
+        dbg,
+    );
+    value_change(
+        &mut o,
+        "files",
+        "download_maps",
+        &fa.download_maps,
+        &fb.download_maps,
+        yes_no,
+    );
     let (la, lb) = (&a.levels, &b.levels);
     value_change(&mut o, "levels", "graal", &la.graal, &lb.graal, yes_no);
     value_change(&mut o, "levels", "zelda", &la.zelda, &lb.zelda, yes_no);
     value_change(&mut o, "levels", "nw", &la.nw, &lb.nw, yes_no);
     value_change(&mut o, "levels", "gmap", &la.gmap, &lb.gmap, yes_no);
-    value_change(&mut o, "levels", "heights", &la.heights, &lb.heights, yes_no);
-    value_change(&mut o, "levels", "cached_links", &la.cached_links, &lb.cached_links, yes_no);
-    value_change(&mut o, "life", "death", &a.life.death, &b.life.death, death_text);
-    value_change(&mut o, "life", "combat", &a.life.combat, &b.life.combat, combat_text);
+    value_change(
+        &mut o,
+        "levels",
+        "heights",
+        &la.heights,
+        &lb.heights,
+        yes_no,
+    );
+    value_change(
+        &mut o,
+        "levels",
+        "cached_links",
+        &la.cached_links,
+        &lb.cached_links,
+        yes_no,
+    );
+    value_change(
+        &mut o,
+        "life",
+        "death",
+        &a.life.death,
+        &b.life.death,
+        death_text,
+    );
+    value_change(
+        &mut o,
+        "life",
+        "combat",
+        &a.life.combat,
+        &b.life.combat,
+        combat_text,
+    );
     let (ua, ub) = (&a.ui, &b.ui);
-    value_change(&mut o, "ui", "server_list", &ua.server_list, &ub.server_list, list_text);
-    value_change(&mut o, "ui", "chat_recall", &ua.chat_recall, &ub.chat_recall, yes_no);
+    value_change(
+        &mut o,
+        "ui",
+        "server_list",
+        &ua.server_list,
+        &ub.server_list,
+        list_text,
+    );
+    value_change(
+        &mut o,
+        "ui",
+        "chat_recall",
+        &ua.chat_recall,
+        &ub.chat_recall,
+        yes_no,
+    );
     value_change(&mut o, "ui", "hud", &ua.hud, &ub.hud, dbg);
     value_change(&mut o, "ui", "minimap", &ua.minimap, &ub.minimap, yes_no);
     value_change(&mut o, "ui", "editor", &ua.editor, &ub.editor, yes_no);
     value_change(&mut o, "ui", "ganis", &ua.ganis, &ub.ganis, yes_no);
-    value_change(&mut o, "ui", "emoticons", &ua.emoticons, &ub.emoticons, yes_no);
-    value_change(&mut o, "ui", "key_config", &ua.key_config, &ub.key_config, yes_no);
-    value_change(&mut o, "ui", "log_window", &ua.log_window, &ub.log_window, yes_no);
-    value_change(&mut o, "ui", "ghost_mode", &ua.ghost_mode, &ub.ghost_mode, yes_no);
-    value_change(&mut o, "ui", "server_in_title", &ua.server_in_title, &ub.server_in_title, yes_no);
+    value_change(
+        &mut o,
+        "ui",
+        "emoticons",
+        &ua.emoticons,
+        &ub.emoticons,
+        yes_no,
+    );
+    value_change(
+        &mut o,
+        "ui",
+        "key_config",
+        &ua.key_config,
+        &ub.key_config,
+        yes_no,
+    );
+    value_change(
+        &mut o,
+        "ui",
+        "log_window",
+        &ua.log_window,
+        &ub.log_window,
+        yes_no,
+    );
+    value_change(
+        &mut o,
+        "ui",
+        "ghost_mode",
+        &ua.ghost_mode,
+        &ub.ghost_mode,
+        yes_no,
+    );
+    value_change(
+        &mut o,
+        "ui",
+        "server_in_title",
+        &ua.server_in_title,
+        &ub.server_in_title,
+        yes_no,
+    );
     value_change(&mut o, "ui", "chat_text", &ua.chat_text, &ub.chat_text, dbg);
     value_change(&mut o, "ui", "window", &ua.window, &ub.window, window_text);
-    value_change(&mut o, "ui", "gs1_commands", &ua.gs1_commands, &ub.gs1_commands, dbg);
-    value_change(&mut o, "mannerisms", "mannerisms", &a.mannerisms, &b.mannerisms, manner_text);
+    value_change(
+        &mut o,
+        "ui",
+        "gs1_commands",
+        &ua.gs1_commands,
+        &ub.gs1_commands,
+        dbg,
+    );
+    value_change(
+        &mut o,
+        "mannerisms",
+        "mannerisms",
+        &a.mannerisms,
+        &b.mannerisms,
+        manner_text,
+    );
     value_change(&mut o, "drops", "drops", &a.drops, &b.drops, drops_text);
     o
 }
@@ -1656,7 +1980,9 @@ pub fn diff(a: &VersionProfile, b: &VersionProfile) -> Vec<Change> {
 fn drops_text(d: &ItemDrops) -> String {
     match *d {
         DROPS_133 => "client rolls bush and pot drops, applies pickups itself".into(),
-        DROPS_138 => "client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE".into(),
+        DROPS_138 => {
+            "client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE".into()
+        }
         DROPS_142 => "server drops (PLO_ITEMADD), pickups go through PLI_ITEMTAKE".into(),
         _ => format!("{d:?}"),
     }
@@ -1709,9 +2035,19 @@ pub fn render(format: Format, only: Option<ClientVersion>) -> String {
         let basis = basis_text(s.basis);
         let mut rows: Vec<(&str, String, String, String)> = Vec::new();
         if i == 0 {
-            rows.push(("origin", "-".into(), "-".into(), "start of the chain, written out in full as ORIGIN".into()));
+            rows.push((
+                "origin",
+                "-".into(),
+                "-".into(),
+                "start of the chain, written out in full as ORIGIN".into(),
+            ));
         } else if ch.is_empty() {
-            rows.push(("same", "-".into(), "-".into(), "no change against the step before".into()));
+            rows.push((
+                "same",
+                "-".into(),
+                "-".into(),
+                "no change against the step before".into(),
+            ));
         }
         for c in &ch {
             rows.push(("changed", c.area.into(), c.field.into(), c.detail.clone()));
@@ -1723,7 +2059,10 @@ pub fn render(format: Format, only: Option<ClientVersion>) -> String {
         match format {
             Format::Tsv => {
                 for (kind, area, field, detail) in &rows {
-                    out.push_str(&format!("{}\t{}\t{}\t{basis}\t{kind}\t{area}\t{field}\t{detail}\n", i, s.label, s.token));
+                    out.push_str(&format!(
+                        "{}\t{}\t{}\t{basis}\t{kind}\t{area}\t{field}\t{detail}\n",
+                        i, s.label, s.token
+                    ));
                 }
             }
             Format::Text => {
@@ -1738,8 +2077,15 @@ pub fn render(format: Format, only: Option<ClientVersion>) -> String {
                 }
             }
             Format::Markdown => {
-                let date = if s.date.is_empty() { String::new() } else { format!(", linked {}", s.date) };
-                out.push_str(&format!("#### {} (`{}`, {basis}{date})\n\n", s.label, s.token));
+                let date = if s.date.is_empty() {
+                    String::new()
+                } else {
+                    format!(", linked {}", s.date)
+                };
+                out.push_str(&format!(
+                    "#### {} (`{}`, {basis}{date})\n\n",
+                    s.label, s.token
+                ));
                 for (kind, area, field, detail) in &rows {
                     match *kind {
                         "changed" => out.push_str(&format!("- {area}: **{field}**: {detail}\n")),
@@ -1781,7 +2127,7 @@ mod tests {
     fn strip_field(row: &str, from: &str, until: &str) -> String {
         let a = row.find(from).expect("field");
         let b = a + row[a..].find(until).expect("next field");
-        format!("{}{}", &row[..a].trim_end_matches(' '), &row[b..]).replace(",, udp:", ", udp:")
+        format!("{}{}", row[..a].trim_end_matches(' '), &row[b..]).replace(",, udp:", ", udp:")
     }
 
     /// Behaviour is unchanged: every build that existed before the chain
@@ -1804,7 +2150,8 @@ mod tests {
         let mut seen = 0;
         for line in GOLDEN.lines() {
             let (label, want) = line.split_once('\t').expect("label<TAB>row");
-            let p = super::super::profile::by_label(label).unwrap_or_else(|| panic!("no profile {label}"));
+            let p = super::super::profile::by_label(label)
+                .unwrap_or_else(|| panic!("no profile {label}"));
             // Fields added after the hand-written rows existed (the post-login
             // frame `login`) are not in them: compare without them.
             let got = strip_field(&format!("{p:?}"), "login: ", ", udp:");
@@ -1816,39 +2163,70 @@ mod tests {
                 None => got,
             };
             // The login shape and its basis (`Listserver::shape`) came later too.
-            let got = if got.contains(", shape: ") { strip_field(&got, ", shape: ", " }") } else { got };
+            let got = if got.contains(", shape: ") {
+                strip_field(&got, ", shape: ", " }")
+            } else {
+                got
+            };
             if got != want {
-                let at = got.bytes().zip(want.bytes()).position(|(a, b)| a != b).unwrap_or(got.len().min(want.len()));
+                let at = got
+                    .bytes()
+                    .zip(want.bytes())
+                    .position(|(a, b)| a != b)
+                    .unwrap_or(got.len().min(want.len()));
                 let ctx = |s: &str| s[at.saturating_sub(60)..(at + 80).min(s.len())].to_string();
-                panic!("{label} differs near byte {at}:\n  chain: ...{}\n  was:   ...{}", ctx(&got), ctx(want));
+                panic!(
+                    "{label} differs near byte {at}:\n  chain: ...{}\n  was:   ...{}",
+                    ctx(&got),
+                    ctx(want)
+                );
             }
             seen += 1;
         }
-        assert_eq!(seen, 26, "the golden file holds the 26 rows that existed before the chain");
+        assert_eq!(
+            seen, 26,
+            "the golden file holds the 26 rows that existed before the chain"
+        );
     }
 
     /// Every id a delta adds is new at that step and every id it removes was
     /// there, with no id on both sides: a delta says only what changed.
     #[test]
     fn deltas_are_minimal() {
-        let sets = |p: &VersionProfile| [p.protocol.plo, p.protocol.pli, p.props.own, p.props.other];
-        for i in 1..CHAIN.len() {
-            let s = &CHAIN[i];
+        let sets =
+            |p: &VersionProfile| [p.protocol.plo, p.protocol.pli, p.props.own, p.props.other];
+        for (i, s) in CHAIN.iter().enumerate().skip(1) {
             let before = sets(&RESOLVED[i - 1]);
             let d = &s.delta;
-            for (n, delta) in [d.plo, d.pli, d.own_props, d.other_props].iter().enumerate() {
+            for (n, delta) in [d.plo, d.pli, d.own_props, d.other_props]
+                .iter()
+                .enumerate()
+            {
                 let (minus, plus) = delta.expanded();
                 for id in &plus {
-                    assert!(!before[n].contains(*id), "{}: delta {n} adds id {id} that is already there", s.label);
+                    assert!(
+                        !before[n].contains(*id),
+                        "{}: delta {n} adds id {id} that is already there",
+                        s.label
+                    );
                     assert!(!minus.contains(id), "{}: id {id} is on both sides", s.label);
                 }
                 for id in &minus {
-                    assert!(before[n].contains(*id), "{}: delta {n} removes id {id} that was not there", s.label);
+                    assert!(
+                        before[n].contains(*id),
+                        "{}: delta {n} removes id {id} that was not there",
+                        s.label
+                    );
                 }
                 let mut all = plus.clone();
                 all.sort();
                 all.dedup();
-                assert_eq!(all.len(), plus.len(), "{}: duplicate ids in a plus list", s.label);
+                assert_eq!(
+                    all.len(),
+                    plus.len(),
+                    "{}: duplicate ids in a plus list",
+                    s.label
+                );
             }
         }
     }
@@ -1858,12 +2236,20 @@ mod tests {
     /// the resolved row did not change, and an empty step has an `unknown`.
     #[test]
     fn deltas_are_effective_and_empty_steps_explain_themselves() {
-        for i in 1..CHAIN.len() {
-            let s = &CHAIN[i];
+        for (i, s) in CHAIN.iter().enumerate().skip(1) {
             let ch = changes(i);
-            assert_eq!(s.delta == Delta::NONE, ch.is_empty(), "{}: delta and resolved change disagree", s.label);
+            assert_eq!(
+                s.delta == Delta::NONE,
+                ch.is_empty(),
+                "{}: delta and resolved change disagree",
+                s.label
+            );
             if ch.is_empty() {
-                assert!(!s.unknown.is_empty(), "{}: a step that changes nothing must say what is unknown", s.label);
+                assert!(
+                    !s.unknown.is_empty(),
+                    "{}: a step that changes nothing must say what is unknown",
+                    s.label
+                );
             }
             assert!(!s.source.is_empty(), "{}", s.label);
         }
@@ -1879,7 +2265,10 @@ mod tests {
             }
         }
         // Builds with a binary behind them that are known to be incomplete.
-        assert!(step(ClientVersion::V222).unknown.iter().any(|u| u.what.contains("36, 42 and 45")));
+        assert!(step(ClientVersion::V222)
+            .unknown
+            .iter()
+            .any(|u| u.what.contains("36, 42 and 45")));
     }
 
     /// Identity: one step per `ClientVersion`, in the version enum's order,
@@ -1916,7 +2305,10 @@ mod tests {
                 ..Delta::NONE
             },
             source: "test",
-            unknown: &[Unknown { area: "all", what: "made up" }],
+            unknown: &[Unknown {
+                area: "all",
+                what: "made up",
+            }],
         };
         let p = apply(last, &next);
         assert!(p.protocol.plo.contains(192) && !last.protocol.plo.contains(192));
@@ -1937,13 +2329,20 @@ mod tests {
             let i = CHAIN.iter().position(|s| s.version == v).unwrap();
             changes(i)
         };
-        let has = |c: &[Change], field: &str, text: &str| c.iter().any(|c| c.field.starts_with(field) && c.detail.contains(text));
+        let has = |c: &[Change], field: &str, text: &str| {
+            c.iter()
+                .any(|c| c.field.starts_with(field) && c.detail.contains(text))
+        };
         // 2.00 -> 2.01: ADJACENTLEVEL and HITOBJECTS become sendable.
         assert!(has(&ch(ClientVersion::V201), "pli", "+35 ADJACENTLEVEL"));
         assert!(has(&ch(ClientVersion::V201), "pli", "+36 HITOBJECTS"));
         // 2.02 rev 2: LANGUAGE.
         assert!(has(&ch(ClientVersion::V202R2), "pli", "+37 LANGUAGE"));
-        assert!(has(&ch(ClientVersion::V202R2), "sends_language", "no -> yes"));
+        assert!(has(
+            &ch(ClientVersion::V202R2),
+            "sends_language",
+            "no -> yes"
+        ));
         // 2.04 drops PLO 26.
         assert!(has(&ch(ClientVersion::V204), "plo", "-26"));
         // Server ids 53 (2.00) to 61 (2.1 tests): the 2.1 step adds 49 and 169 to 174.

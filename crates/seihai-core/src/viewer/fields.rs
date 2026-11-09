@@ -34,12 +34,17 @@ fn gchar(b: u8) -> u8 {
 }
 
 fn gint(b: &[u8]) -> u64 {
-    b.iter().fold(0u64, |a, &x| (a << 7) | u64::from(gchar(x) & 0x7f))
+    b.iter()
+        .fold(0u64, |a, &x| (a << 7) | u64::from(gchar(x) & 0x7f))
 }
 
 fn tiles(v: u8) -> String {
     let h = f32::from(v) / 2.0;
-    if (h - h.round()).abs() < 1e-4 { format!("{}", h.round() as i64) } else { format!("{h}") }
+    if (h - h.round()).abs() < 1e-4 {
+        format!("{}", h.round() as i64)
+    } else {
+        format!("{h}")
+    }
 }
 
 /// Text with the account name masked (when masking is on and the account
@@ -54,8 +59,16 @@ fn text(b: &[u8], mask: bool, account: Option<&str>) -> String {
 
 /// Read `payload` with `rows` (already in field order). Returns `None` when
 /// a row needs the trace decoder (`props`, `showimg`).
-pub fn read_layout(rows: &[&LayoutRow], payload: &[u8], mask: bool, account: Option<&str>) -> Option<Read> {
-    if rows.iter().any(|r| matches!(r.enc, Enc::Props | Enc::Showimg)) {
+pub fn read_layout(
+    rows: &[&LayoutRow],
+    payload: &[u8],
+    mask: bool,
+    account: Option<&str>,
+) -> Option<Read> {
+    if rows
+        .iter()
+        .any(|r| matches!(r.enc, Enc::Props | Enc::Showimg))
+    {
         return None;
     }
     let mut out = Read::default();
@@ -64,7 +77,11 @@ pub fn read_layout(rows: &[&LayoutRow], payload: &[u8], mask: bool, account: Opt
     for r in rows {
         let left = payload.get(pos..).unwrap_or(&[]);
         let short = |out: &mut Read, need: usize| {
-            out.unknown.push(format!("payload ends inside `{}` (needs {need}, {} left)", r.field, left.len()));
+            out.unknown.push(format!(
+                "payload ends inside `{}` (needs {need}, {} left)",
+                r.field,
+                left.len()
+            ));
         };
         let masked = |v: String| if mask { "<MASKED>".to_string() } else { v };
         let value = match r.enc {
@@ -92,7 +109,11 @@ pub fn read_layout(rows: &[&LayoutRow], payload: &[u8], mask: bool, account: Opt
             Enc::Gshort => match read_gshort(left) {
                 Some(v) => {
                     pos += 2;
-                    if r.field == "player" { masked(v.to_string()) } else { v.to_string() }
+                    if r.field == "player" {
+                        masked(v.to_string())
+                    } else {
+                        v.to_string()
+                    }
                 }
                 None => {
                     short(&mut out, 2);
@@ -115,7 +136,11 @@ pub fn read_layout(rows: &[&LayoutRow], payload: &[u8], mask: bool, account: Opt
                     Some(b) => {
                         pos += n;
                         let v = gint(b).to_string();
-                        if r.field == "modtime" { masked(v) } else { v }
+                        if r.field == "modtime" {
+                            masked(v)
+                        } else {
+                            v
+                        }
                     }
                     None => {
                         short(&mut out, n);
@@ -145,7 +170,8 @@ pub fn read_layout(rows: &[&LayoutRow], payload: &[u8], mask: bool, account: Opt
                 while let Some((&n, tail)) = rest.split_first() {
                     let n = usize::from(gchar(n));
                     let Some(item) = tail.get(..n) else {
-                        out.unknown.push(format!("`{}` ends inside an item", r.field));
+                        out.unknown
+                            .push(format!("`{}` ends inside an item", r.field));
                         break;
                     };
                     items.push(text(item, mask, account));
@@ -163,20 +189,38 @@ pub fn read_layout(rows: &[&LayoutRow], payload: &[u8], mask: bool, account: Opt
             Enc::Raw => {
                 pos = payload.len();
                 rest_taken = true;
-                if left.len() > 32 { format!("len={} crc={:08x}", left.len(), crc32(left)) } else { short_hex(left) }
+                if left.len() > 32 {
+                    format!("len={} crc={:08x}", left.len(), crc32(left))
+                } else {
+                    short_hex(left)
+                }
             }
             Enc::Props | Enc::Showimg => unreachable!(),
         };
         if r.status != super::tables::Status::Known {
-            out.unknown.push(format!("`{}` is {} in the table", r.field, r.status.label()));
+            out.unknown.push(format!(
+                "`{}` is {} in the table",
+                r.field,
+                r.status.label()
+            ));
         }
-        let name = if r.status == super::tables::Status::Unknown { format!("?{}", r.field) } else { r.field.clone() };
+        let name = if r.status == super::tables::Status::Unknown {
+            format!("?{}", r.field)
+        } else {
+            r.field.clone()
+        };
         out.fields.push((name, value));
     }
-    if pos < payload.len() && !rest_taken && out.unknown.iter().all(|u| !u.starts_with("payload ends")) {
+    if pos < payload.len()
+        && !rest_taken
+        && out.unknown.iter().all(|u| !u.starts_with("payload ends"))
+    {
         let tail = &payload[pos..];
         out.fields.push(("?tail".into(), short_hex(tail)));
-        out.unknown.push(format!("{} byte(s) after the last field in the layout", tail.len()));
+        out.unknown.push(format!(
+            "{} byte(s) after the last field in the layout",
+            tail.len()
+        ));
     }
     Some(out)
 }
@@ -188,7 +232,10 @@ mod tests {
     use crate::viewer::tables::{parse_layouts, LayoutRow};
 
     fn rows(tsv: &str) -> Vec<LayoutRow> {
-        parse_layouts(&format!("dir\tid\tname\tidx\tfield\tencoding\tfrom\tto\tstatus\tnote\n{tsv}")).unwrap()
+        parse_layouts(&format!(
+            "dir\tid\tname\tidx\tfield\tencoding\tfrom\tto\tstatus\tnote\n{tsv}"
+        ))
+        .unwrap()
     }
 
     fn r(rows: &[LayoutRow]) -> Vec<&LayoutRow> {

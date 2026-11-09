@@ -82,7 +82,12 @@ pub struct Cmd {
 }
 
 const fn c(name: &'static str, sig: &'static str, since: Era, exec: Exec) -> Cmd {
-    Cmd { name, sig, since, exec }
+    Cmd {
+        name,
+        sig,
+        since,
+        exec,
+    }
 }
 
 use Era::*;
@@ -309,19 +314,79 @@ pub fn is_text_letter(l: char) -> bool {
 
 /// Name tables used by `I`, `B`, `C`, `D` and `L` arguments.
 pub const ITEMS: &[&str] = &[
-    "greenrupee", "bluerupee", "redrupee", "bombs", "darts", "heart", "glove1", "bow", "bomb", "shield", "sword", "fullheart",
-    "superbomb", "battleaxe", "goldensword", "mirrorshield", "glove2", "lizardshield", "lizardsword", "goldrupee", "fireball",
-    "fireblast", "nukeshot", "joltbomb", "spinattack",
+    "greenrupee",
+    "bluerupee",
+    "redrupee",
+    "bombs",
+    "darts",
+    "heart",
+    "glove1",
+    "bow",
+    "bomb",
+    "shield",
+    "sword",
+    "fullheart",
+    "superbomb",
+    "battleaxe",
+    "goldensword",
+    "mirrorshield",
+    "glove2",
+    "lizardshield",
+    "lizardsword",
+    "goldrupee",
+    "fireball",
+    "fireblast",
+    "nukeshot",
+    "joltbomb",
+    "spinattack",
 ];
 pub const BADDIES: &[&str] = &[
-    "graysoldier", "bluesoldier", "redsoldier", "shootingsoldier", "swampsoldier", "frog", "octopus", "goldenwarrior", "lizardon",
+    "graysoldier",
+    "bluesoldier",
+    "redsoldier",
+    "shootingsoldier",
+    "swampsoldier",
+    "frog",
+    "octopus",
+    "goldenwarrior",
+    "lizardon",
     "dragon",
 ];
 pub const COLORS: &[&str] = &[
-    "white", "yellow", "orange", "pink", "red", "darkred", "lightgreen", "green", "darkgreen", "lightblue", "blue", "darkblue",
-    "brown", "cynober", "purple", "darkpurple", "lightgray", "gray", "black", "transparent",
+    "white",
+    "yellow",
+    "orange",
+    "pink",
+    "red",
+    "darkred",
+    "lightgreen",
+    "green",
+    "darkgreen",
+    "lightblue",
+    "blue",
+    "darkblue",
+    "brown",
+    "cynober",
+    "purple",
+    "darkpurple",
+    "lightgray",
+    "gray",
+    "black",
+    "transparent",
 ];
-pub const CARRY: &[&str] = &["bush", "sign", "vase", "stone", "blackstone", "bomb", "hotbomb", "superbomb", "joltbomb", "hotjoltbomb", "none"];
+pub const CARRY: &[&str] = &[
+    "bush",
+    "sign",
+    "vase",
+    "stone",
+    "blackstone",
+    "bomb",
+    "hotbomb",
+    "superbomb",
+    "joltbomb",
+    "hotjoltbomb",
+    "none",
+];
 pub const DIRS: &[&str] = &["up", "left", "down", "right"];
 
 /// Number for a name in the table a signature letter selects.
@@ -435,7 +500,10 @@ pub static BUILTIN_VARS: &[(&str, Era, bool)] = &[
 ];
 
 pub fn builtin_var(name: &str, era: Era) -> Option<(&'static str, bool)> {
-    BUILTIN_VARS.iter().find(|(n, e, _)| *n == name && *e <= era).map(|(n, _, w)| (*n, *w))
+    BUILTIN_VARS
+        .iter()
+        .find(|(n, e, _)| *n == name && *e <= era)
+        .map(|(n, _, w)| (*n, *w))
 }
 
 pub fn status_flag(name: &str, era: Era) -> bool {
@@ -460,42 +528,154 @@ pub struct Builtin {
 use ArgKind::{Num as N, Text as T};
 
 pub static BUILTINS: &[Builtin] = &[
-    Builtin { name: "abs", args: &[N], since: V200 },
-    Builtin { name: "int", args: &[N], since: V200 },
-    Builtin { name: "sin", args: &[N], since: V200 },
-    Builtin { name: "cos", args: &[N], since: V200 },
-    Builtin { name: "arctan", args: &[N], since: V200 },
-    Builtin { name: "random", args: &[N, N], since: V200 },
-    Builtin { name: "strequals", args: &[T, T], since: V200 },
-    Builtin { name: "strlen", args: &[T], since: V202 },
-    Builtin { name: "startswith", args: &[T, T], since: V202 },
-    Builtin { name: "indexof", args: &[T, T], since: V202 },
-    Builtin { name: "ascii", args: &[T], since: V21 },
+    Builtin {
+        name: "abs",
+        args: &[N],
+        since: V200,
+    },
+    Builtin {
+        name: "int",
+        args: &[N],
+        since: V200,
+    },
+    Builtin {
+        name: "sin",
+        args: &[N],
+        since: V200,
+    },
+    Builtin {
+        name: "cos",
+        args: &[N],
+        since: V200,
+    },
+    Builtin {
+        name: "arctan",
+        args: &[N],
+        since: V200,
+    },
+    Builtin {
+        name: "random",
+        args: &[N, N],
+        since: V200,
+    },
+    Builtin {
+        name: "strequals",
+        args: &[T, T],
+        since: V200,
+    },
+    Builtin {
+        name: "strlen",
+        args: &[T],
+        since: V202,
+    },
+    Builtin {
+        name: "startswith",
+        args: &[T, T],
+        since: V202,
+    },
+    Builtin {
+        name: "indexof",
+        args: &[T, T],
+        since: V202,
+    },
+    Builtin {
+        name: "ascii",
+        args: &[T],
+        since: V21,
+    },
     // 2.2 command list.
-    Builtin { name: "strcontains", args: &[T, T], since: V21 },
-    Builtin { name: "lindexof", args: &[T, T], since: V21 },
-    Builtin { name: "onmapx", args: &[T], since: V21 },
-    Builtin { name: "onmapy", args: &[T], since: V21 },
-    Builtin { name: "arraylen", args: &[T], since: V200 },
+    Builtin {
+        name: "strcontains",
+        args: &[T, T],
+        since: V21,
+    },
+    Builtin {
+        name: "lindexof",
+        args: &[T, T],
+        since: V21,
+    },
+    Builtin {
+        name: "onmapx",
+        args: &[T],
+        since: V21,
+    },
+    Builtin {
+        name: "onmapy",
+        args: &[T],
+        since: V21,
+    },
+    Builtin {
+        name: "arraylen",
+        args: &[T],
+        since: V200,
+    },
     // Level collision at a point in tiles; true off the board.
-    Builtin { name: "onwall", args: &[N, N], since: V200 },
+    Builtin {
+        name: "onwall",
+        args: &[N, N],
+        since: V200,
+    },
     // Liquid (water or lava) at a point in tiles; false off the board.
-    Builtin { name: "onwater", args: &[N, N], since: V200 },
+    Builtin {
+        name: "onwater",
+        args: &[N, N],
+        since: V200,
+    },
     // -1 on the default tileset, as in 2.05 (see documentation/tile-types.md).
-    Builtin { name: "tiletype", args: &[N, N], since: V200 },
+    Builtin {
+        name: "tiletype",
+        args: &[N, N],
+        since: V200,
+    },
     // Chat tests, true only during `playerchats`. [inferred: whole line / contained text]
-    Builtin { name: "playersays", args: &[T], since: V200 },
-    Builtin { name: "playersays2", args: &[T], since: V200 },
+    Builtin {
+        name: "playersays",
+        args: &[T],
+        since: V200,
+    },
+    Builtin {
+        name: "playersays2",
+        args: &[T],
+        since: V200,
+    },
     // Stubs: return a value so scripts do not log every call.
-    Builtin { name: "strtofloat", args: &[T], since: V200 },
-    Builtin { name: "hasweapon", args: &[T], since: V200 },
-    Builtin { name: "keydown", args: &[N], since: V200 },
-    Builtin { name: "keydown2", args: &[N], since: V200 },
-    Builtin { name: "sarraylen", args: &[T], since: V200 },
+    Builtin {
+        name: "strtofloat",
+        args: &[T],
+        since: V200,
+    },
+    Builtin {
+        name: "hasweapon",
+        args: &[T],
+        since: V200,
+    },
+    Builtin {
+        name: "keydown",
+        args: &[N],
+        since: V200,
+    },
+    Builtin {
+        name: "keydown2",
+        args: &[N],
+        since: V200,
+    },
+    Builtin {
+        name: "sarraylen",
+        args: &[T],
+        since: V200,
+    },
     // `with (getnpc(name))`, `with (getplayer(account))`: the targets of
     // `with` (2.1 and later). Seihai does not switch objects; they read 0.
-    Builtin { name: "getnpc", args: &[T], since: V21 },
-    Builtin { name: "getplayer", args: &[T], since: V21 },
+    Builtin {
+        name: "getnpc",
+        args: &[T],
+        since: V21,
+    },
+    Builtin {
+        name: "getplayer",
+        args: &[T],
+        since: V21,
+    },
 ];
 
 pub fn builtin_fn(name: &str, era: Era) -> Option<&'static Builtin> {
@@ -522,7 +702,11 @@ mod tests {
     #[test]
     fn command_names_are_unique() {
         for (i, a) in COMMANDS.iter().enumerate() {
-            assert!(COMMANDS[i + 1..].iter().all(|b| b.name != a.name), "{}", a.name);
+            assert!(
+                COMMANDS[i + 1..].iter().all(|b| b.name != a.name),
+                "{}",
+                a.name
+            );
         }
     }
 
@@ -554,7 +738,12 @@ mod tests {
     #[test]
     fn signatures_name_known_letters() {
         for c in COMMANDS {
-            assert!(c.sig.chars().all(|l| "RSFQIBCDLON".contains(l)), "{} {}", c.name, c.sig);
+            assert!(
+                c.sig.chars().all(|l| "RSFQIBCDLON".contains(l)),
+                "{} {}",
+                c.name,
+                c.sig
+            );
         }
     }
 

@@ -149,7 +149,10 @@ impl NameList {
     pub fn load(path: &Path) -> Self {
         match fs::read(path) {
             // Latin-1 safe: bytes that are not UTF-8 are read as is.
-            Ok(b) => Self::parse(&String::from_utf8(b.clone()).unwrap_or_else(|_| b.iter().map(|&c| c as char).collect())),
+            Ok(b) => Self::parse(
+                &String::from_utf8(b.clone())
+                    .unwrap_or_else(|_| b.iter().map(|&c| c as char).collect()),
+            ),
             Err(_) => NameList::default(),
         }
     }
@@ -164,7 +167,10 @@ impl NameList {
                 _ => Ok(()),
             };
         }
-        let dir = path.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new("."));
+        let dir = path
+            .parent()
+            .filter(|d| !d.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
         fs::create_dir_all(dir)?;
         let tmp = dir.join(format!(
             ".{}.tmp{}",
@@ -206,7 +212,10 @@ pub const MUTE_SENDS_MAX: u32 = 5;
 impl ChatLists {
     /// Load all three from `dir`. Missing files are empty lists.
     pub fn load(dir: &Path) -> Self {
-        let mut l = ChatLists { dir: Some(dir.to_path_buf()), ..Default::default() };
+        let mut l = ChatLists {
+            dir: Some(dir.to_path_buf()),
+            ..Default::default()
+        };
         for k in ListKind::ALL {
             *l.list_mut(k) = NameList::load(&dir.join(k.file_name()));
         }
@@ -271,7 +280,11 @@ impl ChatLists {
     pub fn filter(&self, pli: &IdSet) -> ChatFilter {
         ChatFilter {
             ignore: self.ignore.clone(),
-            mute: if pli.contains(PLI_MUTEPLAYER) { self.mute.clone() } else { NameList::default() },
+            mute: if pli.contains(PLI_MUTEPLAYER) {
+                self.mute.clone()
+            } else {
+                NameList::default()
+            },
         }
     }
 }
@@ -288,13 +301,19 @@ impl Identity {
     /// Whether this is the player named `name` (an account or a nickname).
     pub fn is_named(&self, name: &str) -> bool {
         let n = name.trim();
-        [&self.account, &self.nick].into_iter().flatten().any(|x| x.eq_ignore_ascii_case(n))
+        [&self.account, &self.nick]
+            .into_iter()
+            .flatten()
+            .any(|x| x.eq_ignore_ascii_case(n))
     }
 
     /// The name to store in a list for this player: the account if
     /// known, else the nickname.
     pub fn list_name(&self) -> Option<&str> {
-        self.account.as_deref().or(self.nick.as_deref()).filter(|n| valid_name(n))
+        self.account
+            .as_deref()
+            .or(self.nick.as_deref())
+            .filter(|n| valid_name(n))
     }
 }
 
@@ -321,11 +340,17 @@ impl ChatFilter {
     }
 
     pub fn ignored(&self, who: &Identity) -> bool {
-        who.account.as_deref().or(who.nick.as_deref()).is_some_and(|k| self.ignore.contains(k))
+        who.account
+            .as_deref()
+            .or(who.nick.as_deref())
+            .is_some_and(|k| self.ignore.contains(k))
     }
 
     pub fn muted(&self, who: &Identity) -> bool {
-        who.account.as_deref().or(who.nick.as_deref()).is_some_and(|k| self.mute.contains(k))
+        who.account
+            .as_deref()
+            .or(who.nick.as_deref())
+            .is_some_and(|k| self.mute.contains(k))
     }
 }
 
@@ -351,7 +376,11 @@ pub fn parse_command(line: &str) -> Option<ListCommand> {
         if arg.is_empty() {
             return None;
         }
-        Some(if add { ListCommand::Add(k, arg.to_string()) } else { ListCommand::Remove(k, arg.to_string()) })
+        Some(if add {
+            ListCommand::Add(k, arg.to_string())
+        } else {
+            ListCommand::Remove(k, arg.to_string())
+        })
     };
     match cmd.as_str() {
         "buddy" => named(ListKind::Buddy, true),
@@ -383,7 +412,12 @@ pub struct CommandOutcome {
 /// Run a list command: update and save the list, refresh the filter in
 /// `state`, and say what to send. Buddy and Ignore send nothing; Mute sends
 /// id 43 for a player who is in the level, on a build whose `pli` has 43.
-pub fn apply_command(cmd: &ListCommand, lists: &mut ChatLists, state: &mut SessionState, pli: &IdSet) -> CommandOutcome {
+pub fn apply_command(
+    cmd: &ListCommand,
+    lists: &mut ChatLists,
+    state: &mut SessionState,
+    pli: &IdSet,
+) -> CommandOutcome {
     let mut out = CommandOutcome::default();
     match cmd {
         ListCommand::Show(kind) => {
@@ -417,9 +451,15 @@ pub fn apply_command(cmd: &ListCommand, lists: &mut ChatLists, state: &mut Sessi
             }
             // A player we have seen: store the account name if we know
             // it, otherwise what was typed.
-            let seen = state.find_identity(name).map(|(_, w)| w.list_name().map(str::to_string));
+            let seen = state
+                .find_identity(name)
+                .map(|(_, w)| w.list_name().map(str::to_string));
             let stored = seen.flatten().unwrap_or_else(|| name.trim().to_string());
-            let r = if add { lists.add(*k, &stored) } else { lists.remove(*k, &stored) };
+            let r = if add {
+                lists.add(*k, &stored)
+            } else {
+                lists.remove(*k, &stored)
+            };
             match r {
                 Ok(true) => out.notes.push(format!(
                     "{} {} {} list",
@@ -433,7 +473,9 @@ pub fn apply_command(cmd: &ListCommand, lists: &mut ChatLists, state: &mut Sessi
                     if add { "already in" } else { "not in" },
                     k.label()
                 )),
-                Err(e) => out.notes.push(format!("could not save {}: {e}", k.file_name())),
+                Err(e) => out
+                    .notes
+                    .push(format!("could not save {}: {e}", k.file_name())),
             }
             if *k == ListKind::Mute {
                 match state.present_id(&stored).or_else(|| state.present_id(name)) {
@@ -468,7 +510,12 @@ pub enum MenuItem {
 }
 
 pub fn menu_items(pli: &IdSet) -> Vec<MenuItem> {
-    let mut v = vec![MenuItem::Message, MenuItem::History, MenuItem::Buddy, MenuItem::Ignore];
+    let mut v = vec![
+        MenuItem::Message,
+        MenuItem::History,
+        MenuItem::Buddy,
+        MenuItem::Ignore,
+    ];
     if pli.contains(PLI_MUTEPLAYER) {
         v.push(MenuItem::Mute);
     }
@@ -499,18 +546,30 @@ pub struct BubbleTimer {
 
 impl BubbleTimer {
     pub fn start() -> Self {
-        BubbleTimer { left_ms: BUBBLE_MS, held: false, floor: false }
+        BubbleTimer {
+            left_ms: BUBBLE_MS,
+            held: false,
+            floor: false,
+        }
     }
 
     /// The timer of a line the player typed: waits for [`Self::release`].
     pub fn start_held() -> Self {
-        BubbleTimer { left_ms: BUBBLE_MS, held: true, floor: false }
+        BubbleTimer {
+            left_ms: BUBBLE_MS,
+            held: true,
+            floor: false,
+        }
     }
 
     /// The timer of another player's line: runs at once, but the line also
     /// waits for [`Self::release`] (their empty CURCHAT).
     pub fn start_floor() -> Self {
-        BubbleTimer { left_ms: BUBBLE_MS, held: true, floor: true }
+        BubbleTimer {
+            left_ms: BUBBLE_MS,
+            held: true,
+            floor: true,
+        }
     }
 
     /// Time left before the line may end.
@@ -587,9 +646,18 @@ mod tests {
         assert!(l.add(ListKind::Ignore, "Jerk").unwrap());
         assert!(l.add(ListKind::Ignore, "Troll2").unwrap());
         assert!(l.add(ListKind::Mute, "Loud").unwrap());
-        assert!(!l.add(ListKind::Mute, "LOUD").unwrap(), "no change, no write");
-        assert_eq!(fs::read_to_string(d.join("ignoredaccounts.txt")).unwrap(), "Jerk\nTroll2\n");
-        assert_eq!(fs::read_to_string(d.join("buddyaccounts.txt")).unwrap(), "Pal\n");
+        assert!(
+            !l.add(ListKind::Mute, "LOUD").unwrap(),
+            "no change, no write"
+        );
+        assert_eq!(
+            fs::read_to_string(d.join("ignoredaccounts.txt")).unwrap(),
+            "Jerk\nTroll2\n"
+        );
+        assert_eq!(
+            fs::read_to_string(d.join("buddyaccounts.txt")).unwrap(),
+            "Pal\n"
+        );
         let back = ChatLists::load(&d);
         assert_eq!(back.buddy, l.buddy);
         assert_eq!(back.ignore, l.ignore);
@@ -598,7 +666,10 @@ mod tests {
         assert!(l.remove(ListKind::Buddy, "pal").unwrap());
         assert!(!d.join("buddyaccounts.txt").exists());
         // No temporary file is left behind.
-        let left: Vec<_> = fs::read_dir(&d).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
+        let left: Vec<_> = fs::read_dir(&d)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
         assert!(left.iter().all(|n| !n.contains(".tmp")), "{left:?}");
         let _ = fs::remove_dir_all(&d);
     }
@@ -642,10 +713,19 @@ mod tests {
     #[test]
     fn mute_packet_bytes() {
         // Lab capture: player id 2, mute then unmute.
-        assert_eq!(mute_message(2, true), vec![43 + 0x20, 0x20, 0x22, 0x21, b'\n']);
-        assert_eq!(mute_message(2, false), vec![43 + 0x20, 0x20, 0x22, 0x20, b'\n']);
+        assert_eq!(
+            mute_message(2, true),
+            vec![43 + 0x20, 0x20, 0x22, 0x21, b'\n']
+        );
+        assert_eq!(
+            mute_message(2, false),
+            vec![43 + 0x20, 0x20, 0x22, 0x20, b'\n']
+        );
         // A GSHORT of 200 is (1, 72).
-        assert_eq!(mute_message(200, true), vec![0x4b, 0x21, 0x20 + 72, 0x21, b'\n']);
+        assert_eq!(
+            mute_message(200, true),
+            vec![0x4b, 0x21, 0x20 + 72, 0x21, b'\n']
+        );
     }
 
     #[test]
@@ -654,18 +734,34 @@ mod tests {
         let mut l = ChatLists::in_memory();
         l.mute.add("loud");
         l.ignore.add("jerk");
-        let who = |n: &str| Identity { account: None, nick: Some(n.into()) };
+        let who = |n: &str| Identity {
+            account: None,
+            nick: Some(n.into()),
+        };
         for v in ClientVersion::all_versions() {
             let p = profile(*v);
             let f = l.filter(&p.protocol.pli);
             let has43 = p.protocol.pli.contains(43);
             assert_eq!(f.hides(&who("loud")), has43, "{}", p.label);
-            assert!(f.hides(&who("jerk")), "{}: ignore applies everywhere", p.label);
-            assert_eq!(menu_items(&p.protocol.pli).contains(&MenuItem::Mute), has43, "{}", p.label);
+            assert!(
+                f.hides(&who("jerk")),
+                "{}: ignore applies everywhere",
+                p.label
+            );
+            assert_eq!(
+                menu_items(&p.protocol.pli).contains(&MenuItem::Mute),
+                has43,
+                "{}",
+                p.label
+            );
         }
         // The set differs across versions: some build sends 43, some does not.
-        let any = ClientVersion::all_versions().iter().any(|v| profile(*v).protocol.pli.contains(43));
-        let none = ClientVersion::all_versions().iter().any(|v| !profile(*v).protocol.pli.contains(43));
+        let any = ClientVersion::all_versions()
+            .iter()
+            .any(|v| profile(*v).protocol.pli.contains(43));
+        let none = ClientVersion::all_versions()
+            .iter()
+            .any(|v| !profile(*v).protocol.pli.contains(43));
         assert!(any && none);
     }
 
@@ -676,12 +772,25 @@ mod tests {
         assert!(!p205.protocol.pli.contains(43));
         assert_eq!(
             menu_items(&p205.protocol.pli),
-            vec![MenuItem::Message, MenuItem::History, MenuItem::Buddy, MenuItem::Ignore, MenuItem::Profile]
+            vec![
+                MenuItem::Message,
+                MenuItem::History,
+                MenuItem::Buddy,
+                MenuItem::Ignore,
+                MenuItem::Profile
+            ]
         );
         let p222 = profile(ClientVersion::V222);
         assert_eq!(
             menu_items(&p222.protocol.pli),
-            vec![MenuItem::Message, MenuItem::History, MenuItem::Buddy, MenuItem::Ignore, MenuItem::Mute, MenuItem::Profile]
+            vec![
+                MenuItem::Message,
+                MenuItem::History,
+                MenuItem::Buddy,
+                MenuItem::Ignore,
+                MenuItem::Mute,
+                MenuItem::Profile
+            ]
         );
     }
 
@@ -689,21 +798,51 @@ mod tests {
     fn filter_matches_account_first_then_nick() {
         let mut f = ChatFilter::default();
         f.ignore.add("jerk");
-        let acc = |a: &str, n: &str| Identity { account: Some(a.into()), nick: Some(n.into()) };
-        assert!(f.hides(&acc("Jerk", "Nice Guy")), "account decides, any case");
-        assert!(!f.hides(&acc("other", "jerk")), "a known account is not overridden by a nickname");
-        assert!(f.hides(&Identity { account: None, nick: Some("JERK".into()) }), "no account yet: nickname");
+        let acc = |a: &str, n: &str| Identity {
+            account: Some(a.into()),
+            nick: Some(n.into()),
+        };
+        assert!(
+            f.hides(&acc("Jerk", "Nice Guy")),
+            "account decides, any case"
+        );
+        assert!(
+            !f.hides(&acc("other", "jerk")),
+            "a known account is not overridden by a nickname"
+        );
+        assert!(
+            f.hides(&Identity {
+                account: None,
+                nick: Some("JERK".into())
+            }),
+            "no account yet: nickname"
+        );
         assert!(!f.hides(&Identity::default()));
     }
 
     #[test]
     fn commands_parse() {
-        assert_eq!(parse_command("/ignore  Bob "), Some(ListCommand::Add(ListKind::Ignore, "Bob".into())));
-        assert_eq!(parse_command("/UNIGNORE bob"), Some(ListCommand::Remove(ListKind::Ignore, "bob".into())));
-        assert_eq!(parse_command("/buddy a b"), Some(ListCommand::Add(ListKind::Buddy, "a b".into())));
-        assert_eq!(parse_command("/unmute x"), Some(ListCommand::Remove(ListKind::Mute, "x".into())));
+        assert_eq!(
+            parse_command("/ignore  Bob "),
+            Some(ListCommand::Add(ListKind::Ignore, "Bob".into()))
+        );
+        assert_eq!(
+            parse_command("/UNIGNORE bob"),
+            Some(ListCommand::Remove(ListKind::Ignore, "bob".into()))
+        );
+        assert_eq!(
+            parse_command("/buddy a b"),
+            Some(ListCommand::Add(ListKind::Buddy, "a b".into()))
+        );
+        assert_eq!(
+            parse_command("/unmute x"),
+            Some(ListCommand::Remove(ListKind::Mute, "x".into()))
+        );
         assert_eq!(parse_command("/lists"), Some(ListCommand::Show(None)));
-        assert_eq!(parse_command("/lists mute"), Some(ListCommand::Show(Some(ListKind::Mute))));
+        assert_eq!(
+            parse_command("/lists mute"),
+            Some(ListCommand::Show(Some(ListKind::Mute)))
+        );
         // No name, unknown commands and plain chat are not commands.
         assert_eq!(parse_command("/ignore"), None);
         assert_eq!(parse_command("/dance"), None);
@@ -712,7 +851,13 @@ mod tests {
     }
 
     fn who(state: &mut SessionState, id: u16, nick: &str, account: &str) {
-        let mut v = vec![0x20 + 8, 0x20 + (id >> 7) as u8, 0x20 + (id & 0x7f) as u8, 0x20, 0x20 + nick.len() as u8];
+        let mut v = vec![
+            0x20 + 8,
+            0x20 + (id >> 7) as u8,
+            0x20 + (id & 0x7f) as u8,
+            0x20,
+            0x20 + nick.len() as u8,
+        ];
         v.extend_from_slice(nick.as_bytes());
         v.extend_from_slice(&[34 + 0x20, 0x20 + account.len() as u8]);
         v.extend_from_slice(account.as_bytes());
@@ -730,38 +875,83 @@ mod tests {
         who(&mut st, 2, "Loudmouth", "loud_acct");
 
         // Ignore by nickname: the account is what is stored, nothing is sent.
-        let out = apply_command(&parse_command("/ignore loudmouth").unwrap(), &mut lists, &mut st, &pli222);
+        let out = apply_command(
+            &parse_command("/ignore loudmouth").unwrap(),
+            &mut lists,
+            &mut st,
+            &pli222,
+        );
         assert!(out.mute_sends.is_empty());
         assert!(lists.ignore.contains("loud_acct"));
-        assert_eq!(fs::read_to_string(d.join("ignoredaccounts.txt")).unwrap(), "loud_acct\n");
+        assert_eq!(
+            fs::read_to_string(d.join("ignoredaccounts.txt")).unwrap(),
+            "loud_acct\n"
+        );
         assert!(st.hides(2));
-        let out = apply_command(&parse_command("/unignore LOUD_ACCT").unwrap(), &mut lists, &mut st, &pli222);
+        let out = apply_command(
+            &parse_command("/unignore LOUD_ACCT").unwrap(),
+            &mut lists,
+            &mut st,
+            &pli222,
+        );
         assert!(out.mute_sends.is_empty());
         assert!(!st.hides(2));
         assert!(!d.join("ignoredaccounts.txt").exists());
 
         // Buddy: local file only.
-        let out = apply_command(&parse_command("/buddy Loudmouth").unwrap(), &mut lists, &mut st, &pli222);
+        let out = apply_command(
+            &parse_command("/buddy Loudmouth").unwrap(),
+            &mut lists,
+            &mut st,
+            &pli222,
+        );
         assert!(out.mute_sends.is_empty());
-        assert_eq!(fs::read_to_string(d.join("buddyaccounts.txt")).unwrap(), "loud_acct\n");
+        assert_eq!(
+            fs::read_to_string(d.join("buddyaccounts.txt")).unwrap(),
+            "loud_acct\n"
+        );
         assert!(!st.hides(2), "a buddy is not hidden");
 
         // Mute: id 43 for the player in the level, then unmute.
-        let out = apply_command(&parse_command("/mute loud_acct").unwrap(), &mut lists, &mut st, &pli222);
+        let out = apply_command(
+            &parse_command("/mute loud_acct").unwrap(),
+            &mut lists,
+            &mut st,
+            &pli222,
+        );
         assert_eq!(out.mute_sends, vec![(2, true)]);
         assert!(st.hides(2));
-        let out = apply_command(&parse_command("/unmute loud_acct").unwrap(), &mut lists, &mut st, &pli222);
+        let out = apply_command(
+            &parse_command("/unmute loud_acct").unwrap(),
+            &mut lists,
+            &mut st,
+            &pli222,
+        );
         assert_eq!(out.mute_sends, vec![(2, false)]);
         assert!(!st.hides(2));
 
         // Not in the level: the list changes, nothing is sent.
-        let out = apply_command(&parse_command("/mute Faraway").unwrap(), &mut lists, &mut st, &pli222);
+        let out = apply_command(
+            &parse_command("/mute Faraway").unwrap(),
+            &mut lists,
+            &mut st,
+            &pli222,
+        );
         assert!(out.mute_sends.is_empty());
         assert!(lists.mute.contains("Faraway"));
-        assert!(out.notes.iter().any(|n| n.contains("nothing was sent")), "{:?}", out.notes);
+        assert!(
+            out.notes.iter().any(|n| n.contains("nothing was sent")),
+            "{:?}",
+            out.notes
+        );
 
         // A repeated add says so and changes nothing.
-        let out = apply_command(&parse_command("/buddy LOUD_ACCT").unwrap(), &mut lists, &mut st, &pli222);
+        let out = apply_command(
+            &parse_command("/buddy LOUD_ACCT").unwrap(),
+            &mut lists,
+            &mut st,
+            &pli222,
+        );
         assert!(out.notes[0].contains("already in"), "{:?}", out.notes);
         let _ = fs::remove_dir_all(&d);
     }
@@ -774,12 +964,22 @@ mod tests {
         let mut lists = ChatLists::in_memory();
         let mut st = SessionState::default();
         who(&mut st, 2, "Loud", "loud");
-        let out = apply_command(&parse_command("/mute loud").unwrap(), &mut lists, &mut st, &pli205);
+        let out = apply_command(
+            &parse_command("/mute loud").unwrap(),
+            &mut lists,
+            &mut st,
+            &pli205,
+        );
         assert!(out.mute_sends.is_empty());
         assert!(lists.mute.is_empty());
         assert!(out.notes[0].contains("no mute"));
         // Ignore still works there.
-        apply_command(&parse_command("/ignore loud").unwrap(), &mut lists, &mut st, &pli205);
+        apply_command(
+            &parse_command("/ignore loud").unwrap(),
+            &mut lists,
+            &mut st,
+            &pli205,
+        );
         assert!(st.hides(2));
     }
 
@@ -792,12 +992,31 @@ mod tests {
         who(&mut st, 2, "Loud", "loud");
         let mut sent = 0;
         for _ in 0..4 {
-            sent += apply_command(&parse_command("/mute loud").unwrap(), &mut lists, &mut st, &pli).mute_sends.len();
-            sent += apply_command(&parse_command("/unmute loud").unwrap(), &mut lists, &mut st, &pli).mute_sends.len();
+            sent += apply_command(
+                &parse_command("/mute loud").unwrap(),
+                &mut lists,
+                &mut st,
+                &pli,
+            )
+            .mute_sends
+            .len();
+            sent += apply_command(
+                &parse_command("/unmute loud").unwrap(),
+                &mut lists,
+                &mut st,
+                &pli,
+            )
+            .mute_sends
+            .len();
         }
         assert_eq!(sent as u32, MUTE_SENDS_MAX);
         // The list still follows the command after the cap.
-        apply_command(&parse_command("/mute loud").unwrap(), &mut lists, &mut st, &pli);
+        apply_command(
+            &parse_command("/mute loud").unwrap(),
+            &mut lists,
+            &mut st,
+            &pli,
+        );
         assert!(lists.mute.contains("loud"));
     }
 
@@ -810,7 +1029,10 @@ mod tests {
         lists.buddy.add("b");
         let mut st = SessionState::default();
         let out = apply_command(&ListCommand::Show(None), &mut lists, &mut st, &pli);
-        assert_eq!(out.notes, vec!["buddy: a, b", "ignore: empty", "mute: empty"]);
+        assert_eq!(
+            out.notes,
+            vec!["buddy: a, b", "ignore: empty", "mute: empty"]
+        );
     }
 
     #[test]

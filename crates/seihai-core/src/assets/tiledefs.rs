@@ -59,17 +59,32 @@ mod tests {
 
     #[test]
     fn parses_the_shapes_in_the_data_folder() {
-        let t = "pics1.png,,0,0,0\nalienpics.png,alien1.nw,4,1728,0\npicso.png,offlinetutorial,1,0,0\n";
+        let t =
+            "pics1.png,,0,0,0\nalienpics.png,alien1.nw,4,1728,0\npicso.png,offlinetutorial,1,0,0\n";
         let v = parse_tiledefs(t);
         assert_eq!(v.len(), 3);
-        assert_eq!(v[0], TileDef { image: "pics1.png".into(), prefix: String::new(), kind: 0, x: 0, y: 0 });
-        assert_eq!((v[1].image.as_str(), v[1].prefix.as_str(), v[1].kind, v[1].x), ("alienpics.png", "alien1.nw", 4, 1728));
+        assert_eq!(
+            v[0],
+            TileDef {
+                image: "pics1.png".into(),
+                prefix: String::new(),
+                kind: 0,
+                x: 0,
+                y: 0
+            }
+        );
+        assert_eq!(
+            (v[1].image.as_str(), v[1].prefix.as_str(), v[1].kind, v[1].x),
+            ("alienpics.png", "alien1.nw", 4, 1728)
+        );
         assert_eq!(v[2].kind, 1);
     }
 
     #[test]
     fn optional_position_and_bad_lines() {
-        let v = parse_tiledefs("a.png,p,1\n\n// note\nnoprefix.png\n,x,1\nb.png,q,notnum\r\nc.png,r,2,5,6\r\n");
+        let v = parse_tiledefs(
+            "a.png,p,1\n\n// note\nnoprefix.png\n,x,1\nb.png,q,notnum\r\nc.png,r,2,5,6\r\n",
+        );
         assert_eq!(v.len(), 2);
         assert_eq!((v[0].x, v[0].y), (0, 0));
         assert_eq!((v[1].x, v[1].y), (5, 6));

@@ -57,7 +57,10 @@ impl FrameLen {
             return Some((2, short as usize));
         }
         let long = buf.get(2..6)?;
-        Some((6, u32::from_be_bytes([long[0], long[1], long[2], long[3]]) as usize))
+        Some((
+            6,
+            u32::from_be_bytes([long[0], long[1], long[2], long[3]]) as usize,
+        ))
     }
 }
 
@@ -100,7 +103,11 @@ impl Gen5 {
     /// Resume from a known iterator state (for replaying captures that
     /// start mid-session).
     pub fn with_state(it: u32, key: u8) -> Self {
-        Self { it, key, round_down: false }
+        Self {
+            it,
+            key,
+            round_down: false,
+        }
     }
 
     /// Current iterator state.
@@ -121,7 +128,11 @@ impl Gen5 {
             Gen5Comp::None => 12,
             Gen5Comp::Zlib | Gen5Comp::Bz2 => 4,
         };
-        let groups = if self.round_down && comp != Gen5Comp::None { body.len() / 4 } else { body.len().div_ceil(4) };
+        let groups = if self.round_down && comp != Gen5Comp::None {
+            body.len() / 4
+        } else {
+            body.len().div_ceil(4)
+        };
         for chunk in body.chunks_mut(4).take(groups.min(limit)) {
             self.it = self.it.wrapping_mul(GEN3_MUL).wrapping_add(self.key as u32);
             for (b, k) in chunk.iter_mut().zip(self.it.to_le_bytes()) {
@@ -172,10 +183,7 @@ pub fn write_frame(comp: Gen5Comp, body: &[u8]) -> Vec<u8> {
 /// Read one gen-5 frame: `u16be (1+body)` + comp byte + XORed body.
 ///
 /// Returns the decompressed body. `cipher` is advanced.
-pub fn read_frame<R: std::io::Read>(
-    r: &mut R,
-    cipher: &mut Gen5,
-) -> std::io::Result<Vec<u8>> {
+pub fn read_frame<R: std::io::Read>(r: &mut R, cipher: &mut Gen5) -> std::io::Result<Vec<u8>> {
     read_frame_inner(r, cipher, false, FrameLen::Short)
 }
 
@@ -440,5 +448,4 @@ mod tests {
         assert_eq!(frame[2], 0x04);
         assert_eq!(&frame[3..], b"abc");
     }
-
 }

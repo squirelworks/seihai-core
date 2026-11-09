@@ -12,13 +12,14 @@ pub use udp::{
     UDP_ID_TRIGGER, UDP_PORT,
 };
 
-use crate::protocol::{
-    bz2_compress, choose_comp, encode_pos_classic, encode_pos_precise, read_zlib_frame, write_frame, write_gstring,
-    write_login, write_zlib_frame, write_zlib_frame_best, zlib_compress, ClientVersion, EncryptionGen, FrameLen, Gen3, Gen5, LoginShape, TamperSender,
-    Gen5Comp, IdSet, LevelRequest, ListReply, LoginRequest, PlayerUpdate, SessionState,
-};
 use crate::offline::OfflineSession;
 use crate::protocol::parse_list_reply;
+use crate::protocol::{
+    bz2_compress, choose_comp, encode_pos_classic, encode_pos_precise, read_zlib_frame,
+    write_frame, write_gstring, write_login, write_zlib_frame, write_zlib_frame_best,
+    zlib_compress, ClientVersion, EncryptionGen, FrameLen, Gen3, Gen5, Gen5Comp, IdSet,
+    LevelRequest, ListReply, LoginRequest, LoginShape, PlayerUpdate, SessionState, TamperSender,
+};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::mpsc::{self, Receiver};
@@ -45,11 +46,15 @@ pub fn position_message(x: f32, y: f32, dir: u8) -> Vec<u8> {
 }
 
 /// `PLI_PLAYERPROPS` (2) with prop 10 in the pre-2.1 bow form, `c(10 + len)`
-/// + `name`: how the real 2.00 and 2.05 tell others their animation
+/// followed by `name`: how the real 2.00 and 2.05 tell others their animation
 /// (`sword` as a swing starts, `idle` after it). See
 /// [`crate::combat::swing_in_bow_slot`].
 pub fn bow_slot_message(name: &str) -> Vec<u8> {
-    let mut m = vec![2 + 0x20, 10 + 0x20, (10 + name.len() as u8).wrapping_add(0x20)];
+    let mut m = vec![
+        2 + 0x20,
+        10 + 0x20,
+        (10 + name.len() as u8).wrapping_add(0x20),
+    ];
     m.extend_from_slice(name.as_bytes());
     m.push(b'\n');
     m
@@ -106,7 +111,8 @@ pub fn walk_message_for(version: ClientVersion, x: f32, y: f32, sprite: u8) -> V
 /// (`documentation/gr-flags.md`). 2.3 has no binary and takes 2.31's
 /// values; the 3.x builds were not probed and keep every flag.
 pub fn sends_client_flags_only(version: ClientVersion) -> bool {
-    matches!(version, ClientVersion::V230 | ClientVersion::V231) || version.profile().protocol.lobby.is_some()
+    matches!(version, ClientVersion::V230 | ClientVersion::V231)
+        || version.profile().protocol.lobby.is_some()
 }
 
 /// Extra messages that go in the same frame right after 46 on a level
@@ -117,7 +123,11 @@ pub fn sends_client_flags_only(version: ClientVersion) -> bool {
 /// Seihai does not track, so 46 goes out alone then. The position is X2/Y2
 /// for a precise-position build: the real 2.31 sent `ENTERLEVEL` and
 /// `PLAYERPROPS X2=61 Y2=33` in its warp frame (lan-231c, 2026-10-31).
-pub fn enter_level_extras(version: ClientVersion, own_link: bool, at: &PlayerUpdate) -> Vec<Vec<u8>> {
+pub fn enter_level_extras(
+    version: ClientVersion,
+    own_link: bool,
+    at: &PlayerUpdate,
+) -> Vec<Vec<u8>> {
     if own_link {
         vec![walk_message_for(version, at.x, at.y, at.dir % 4)]
     } else {
@@ -160,7 +170,13 @@ pub struct EnterLevelSender {
 
 impl EnterLevelSender {
     pub fn for_version(version: ClientVersion) -> Self {
-        Self { version, level: None, pending: false, sent: 0, login_owed: false }
+        Self {
+            version,
+            level: None,
+            pending: false,
+            sent: 0,
+            login_owed: false,
+        }
     }
 
     /// Send 46 for the login. Call once, right after the post-login frame.
@@ -199,7 +215,11 @@ impl EnterLevelSender {
         let first = self.level.is_none();
         // Level names are not case-sensitive (a gmap grid may spell one
         // differently from the server's LEVELNAME).
-        if self.level.as_deref().is_some_and(|l| l.eq_ignore_ascii_case(name)) {
+        if self
+            .level
+            .as_deref()
+            .is_some_and(|l| l.eq_ignore_ascii_case(name))
+        {
             return false;
         }
         self.level = Some(name.to_string());
@@ -294,7 +314,12 @@ pub fn throw_carried_message() -> Vec<u8> {
 /// the head, in the 2.05 code ([`crate::throwing::carry_wire_code`]; -1
 /// empty hands). Other clients draw the object from it.
 pub fn carry_sprite_message(sprite: Option<u16>) -> Vec<u8> {
-    vec![2 + 0x20, 19 + 0x20, crate::throwing::carry_wire_byte(sprite), b'\n']
+    vec![
+        2 + 0x20,
+        19 + 0x20,
+        crate::throwing::carry_wire_byte(sprite),
+        b'\n',
+    ]
 }
 
 /// `PLI_PLAYERPROPS` (2) with MAXPOWER (1): heart containers. A real client
@@ -312,7 +337,12 @@ pub fn max_power_message(hearts: u8) -> Vec<u8> {
 /// `22 24 2A 24 "hurt" 2F 5F 31 A2`. The real 2.05 client's
 /// hit report, lab run 1 (2026-10-29 note), was `22 25 2A 24 "hurt" 31 A0`:
 /// 5 half hearts, `hurt`, sprite 128 (hurt sprite 32, facing up).
-pub fn power_props_message(cur_half: Option<u8>, gani: Option<&str>, pos: (Option<u8>, Option<u8>), sprite: Option<u8>) -> Vec<u8> {
+pub fn power_props_message(
+    cur_half: Option<u8>,
+    gani: Option<&str>,
+    pos: (Option<u8>, Option<u8>),
+    sprite: Option<u8>,
+) -> Vec<u8> {
     let mut m = vec![2 + 0x20];
     if let Some(c) = cur_half {
         m.push(2 + 0x20);
@@ -470,7 +500,11 @@ pub fn link_request_frame(
         messages.push(enter_level_message());
         messages.push(walk_message_for(version, x, y, dir % 4));
     }
-    LinkFrame { messages, with_tamper, with_enter_level }
+    LinkFrame {
+        messages,
+        with_tamper,
+        with_enter_level,
+    }
 }
 
 /// What [`start_online_link`] sent and what the caller still owes.
@@ -503,7 +537,11 @@ pub struct LinkArrival {
 
 impl LinkArrival {
     pub fn new(dest: &str, (x, y): (f32, f32)) -> Self {
-        Self { dest: dest.to_string(), x, y }
+        Self {
+            dest: dest.to_string(),
+            x,
+            y,
+        }
     }
 
     /// The level `entered` is now the current one: the held position if it
@@ -560,7 +598,11 @@ pub fn start_online_link(
         return Ok(None);
     }
     session.begin_warp(dest);
-    let cached = if version.sends_cached_links() { net_state.cached_mod_time(dest) } else { None };
+    let cached = if version.sends_cached_links() {
+        net_state.cached_mod_time(dest)
+    } else {
+        None
+    };
     let dir = session.player_update().dir;
     let frame = link_request_frame(version, cached, x, y, dir, dest, tamper);
     if let Err(e) = send(&frame.messages) {
@@ -573,7 +615,11 @@ pub fn start_online_link(
             el.cached_link(dest, frame.with_enter_level);
         }
     }
-    Ok(Some(LinkStart { frame, arrival: Some((x, y)), cached_mod_time: cached }))
+    Ok(Some(LinkStart {
+        frame,
+        arrival: Some((x, y)),
+        cached_mod_time: cached,
+    }))
 }
 
 /// Where a secure login ([`crate::protocol::seclogin`]) gets the server
@@ -596,12 +642,16 @@ pub struct SecureLogin {
 impl SecureLogin {
     /// Pins from the settings folder's `known_servers.txt`.
     pub fn trust_on_first_use() -> Self {
-        Self { pin: PinSource::File(crate::protocol::seclogin::pin_path()) }
+        Self {
+            pin: PinSource::File(crate::protocol::seclogin::pin_path()),
+        }
     }
 
     /// Only `key`.
     pub fn pinned(key: [u8; 32]) -> Self {
-        Self { pin: PinSource::Key(key) }
+        Self {
+            pin: PinSource::Key(key),
+        }
     }
 }
 
@@ -628,7 +678,12 @@ pub struct LoginFailure {
 
 impl std::fmt::Display for LoginFailure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} failed: {}", if self.connect { "connect" } else { "login" }, self.error)
+        write!(
+            f,
+            "{} failed: {}",
+            if self.connect { "connect" } else { "login" },
+            self.error
+        )
     }
 }
 
@@ -648,7 +703,16 @@ pub fn login_gserver(
     password: &str,
     send_tampercheck: bool,
 ) -> Result<GserverSession, LoginFailure> {
-    login_gserver_with(addr, version, key, account, password, send_tampercheck, true, |n| wantfile_message(n))
+    login_gserver_with(
+        addr,
+        version,
+        key,
+        account,
+        password,
+        send_tampercheck,
+        true,
+        wantfile_message,
+    )
 }
 
 /// As [`login_gserver`]. `check` gives the file message for each of the
@@ -669,7 +733,17 @@ pub fn login_gserver_with(
     first_session: bool,
     check: impl Fn(&str) -> Vec<u8>,
 ) -> Result<GserverSession, LoginFailure> {
-    login_gserver_secure(addr, version, key, account, password, send_tampercheck, first_session, check, None)
+    login_gserver_secure(
+        addr,
+        version,
+        key,
+        account,
+        password,
+        send_tampercheck,
+        first_session,
+        check,
+        None,
+    )
 }
 
 /// As [`login_gserver_with`]; with `secure`, the login goes through the
@@ -687,8 +761,10 @@ pub fn login_gserver_secure(
     check: impl Fn(&str) -> Vec<u8>,
     secure: Option<&SecureLogin>,
 ) -> Result<GserverSession, LoginFailure> {
-    let mut conn =
-        Connection::connect(addr).map_err(|error| LoginFailure { connect: true, error })?;
+    let mut conn = Connection::connect(addr).map_err(|error| LoginFailure {
+        connect: true,
+        error,
+    })?;
     let login_with = |conn: &mut Connection, then: &[Vec<u8>]| match secure {
         Some(s) => conn.login_secure_with(version, key, account, password, then, addr, s),
         None => conn.login_versioned_with(version, key, account, password, then),
@@ -697,17 +773,27 @@ pub fn login_gserver_secure(
     let first_files = login.map_or(&[][..], |l| l.first_frame_files);
     let bundle = login.is_some_and(|l| l.bundle_login) || !first_files.is_empty();
     let mut warnings = Vec::new();
-    let tamper = if send_tampercheck { TamperSender::for_version(version) } else { None };
+    let tamper = if send_tampercheck {
+        TamperSender::for_version(version)
+    } else {
+        None
+    };
     let tamper_unavailable = send_tampercheck && tamper.is_none();
     let after_login = version.profile().protocol.lobby.and_then(|l| l.after_login);
     if !bundle {
-        login_with(&mut conn, &[])
-            .map_err(|error| LoginFailure { connect: false, error })?;
+        login_with(&mut conn, &[]).map_err(|error| LoginFailure {
+            connect: false,
+            error,
+        })?;
         let mut msgs = conn.post_login_messages(version, "English", tamper.as_ref());
         // The real 4.04r2 and 4.20r8 ask their base files in the frame of
         // the language (lab, 2026-10-31).
         if let Some(a) = after_login {
-            let first = if first_session { a.first_session_files } else { &[] };
+            let first = if first_session {
+                a.first_session_files
+            } else {
+                &[]
+            };
             msgs.extend(a.after_language.iter().chain(first).map(|n| check(n)));
         }
         if !msgs.is_empty() {
@@ -720,8 +806,10 @@ pub fn login_gserver_secure(
         // The real 3.04: login line, language and the file checks in one plain frame.
         let mut then = conn.post_login_messages(version, "English", tamper.as_ref());
         then.extend(first_files.iter().map(|n| check(n)));
-        login_with(&mut conn, &then)
-            .map_err(|error| LoginFailure { connect: false, error })?;
+        login_with(&mut conn, &then).map_err(|error| LoginFailure {
+            connect: false,
+            error,
+        })?;
     }
     let mut enter_level = EnterLevelSender::for_version(version);
     if version.profile().protocol.login.is_some() || after_login.is_some() {
@@ -731,7 +819,13 @@ pub fn login_gserver_secure(
     } else if let Err(e) = enter_level.at_login(&mut conn) {
         warnings.push(format!("enter-level send failed: {e}"));
     }
-    Ok(GserverSession { conn, tamper, enter_level, tamper_unavailable, warnings })
+    Ok(GserverSession {
+        conn,
+        tamper,
+        enter_level,
+        tamper_unavailable,
+        warnings,
+    })
 }
 
 /// The socket's own thread ([`Connection::spawn_reader_timed`]): write what
@@ -769,7 +863,10 @@ fn socket_thread(
         // listens.
         if !queue_open && pending.is_empty() {
             let _ = stream.shutdown(std::net::Shutdown::Both);
-            return fail(&frames, io::Error::new(io::ErrorKind::NotConnected, "closed on Seihai's side"));
+            return fail(
+                &frames,
+                io::Error::new(io::ErrorKind::NotConnected, "closed on Seihai's side"),
+            );
         }
         while !pending.is_empty() {
             match stream.write(&pending) {
@@ -789,7 +886,11 @@ fn socket_thread(
                 inbuf.extend_from_slice(&chunk[..n]);
                 busy = true;
             }
-            Err(e) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted) => {}
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted
+                ) => {}
             Err(e) => return fail(&frames, e),
         }
         let at = Instant::now();
@@ -797,7 +898,10 @@ fn socket_thread(
         // then that many bytes.
         while let Some((head, len)) = frame_len.header(&inbuf) {
             if len > FrameLen::MAX_LONG {
-                let e = io::Error::new(io::ErrorKind::InvalidData, format!("gen-5 frame length {len} is over {}", FrameLen::MAX_LONG));
+                let e = io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("gen-5 frame length {len} is over {}", FrameLen::MAX_LONG),
+                );
                 return fail(&frames, e);
             }
             if inbuf.len() < head + len {
@@ -852,7 +956,9 @@ fn list_read_error(e: io::Error) -> io::Error {
 pub fn list_failure_text(addr: &str, e: &io::Error) -> String {
     let mut s = format!("listserver failed: {e}");
     if e.kind() == io::ErrorKind::ConnectionRefused && addr.ends_with(":14921") {
-        s.push_str(" (the public listserver refuses port 14921; it answered a classic login on 14923)");
+        s.push_str(
+            " (the public listserver refuses port 14921; it answered a classic login on 14923)",
+        );
     }
     s
 }
@@ -875,7 +981,10 @@ fn connect_any(addrs: &[SocketAddr], timeout: Duration) -> io::Result<TcpStream>
         }
     }
     Err(last.unwrap_or_else(|| {
-        io::Error::new(io::ErrorKind::NotFound, "host name resolved to no addresses")
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "host name resolved to no addresses",
+        )
     }))
 }
 
@@ -986,7 +1095,24 @@ impl Connection {
         let addrs: Vec<SocketAddr> = addr.to_socket_addrs()?.collect();
         let stream = connect_any(&addrs, CONNECT_TIMEOUT)?;
         stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-        Ok(Self { stream, gen3: None, gen5: None, gen5_in: None, frame_len: FrameLen::Short, pli: None, zlib_best: false, flags_out: Vec::new(), flags_since: None, files_out: Vec::new(), files_since: None, last_walk: None, precise_walk: false, client_flags_only: false, send_log: None, io_thread: None })
+        Ok(Self {
+            stream,
+            gen3: None,
+            gen5: None,
+            gen5_in: None,
+            frame_len: FrameLen::Short,
+            pli: None,
+            zlib_best: false,
+            flags_out: Vec::new(),
+            flags_since: None,
+            files_out: Vec::new(),
+            files_since: None,
+            last_walk: None,
+            precise_walk: false,
+            client_flags_only: false,
+            send_log: None,
+            io_thread: None,
+        })
     }
 
     /// Close the connection in both directions. A reader thread from
@@ -998,7 +1124,7 @@ impl Connection {
     /// True if this connection's client version has message `id` in its
     /// send set (always true before the login fixed the version).
     pub fn can_send(&self, id: u8) -> bool {
-        self.pli.as_ref().map_or(true, |p| p.contains(id))
+        self.pli.as_ref().is_none_or(|p| p.contains(id))
     }
 
     /// Send a raw byte buffer.
@@ -1009,7 +1135,9 @@ impl Connection {
     pub fn send_raw(&mut self, data: &[u8]) -> io::Result<()> {
         match &self.io_thread {
             Some(t) => {
-                t.out.send(data.to_vec()).map_err(|_| io::Error::new(io::ErrorKind::BrokenPipe, "connection closed"))?;
+                t.out
+                    .send(data.to_vec())
+                    .map_err(|_| io::Error::new(io::ErrorKind::BrokenPipe, "connection closed"))?;
                 t.thread.unpark();
                 Ok(())
             }
@@ -1076,6 +1204,10 @@ impl Connection {
     /// password go sealed, to a server whose key `secure` trusts. `server`
     /// names the server in the pin file (`host:port` as given). After the
     /// handshake the session is `version`'s, as after its classic login.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Preserve the public secure-login API used by existing clients"
+    )]
     pub fn login_secure_with(
         &mut self,
         version: ClientVersion,
@@ -1088,7 +1220,11 @@ impl Connection {
     ) -> io::Result<()> {
         let mut classic = Vec::new();
         write_login(&mut classic, version, key, account, password)?;
-        let prefix_len = if version.encryption() == EncryptionGen::Gen2 { 1 } else { 2 };
+        let prefix_len = if version.encryption() == EncryptionGen::Gen2 {
+            1
+        } else {
+            2
+        };
         let (prefix, rest) = classic.split_at(prefix_len);
         let tail = &rest[8..];
         let sealed = self.secure_handshake(prefix, version.token(), b"", tail, server, secure)?;
@@ -1099,7 +1235,15 @@ impl Connection {
 
     /// C1, S1 and the pin check of the secure login; returns the C2 line
     /// (no line feed) that seals `tail`.
-    fn secure_handshake(&mut self, prefix: &[u8], inner: &str, suffix: &[u8], tail: &[u8], server: &str, secure: &SecureLogin) -> io::Result<Vec<u8>> {
+    fn secure_handshake(
+        &mut self,
+        prefix: &[u8],
+        inner: &str,
+        suffix: &[u8],
+        tail: &[u8],
+        server: &str,
+        secure: &SecureLogin,
+    ) -> io::Result<Vec<u8>> {
         use crate::protocol::seclogin::{self, ClientHandshake, PinCheck};
         let bad = |e: seclogin::Error| io::Error::new(io::ErrorKind::InvalidData, e.to_string());
         let hs = ClientHandshake::new(prefix, inner, suffix).map_err(bad)?;
@@ -1114,7 +1258,10 @@ impl Connection {
         let s1 = body.split(|&b| b == b'\n').next().unwrap_or_default();
         if !s1.starts_with(seclogin::TOKEN.as_bytes()) {
             let text = s1.get(1..).map(crate::protocol::latin1).unwrap_or_default();
-            return Err(io::Error::new(io::ErrorKind::PermissionDenied, format!("the server refused the secure login: {text}")));
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                format!("the server refused the secure login: {text}"),
+            ));
         }
         let verified = hs.finish(s1).map_err(bad)?;
         let fp = seclogin::fingerprint(&verified.server_key);
@@ -1149,12 +1296,21 @@ impl Connection {
 
     /// Send a login frame whose first line (with its line feed) is `line`,
     /// then `then`, and set the session up for `version` and `key`.
-    fn send_login_frame(&mut self, version: ClientVersion, key: u8, mut line: Vec<u8>, then: &[Vec<u8>]) -> io::Result<()> {
+    fn send_login_frame(
+        &mut self,
+        version: ClientVersion,
+        key: u8,
+        mut line: Vec<u8>,
+        then: &[Vec<u8>],
+    ) -> io::Result<()> {
         let mut gen3 = (version.encryption() == EncryptionGen::Gen3).then(|| Gen3::new(key));
         for m in then {
             if let Err(why) = check_wire_message(m) {
                 self.log_send(m, Some(why));
-                eprintln!("not sent: malformed message ({why}): {}", describe_message(m));
+                eprintln!(
+                    "not sent: malformed message ({why}): {}",
+                    describe_message(m)
+                );
                 continue;
             }
             self.log_send(m, None);
@@ -1164,7 +1320,11 @@ impl Connection {
             }
         }
         self.zlib_best = version.encryption() == EncryptionGen::Gen2;
-        let frame = if self.zlib_best { write_zlib_frame_best(&line)? } else { write_zlib_frame(&line)? };
+        let frame = if self.zlib_best {
+            write_zlib_frame_best(&line)?
+        } else {
+            write_zlib_frame(&line)?
+        };
         self.send_raw(&frame)?;
         self.pli = Some(version.profile().protocol.pli);
         self.precise_walk = version.profile().props.precise_pos;
@@ -1173,8 +1333,16 @@ impl Connection {
         match version.encryption() {
             EncryptionGen::Gen3 => self.gen3 = gen3,
             EncryptionGen::Gen5 => {
-                let g = if version.profile().protocol.gen5_round_down { Gen5::new(key).round_down() } else { Gen5::new(key) };
-                self.frame_len = if version.profile().protocol.gen5_long_frames { FrameLen::Long } else { FrameLen::Short };
+                let g = if version.profile().protocol.gen5_round_down {
+                    Gen5::new(key).round_down()
+                } else {
+                    Gen5::new(key)
+                };
+                self.frame_len = if version.profile().protocol.gen5_long_frames {
+                    FrameLen::Long
+                } else {
+                    FrameLen::Short
+                };
                 self.gen5 = Some(g.clone());
                 self.gen5_in = Some(g);
             }
@@ -1241,10 +1409,20 @@ impl Connection {
         serverlist.push(b'\n');
         if let Some((server, secure)) = secure {
             if !matches!(shape, LoginShape::Gen5 | LoginShape::Gen5OneFrame) {
-                return Err(io::Error::new(io::ErrorKind::Unsupported, "the secure list login needs a 2.22 or later profile"));
+                return Err(io::Error::new(
+                    io::ErrorKind::Unsupported,
+                    "the secure list login needs a 2.22 or later profile",
+                ));
             }
             let prefix = [7 + 0x20, (key & 0x7F) + 0x20];
-            let sealed = self.secure_handshake(&prefix, version.listserver_token(), b"newmain", &serverlist[1..serverlist.len() - 1], server, secure)?;
+            let sealed = self.secure_handshake(
+                &prefix,
+                version.listserver_token(),
+                b"newmain",
+                &serverlist[1..serverlist.len() - 1],
+                server,
+                secure,
+            )?;
             let mut line = sealed;
             line.push(b'\n');
             self.send_raw(&write_zlib_frame_best(&line)?)?;
@@ -1312,16 +1490,28 @@ impl Connection {
     ) -> io::Result<ListReply> {
         let version = version.list_version();
         let mut conn = Self::connect(addr)?;
-        conn.login_listserver_secure(version, random_key(), account, password, secure.map(|s| (addr, s)))?;
+        conn.login_listserver_secure(
+            version,
+            random_key(),
+            account,
+            password,
+            secure.map(|s| (addr, s)),
+        )?;
         // Shape S (1.41): wait for the listserver to speak; if it does not,
         // log in with shape B, which a listserver that waits for a request
         // answers. The real 1.41 has no such fallback.
         let mut first: Option<Vec<u8>> = None;
         if version.listserver().shape == LoginShape::Silent && secure.is_none() {
-            conn.stream.set_read_timeout(Some(crate::protocol::SILENT_LIST_WAIT))?;
+            conn.stream
+                .set_read_timeout(Some(crate::protocol::SILENT_LIST_WAIT))?;
             match conn.read_list_body() {
                 Ok(b) => first = Some(b),
-                Err(e) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => {
+                Err(e)
+                    if matches!(
+                        e.kind(),
+                        io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                    ) =>
+                {
                     eprintln!("listserver: nothing within {:?} of a silent 1.41 login; sending the classic login", crate::protocol::SILENT_LIST_WAIT);
                     conn.send_classic_list_login(account, password)?;
                 }
@@ -1394,7 +1584,12 @@ impl Connection {
     /// Gen-3: zlib + insertion. Gen-5: ctype + XOR + compress (bz2 if ≥ 0x1000).
     pub fn send_messages(&mut self, msgs: &[Vec<u8>]) -> io::Result<()> {
         if let Some(pli) = &self.pli {
-            if let Some(id) = msgs.iter().filter_map(|m| m.first()).map(|b| b.wrapping_sub(0x20)).find(|&id| !pli.contains(id)) {
+            if let Some(id) = msgs
+                .iter()
+                .filter_map(|m| m.first())
+                .map(|b| b.wrapping_sub(0x20))
+                .find(|&id| !pli.contains(id))
+            {
                 return Err(io::Error::new(
                     io::ErrorKind::Unsupported,
                     format!("this client version cannot send message {id}"),
@@ -1410,7 +1605,10 @@ impl Connection {
             // invalid packets"). Such a message is dropped, not sent.
             if let Err(why) = check_wire_message(m) {
                 self.log_send(m, Some(why));
-                eprintln!("not sent: malformed message ({why}): {}", describe_message(m));
+                eprintln!(
+                    "not sent: malformed message ({why}): {}",
+                    describe_message(m)
+                );
                 continue;
             }
             self.log_send(m, None);
@@ -1434,7 +1632,11 @@ impl Connection {
             let frame = write_frame(comp, &encoded);
             self.send_raw(&frame)?;
         } else {
-            let frame = if self.zlib_best { write_zlib_frame_best(&body)? } else { write_zlib_frame(&body)? };
+            let frame = if self.zlib_best {
+                write_zlib_frame_best(&body)?
+            } else {
+                write_zlib_frame(&body)?
+            };
             self.send_raw(&frame)?;
         }
         self.stream.flush()
@@ -1465,7 +1667,12 @@ impl Connection {
     }
 
     /// The messages of [`Self::send_post_login_with`], not sent.
-    fn post_login_messages(&self, version: ClientVersion, language: &str, tamper: Option<&TamperSender>) -> Vec<Vec<u8>> {
+    fn post_login_messages(
+        &self,
+        version: ClientVersion,
+        language: &str,
+        tamper: Option<&TamperSender>,
+    ) -> Vec<Vec<u8>> {
         let mut msgs = Vec::new();
         if version.profile().protocol.sends_language {
             let mut msg = vec![37 + 0x20];
@@ -1488,7 +1695,11 @@ impl Connection {
     /// the props frame that follows.
     ///
     /// Returns `Ok(false)` and sends nothing for a profile without 46.
-    pub fn send_enter_level(&mut self, version: ClientVersion, then: &[Vec<u8>]) -> io::Result<bool> {
+    pub fn send_enter_level(
+        &mut self,
+        version: ClientVersion,
+        then: &[Vec<u8>],
+    ) -> io::Result<bool> {
         if !version.sends_enter_level() {
             return Ok(false);
         }
@@ -1518,7 +1729,9 @@ impl Connection {
         msgs.extend(self.take_files());
         msgs.extend(self.take_flags());
         msgs.extend(props);
-        let with_46 = msgs.iter().any(|m| m.first() == Some(&(PLI_ENTERLEVEL + 0x20)));
+        let with_46 = msgs
+            .iter()
+            .any(|m| m.first() == Some(&(PLI_ENTERLEVEL + 0x20)));
         self.send_messages(&msgs)?;
         Ok(with_46)
     }
@@ -1550,7 +1763,11 @@ impl Connection {
             return;
         }
         let m = crate::protocol::flagset::flag_message(name, value);
-        if self.pli.as_ref().is_some_and(|pli| !pli.contains(m[0] - 0x20)) {
+        if self
+            .pli
+            .as_ref()
+            .is_some_and(|pli| !pli.contains(m[0] - 0x20))
+        {
             return;
         }
         self.flags_since.get_or_insert_with(Instant::now);
@@ -1560,7 +1777,9 @@ impl Connection {
         if value.is_some() {
             let mut key = vec![m[0]];
             key.extend(name.as_bytes());
-            self.flags_out.retain(|q| !(q.starts_with(&key) && matches!(q.get(key.len()), Some(b'=' | b'\n'))));
+            self.flags_out.retain(|q| {
+                !(q.starts_with(&key) && matches!(q.get(key.len()), Some(b'=' | b'\n')))
+            });
         }
         self.flags_out.push(m);
     }
@@ -1620,7 +1839,6 @@ impl Connection {
         self.send_messages(&[m])
     }
 
-
     /// Read server frames on a background thread.
     ///
     /// After a gen-5 login the reader uses gen-5 framing (ctype + XOR +
@@ -1661,7 +1879,10 @@ impl Connection {
         let handle = std::thread::Builder::new()
             .name("seihai-net".into())
             .spawn(move || socket_thread(stream, cipher, frame_len, out_rx, tx))?;
-        self.io_thread = Some(IoThread { out: out_tx, thread: handle.thread().clone() });
+        self.io_thread = Some(IoThread {
+            out: out_tx,
+            thread: handle.thread().clone(),
+        });
         Ok(rx)
     }
 
@@ -1749,7 +1970,12 @@ impl Connection {
     /// all are empty.
     ///
     /// [`WalkCadence`]: crate::protocol::walkcadence::WalkCadence
-    pub fn send_tick_frame(&mut self, lead: Vec<Vec<u8>>, boards: Vec<Vec<u8>>, props: Option<Vec<u8>>) -> io::Result<()> {
+    pub fn send_tick_frame(
+        &mut self,
+        lead: Vec<Vec<u8>>,
+        boards: Vec<Vec<u8>>,
+        props: Option<Vec<u8>>,
+    ) -> io::Result<()> {
         // Queued file requests go in the next tick's frame, with or without
         // props. (2.22's later-step requests do not wait for a tick: the
         // main loop sends them at once.)
@@ -1785,7 +2011,11 @@ impl Connection {
         let walk = self.walk_message(upd.x, upd.y, sprite);
         let changed = self.last_walk.as_ref() != Some(&walk);
         // Queued file requests ride with a walk update only.
-        let mut msgs = if changed { self.take_files() } else { Vec::new() };
+        let mut msgs = if changed {
+            self.take_files()
+        } else {
+            Vec::new()
+        };
         msgs.extend(self.take_flags());
         if changed {
             self.last_walk = Some(walk.clone());
@@ -1869,7 +2099,14 @@ impl Connection {
 
     /// Tell the server about a change to the level's tiles
     /// ([`board_modify_message`]).
-    pub fn send_board_modify(&mut self, x: u8, y: u8, w: u8, h: u8, tiles: &[u16]) -> io::Result<()> {
+    pub fn send_board_modify(
+        &mut self,
+        x: u8,
+        y: u8,
+        w: u8,
+        h: u8,
+        tiles: &[u16],
+    ) -> io::Result<()> {
         self.send_messages(&[board_modify_message(x, y, w, h, tiles)])
     }
 
@@ -1881,7 +2118,13 @@ impl Connection {
     /// dropped the connection on it, so a 1.39 player who pushed a wall went
     /// silently offline while the socket stayed open (stress test,
     /// 2026-10-31).
-    pub fn send_trigger_action(&mut self, x: f32, y: f32, action: &str, param: &str) -> io::Result<()> {
+    pub fn send_trigger_action(
+        &mut self,
+        x: f32,
+        y: f32,
+        action: &str,
+        param: &str,
+    ) -> io::Result<()> {
         if !self.can_send(38) {
             return Ok(());
         }
@@ -1941,6 +2184,10 @@ impl Connection {
     /// player's `dir` goes into the props that follow 46. Returns what the
     /// frame held; `with_enter_level` means the caller owes no 46 after the
     /// server's answer ([`EnterLevelSender::cached_link`]).
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Preserve the public level-link API used by existing clients"
+    )]
     pub fn send_link(
         &mut self,
         version: ClientVersion,
@@ -1960,7 +2207,6 @@ impl Connection {
     pub fn send_wantfile(&mut self, name: &str) -> io::Result<()> {
         self.send_messages(&[wantfile_message(name)])
     }
-
 }
 
 /// A GSHORT: two GCHARs, high 7 bits first.
@@ -2018,7 +2264,6 @@ pub fn parse_server_list(reply: &str) -> Vec<String> {
         .collect()
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2030,9 +2275,18 @@ mod tests {
     #[test]
     fn count_props_carry_arrows_then_bombs() {
         // the real 2.05 after a shot: ARROWSCOUNT 19; after a bomb: BOMBSCOUNT 14
-        assert_eq!(count_props_message(Some(19), None), vec![0x22, 0x24, 19 + 0x20, b'\n']);
-        assert_eq!(count_props_message(None, Some(14)), vec![0x22, 0x25, 14 + 0x20, b'\n']);
-        assert_eq!(count_props_message(Some(0), Some(3)), vec![0x22, 0x24, 0x20, 0x25, 0x23, b'\n']);
+        assert_eq!(
+            count_props_message(Some(19), None),
+            vec![0x22, 0x24, 19 + 0x20, b'\n']
+        );
+        assert_eq!(
+            count_props_message(None, Some(14)),
+            vec![0x22, 0x25, 14 + 0x20, b'\n']
+        );
+        assert_eq!(
+            count_props_message(Some(0), Some(3)),
+            vec![0x22, 0x24, 0x20, 0x25, 0x23, b'\n']
+        );
     }
 
     #[test]
@@ -2042,7 +2296,7 @@ mod tests {
         // Then the next step: `n'\x80` (X2 992, 31 tiles).
         let m = position_message_precise(30.5, 30.5, 3);
         assert_eq!(&m[..6], &[2 + 0x20, b'1', b'#', b'n', b'\'', b'p']);
-        assert_eq!(&m[6..9], &[b'o', b'\'', b'p']);
+        assert_eq!(&m[6..9], b"o'p");
         assert_eq!(*m.last().unwrap(), b'\n');
         assert_eq!(&position_message_precise(31.0, 0.0, 0)[4..6], b"'\x80");
     }
@@ -2053,36 +2307,71 @@ mod tests {
         // x 30 is `GANI walk, SPRITE 3, X2 30.5`, then X2 only, never X/Y.
         // Seihai sends SPRITE, X2 and Y2 together for 2.31 now; the
         // classic X/Y stays for 2.22 and 3.04, which have no X2/Y2.
-        for (v, precise) in [(ClientVersion::V222, false), (ClientVersion::V230, true), (ClientVersion::V231, true), (ClientVersion::V304, false), (ClientVersion::V3153, true)] {
-            assert_eq!(walk_message_for(v, 30.5, 30.0, 3)[1], if precise { 17 } else { 15 } + 0x20, "{}", v.label());
+        for (v, precise) in [
+            (ClientVersion::V222, false),
+            (ClientVersion::V230, true),
+            (ClientVersion::V231, true),
+            (ClientVersion::V304, false),
+            (ClientVersion::V3153, true),
+        ] {
+            assert_eq!(
+                walk_message_for(v, 30.5, 30.0, 3)[1],
+                if precise { 17 } else { 15 } + 0x20,
+                "{}",
+                v.label()
+            );
         }
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V231, 5, "acct", "pw").unwrap();
+        conn.login_versioned(ClientVersion::V231, 5, "acct", "pw")
+            .unwrap();
         let _ = read_frame(&mut srv);
         assert!(conn.precise_walk && conn.client_flags_only);
         conn.queue_flag("gr.x", Some("30"));
         conn.queue_flag("probeflag", None);
         conn.queue_flag("client.probe", Some("2"));
         assert_eq!(conn.take_flags(), vec![b"\x32client.probe=2\n".to_vec()]);
-        assert_eq!(conn.walk_message(30.5, 30.0, 3), position_message_precise(30.5, 30.0, 3));
+        assert_eq!(
+            conn.walk_message(30.5, 30.0, 3),
+            position_message_precise(30.5, 30.0, 3)
+        );
         // X2 30.5 tiles is 976 = GSHORT `n'p`, as in the 4.04r2 test.
-        assert_eq!(&position_message_precise(30.5, 0.0, 3)[3..6], &[78 + 0x20, b'\'', b'p']);
+        assert_eq!(
+            &position_message_precise(30.5, 0.0, 3)[3..6],
+            &[78 + 0x20, b'\'', b'p']
+        );
     }
 
     #[test]
     fn lobby_builds_walk_with_x2_y2_and_send_client_flags_only() {
-        for (v, precise) in [(ClientVersion::V222, false), (ClientVersion::V404R2, true), (ClientVersion::V420R8, true)] {
+        for (v, precise) in [
+            (ClientVersion::V222, false),
+            (ClientVersion::V404R2, true),
+            (ClientVersion::V420R8, true),
+        ] {
             let (mut conn, mut srv) = pair();
             conn.login_versioned(v, 5, "acct", "pw").unwrap();
             let _ = read_frame(&mut srv);
             assert_eq!(conn.precise_walk, precise, "{}", v.label());
             assert_eq!(conn.client_flags_only, precise, "{}", v.label());
-            assert_eq!(conn.walk_message(30.0, 30.5, 2)[1], if precise { 17 } else { 15 } + 0x20, "{}", v.label());
+            assert_eq!(
+                conn.walk_message(30.0, 30.5, 2)[1],
+                if precise { 17 } else { 15 } + 0x20,
+                "{}",
+                v.label()
+            );
             conn.queue_flag("gr.x", Some("30"));
             conn.queue_flag("probeflag", None);
             conn.queue_flag("client.probe", Some("2"));
             let sent: Vec<Vec<u8>> = conn.take_flags();
-            let want: Vec<&[u8]> = if precise { vec![b"\x32client.probe=2\n"] } else { vec![b"\x32gr.x=30\n", b"\x33probeflag\n", b"\x32client.probe=2\n"] };
+            let want: Vec<&[u8]> = if precise {
+                vec![b"\x32client.probe=2\n"]
+            } else {
+                vec![
+                    b"\x32gr.x=30\n",
+                    b"\x33probeflag\n",
+                    b"\x32client.probe=2\n",
+                ]
+            };
             assert_eq!(sent, want, "{}", v.label());
         }
     }
@@ -2100,10 +2389,16 @@ mod tests {
     #[test]
     fn link_arrival_is_held_by_the_destination_name() {
         let mut held = Some(LinkArrival::new("westocean_n-17.nw", (30.0, 2.0)));
-        assert_eq!(LinkArrival::take_for(&mut held, "WestOcean_n-17"), Some((30.0, 2.0)));
+        assert_eq!(
+            LinkArrival::take_for(&mut held, "WestOcean_n-17"),
+            Some((30.0, 2.0))
+        );
         assert_eq!(held, None, "applied once");
         let mut held = Some(LinkArrival::new("house.nw", (12.0, 3.0)));
-        assert_eq!(LinkArrival::take_for(&mut held, "onlinestartlocal.nw"), None);
+        assert_eq!(
+            LinkArrival::take_for(&mut held, "onlinestartlocal.nw"),
+            None
+        );
         assert_eq!(held, None, "a warp elsewhere drops it");
         assert_eq!(LinkArrival::take_for(&mut None, "house.nw"), None);
     }
@@ -2111,7 +2406,11 @@ mod tests {
     #[test]
     fn max_power_message_is_prop_1() {
         assert_eq!(max_power_message(3), vec![0x22, 0x21, 0x23, b'\n']);
-        assert_eq!(max_power_message(99), vec![0x22, 0x21, 0x34, b'\n'], "20 at most");
+        assert_eq!(
+            max_power_message(99),
+            vec![0x22, 0x21, 0x34, b'\n'],
+            "20 at most"
+        );
     }
 
     /// A flag a script set rides ahead of the walk props in the same frame.
@@ -2124,7 +2423,14 @@ mod tests {
         conn.queue_flag("door", Some(""));
         conn.queue_flag("gr.x", Some("127.5"));
         conn.queue_flag("door", None);
-        assert_eq!(conn.take_flags(), [b"\x32door\n".to_vec(), b"\x32gr.x=127.5\n".to_vec(), b"\x33door\n".to_vec()]);
+        assert_eq!(
+            conn.take_flags(),
+            [
+                b"\x32door\n".to_vec(),
+                b"\x32gr.x=127.5\n".to_vec(),
+                b"\x33door\n".to_vec()
+            ]
+        );
     }
 
     #[test]
@@ -2133,17 +2439,36 @@ mod tests {
         let addr = listener.local_addr().unwrap().to_string();
         let mut conn = Connection::connect(&addr).unwrap();
         let (mut srv, _) = listener.accept().unwrap();
-        conn.login_versioned(ClientVersion::V205, 0x42, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V205, 0x42, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
 
-        conn.send_walk_sprite(&PlayerUpdate { x: 30.0, y: 30.5, dir: 1 }, 1).unwrap();
+        conn.send_walk_sprite(
+            &PlayerUpdate {
+                x: 30.0,
+                y: 30.5,
+                dir: 1,
+            },
+            1,
+        )
+        .unwrap();
         conn.queue_flag("gr.x", Some("29.5"));
         conn.queue_flag("door", None);
-        conn.send_walk_sprite(&PlayerUpdate { x: 29.5, y: 30.5, dir: 1 }, 1).unwrap();
+        conn.send_walk_sprite(
+            &PlayerUpdate {
+                x: 29.5,
+                y: 30.5,
+                dir: 1,
+            },
+            1,
+        )
+        .unwrap();
         let mut g = Gen3::new(0x42);
         let mut decode = |srv: &mut TcpStream| {
             let body = read_frame(srv);
-            body.split_inclusive(|b| *b == b'\n').map(|l| g.decode(l).unwrap()).collect::<Vec<_>>()
+            body.split_inclusive(|b| *b == b'\n')
+                .map(|l| g.decode(l).unwrap())
+                .collect::<Vec<_>>()
         };
         assert_eq!(decode(&mut srv).len(), 1, "no flags queued");
         let second = decode(&mut srv);
@@ -2164,23 +2489,31 @@ mod tests {
         let addr = listener.local_addr().unwrap().to_string();
         let mut conn = Connection::connect(&addr).unwrap();
         let (mut srv, _) = listener.accept().unwrap();
-        conn.login_versioned(ClientVersion::V205, 0x42, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V205, 0x42, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let mut g = Gen3::new(0x42);
         let mut decode = |srv: &mut TcpStream| {
             let body = read_frame(srv);
-            body.split_inclusive(|b| *b == b'\n').map(|l| g.decode(l).unwrap()).collect::<Vec<_>>()
+            body.split_inclusive(|b| *b == b'\n')
+                .map(|l| g.decode(l).unwrap())
+                .collect::<Vec<_>>()
         };
         let want = |n: &str| FileRequest::Want(n.into()).message();
 
-        let here = PlayerUpdate { x: 30.0, y: 30.5, dir: 3 };
+        let here = PlayerUpdate {
+            x: 30.0,
+            y: 30.5,
+            dir: 3,
+        };
         conn.send_walk_sprite(&here, 3).unwrap();
         assert_eq!(decode(&mut srv).len(), 1);
         conn.queue_files(vec![want("steps.wav"), want("walk.gani")]);
         // An unchanged update sends nothing and keeps the requests.
         conn.send_walk_sprite(&here, 3).unwrap();
         conn.queue_flag("gr.x", Some("30.5"));
-        conn.send_walk_sprite(&PlayerUpdate { x: 30.5, ..here }, 3).unwrap();
+        conn.send_walk_sprite(&PlayerUpdate { x: 30.5, ..here }, 3)
+            .unwrap();
         let f = decode(&mut srv);
         assert_eq!(f.len(), 4);
         assert_eq!(f[0], want("steps.wav"));
@@ -2190,7 +2523,11 @@ mod tests {
 
         conn.queue_files(vec![want("steps2.wav")]);
         conn.send_tick_frame(Vec::new(), Vec::new(), None).unwrap();
-        assert_eq!(decode(&mut srv), vec![want("steps2.wav")], "a tick without props");
+        assert_eq!(
+            decode(&mut srv),
+            vec![want("steps2.wav")],
+            "a tick without props"
+        );
         assert!(conn.take_files().is_empty());
     }
 
@@ -2201,9 +2538,14 @@ mod tests {
         let addr = listener.local_addr().unwrap().to_string();
         let mut conn = Connection::connect(&addr).unwrap();
         let (mut srv, _) = listener.accept().unwrap();
-        conn.login_versioned(ClientVersion::V205, 0x42, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V205, 0x42, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
-        let here = PlayerUpdate { x: 30.0, y: 30.5, dir: 1 };
+        let here = PlayerUpdate {
+            x: 30.0,
+            y: 30.5,
+            dir: 1,
+        };
         for _ in 0..5 {
             conn.send_walk_sprite(&here, 47).unwrap();
         }
@@ -2211,7 +2553,9 @@ mod tests {
         let mut g = Gen3::new(0x42);
         let mut decode = |srv: &mut TcpStream| {
             let body = read_frame(srv);
-            body.split_inclusive(|b| *b == b'\n').map(|l| g.decode(l).unwrap()).collect::<Vec<_>>()
+            body.split_inclusive(|b| *b == b'\n')
+                .map(|l| g.decode(l).unwrap())
+                .collect::<Vec<_>>()
         };
         assert_eq!(decode(&mut srv).len(), 1, "the first one");
         // The next frame on the wire is the SPRITE change, not a repeat.
@@ -2226,7 +2570,8 @@ mod tests {
         let mut conn = Connection::connect(&addr).unwrap();
         let (mut srv, _) = listener.accept().unwrap();
 
-        conn.login_versioned(ClientVersion::V205, 0x42, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V205, 0x42, "ab", "cd")
+            .unwrap();
         conn.send_position(30.5, 12.0, 2).unwrap();
 
         let login = read_frame(&mut srv);
@@ -2252,8 +2597,14 @@ mod tests {
         assert_eq!(check_wire_message(b""), Err("empty"));
         assert_eq!(check_wire_message(b"\n"), Err("id byte below 0x20"));
         assert_eq!(check_wire_message(b"2/\x7f"), Err("no closing line feed"));
-        assert_eq!(check_wire_message(b"2gr.x=1\ngr.y=2\n"), Err("line feed inside the payload"));
-        assert_eq!(describe_message(b"7a\\b\x01\n"), "id 23 len 6 a\\x5cb\\x01\\x0a");
+        assert_eq!(
+            check_wire_message(b"2gr.x=1\ngr.y=2\n"),
+            Err("line feed inside the payload")
+        );
+        assert_eq!(
+            describe_message(b"7a\\b\x01\n"),
+            "id 23 len 6 a\\x5cb\\x01\\x0a"
+        );
     }
 
     /// A message with a line feed inside would read as two messages on the
@@ -2263,13 +2614,17 @@ mod tests {
     #[test]
     fn a_malformed_message_is_dropped_and_gen3_stays_in_step() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V205, 0x31, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V205, 0x31, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let good = crate::protocol::flagset::flag_message("a", Some("1"));
         let bad = b"\x32b=1\nc=2\n".to_vec();
         conn.send_messages(&[bad, good.clone()]).unwrap();
-        conn.send_messages(&[good.clone()]).unwrap();
-        assert_eq!(gen3_messages(0x31, &read_frame(&mut srv)), vec![good.clone()]);
+        conn.send_messages(std::slice::from_ref(&good)).unwrap();
+        assert_eq!(
+            gen3_messages(0x31, &read_frame(&mut srv)),
+            vec![good.clone()]
+        );
         let mut g = Gen3::new(0x31);
         let _ = g.next_insertion(good.len());
         let body = read_frame(&mut srv);
@@ -2302,15 +2657,23 @@ mod tests {
     #[test]
     fn verify_want_matches_the_real_404() {
         assert_eq!(crate::assets::crc32::crc32(b"GRPKG001\n"), 0x15a8ea07);
-        assert_eq!(verify_want_message(0x15a8ea07, "basepackage.gupd"), b"O!MCt'basepackage.gupd\n");
+        assert_eq!(
+            verify_want_message(0x15a8ea07, "basepackage.gupd"),
+            b"O!MCt'basepackage.gupd\n"
+        );
     }
 
     #[test]
     fn lobby_logins_on_the_wire() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V512, 0x4B, "guest", "7Y3bdzjf").unwrap();
-        conn.send_post_login(ClientVersion::V512, "English").unwrap();
-        assert_eq!(read_frame(&mut srv), b"%kG3D14097%guest(7Y3bdzjfwin,\"\",\"\",\"\",\"6.2 9200 \"\n");
+        conn.login_versioned(ClientVersion::V512, 0x4B, "guest", "7Y3bdzjf")
+            .unwrap();
+        conn.send_post_login(ClientVersion::V512, "English")
+            .unwrap();
+        assert_eq!(
+            read_frame(&mut srv),
+            b"%kG3D14097%guest(7Y3bdzjfwin,\"\",\"\",\"\",\"6.2 9200 \"\n"
+        );
         let raw = read_raw(&mut srv);
         assert_eq!(raw[0], Gen5Comp::Zlib as u8);
         let mut body = raw[1..].to_vec();
@@ -2319,8 +2682,10 @@ mod tests {
         assert_eq!(zlib_decompress(&body).unwrap(), b"EEnglish\n");
 
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V524R4, 0x4B, "guest", "7Y3bdzjf").unwrap();
-        conn.send_post_login(ClientVersion::V524R4, "English").unwrap();
+        conn.login_versioned(ClientVersion::V524R4, 0x4B, "guest", "7Y3bdzjf")
+            .unwrap();
+        conn.send_post_login(ClientVersion::V524R4, "English")
+            .unwrap();
         assert!(read_frame(&mut srv).starts_with(b"%kG3D15010%guest(7Y3bdzjfwin,"));
         assert_eq!(gen5_body(&mut srv, &mut Gen5::new(0x4B)), b"EEnglish\n");
     }
@@ -2331,16 +2696,19 @@ mod tests {
     #[test]
     fn trigger_action_is_skipped_where_the_build_has_none() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V139, 0x21, "guest", "pw").unwrap();
+        conn.login_versioned(ClientVersion::V139, 0x21, "guest", "pw")
+            .unwrap();
         let _ = read_frame(&mut srv);
         assert!(!conn.can_send(38));
         conn.send_trigger_action(30.0, 30.0, "pushed", "0").unwrap();
-        srv.set_read_timeout(Some(Duration::from_millis(300))).unwrap();
+        srv.set_read_timeout(Some(Duration::from_millis(300)))
+            .unwrap();
         let mut b = [0u8; 64];
         assert!(srv.read(&mut b).is_err(), "nothing went out");
 
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V205, 0x21, "guest", "pw").unwrap();
+        conn.login_versioned(ClientVersion::V205, 0x21, "guest", "pw")
+            .unwrap();
         let _ = read_frame(&mut srv);
         assert!(conn.can_send(38));
         conn.send_trigger_action(30.0, 30.0, "pushed", "0").unwrap();
@@ -2351,7 +2719,8 @@ mod tests {
     #[test]
     fn dropping_the_connection_closes_the_socket() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V222, 0x21, "guest", "pw").unwrap();
+        conn.login_versioned(ClientVersion::V222, 0x21, "guest", "pw")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let rx = conn.spawn_reader_timed().unwrap();
         drop(conn);
@@ -2371,19 +2740,27 @@ mod tests {
         let long = |key: u8| {
             let mut enc = body.clone();
             Gen5::new(key).xor_body(&mut enc, Gen5Comp::None);
-            [&[0xFF, 0xFF][..], &((enc.len() + 1) as u32).to_be_bytes(), &[Gen5Comp::None as u8], &enc].concat()
+            [
+                &[0xFF, 0xFF][..],
+                &((enc.len() + 1) as u32).to_be_bytes(),
+                &[Gen5Comp::None as u8],
+                &enc,
+            ]
+            .concat()
         };
-        assert_eq!(ClientVersion::V603R7.profile().protocol.gen5_long_frames, true);
-        assert_eq!(ClientVersion::V600R2.profile().protocol.gen5_long_frames, true);
-        assert_eq!(ClientVersion::V531R4.profile().protocol.gen5_long_frames, false);
+        assert!(ClientVersion::V603R7.profile().protocol.gen5_long_frames);
+        assert!(ClientVersion::V600R2.profile().protocol.gen5_long_frames);
+        assert!(!ClientVersion::V531R4.profile().protocol.gen5_long_frames);
 
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V603R7, 0x19, "guest", "7Y3bdzjf").unwrap();
+        conn.login_versioned(ClientVersion::V603R7, 0x19, "guest", "7Y3bdzjf")
+            .unwrap();
         srv.write_all(&long(0x19)).unwrap();
         assert_eq!(conn.read_body().unwrap(), body);
 
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V600R2, 0x19, "guest", "7Y3bdzjf").unwrap();
+        conn.login_versioned(ClientVersion::V600R2, 0x19, "guest", "7Y3bdzjf")
+            .unwrap();
         let rx = conn.spawn_reader_timed().unwrap();
         srv.write_all(&long(0x19)).unwrap();
         let (_, got) = rx.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -2392,7 +2769,8 @@ mod tests {
         // 5.31r4 takes `FF FF` as the length itself: the next byte is not a
         // compression type.
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V531R4, 0x19, "guest", "7Y3bdzjf").unwrap();
+        conn.login_versioned(ClientVersion::V531R4, 0x19, "guest", "7Y3bdzjf")
+            .unwrap();
         srv.write_all(&long(0x19)).unwrap();
         assert!(conn.read_body().is_err());
     }
@@ -2403,7 +2781,8 @@ mod tests {
     #[test]
     fn gen5_login_is_plain_then_seeded() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V222, 0x2B, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V222, 0x2B, "ab", "cd")
+            .unwrap();
         conn.send_messages(&[b"EEnglish\n".to_vec()]).unwrap();
 
         let login = read_frame(&mut srv);
@@ -2413,7 +2792,9 @@ mod tests {
         let raw = read_raw(&mut srv);
         let mut g = Gen5::new(0x2B);
         let body = crate::protocol::read_frame(
-            &mut [&(raw.len() as u16).to_be_bytes()[..], &raw].concat().as_slice(),
+            &mut [&(raw.len() as u16).to_be_bytes()[..], &raw]
+                .concat()
+                .as_slice(),
             &mut g,
         )
         .unwrap();
@@ -2423,7 +2804,11 @@ mod tests {
     /// The secure login (`SEI00001`) as the server sees it: C1 names the
     /// inner build and carries no account; C2 opens to the classic tail;
     /// later frames are the inner build's, seeded as after a classic login.
-    fn secure_server(mut srv: TcpStream, id: crate::protocol::seclogin::ServerIdentity, prefix_len: usize) -> std::thread::JoinHandle<(Vec<u8>, Vec<u8>, TcpStream)> {
+    fn secure_server(
+        mut srv: TcpStream,
+        id: crate::protocol::seclogin::ServerIdentity,
+        prefix_len: usize,
+    ) -> std::thread::JoinHandle<(Vec<u8>, Vec<u8>, TcpStream)> {
         use crate::protocol::seclogin::ClientHello;
         std::thread::spawn(move || {
             let c1 = read_frame(&mut srv);
@@ -2446,7 +2831,16 @@ mod tests {
         let key = id.public_key();
         let server = secure_server(srv, id, 2);
         let secure = SecureLogin::pinned(key);
-        conn.login_secure_with(ClientVersion::V222, 0x2B, "ab", "cdpass", &[], "lab", &secure).unwrap();
+        conn.login_secure_with(
+            ClientVersion::V222,
+            0x2B,
+            "ab",
+            "cdpass",
+            &[],
+            "lab",
+            &secure,
+        )
+        .unwrap();
         conn.send_messages(&[b"EEnglish\n".to_vec()]).unwrap();
         let (c1, opened, mut srv) = server.join().unwrap();
         assert_eq!(&c1[..18], b"%KSEI00001GNW03014");
@@ -2455,7 +2849,13 @@ mod tests {
         // The next frame is gen 5 from the seed, as after a classic login.
         let raw = read_raw(&mut srv);
         let mut g = Gen5::new(0x2B);
-        let body = crate::protocol::read_frame(&mut [&(raw.len() as u16).to_be_bytes()[..], &raw].concat().as_slice(), &mut g).unwrap();
+        let body = crate::protocol::read_frame(
+            &mut [&(raw.len() as u16).to_be_bytes()[..], &raw]
+                .concat()
+                .as_slice(),
+            &mut g,
+        )
+        .unwrap();
         assert_eq!(body, b"EEnglish\n");
         let _ = encode_key;
     }
@@ -2466,7 +2866,17 @@ mod tests {
         let (mut conn, srv) = pair();
         let server = secure_server(srv, ServerIdentity::generate(), 2);
         let secure = SecureLogin::pinned(ServerIdentity::generate().public_key());
-        let e = conn.login_secure_with(ClientVersion::V231, 0x11, "ab", "cdpass", &[], "lab", &secure).unwrap_err();
+        let e = conn
+            .login_secure_with(
+                ClientVersion::V231,
+                0x11,
+                "ab",
+                "cdpass",
+                &[],
+                "lab",
+                &secure,
+            )
+            .unwrap_err();
         assert_eq!(e.kind(), io::ErrorKind::PermissionDenied);
         drop(conn);
         // The server never gets a C2.
@@ -2476,24 +2886,33 @@ mod tests {
     #[test]
     fn secure_login_trusts_on_first_use_then_holds_the_pin() {
         use crate::protocol::seclogin::ServerIdentity;
-        let path = std::env::temp_dir().join(format!("seihai-tofu-{}/known_servers.txt", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "seihai-tofu-{}/known_servers.txt",
+            std::process::id()
+        ));
         let _ = std::fs::remove_file(&path);
-        let secure = SecureLogin { pin: PinSource::File(path.clone()) };
+        let secure = SecureLogin {
+            pin: PinSource::File(path.clone()),
+        };
         let id = ServerIdentity::generate();
         let seed = id.seed();
         let (mut conn, srv) = pair();
         let server = secure_server(srv, id, 2);
-        conn.login_secure_with(ClientVersion::V231, 0x11, "ab", "cd", &[], "lab:1", &secure).unwrap();
+        conn.login_secure_with(ClientVersion::V231, 0x11, "ab", "cd", &[], "lab:1", &secure)
+            .unwrap();
         server.join().unwrap();
         // Same key again: fine.
         let (mut conn, srv) = pair();
         let server = secure_server(srv, ServerIdentity::from_seed(&seed), 2);
-        conn.login_secure_with(ClientVersion::V231, 0x11, "ab", "cd", &[], "lab:1", &secure).unwrap();
+        conn.login_secure_with(ClientVersion::V231, 0x11, "ab", "cd", &[], "lab:1", &secure)
+            .unwrap();
         server.join().unwrap();
         // A new key for the same server: refused.
         let (mut conn, srv) = pair();
         let server = secure_server(srv, ServerIdentity::generate(), 2);
-        let e = conn.login_secure_with(ClientVersion::V231, 0x11, "ab", "cd", &[], "lab:1", &secure).unwrap_err();
+        let e = conn
+            .login_secure_with(ClientVersion::V231, 0x11, "ab", "cd", &[], "lab:1", &secure)
+            .unwrap_err();
         assert!(e.to_string().contains("CHANGED"), "{e}");
         drop(conn);
         assert!(server.join().is_err());
@@ -2506,10 +2925,13 @@ mod tests {
         let t = std::thread::spawn(move || {
             let _ = read_frame(&mut srv);
             // PLO_DISCMESSAGE (16), as a classic server answers an unknown token.
-            srv.write_all(&write_zlib_frame(b"0Your client version is not allowed.\n").unwrap()).unwrap();
+            srv.write_all(&write_zlib_frame(b"0Your client version is not allowed.\n").unwrap())
+                .unwrap();
         });
         let secure = SecureLogin::pinned([0; 32]);
-        let e = conn.login_secure_with(ClientVersion::V231, 0x11, "ab", "cd", &[], "lab", &secure).unwrap_err();
+        let e = conn
+            .login_secure_with(ClientVersion::V231, 0x11, "ab", "cd", &[], "lab", &secure)
+            .unwrap_err();
         assert!(e.to_string().contains("not allowed"), "{e}");
         t.join().unwrap();
     }
@@ -2521,7 +2943,14 @@ mod tests {
         let id = ServerIdentity::generate();
         let secure = SecureLogin::pinned(id.public_key());
         let server = secure_server(srv, id, 2);
-        conn.login_listserver_secure(ClientVersion::V222, 0x66, "ab", "cd", Some(("lab", &secure))).unwrap();
+        conn.login_listserver_secure(
+            ClientVersion::V222,
+            0x66,
+            "ab",
+            "cd",
+            Some(("lab", &secure)),
+        )
+        .unwrap();
         let (c1, opened, mut srv) = server.join().unwrap();
         assert_eq!(&c1[..18], b"'\x86SEI00001GNW30123");
         assert!(c1.ends_with(b"newmain\n"));
@@ -2529,7 +2958,8 @@ mod tests {
         // The reply is gen 5 from the seed.
         let mut out = Gen5::new(0x66);
         let z = zlib_compress(b"\"Lab listserver\n").unwrap();
-        srv.write_all(&write_frame(Gen5Comp::Zlib, &out.encode(z, Gen5Comp::Zlib))).unwrap();
+        srv.write_all(&write_frame(Gen5Comp::Zlib, &out.encode(z, Gen5Comp::Zlib)))
+            .unwrap();
         let reply = parse_list_reply(&conn.read_body().unwrap());
         assert_eq!(reply.status.as_deref(), Some("Lab listserver"));
     }
@@ -2538,7 +2968,15 @@ mod tests {
     fn secure_list_login_needs_a_gen5_profile() {
         let (mut conn, _srv) = pair();
         let secure = SecureLogin::pinned([0; 32]);
-        let e = conn.login_listserver_secure(ClientVersion::V205, 0x66, "ab", "cd", Some(("lab", &secure))).unwrap_err();
+        let e = conn
+            .login_listserver_secure(
+                ClientVersion::V205,
+                0x66,
+                "ab",
+                "cd",
+                Some(("lab", &secure)),
+            )
+            .unwrap_err();
         assert_eq!(e.kind(), io::ErrorKind::Unsupported);
     }
 
@@ -2547,10 +2985,18 @@ mod tests {
     #[test]
     fn gen5_listserver_login() {
         let (mut conn, mut srv) = pair();
-        conn.login_listserver(ClientVersion::V222, 0x66, "ab", "cd").unwrap();
+        conn.login_listserver(ClientVersion::V222, 0x66, "ab", "cd")
+            .unwrap();
         let first = wire(&mut srv);
-        assert_eq!(&first[2..4], &[0x78, 0xDA], "the id 7 frame is compressed at the best level");
-        assert_eq!(crate::protocol::zlib_decompress(&first[2..]).unwrap(), b"'\x86GNW30123newmain\n");
+        assert_eq!(
+            &first[2..4],
+            &[0x78, 0xDA],
+            "the id 7 frame is compressed at the best level"
+        );
+        assert_eq!(
+            crate::protocol::zlib_decompress(&first[2..]).unwrap(),
+            b"'\x86GNW30123newmain\n"
+        );
         let raw = read_raw(&mut srv);
         let mut g = Gen5::new(0x66);
         assert_eq!(raw[0], Gen5Comp::None as u8);
@@ -2573,14 +3019,28 @@ mod tests {
     #[test]
     fn one_frame_listserver_login_304() {
         let (mut conn, mut srv) = pair();
-        conn.login_listserver(ClientVersion::V304, 0x2b, "ab", "cd").unwrap();
+        conn.login_listserver(ClientVersion::V304, 0x2b, "ab", "cd")
+            .unwrap();
         let first = wire(&mut srv);
-        assert_eq!(&first[2..4], &[0x78, 0x9C], "the real 3.04 frame is at the default level");
-        assert_eq!(crate::protocol::zlib_decompress(&first[2..]).unwrap(), b"'KG3D30123newmain\n!\"ab\"cd\n");
+        assert_eq!(
+            &first[2..4],
+            &[0x78, 0x9C],
+            "the real 3.04 frame is at the default level"
+        );
+        assert_eq!(
+            crate::protocol::zlib_decompress(&first[2..]).unwrap(),
+            b"'KG3D30123newmain\n!\"ab\"cd\n"
+        );
         let mut out = Gen5::new(0x2b);
         let z = zlib_compress(b"\"Lab listserver\n").unwrap();
-        srv.write_all(&write_frame(Gen5Comp::Zlib, &out.encode(z, Gen5Comp::Zlib))).unwrap();
-        assert_eq!(parse_list_reply(&conn.read_body().unwrap()).status.as_deref(), Some("Lab listserver"));
+        srv.write_all(&write_frame(Gen5Comp::Zlib, &out.encode(z, Gen5Comp::Zlib)))
+            .unwrap();
+        assert_eq!(
+            parse_list_reply(&conn.read_body().unwrap())
+                .status
+                .as_deref(),
+            Some("Lab listserver")
+        );
     }
 
     /// The raw bytes of the next frame on the wire, length prefix and all.
@@ -2597,14 +3057,35 @@ mod tests {
     /// 1.42 and 2.01 to 2.04 send it as an inference.
     #[test]
     fn shape_a_listserver_login() {
-        for v in [ClientVersion::V142, ClientVersion::V200, ClientVersion::V201, ClientVersion::V204, ClientVersion::V205] {
-            assert_eq!(v.listserver().shape, LoginShape::NewmainOnly, "{}", v.label());
+        for v in [
+            ClientVersion::V142,
+            ClientVersion::V200,
+            ClientVersion::V201,
+            ClientVersion::V204,
+            ClientVersion::V205,
+        ] {
+            assert_eq!(
+                v.listserver().shape,
+                LoginShape::NewmainOnly,
+                "{}",
+                v.label()
+            );
             let (mut conn, mut srv) = pair();
             conn.login_listserver(v, 0x66, "ab", "cd").unwrap();
             let raw = wire(&mut srv);
-            assert_eq!(raw.len(), 2 + 17, "{}: 17-byte zlib stream, as the real client", v.label());
+            assert_eq!(
+                raw.len(),
+                2 + 17,
+                "{}: 17-byte zlib stream, as the real client",
+                v.label()
+            );
             assert_eq!(&raw[2..4], &[0x78, 0xDA], "{}", v.label());
-            assert_eq!(crate::protocol::zlib_decompress(&raw[2..]).unwrap(), b" newmain\n", "{}", v.label());
+            assert_eq!(
+                crate::protocol::zlib_decompress(&raw[2..]).unwrap(),
+                b" newmain\n",
+                "{}",
+                v.label()
+            );
             // No account or password in it, and nothing follows.
             drop(conn);
             let mut rest = Vec::new();
@@ -2617,13 +3098,27 @@ mod tests {
     /// The builds with no capture (2.1 to 2.16) keep it.
     #[test]
     fn shape_b_listserver_login() {
-        for v in [ClientVersion::V210, ClientVersion::V216, ClientVersion::V217] {
-            assert_eq!(v.listserver().shape, LoginShape::NewmainAccount, "{}", v.label());
+        for v in [
+            ClientVersion::V210,
+            ClientVersion::V216,
+            ClientVersion::V217,
+        ] {
+            assert_eq!(
+                v.listserver().shape,
+                LoginShape::NewmainAccount,
+                "{}",
+                v.label()
+            );
             let (mut conn, mut srv) = pair();
             conn.login_listserver(v, 0x66, "ab", "cd").unwrap();
             let raw = wire(&mut srv);
             assert_eq!(&raw[2..4], &[0x78, 0xDA], "{}", v.label());
-            assert_eq!(crate::protocol::zlib_decompress(&raw[2..]).unwrap(), b" newmain\n!\"ab\"cd\n", "{}", v.label());
+            assert_eq!(
+                crate::protocol::zlib_decompress(&raw[2..]).unwrap(),
+                b" newmain\n!\"ab\"cd\n",
+                "{}",
+                v.label()
+            );
         }
     }
 
@@ -2632,7 +3127,8 @@ mod tests {
     #[test]
     fn gen2_login_has_no_key() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V139, 0x42, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V139, 0x42, "ab", "cd")
+            .unwrap();
         assert_eq!(read_frame(&mut srv), b" GNW07080\"ab\"cd\n");
     }
 
@@ -2651,7 +3147,8 @@ mod tests {
             }
         }
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V205, 0x21, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V205, 0x21, "ab", "cd")
+            .unwrap();
         assert_eq!(&wire(&mut srv)[2..4], &[0x78, 0x9C]);
     }
 
@@ -2662,7 +3159,8 @@ mod tests {
     #[test]
     fn sends_go_out_while_the_reader_waits() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V222, 0x21, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V222, 0x21, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let rx = conn.spawn_reader_timed().unwrap();
         // Nothing from the server yet: the reader is waiting, and sends
@@ -2670,16 +3168,27 @@ mod tests {
         let mut g = Gen5::new(0x21);
         srv.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
         for i in 0..3u8 {
-            conn.send_messages(&[vec![2 + 0x20, 15 + 0x20, 0x20 + i, b'\n']]).unwrap();
-            assert_eq!(gen5_body(&mut srv, &mut g), [2 + 0x20, 15 + 0x20, 0x20 + i, b'\n']);
+            conn.send_messages(&[vec![2 + 0x20, 15 + 0x20, 0x20 + i, b'\n']])
+                .unwrap();
+            assert_eq!(
+                gen5_body(&mut srv, &mut g),
+                [2 + 0x20, 15 + 0x20, 0x20 + i, b'\n']
+            );
         }
         // A server frame in two writes arrives whole.
         let mut out = Gen5::new(0x21);
-        let frame = write_frame(Gen5Comp::None, &out.encode(b"&new1.nw\n".to_vec(), Gen5Comp::None));
+        let frame = write_frame(
+            Gen5Comp::None,
+            &out.encode(b"&new1.nw\n".to_vec(), Gen5Comp::None),
+        );
         srv.write_all(&frame[..3]).unwrap();
         std::thread::sleep(Duration::from_millis(50));
-        conn.send_messages(&[vec![2 + 0x20, 16 + 0x20, 0x21, b'\n']]).unwrap();
-        assert_eq!(gen5_body(&mut srv, &mut g), [2 + 0x20, 16 + 0x20, 0x21, b'\n']);
+        conn.send_messages(&[vec![2 + 0x20, 16 + 0x20, 0x21, b'\n']])
+            .unwrap();
+        assert_eq!(
+            gen5_body(&mut srv, &mut g),
+            [2 + 0x20, 16 + 0x20, 0x21, b'\n']
+        );
         srv.write_all(&frame[3..]).unwrap();
         let (_, body) = rx.recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(body.unwrap(), b"&new1.nw\n");
@@ -2688,8 +3197,14 @@ mod tests {
         let (_, end) = rx.recv_timeout(Duration::from_secs(5)).unwrap();
         assert!(end.is_err());
         let until = Instant::now() + Duration::from_secs(5);
-        while conn.send_messages(&[vec![2 + 0x20, 15 + 0x20, 0x20, b'\n']]).is_ok() {
-            assert!(Instant::now() < until, "sends still accepted after the close");
+        while conn
+            .send_messages(&[vec![2 + 0x20, 15 + 0x20, 0x20, b'\n']])
+            .is_ok()
+        {
+            assert!(
+                Instant::now() < until,
+                "sends still accepted after the close"
+            );
             std::thread::sleep(Duration::from_millis(10));
         }
     }
@@ -2699,7 +3214,8 @@ mod tests {
     #[test]
     fn gen5_disconnect_message_reaches_state() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V222, 0x11, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V222, 0x11, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let mut out = Gen5::new(0x11);
         let msg = b"0Your client version is not allowed on this server.\n".to_vec();
@@ -2729,7 +3245,8 @@ mod tests {
     #[test]
     fn chat_toall_and_pm_wire() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V139, 0, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V139, 0, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         conn.send_chat("hi there").unwrap();
         conn.send_toall("all").unwrap();
@@ -2744,17 +3261,21 @@ mod tests {
     #[test]
     fn sends_follow_the_version() {
         let (mut conn, mut server) = pair();
-        conn.login_versioned(ClientVersion::V139, 0, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V139, 0, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut server);
-        conn.send_post_login(ClientVersion::V139, "English").unwrap();
+        conn.send_post_login(ClientVersion::V139, "English")
+            .unwrap();
         let mut lang = vec![37 + 0x20];
         lang.extend_from_slice(b"English\n");
         assert!(conn.send_messages(&[lang]).is_err());
 
         let (mut conn, mut server) = pair();
-        conn.login_versioned(ClientVersion::V205, 0x42, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V205, 0x42, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut server);
-        conn.send_post_login(ClientVersion::V205, "English").unwrap();
+        conn.send_post_login(ClientVersion::V205, "English")
+            .unwrap();
         let body = read_frame(&mut server);
         assert_eq!(body[0], 37 + 0x20);
     }
@@ -2763,7 +3284,9 @@ mod tests {
     /// GServer does.
     fn gen3_messages(key: u8, body: &[u8]) -> Vec<Vec<u8>> {
         let mut g = Gen3::new(key);
-        body.split_inclusive(|&b| b == b'\n').map(|m| g.decode(m).unwrap()).collect()
+        body.split_inclusive(|&b| b == b'\n')
+            .map(|m| g.decode(m).unwrap())
+            .collect()
     }
 
     fn lang_msg() -> Vec<u8> {
@@ -2778,38 +3301,51 @@ mod tests {
     fn tampercheck_is_opt_in_and_second_in_the_frame() {
         // 2.17, gen 3.
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V217, 0x31, "ab", "cd").unwrap();
-        conn.send_post_login(ClientVersion::V217, "English").unwrap();
+        conn.login_versioned(ClientVersion::V217, 0x31, "ab", "cd")
+            .unwrap();
+        conn.send_post_login(ClientVersion::V217, "English")
+            .unwrap();
         let _ = read_frame(&mut srv);
         assert_eq!(gen3_messages(0x31, &read_frame(&mut srv)), vec![lang_msg()]);
 
         let (mut conn, mut srv) = pair();
         let t = TamperSender::for_version(ClientVersion::V217).unwrap();
-        conn.login_versioned(ClientVersion::V217, 0x31, "ab", "cd").unwrap();
-        conn.send_post_login_with(ClientVersion::V217, "English", Some(&t)).unwrap();
+        conn.login_versioned(ClientVersion::V217, 0x31, "ab", "cd")
+            .unwrap();
+        conn.send_post_login_with(ClientVersion::V217, "English", Some(&t))
+            .unwrap();
         let _ = read_frame(&mut srv);
         let msgs = gen3_messages(0x31, &read_frame(&mut srv));
         assert_eq!(msgs.len(), 2);
         assert_eq!(msgs[0], lang_msg());
         assert_eq!(msgs[1][0], 39 + 0x20);
-        assert_eq!(&msgs[1][1..11], &[0x2a, 0x7b, 0xad, 0x19, 0x5e, 0x23, 0x12, 0x43, 0xd8, 0x2c]);
+        assert_eq!(
+            &msgs[1][1..11],
+            &[0x2a, 0x7b, 0xad, 0x19, 0x5e, 0x23, 0x12, 0x43, 0xd8, 0x2c]
+        );
         assert_eq!(msgs[1][11], b'\n');
 
         // 2.22, gen 5: language then the 10 raw bytes.
         let (mut conn, mut srv) = pair();
         let t = TamperSender::for_version(ClientVersion::V222).unwrap();
-        conn.login_versioned(ClientVersion::V222, 0x2B, "ab", "cd").unwrap();
-        conn.send_post_login_with(ClientVersion::V222, "English", Some(&t)).unwrap();
+        conn.login_versioned(ClientVersion::V222, 0x2B, "ab", "cd")
+            .unwrap();
+        conn.send_post_login_with(ClientVersion::V222, "English", Some(&t))
+            .unwrap();
         let _ = read_frame(&mut srv);
         let raw = read_raw(&mut srv);
         let mut g = Gen5::new(0x2B);
         let body = crate::protocol::read_frame(
-            &mut [&(raw.len() as u16).to_be_bytes()[..], &raw].concat().as_slice(),
+            &mut [&(raw.len() as u16).to_be_bytes()[..], &raw]
+                .concat()
+                .as_slice(),
             &mut g,
         )
         .unwrap();
         let mut want = lang_msg();
-        want.extend_from_slice(&[b'G', 0x25, 0x0e, 0x4d, 0x0f, 0x96, 0x2b, 0x03, 0xed, 0xe6, 0x31, b'\n']);
+        want.extend_from_slice(&[
+            b'G', 0x25, 0x0e, 0x4d, 0x0f, 0x96, 0x2b, 0x03, 0xed, 0xe6, 0x31, b'\n',
+        ]);
         assert_eq!(body, want);
     }
 
@@ -2819,13 +3355,16 @@ mod tests {
     fn tampercheck_resend_and_gate() {
         let (mut conn, mut srv) = pair();
         let t = TamperSender::for_version(ClientVersion::V231).unwrap();
-        conn.login_versioned(ClientVersion::V231, 0x10, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V231, 0x10, "ab", "cd")
+            .unwrap();
         conn.send_tampercheck(&t).unwrap();
         let _ = read_frame(&mut srv);
         let raw = read_raw(&mut srv);
         let mut g = Gen5::new(0x10);
         let body = crate::protocol::read_frame(
-            &mut [&(raw.len() as u16).to_be_bytes()[..], &raw].concat().as_slice(),
+            &mut [&(raw.len() as u16).to_be_bytes()[..], &raw]
+                .concat()
+                .as_slice(),
             &mut g,
         )
         .unwrap();
@@ -2834,11 +3373,14 @@ mod tests {
 
         // 2.05 has no id 39: refused, nothing on the wire.
         let (mut conn, _srv) = pair();
-        conn.login_versioned(ClientVersion::V205, 0x10, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V205, 0x10, "ab", "cd")
+            .unwrap();
         let t = TamperSender::for_version(ClientVersion::V222).unwrap();
         assert!(conn.send_tampercheck(&t).is_err());
         // A version that cannot send 39 gets language only from post-login.
-        assert!(conn.send_post_login_with(ClientVersion::V205, "English", Some(&t)).is_err());
+        assert!(conn
+            .send_post_login_with(ClientVersion::V205, "English", Some(&t))
+            .is_err());
     }
 
     /// 2.00: type 0, the key byte, `GNW24011`, then plain account and
@@ -2846,7 +3388,8 @@ mod tests {
     #[test]
     fn v200_login_line() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V200, 0x55, "acct", "pw").unwrap();
+        conn.login_versioned(ClientVersion::V200, 0x55, "acct", "pw")
+            .unwrap();
         let login = read_frame(&mut srv);
         let mut want = vec![0x20, 0x55 + 0x20];
         want.extend_from_slice(b"GNW24011");
@@ -2857,10 +3400,12 @@ mod tests {
         assert_eq!(login, want);
         // The key byte is `key & 0x7F` as a GCHAR.
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V200, 0xD5, "a", "b").unwrap();
+        conn.login_versioned(ClientVersion::V200, 0xD5, "a", "b")
+            .unwrap();
         assert_eq!(read_frame(&mut srv)[1], 0x55 + 0x20);
         // 2.00 sends no language, so post-login sends nothing; 37 and 39 are refused.
-        conn.send_post_login(ClientVersion::V200, "English").unwrap();
+        conn.send_post_login(ClientVersion::V200, "English")
+            .unwrap();
         assert!(conn.send_messages(&[lang_msg()]).is_err());
         let mut t39 = vec![39 + 0x20];
         t39.extend_from_slice(&[0x20; 10]);
@@ -2883,7 +3428,16 @@ mod tests {
     /// sends it: id, count, field count, then 8 gstrings.
     fn svrlist_body() -> Vec<u8> {
         let mut b = vec![0x20, 1 + 0x20, 8 + 0x20];
-        for f in ["P Mock", "English", "desc", "http://x", "Version: 1", "3", "127.0.0.1", "14802"] {
+        for f in [
+            "P Mock",
+            "English",
+            "desc",
+            "http://x",
+            "Version: 1",
+            "3",
+            "127.0.0.1",
+            "14802",
+        ] {
             b.extend(gs(f));
         }
         b.push(b'\n');
@@ -2897,7 +3451,8 @@ mod tests {
 
     fn send_gen5(srv: &mut TcpStream, out: &mut Gen5, body: &[u8]) {
         let z = zlib_compress(body).unwrap();
-        srv.write_all(&write_frame(Gen5Comp::Zlib, &out.encode(z, Gen5Comp::Zlib))).unwrap();
+        srv.write_all(&write_frame(Gen5Comp::Zlib, &out.encode(z, Gen5Comp::Zlib)))
+            .unwrap();
     }
 
     /// Accept a 2.22 listserver login, return the connection and the key
@@ -2930,15 +3485,17 @@ mod tests {
         });
 
         let t = Instant::now();
-        let reply =
-            Connection::fetch_server_list(&addr, ClientVersion::V222, "ab", "cd").unwrap();
+        let reply = Connection::fetch_server_list(&addr, ClientVersion::V222, "ab", "cd").unwrap();
         assert!(t.elapsed() < Duration::from_secs(3));
         assert_eq!(reply.servers.len(), 1);
         assert_eq!(reply.servers[0].name, "Mock");
         assert_eq!(reply.servers[0].port, 14802);
         assert_eq!(reply.status.as_deref(), Some("Welcome, ab.\n2 online"));
         assert_eq!(reply.site_url.as_deref(), Some("https://site.example"));
-        assert_eq!(reply.upgrade_url.as_deref(), Some("https://upgrade.example"));
+        assert_eq!(
+            reply.upgrade_url.as_deref(),
+            Some("https://upgrade.example")
+        );
         assert!(reply.error.is_none());
         done_tx.send(()).unwrap();
         server.join().unwrap();
@@ -2959,10 +3516,12 @@ mod tests {
         });
 
         let t = Instant::now();
-        let reply =
-            Connection::fetch_server_list(&addr, ClientVersion::V222, "ab", "cd").unwrap();
+        let reply = Connection::fetch_server_list(&addr, ClientVersion::V222, "ab", "cd").unwrap();
         let took = t.elapsed();
-        assert!(took >= Duration::from_millis(1400), "returned too early: {took:?}");
+        assert!(
+            took >= Duration::from_millis(1400),
+            "returned too early: {took:?}"
+        );
         assert!(took < Duration::from_secs(4), "waited too long: {took:?}");
         assert_eq!(reply.servers.len(), 1);
         assert!(reply.status.is_none() && reply.site_url.is_none() && reply.upgrade_url.is_none());
@@ -2987,11 +3546,13 @@ mod tests {
         });
 
         let t = Instant::now();
-        let reply =
-            Connection::fetch_server_list(&addr, ClientVersion::V222, "ab", "cd").unwrap();
+        let reply = Connection::fetch_server_list(&addr, ClientVersion::V222, "ab", "cd").unwrap();
         assert!(t.elapsed() < Duration::from_millis(400));
         assert_eq!(reply.servers.len(), 1);
-        assert_eq!(reply.upgrade_url.as_deref(), Some("https://upgrade.example"));
+        assert_eq!(
+            reply.upgrade_url.as_deref(),
+            Some("https://upgrade.example")
+        );
         done_tx.send(()).unwrap();
         server.join().unwrap();
     }
@@ -3014,7 +3575,8 @@ mod tests {
     fn shape_s_listserver_login_sends_nothing() {
         assert_eq!(ClientVersion::V141.listserver().shape, LoginShape::Silent);
         let (mut conn, mut srv) = pair();
-        conn.login_listserver(ClientVersion::V141, 0x66, "ab", "cd").unwrap();
+        conn.login_listserver(ClientVersion::V141, 0x66, "ab", "cd")
+            .unwrap();
         drop(conn);
         let mut rest = Vec::new();
         srv.read_to_end(&mut rest).unwrap();
@@ -3033,9 +3595,13 @@ mod tests {
             send_plain(&mut srv, &svrlist_body());
             send_plain(&mut srv, &tail_body());
             let _ = done_rx.recv();
-            srv.set_read_timeout(Some(Duration::from_millis(200))).unwrap();
+            srv.set_read_timeout(Some(Duration::from_millis(200)))
+                .unwrap();
             let mut b = [0u8; 1];
-            assert!(srv.read(&mut b).map_or(true, |n| n == 0), "1.41 sent something");
+            assert!(
+                srv.read(&mut b).map_or(true, |n| n == 0),
+                "1.41 sent something"
+            );
         });
         let t = Instant::now();
         let reply = Connection::fetch_server_list(&addr, ClientVersion::V141, "ab", "cd").unwrap();
@@ -3062,7 +3628,11 @@ mod tests {
         let t = Instant::now();
         let reply = Connection::fetch_server_list(&addr, ClientVersion::V141, "ab", "cd").unwrap();
         let took = t.elapsed();
-        assert!(took >= crate::protocol::SILENT_LIST_WAIT && took < crate::protocol::SILENT_LIST_WAIT + Duration::from_secs(2), "{took:?}");
+        assert!(
+            took >= crate::protocol::SILENT_LIST_WAIT
+                && took < crate::protocol::SILENT_LIST_WAIT + Duration::from_secs(2),
+            "{took:?}"
+        );
         assert_eq!(reply.servers.len(), 1);
         done_tx.send(()).unwrap();
         server.join().unwrap();
@@ -3088,14 +3658,16 @@ mod tests {
         });
 
         let t = Instant::now();
-        let reply =
-            Connection::fetch_server_list(&addr, ClientVersion::V217, "ab", "cd").unwrap();
+        let reply = Connection::fetch_server_list(&addr, ClientVersion::V217, "ab", "cd").unwrap();
         assert!(t.elapsed() < Duration::from_secs(3));
         assert_eq!(reply.servers.len(), 1);
         assert_eq!(reply.servers[0].name, "Mock");
         assert_eq!(reply.status.as_deref(), Some("Welcome, ab.\n2 online"));
         assert_eq!(reply.site_url.as_deref(), Some("https://site.example"));
-        assert_eq!(reply.upgrade_url.as_deref(), Some("https://upgrade.example"));
+        assert_eq!(
+            reply.upgrade_url.as_deref(),
+            Some("https://upgrade.example")
+        );
         assert!(reply.error.is_none());
         done_tx.send(()).unwrap();
         server.join().unwrap();
@@ -3115,10 +3687,12 @@ mod tests {
         });
 
         let t = Instant::now();
-        let reply =
-            Connection::fetch_server_list(&addr, ClientVersion::V217, "ab", "cd").unwrap();
+        let reply = Connection::fetch_server_list(&addr, ClientVersion::V217, "ab", "cd").unwrap();
         let took = t.elapsed();
-        assert!(took >= Duration::from_millis(1400), "returned too early: {took:?}");
+        assert!(
+            took >= Duration::from_millis(1400),
+            "returned too early: {took:?}"
+        );
         assert!(took < Duration::from_secs(4), "waited too long: {took:?}");
         assert_eq!(reply.servers.len(), 1);
         assert!(reply.status.is_none());
@@ -3132,7 +3706,16 @@ mod tests {
         let mut b = vec![0x20, names.len() as u8 + 0x20];
         for n in names {
             b.push(8 + 0x20);
-            for f in [n, "English", "d", "http://x", "Version: 1", "0", "127.0.0.1", "14802"] {
+            for f in [
+                n,
+                "English",
+                "d",
+                "http://x",
+                "Version: 1",
+                "0",
+                "127.0.0.1",
+                "14802",
+            ] {
                 b.extend(gs(f));
             }
         }
@@ -3156,14 +3739,20 @@ mod tests {
             let mut out = Gen5::new(key);
             send_gen5(&mut srv, &mut out, &named_list_body(&["Old A", "Old B"]));
             std::thread::sleep(Duration::from_millis(350));
-            send_gen5(&mut srv, &mut out, &named_list_body(&["P New A", "U New B", "H New C"]));
+            send_gen5(
+                &mut srv,
+                &mut out,
+                &named_list_body(&["P New A", "U New B", "H New C"]),
+            );
             send_gen5(&mut srv, &mut out, &tail_body());
             let _ = done_rx.recv();
         });
         let t = Instant::now();
-        let reply =
-            Connection::fetch_server_list(&addr, ClientVersion::V222, "ab", "cd").unwrap();
-        assert!(t.elapsed() < Duration::from_millis(1200), "status should end the wait");
+        let reply = Connection::fetch_server_list(&addr, ClientVersion::V222, "ab", "cd").unwrap();
+        assert!(
+            t.elapsed() < Duration::from_millis(1200),
+            "status should end the wait"
+        );
         let names: Vec<_> = reply.servers.iter().map(|e| e.name.as_str()).collect();
         assert_eq!(names, ["New A", "New B", "New C"]);
         assert_eq!(reply.servers[0].kind, "P");
@@ -3190,8 +3779,7 @@ mod tests {
             send_gen5(&mut srv, &mut out, &tail_body());
             let _ = done_rx.recv();
         });
-        let reply =
-            Connection::fetch_server_list(&addr, ClientVersion::V222, "ab", "cd").unwrap();
+        let reply = Connection::fetch_server_list(&addr, ClientVersion::V222, "ab", "cd").unwrap();
         let names: Vec<_> = reply.servers.iter().map(|e| e.name.as_str()).collect();
         assert_eq!(names, ["New A"], "the later list replaces the earlier one");
         assert!(reply.status.is_some());
@@ -3213,7 +3801,8 @@ mod tests {
     #[test]
     fn strict_gen5_reader_refuses_plain_frame() {
         let frame = write_zlib_frame(b"x\n").unwrap();
-        let err = crate::protocol::read_frame(&mut frame.as_slice(), &mut Gen5::new(1)).unwrap_err();
+        let err =
+            crate::protocol::read_frame(&mut frame.as_slice(), &mut Gen5::new(1)).unwrap_err();
         assert!(err.to_string().contains("0x78"));
     }
 
@@ -3242,8 +3831,7 @@ mod tests {
         });
 
         let t = Instant::now();
-        let reply =
-            Connection::fetch_server_list(&addr, ClientVersion::V205, "ab", "cd").unwrap();
+        let reply = Connection::fetch_server_list(&addr, ClientVersion::V205, "ab", "cd").unwrap();
         assert!(t.elapsed() < Duration::from_millis(400));
         assert!(reply.servers.is_empty());
         assert_eq!(reply.error.as_deref(), Some("Bad account or password."));
@@ -3310,7 +3898,13 @@ mod tests {
     /// Read the next gen-5 frame a 2.31 login's client sent.
     fn gen5_body(srv: &mut TcpStream, g: &mut Gen5) -> Vec<u8> {
         let raw = read_raw(srv);
-        crate::protocol::read_frame(&mut [&(raw.len() as u16).to_be_bytes()[..], &raw].concat().as_slice(), g).unwrap()
+        crate::protocol::read_frame(
+            &mut [&(raw.len() as u16).to_be_bytes()[..], &raw]
+                .concat()
+                .as_slice(),
+            g,
+        )
+        .unwrap()
     }
 
     const ENTER: [u8; 3] = [46 + 0x20, 1 + 0x20, b'\n'];
@@ -3321,27 +3915,55 @@ mod tests {
     fn enter_level_follows_the_profile_send_set() {
         assert_eq!(enter_level_message(), ENTER);
         for p in crate::protocol::PROFILES {
-            assert_eq!(p.version.sends_enter_level(), p.protocol.pli.contains(46), "{}", p.label);
+            assert_eq!(
+                p.version.sends_enter_level(),
+                p.protocol.pli.contains(46),
+                "{}",
+                p.label
+            );
         }
         let with: Vec<&str> = crate::protocol::PROFILES
             .iter()
             .filter(|p| p.version.sends_enter_level())
             .map(|p| p.label)
             .collect();
-        assert_eq!(with, ["2.3", "2.31", "3.153", "4.04r2", "4.20r6", "4.20r8", "5.00r7", "5.12", "5.24r4", "5.30r3", "5.31r4", "6.00r2", "6.015", "6.034", "6.03r7", "6.03r7 Linux"]);
+        assert_eq!(
+            with,
+            [
+                "2.3",
+                "2.31",
+                "3.153",
+                "4.04r2",
+                "4.20r6",
+                "4.20r8",
+                "5.00r7",
+                "5.12",
+                "5.24r4",
+                "5.30r3",
+                "5.31r4",
+                "6.00r2",
+                "6.015",
+                "6.034",
+                "6.03r7",
+                "6.03r7 Linux"
+            ]
+        );
     }
 
     /// 46 goes first in the frame, then the props message that follows it.
     #[test]
     fn enter_level_comes_before_the_props_frame() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V231, 0x10, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V231, 0x10, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let mut g = Gen5::new(0x10);
         // A props message with a cell prop (43) and a wrapped x2, as a gmap
         // crossing sends; Seihai has none, so the test only fixes the order.
         let props = vec![2 + 0x20, 43 + 0x20, 1 + 0x20, 78 + 0x20, 0x20, 0x20, b'\n'];
-        assert!(conn.send_enter_level(ClientVersion::V231, &[props.clone()]).unwrap());
+        assert!(conn
+            .send_enter_level(ClientVersion::V231, std::slice::from_ref(&props))
+            .unwrap());
         let body = gen5_body(&mut srv, &mut g);
         assert_eq!([&ENTER[..], &props[..]].concat(), body);
         assert_eq!(body[0], 46 + 0x20);
@@ -3358,7 +3980,8 @@ mod tests {
     #[test]
     fn enter_level_once_per_level_entry() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V231, 0x22, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V231, 0x22, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let mut g = Gen5::new(0x22);
         let mut el = EnterLevelSender::for_version(ClientVersion::V231);
@@ -3369,7 +3992,10 @@ mod tests {
         assert_eq!(el.sent, 1);
         for (i, name) in ["b.nw", "a.nw", "b.nw"].iter().enumerate() {
             assert!(el.level_entered(&mut conn, name).unwrap());
-            assert!(!el.level_entered(&mut conn, name).unwrap(), "repeat of {name}");
+            assert!(
+                !el.level_entered(&mut conn, name).unwrap(),
+                "repeat of {name}"
+            );
             assert_eq!(gen5_body(&mut srv, &mut g), ENTER);
             assert_eq!(el.sent, 2 + i);
         }
@@ -3401,7 +4027,11 @@ mod tests {
     /// and the connection's own gate refuses a hand-built 46.
     #[test]
     fn enter_level_not_sent_without_46() {
-        for v in [ClientVersion::V205, ClientVersion::V217, ClientVersion::V222] {
+        for v in [
+            ClientVersion::V205,
+            ClientVersion::V217,
+            ClientVersion::V222,
+        ] {
             let (mut conn, mut srv) = pair();
             conn.login_versioned(v, 0x31, "ab", "cd").unwrap();
             let _ = read_frame(&mut srv);
@@ -3409,15 +4039,15 @@ mod tests {
             assert!(!el.at_login(&mut conn).unwrap(), "{}", v.label());
             assert!(!el.level_entered(&mut conn, "a.nw").unwrap());
             assert!(!el.level_entered(&mut conn, "b.nw").unwrap());
-            assert!(!conn.send_enter_level(v, &[position_message(1.0, 2.0, 0)]).unwrap());
+            assert!(!conn
+                .send_enter_level(v, &[position_message(1.0, 2.0, 0)])
+                .unwrap());
             assert_eq!(el.sent, 0);
             assert!(conn.send_messages(&[enter_level_message()]).is_err());
             // Nothing was written: the next frame is the walk we send now.
             conn.send_position(3.0, 4.0, 2).unwrap();
             srv.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
-            let body = if v == ClientVersion::V217 {
-                gen3_messages(0x31, &read_frame(&mut srv)).remove(0)
-            } else if v == ClientVersion::V205 {
+            let body = if matches!(v, ClientVersion::V217 | ClientVersion::V205) {
                 gen3_messages(0x31, &read_frame(&mut srv)).remove(0)
             } else {
                 let mut g = Gen5::new(0x31);
@@ -3430,7 +4060,12 @@ mod tests {
     // --- gmap crossings ---
 
     fn east_crossing() -> crate::gmap::Crossing {
-        crate::gmap::Crossing { from: (0, 0), to: (1, 0), local_x: 0.0, local_y: 30.5 }
+        crate::gmap::Crossing {
+            from: (0, 0),
+            to: (1, 0),
+            local_x: 0.0,
+            local_y: 30.5,
+        }
     }
 
     /// The frame a 2.31 client sends at a crossing is one gen-5 frame: 46,
@@ -3439,7 +4074,8 @@ mod tests {
     #[test]
     fn crossing_frame_on_the_wire_231() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V231, 0x44, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V231, 0x44, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let mut g = Gen5::new(0x44);
         let mut el = EnterLevelSender::for_version(ClientVersion::V231);
@@ -3447,11 +4083,13 @@ mod tests {
         assert_eq!(gen5_body(&mut srv, &mut g), ENTER);
         el.note_level("gm_nw.nw");
         let mut t = TamperSender::for_version(ClientVersion::V231);
-        let sent = conn.send_gmap_crossing(ClientVersion::V231, &east_crossing(), t.as_mut()).unwrap();
+        let sent = conn
+            .send_gmap_crossing(ClientVersion::V231, &east_crossing(), t.as_mut())
+            .unwrap();
         assert!(sent);
         el.crossing("gm_ne.nw", sent);
         let body = gen5_body(&mut srv, &mut g);
-        let props = vec![2 + 0x20, 43 + 0x20, 1 + 0x20, 78 + 0x20, 0x20, 0x20, b'\n'];
+        let props = [2 + 0x20, 43 + 0x20, 1 + 0x20, 78 + 0x20, 0x20, 0x20, b'\n'];
         assert_eq!(body, [&ENTER[..], &props[..]].concat());
         // The server's answer names the new level: nothing more is owed.
         assert!(!el.note_level("gm_ne.nw"));
@@ -3464,18 +4102,34 @@ mod tests {
     #[test]
     fn crossing_frame_on_the_wire_222() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V222, 0x45, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V222, 0x45, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let mut g = Gen5::new(0x45);
         let mut t = TamperSender::for_version(ClientVersion::V222);
-        assert!(!conn.send_gmap_crossing(ClientVersion::V222, &east_crossing(), t.as_mut()).unwrap());
+        assert!(!conn
+            .send_gmap_crossing(ClientVersion::V222, &east_crossing(), t.as_mut())
+            .unwrap());
         let body = gen5_body(&mut srv, &mut g);
         assert_eq!(body[0], 39 + 0x20);
-        assert_eq!(body[12], 2 + 0x20, "props follow the 12-byte tamper message");
-        assert_eq!(&body[13..16], &[15 + 0x20, 0x20, 43 + 0x20], "X first, then the cell (real 2.22)");
-        assert!(!conn.send_gmap_crossing(ClientVersion::V222, &east_crossing(), None).unwrap());
+        assert_eq!(
+            body[12],
+            2 + 0x20,
+            "props follow the 12-byte tamper message"
+        );
+        assert_eq!(
+            &body[13..16],
+            &[15 + 0x20, 0x20, 43 + 0x20],
+            "X first, then the cell (real 2.22)"
+        );
+        assert!(!conn
+            .send_gmap_crossing(ClientVersion::V222, &east_crossing(), None)
+            .unwrap());
         let body = gen5_body(&mut srv, &mut g);
-        assert_eq!(body, [&[2 + 0x20, 15 + 0x20, 0x20, 43 + 0x20, 1 + 0x20][..], b"\n"].concat());
+        assert_eq!(
+            body,
+            [&[2 + 0x20, 15 + 0x20, 0x20, 43 + 0x20, 1 + 0x20][..], b"\n"].concat()
+        );
     }
 
     /// 2.22 on its walk cadence, the lab's east crossing between two send
@@ -3496,27 +4150,36 @@ mod tests {
             assert!(wc.tick(st(63.0, "idle")).is_none());
         }
         // A slot on 63.5 ...
-        conn.send_tick_frame(Vec::new(), Vec::new(), wc.tick(st(63.5, "walk"))).unwrap();
+        conn.send_tick_frame(Vec::new(), Vec::new(), wc.tick(st(63.5, "walk")))
+            .unwrap();
         let _ = gen5_body(&mut srv, &mut g);
         // ... then the crossing step, between two slots.
         let lead = crate::gmap::crossing_lead(v, t.as_mut());
         wc.cross(&east_crossing());
         conn.queue_flag("gr.x", Some("64"));
-        conn.send_tick_frame(lead, Vec::new(), wc.tick(st(0.0, "walk"))).unwrap();
+        conn.send_tick_frame(lead, Vec::new(), wc.tick(st(0.0, "walk")))
+            .unwrap();
         let body = gen5_body(&mut srv, &mut g);
         assert_eq!(body[0], 39 + 0x20, "the 39 opens the crossing step's frame");
         assert_eq!(&body[12..], b"\x32gr.x=64\n", "then the flag; no props yet");
         // The next slot: X = 0.5 (half tiles: 1), then the cell.
-        conn.send_tick_frame(Vec::new(), Vec::new(), wc.tick(st(0.5, "walk"))).unwrap();
-        assert_eq!(gen5_body(&mut srv, &mut g), [2 + 0x20, 15 + 0x20, 1 + 0x20, 43 + 0x20, 1 + 0x20, b'\n']);
+        conn.send_tick_frame(Vec::new(), Vec::new(), wc.tick(st(0.5, "walk")))
+            .unwrap();
+        assert_eq!(
+            gen5_body(&mut srv, &mut g),
+            [2 + 0x20, 15 + 0x20, 1 + 0x20, 43 + 0x20, 1 + 0x20, b'\n']
+        );
     }
 
     /// A profile without gmaps writes nothing at a crossing.
     #[test]
     fn crossing_frame_is_not_sent_without_gmaps() {
         let (mut conn, _srv) = pair();
-        conn.login_versioned(ClientVersion::V205, 0x46, "ab", "cd").unwrap();
-        assert!(!conn.send_gmap_crossing(ClientVersion::V205, &east_crossing(), None).unwrap());
+        conn.login_versioned(ClientVersion::V205, 0x46, "ab", "cd")
+            .unwrap();
+        assert!(!conn
+            .send_gmap_crossing(ClientVersion::V205, &east_crossing(), None)
+            .unwrap());
     }
 
     /// The whole path for a 2.31 client on a 2x2 gmap, in process: login
@@ -3550,14 +4213,24 @@ mod tests {
 
         // The server: 49 (cell 0,0), the level, then the gmap name.
         let msg = |id: u8, p: &[u8]| [&[id + 0x20][..], p, b"\n"].concat();
-        let warp = [&[0x20 + 116, 0x20 + 61, 0x20 + 50, 0x20, 0x20][..], b"gm2x2.gmap"].concat();
+        let warp = [
+            &[0x20 + 116, 0x20 + 61, 0x20 + 50, 0x20, 0x20][..],
+            b"gm2x2.gmap",
+        ]
+        .concat();
         let mut net = SessionState::for_version(v);
         net.apply_body(&[msg(49, &warp), msg(6, b"gm_nw.nw"), msg(6, b"gm2x2.gmap")].concat());
-        assert!(!el.note_level("gm_nw.nw"), "the first level is covered by the login 46");
+        assert!(
+            !el.note_level("gm_nw.nw"),
+            "the first level is covered by the login 46"
+        );
 
         let open = |mark: u16| Level::from_board(&vec![mark; 64 * 64]);
         let files = Files(
-            ["gm_nw.nw", "gm_ne.nw", "gm_sw.nw", "gm_se.nw"].iter().map(|n| (n.to_string(), open(0))).collect(),
+            ["gm_nw.nw", "gm_ne.nw", "gm_sw.nw", "gm_se.nw"]
+                .iter()
+                .map(|n| (n.to_string(), open(0)))
+                .collect(),
         );
         let mut session = OfflineSession::new();
         session.current_level = files.level("gm_nw.nw", None);
@@ -3585,11 +4258,29 @@ mod tests {
         }
         assert_eq!(crossed.map(|c| c.to), Some((1, 0)));
         let east = gen5_body(&mut srv, &mut g);
-        assert_eq!(east, [&ENTER[..], &[2 + 0x20, 43 + 0x20, 1 + 0x20, 78 + 0x20, 0x20, 0x20, b'\n'][..]].concat());
+        assert_eq!(
+            east,
+            [
+                &ENTER[..],
+                &[2 + 0x20, 43 + 0x20, 1 + 0x20, 78 + 0x20, 0x20, 0x20, b'\n'][..]
+            ]
+            .concat()
+        );
         // The server answers: new level, mod time, empty board, gmap name.
-        net.apply_body(&[msg(6, b"gm_ne.nw"), msg(39, &[0x20; 5]), msg(0, b""), msg(6, b"gm2x2.gmap")].concat());
+        net.apply_body(
+            &[
+                msg(6, b"gm_ne.nw"),
+                msg(39, &[0x20; 5]),
+                msg(0, b""),
+                msg(6, b"gm2x2.gmap"),
+            ]
+            .concat(),
+        );
         assert_eq!(net.level_name.as_deref(), Some("gm_ne.nw"));
-        assert!(!el.note_level("gm_ne.nw") && !el.is_pending(), "no second 46 for the answer");
+        assert!(
+            !el.note_level("gm_ne.nw") && !el.is_pending(),
+            "no second 46 for the answer"
+        );
         sync_world(&mut session, &mut net, &rules, &files, &mut asked);
         assert_eq!(session.gmap.as_ref().unwrap().cell, (1, 0));
 
@@ -3603,7 +4294,14 @@ mod tests {
         el.crossing(&net.current_level_name().unwrap(), sent);
         let west = gen5_body(&mut srv, &mut g);
         // Local x is 63.5: X2 = (63.5 * 16) << 1 = 2032 = GSHORT 0x2f 0x90.
-        assert_eq!(west, [&ENTER[..], &[2 + 0x20, 43 + 0x20, 0x20, 78 + 0x20, 0x2f, 0x90, b'\n'][..]].concat());
+        assert_eq!(
+            west,
+            [
+                &ENTER[..],
+                &[2 + 0x20, 43 + 0x20, 0x20, 78 + 0x20, 0x2f, 0x90, b'\n'][..]
+            ]
+            .concat()
+        );
         assert_eq!(el.sent, 3, "login plus two crossings");
         assert_eq!(net.current_level_name().as_deref(), Some("gm_nw.nw"));
     }
@@ -3629,8 +4327,22 @@ mod tests {
 
     #[test]
     fn trigger_action_is_pli_38_with_no_npc_and_half_tiles() {
-        assert_eq!(trigger_action_message(21.5, 9.0, "pushed", "0"), [&[38 + 0x20, 0x20, 0x20, 0x20, 43 + 0x20, 18 + 0x20][..], b"pushed,0\n"].concat());
-        assert_eq!(trigger_action_message(1.0, 1.0, "x", ""), [&[38 + 0x20, 0x20, 0x20, 0x20, 2 + 0x20, 2 + 0x20][..], b"x\n"].concat());
+        assert_eq!(
+            trigger_action_message(21.5, 9.0, "pushed", "0"),
+            [
+                &[38 + 0x20, 0x20, 0x20, 0x20, 43 + 0x20, 18 + 0x20][..],
+                b"pushed,0\n"
+            ]
+            .concat()
+        );
+        assert_eq!(
+            trigger_action_message(1.0, 1.0, "x", ""),
+            [
+                &[38 + 0x20, 0x20, 0x20, 0x20, 2 + 0x20, 2 + 0x20][..],
+                b"x\n"
+            ]
+            .concat()
+        );
     }
 
     #[test]
@@ -3652,11 +4364,14 @@ mod tests {
     fn link_request_carries_tamper_check_by_profile() {
         // 2.22: 0 then 39, one frame.
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V222, 0x15, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V222, 0x15, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let mut g = Gen5::new(0x15);
         let mut t = TamperSender::for_version(ClientVersion::V222).unwrap();
-        assert!(conn.send_link_request(10.0, 20.0, "lv_c.nw", Some(&mut t)).unwrap());
+        assert!(conn
+            .send_link_request(10.0, 20.0, "lv_c.nw", Some(&mut t))
+            .unwrap());
         let body = gen5_body(&mut srv, &mut g);
         assert_eq!(body, [warp_msg(), t.message().unwrap()].concat());
         // Off: the warp alone.
@@ -3665,19 +4380,25 @@ mod tests {
 
         // 2.31: its 39 is periodic, never on a link.
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V231, 0x16, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V231, 0x16, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let mut g = Gen5::new(0x16);
         let mut t = TamperSender::for_version(ClientVersion::V231).unwrap();
-        assert!(!conn.send_link_request(10.0, 20.0, "lv_c.nw", Some(&mut t)).unwrap());
+        assert!(!conn
+            .send_link_request(10.0, 20.0, "lv_c.nw", Some(&mut t))
+            .unwrap());
         assert_eq!(gen5_body(&mut srv, &mut g), warp_msg());
 
         // 2.17: sent at login only.
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V217, 0x17, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V217, 0x17, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let mut t = TamperSender::for_version(ClientVersion::V217).unwrap();
-        assert!(!conn.send_link_request(10.0, 20.0, "lv_c.nw", Some(&mut t)).unwrap());
+        assert!(!conn
+            .send_link_request(10.0, 20.0, "lv_c.nw", Some(&mut t))
+            .unwrap());
         assert_eq!(gen3_messages(0x17, &read_frame(&mut srv)), vec![warp_msg()]);
     }
 
@@ -3693,7 +4414,10 @@ mod tests {
         let back = groups.iter().fold(0u64, |a, g| (a << 7) | u64::from(*g));
         assert_eq!(back, u64::from(t));
         assert_eq!(&m[6..], &warp_msg()[1..]);
-        assert_eq!(levelwarpmod_message(0, 10.0, 20.0, "lv_c.nw")[1..6], [0x20; 5]);
+        assert_eq!(
+            levelwarpmod_message(0, 10.0, 20.0, "lv_c.nw")[1..6],
+            [0x20; 5]
+        );
     }
 
     /// The frame of a level link, per profile, level cached or not.
@@ -3709,19 +4433,54 @@ mod tests {
 
         // 2.31: uncached = 0 alone; cached = 30, 46, props. No tamper check.
         let mut tamper = TamperSender::for_version(ClientVersion::V231).unwrap();
-        let f = link_request_frame(ClientVersion::V231, None, 10.0, 20.0, 2, "lv_c.nw", Some(&mut tamper));
+        let f = link_request_frame(
+            ClientVersion::V231,
+            None,
+            10.0,
+            20.0,
+            2,
+            "lv_c.nw",
+            Some(&mut tamper),
+        );
         assert_eq!(f.messages, vec![warp_msg()]);
         assert!(!f.with_enter_level && !f.with_tamper);
-        let f = link_request_frame(ClientVersion::V231, Some(t), 10.0, 20.0, 2, "lv_c.nw", Some(&mut tamper));
-        assert_eq!(f.messages, vec![cached_msg.clone(), ENTER.to_vec(), props.clone()]);
+        let f = link_request_frame(
+            ClientVersion::V231,
+            Some(t),
+            10.0,
+            20.0,
+            2,
+            "lv_c.nw",
+            Some(&mut tamper),
+        );
+        assert_eq!(
+            f.messages,
+            vec![cached_msg.clone(), ENTER.to_vec(), props.clone()]
+        );
         assert!(f.with_enter_level && !f.with_tamper);
 
         // 2.22: uncached = 0, 39; cached = 30, 39. Never 46, no props.
         let mut tamper = TamperSender::for_version(ClientVersion::V222).unwrap();
         let t39 = tamper.message().unwrap();
-        let f = link_request_frame(ClientVersion::V222, None, 10.0, 20.0, 2, "lv_c.nw", Some(&mut tamper));
+        let f = link_request_frame(
+            ClientVersion::V222,
+            None,
+            10.0,
+            20.0,
+            2,
+            "lv_c.nw",
+            Some(&mut tamper),
+        );
         assert_eq!(f.messages, vec![warp_msg(), t39.clone()]);
-        let f = link_request_frame(ClientVersion::V222, Some(t), 10.0, 20.0, 2, "lv_c.nw", Some(&mut tamper));
+        let f = link_request_frame(
+            ClientVersion::V222,
+            Some(t),
+            10.0,
+            20.0,
+            2,
+            "lv_c.nw",
+            Some(&mut tamper),
+        );
         assert_eq!(f.messages, vec![cached_msg.clone(), t39.clone()]);
         assert!(f.with_tamper && !f.with_enter_level);
         // Tamper check off (the default): the request alone.
@@ -3734,10 +4493,18 @@ mod tests {
 
         // 2.3 follows 2.31.
         let f = link_request_frame(ClientVersion::V230, Some(t), 10.0, 20.0, 2, "lv_c.nw", None);
-        assert_eq!(f.messages, vec![cached_msg.clone(), ENTER.to_vec(), props.clone()]);
+        assert_eq!(
+            f.messages,
+            vec![cached_msg.clone(), ENTER.to_vec(), props.clone()]
+        );
 
         // Builds without cached links ask with 0 whatever the cache holds.
-        for v in [ClientVersion::V133, ClientVersion::V139, ClientVersion::V200, ClientVersion::V204] {
+        for v in [
+            ClientVersion::V133,
+            ClientVersion::V139,
+            ClientVersion::V200,
+            ClientVersion::V204,
+        ] {
             assert!(!v.sends_cached_links());
             let f = link_request_frame(v, Some(t), 10.0, 20.0, 2, "lv_c.nw", None);
             assert_eq!(f.messages, vec![warp_msg()], "{}", v.label());
@@ -3750,9 +4517,24 @@ mod tests {
             for cached in [None, Some(t)] {
                 let f = link_request_frame(p.version, cached, 10.0, 20.0, 2, "lv_c.nw", None);
                 let want_mod = cached.is_some() && p.levels.cached_links;
-                assert_eq!(f.messages[0][0], if want_mod { 30 } else { 0 } + 0x20, "{}", p.label);
-                assert_eq!(f.with_enter_level, want_mod && p.protocol.pli.contains(46), "{}", p.label);
-                assert_eq!(f.messages.iter().any(|m| m == &ENTER), f.with_enter_level, "{}", p.label);
+                assert_eq!(
+                    f.messages[0][0],
+                    if want_mod { 30 } else { 0 } + 0x20,
+                    "{}",
+                    p.label
+                );
+                assert_eq!(
+                    f.with_enter_level,
+                    want_mod && p.protocol.pli.contains(46),
+                    "{}",
+                    p.label
+                );
+                assert_eq!(
+                    f.messages.iter().any(|m| m == &ENTER),
+                    f.with_enter_level,
+                    "{}",
+                    p.label
+                );
             }
         }
     }
@@ -3763,26 +4545,39 @@ mod tests {
     fn cached_link_frame_goes_out_in_one_frame_and_owes_no_second_46() {
         let t = 1_781_284_436u32;
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V231, 0x41, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V231, 0x41, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let mut g = Gen5::new(0x41);
         let mut el = EnterLevelSender::for_version(ClientVersion::V231);
         assert!(!el.note_level("a.nw"));
-        let f = conn.send_link(ClientVersion::V231, Some(t), 10.0, 20.0, 2, "lv_c.nw", None).unwrap();
+        let f = conn
+            .send_link(ClientVersion::V231, Some(t), 10.0, 20.0, 2, "lv_c.nw", None)
+            .unwrap();
         assert!(f.with_enter_level);
         el.cached_link("lv_c.nw", f.with_enter_level);
         let body = gen5_body(&mut srv, &mut g);
         assert_eq!(
             body,
-            [levelwarpmod_message(t, 10.0, 20.0, "lv_c.nw"), ENTER.to_vec(), position_message_precise(10.0, 20.0, 2)].concat()
+            [
+                levelwarpmod_message(t, 10.0, 20.0, "lv_c.nw"),
+                ENTER.to_vec(),
+                position_message_precise(10.0, 20.0, 2)
+            ]
+            .concat()
         );
         // The server's answer names the level: no 46 is owed.
         assert!(!el.note_level("lv_c.nw") && !el.is_pending());
         assert_eq!(el.sent, 1);
         // Uncached link: 0 alone, and the 46 is owed after the answer.
-        let f = conn.send_link(ClientVersion::V231, None, 10.0, 20.0, 2, "lv_b.nw", None).unwrap();
+        let f = conn
+            .send_link(ClientVersion::V231, None, 10.0, 20.0, 2, "lv_b.nw", None)
+            .unwrap();
         assert!(!f.with_enter_level);
-        assert_eq!(gen5_body(&mut srv, &mut g), levelwarp_message(10.0, 20.0, "lv_b.nw"));
+        assert_eq!(
+            gen5_body(&mut srv, &mut g),
+            levelwarp_message(10.0, 20.0, "lv_b.nw")
+        );
         assert!(el.note_level("lv_b.nw") && el.is_pending());
     }
 
@@ -3790,13 +4585,24 @@ mod tests {
     /// server-side warp: 46 alone. The level entry is owed once.
     #[test]
     fn enter_level_ordering_after_the_servers_answer() {
-        let at = PlayerUpdate { x: 10.5, y: 3.0, dir: 2 };
-        assert_eq!(enter_level_extras(ClientVersion::V231, true, &at), vec![position_message_precise(10.5, 3.0, 2)]);
-        assert_eq!(enter_level_extras(ClientVersion::V222, true, &at), vec![position_message(10.5, 3.0, 2)]);
+        let at = PlayerUpdate {
+            x: 10.5,
+            y: 3.0,
+            dir: 2,
+        };
+        assert_eq!(
+            enter_level_extras(ClientVersion::V231, true, &at),
+            vec![position_message_precise(10.5, 3.0, 2)]
+        );
+        assert_eq!(
+            enter_level_extras(ClientVersion::V222, true, &at),
+            vec![position_message(10.5, 3.0, 2)]
+        );
         assert!(enter_level_extras(ClientVersion::V231, false, &at).is_empty());
 
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V231, 0x23, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V231, 0x23, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let mut g = Gen5::new(0x23);
         let mut el = EnterLevelSender::for_version(ClientVersion::V231);
@@ -3808,15 +4614,28 @@ mod tests {
         // Own link to b: 46 + props, one frame, 46 first.
         assert!(el.note_level("b.nw"));
         assert!(el.is_pending());
-        assert!(el.send_pending(&mut conn, &enter_level_extras(ClientVersion::V231, true, &at)).unwrap());
+        assert!(el
+            .send_pending(
+                &mut conn,
+                &enter_level_extras(ClientVersion::V231, true, &at)
+            )
+            .unwrap());
         let body = gen5_body(&mut srv, &mut g);
-        assert_eq!(body, [&ENTER[..], &position_message_precise(10.5, 3.0, 2)[..]].concat());
+        assert_eq!(
+            body,
+            [&ENTER[..], &position_message_precise(10.5, 3.0, 2)[..]].concat()
+        );
         // Owed once: a second flush sends nothing.
         assert!(!el.is_pending());
         assert!(!el.send_pending(&mut conn, &[]).unwrap());
         // Server warp to a: 46 alone.
         assert!(el.note_level("a.nw"));
-        assert!(el.send_pending(&mut conn, &enter_level_extras(ClientVersion::V231, false, &at)).unwrap());
+        assert!(el
+            .send_pending(
+                &mut conn,
+                &enter_level_extras(ClientVersion::V231, false, &at)
+            )
+            .unwrap());
         assert_eq!(gen5_body(&mut srv, &mut g), ENTER);
         assert_eq!(el.sent, 2);
     }
@@ -3825,12 +4644,15 @@ mod tests {
     #[test]
     fn enter_level_pending_is_cleared_without_46() {
         let (mut conn, mut srv) = pair();
-        conn.login_versioned(ClientVersion::V222, 0x24, "ab", "cd").unwrap();
+        conn.login_versioned(ClientVersion::V222, 0x24, "ab", "cd")
+            .unwrap();
         let _ = read_frame(&mut srv);
         let mut el = EnterLevelSender::for_version(ClientVersion::V222);
         assert!(!el.note_level("a.nw"));
         assert!(el.note_level("b.nw"));
-        assert!(!el.send_pending(&mut conn, &[position_message(1.0, 2.0, 0)]).unwrap());
+        assert!(!el
+            .send_pending(&mut conn, &[position_message(1.0, 2.0, 0)])
+            .unwrap());
         assert!(!el.is_pending());
         assert_eq!(el.sent, 0);
     }
@@ -3852,8 +4674,14 @@ mod tests {
         let mut g = Gen5::new(0x31);
         let post = gen5_body(&mut srv, &mut g);
         assert_eq!(post[0], 37 + 0x20);
-        assert!(post.len() > lang_msg().len(), "tamper check follows the language");
-        assert!(s.enter_level.login_owed(), "the 46 waits for the post-login frame (2.31)");
+        assert!(
+            post.len() > lang_msg().len(),
+            "tamper check follows the language"
+        );
+        assert!(
+            s.enter_level.login_owed(),
+            "the 46 waits for the post-login frame (2.31)"
+        );
 
         // Without the flag: language only, and no tamper sender.
         let s = login_gserver(&addr, ClientVersion::V231, 0x32, "ab", "cd", false).unwrap();
@@ -3875,12 +4703,28 @@ mod tests {
     #[test]
     fn login_gserver_404_asks_its_base_files() {
         for (first, want) in [
-            (true, &b"EEnglish\n7basepackage.gupd\n7basepackage.gupd\n7bigmap.txt\n"[..]),
-            (false, &b"EEnglish\n7basepackage.gupd\n7basepackage.gupd\n"[..]),
+            (
+                true,
+                &b"EEnglish\n7basepackage.gupd\n7basepackage.gupd\n7bigmap.txt\n"[..],
+            ),
+            (
+                false,
+                &b"EEnglish\n7basepackage.gupd\n7basepackage.gupd\n"[..],
+            ),
         ] {
             let listener = TcpListener::bind("127.0.0.1:0").unwrap();
             let addr = listener.local_addr().unwrap().to_string();
-            let s = login_gserver_with(&addr, ClientVersion::V404R2, 0x31, "ab", "cd", false, first, wantfile_message).unwrap();
+            let s = login_gserver_with(
+                &addr,
+                ClientVersion::V404R2,
+                0x31,
+                "ab",
+                "cd",
+                false,
+                first,
+                wantfile_message,
+            )
+            .unwrap();
             assert!(s.warnings.is_empty());
             assert!(s.enter_level.login_owed());
             let (mut srv, _) = listener.accept().unwrap();
@@ -3905,10 +4749,28 @@ mod tests {
         assert_eq!(&frame[..2], &[0x20, 0x31 + 0x20]);
         assert_eq!(&frame[2..10], b"GNW22122");
         let mut g = Gen3::new(0x31);
-        let msgs: Vec<Vec<u8>> = frame[at..].split_inclusive(|&b| b == b'\n').map(|m| g.decode(m).unwrap()).collect();
+        let msgs: Vec<Vec<u8>> = frame[at..]
+            .split_inclusive(|&b| b == b'\n')
+            .map(|m| g.decode(m).unwrap())
+            .collect();
         assert_eq!(msgs.len(), 2);
         assert_eq!(msgs[0], lang_msg());
-        assert_eq!(&msgs[1][..11], &[39 + 0x20, 0x2a, 0x7b, 0xad, 0x19, 0x5e, 0x23, 0x12, 0x43, 0xd8, 0x2c]);
+        assert_eq!(
+            &msgs[1][..11],
+            &[
+                39 + 0x20,
+                0x2a,
+                0x7b,
+                0xad,
+                0x19,
+                0x5e,
+                0x23,
+                0x12,
+                0x43,
+                0xd8,
+                0x2c
+            ]
+        );
         s.conn.send_messages(&[lang_msg()]).unwrap();
         let next = read_frame(&mut srv);
         assert_eq!(g.decode(&next).unwrap(), lang_msg());
@@ -3944,7 +4806,10 @@ mod tests {
         use crate::protocol::layouts::parse_server_warp;
         let one = TcpListener::bind("127.0.0.1:0").unwrap();
         let two = TcpListener::bind("127.0.0.1:0").unwrap();
-        let (a1, a2) = (one.local_addr().unwrap().to_string(), two.local_addr().unwrap());
+        let (a1, a2) = (
+            one.local_addr().unwrap().to_string(),
+            two.local_addr().unwrap(),
+        );
         let s1 = login_gserver(&a1, ClientVersion::V231, 0x41, "ab", "cd", false).unwrap();
         let (mut srv1, _) = one.accept().unwrap();
         let first = read_frame(&mut srv1);
@@ -3977,7 +4842,10 @@ mod tests {
         assert_eq!(second[1], 0x42 + 0x20);
         let mut g = Gen5::new(0x42);
         assert_eq!(gen5_body(&mut srv2, &mut g), lang_msg());
-        assert!(s2.enter_level.login_owed(), "the fresh login owes its 46 again");
+        assert!(
+            s2.enter_level.login_owed(),
+            "the fresh login owes its 46 again"
+        );
         // A fresh sender: the first level on the new server is not a change.
         let mut el = s2.enter_level;
         assert!(!el.note_level("start.nw"));

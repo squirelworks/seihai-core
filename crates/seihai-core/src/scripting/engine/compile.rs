@@ -12,10 +12,26 @@ use std::collections::HashMap;
 /// A flat node. Jump targets are indexes into [`Compiled::nodes`].
 #[derive(Debug, Clone)]
 pub enum Node {
-    Cmd { cmd: &'static Cmd, args: Vec<Arg>, line: u32 },
-    Unknown { name: String, raw: String, reason: &'static str, line: u32 },
-    Assign { target: VarRef, op: AssignOp, value: Expr },
-    IncDec { target: VarRef, delta: f64 },
+    Cmd {
+        cmd: &'static Cmd,
+        args: Vec<Arg>,
+        line: u32,
+    },
+    Unknown {
+        name: String,
+        raw: String,
+        reason: &'static str,
+        line: u32,
+    },
+    Assign {
+        target: VarRef,
+        op: AssignOp,
+        value: Expr,
+    },
+    IncDec {
+        target: VarRef,
+        delta: f64,
+    },
     /// A call used as a statement.
     Eval(Expr),
     JumpIfFalse(Expr, usize),
@@ -24,7 +40,10 @@ pub enum Node {
     LoopEnter(usize),
     /// End of a pass: counts it and jumps back, or ends the run past the
     /// pass limit.
-    LoopBack { to: usize, slot: usize },
+    LoopBack {
+        to: usize,
+        slot: usize,
+    },
     Return(Option<Expr>),
     /// Ends the run: end of the script, or `break` / `continue` outside a loop.
     End,
@@ -62,12 +81,22 @@ struct Compiler {
 }
 
 pub fn compile(script: &Script) -> Compiled {
-    let mut c = Compiler { nodes: Vec::new(), funcs: HashMap::new(), loops: 0, stack: Vec::new() };
+    let mut c = Compiler {
+        nodes: Vec::new(),
+        funcs: HashMap::new(),
+        loops: 0,
+        stack: Vec::new(),
+    };
     for s in &script.body {
         c.stmt(s);
     }
     c.nodes.push(Node::End);
-    Compiled { nodes: c.nodes, funcs: c.funcs, loops: c.loops, diagnostics: script.diagnostics.clone() }
+    Compiled {
+        nodes: c.nodes,
+        funcs: c.funcs,
+        loops: c.loops,
+        diagnostics: script.diagnostics.clone(),
+    }
 }
 
 impl Compiler {
@@ -119,7 +148,12 @@ impl Compiler {
                 self.patch(jf, end);
                 self.finish_loop(ctx, back, end);
             }
-            Stmt::For { init, cond, step, body } => {
+            Stmt::For {
+                init,
+                cond,
+                step,
+                body,
+            } => {
                 if let Some(i) = init {
                     self.stmt(i);
                 }
@@ -127,7 +161,9 @@ impl Compiler {
                 self.loops += 1;
                 self.emit(Node::LoopEnter(slot));
                 let top = self.here();
-                let jf = cond.as_ref().map(|c| self.emit(Node::JumpIfFalse(c.clone(), HOLE)));
+                let jf = cond
+                    .as_ref()
+                    .map(|c| self.emit(Node::JumpIfFalse(c.clone(), HOLE)));
                 self.stack.push(LoopCtx::default());
                 self.stmt(body);
                 let ctx = self.stack.pop().unwrap();
@@ -154,7 +190,13 @@ impl Compiler {
                 self.emit(Node::Return(None));
                 let after = self.here();
                 self.patch(skip, after);
-                self.funcs.insert(name.clone(), Func { entry, params: params.clone() });
+                self.funcs.insert(
+                    name.clone(),
+                    Func {
+                        entry,
+                        params: params.clone(),
+                    },
+                );
             }
             Stmt::Return(e) => {
                 self.emit(Node::Return(e.clone()));
@@ -178,27 +220,61 @@ impl Compiler {
                 }
             },
             Stmt::Assign { target, op, value } => {
-                self.emit(Node::Assign { target: target.clone(), op: *op, value: value.clone() });
+                self.emit(Node::Assign {
+                    target: target.clone(),
+                    op: *op,
+                    value: value.clone(),
+                });
             }
             Stmt::IncDec { target, delta } => {
-                self.emit(Node::IncDec { target: target.clone(), delta: *delta });
+                self.emit(Node::IncDec {
+                    target: target.clone(),
+                    delta: *delta,
+                });
             }
             Stmt::Call { name, args } => {
-                self.emit(Node::Eval(Expr::Call { name: name.clone(), args: args.clone() }));
+                self.emit(Node::Eval(Expr::Call {
+                    name: name.clone(),
+                    args: args.clone(),
+                }));
             }
             Stmt::Command { name, args, line } => match vocab::command(name) {
                 Some(cmd) => {
-                    self.emit(Node::Cmd { cmd, args: args.clone(), line: *line });
+                    self.emit(Node::Cmd {
+                        cmd,
+                        args: args.clone(),
+                        line: *line,
+                    });
                 }
                 None => {
-                    self.emit(Node::Unknown { name: name.clone(), raw: String::new(), reason: "unknown command", line: *line });
+                    self.emit(Node::Unknown {
+                        name: name.clone(),
+                        raw: String::new(),
+                        reason: "unknown command",
+                        line: *line,
+                    });
                 }
             },
-            Stmt::Unknown { name, raw, reason, line } => {
-                self.emit(Node::Unknown { name: name.clone(), raw: raw.clone(), reason, line: *line });
+            Stmt::Unknown {
+                name,
+                raw,
+                reason,
+                line,
+            } => {
+                self.emit(Node::Unknown {
+                    name: name.clone(),
+                    raw: raw.clone(),
+                    reason,
+                    line: *line,
+                });
             }
             Stmt::With { line, .. } => {
-                self.emit(Node::Unknown { name: "with".into(), raw: String::new(), reason: "body skipped: objects are not switched", line: *line });
+                self.emit(Node::Unknown {
+                    name: "with".into(),
+                    raw: String::new(),
+                    reason: "body skipped: objects are not switched",
+                    line: *line,
+                });
             }
         }
     }
@@ -250,14 +326,30 @@ mod tests {
     #[test]
     fn break_and_continue_are_patched() {
         let k = c("for (i=0;i<3;i++) { if (i==1) continue; if (i==2) break; hide; }");
-        let jumps: Vec<usize> = k.nodes.iter().filter_map(|n| if let Node::Jump(t) = n { Some(*t) } else { None }).collect();
+        let jumps: Vec<usize> = k
+            .nodes
+            .iter()
+            .filter_map(|n| {
+                if let Node::Jump(t) = n {
+                    Some(*t)
+                } else {
+                    None
+                }
+            })
+            .collect();
         assert!(jumps.iter().all(|t| *t != HOLE && *t <= k.nodes.len()));
     }
 
     #[test]
     fn break_outside_a_loop_ends_the_run() {
-        assert!(matches!(c("break;").nodes.as_slice(), [Node::End, Node::End]));
-        assert!(matches!(c("continue;").nodes.as_slice(), [Node::End, Node::End]));
+        assert!(matches!(
+            c("break;").nodes.as_slice(),
+            [Node::End, Node::End]
+        ));
+        assert!(matches!(
+            c("continue;").nodes.as_slice(),
+            [Node::End, Node::End]
+        ));
     }
 
     #[test]

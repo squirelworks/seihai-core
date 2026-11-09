@@ -26,10 +26,7 @@ pub struct Gen3 {
 impl Gen3 {
     /// Create a new iterator. `key` is the login key byte (`rand & 0x7F`).
     pub fn new(key: u8) -> Self {
-        Self {
-            it: GEN3_SEED,
-            key,
-        }
+        Self { it: GEN3_SEED, key }
     }
 
     /// Resume from a known iterator state (for replaying captures that

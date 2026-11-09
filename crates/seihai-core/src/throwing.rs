@@ -50,7 +50,11 @@ pub fn carry_sprite_from_wire(code: i32) -> Option<u16> {
         201 => 239,
         c => c + 260,
     };
-    let s = if CARRY_TABLE.contains(&s) { s } else { CARRY_TABLE[0] };
+    let s = if CARRY_TABLE.contains(&s) {
+        s
+    } else {
+        CARRY_TABLE[0]
+    };
     u16::try_from(s).ok()
 }
 
@@ -105,7 +109,12 @@ pub fn cut_leap_kind(entry: usize) -> usize {
 /// Per-tick step of a thrown object by facing (north, west, south, east):
 /// `(dx, dy, dz)`. `dy` moves the drawn object, `dz` the ground point under
 /// it (the shadow and the hit test).
-pub const STEP: [(f32, f32, f32); 4] = [(0.0, -0.8, -1.0), (-1.0, 0.2, 0.0), (0.0, 1.2, 1.0), (1.0, 0.2, 0.0)];
+pub const STEP: [(f32, f32, f32); 4] = [
+    (0.0, -0.8, -1.0),
+    (-1.0, 0.2, 0.0),
+    (0.0, 1.2, 1.0),
+    (1.0, 0.2, 0.0),
+];
 
 /// Where a carried object is drawn, and where a throw starts, from the
 /// player's sprite top-left.
@@ -167,7 +176,17 @@ impl Thrown {
     /// A throw from the player at `(px, py)` facing `dir`.
     pub fn launch(kind: usize, px: f32, py: f32, dir: u8) -> Self {
         let (x, y) = carry_origin(px, py);
-        Thrown { kind, sprite: carry_sprite(kind), x, y, ground: py + 1.0, dir, ticks_left: FLIGHT_TICKS, thrower: None, own: true }
+        Thrown {
+            kind,
+            sprite: carry_sprite(kind),
+            x,
+            y,
+            ground: py + 1.0,
+            dir,
+            ticks_left: FLIGHT_TICKS,
+            thrower: None,
+            own: true,
+        }
     }
 
     /// A throw another player made (`PLO_THROWCARRIED`): it starts at that
@@ -177,8 +196,21 @@ impl Thrown {
     /// not have (a bomb).
     pub fn launch_remote(sprite: u16, px: f32, py: f32, dir: u8, thrower: u16) -> Self {
         let (x, y) = carry_origin(px, py);
-        let kind = CARRY_SPRITES.iter().position(|&s| s == sprite).unwrap_or(usize::MAX);
-        Thrown { kind, sprite: Some(sprite), x, y, ground: py + 1.0, dir, ticks_left: FLIGHT_TICKS, thrower: Some(thrower), own: false }
+        let kind = CARRY_SPRITES
+            .iter()
+            .position(|&s| s == sprite)
+            .unwrap_or(usize::MAX);
+        Thrown {
+            kind,
+            sprite: Some(sprite),
+            x,
+            y,
+            ground: py + 1.0,
+            dir,
+            ticks_left: FLIGHT_TICKS,
+            thrower: Some(thrower),
+            own: false,
+        }
     }
 
     /// Whether the object, after its step, is on the player whose sprite
@@ -326,13 +358,22 @@ pub fn builtin_sprite_rect(id: u16) -> Option<(i32, i32, i32, i32)> {
 /// `y = ((v >> 12) & 0xfff) * 2`, `w = ((v >> 6) & 0x3f) * 2`,
 /// `h = (v & 0x3f) * 2`.
 pub fn unpack_sprite_rect(v: u32) -> (i32, i32, i32, i32) {
-    (((v >> 24) * 2) as i32, (((v >> 12) & 0xfff) * 2) as i32, (((v >> 6) & 0x3f) * 2) as i32, ((v & 0x3f) * 2) as i32)
+    (
+        ((v >> 24) * 2) as i32,
+        (((v >> 12) & 0xfff) * 2) as i32,
+        (((v >> 6) & 0x3f) * 2) as i32,
+        ((v & 0x3f) * 2) as i32,
+    )
 }
 
 /// Unpack a break-table piece (array 19): sprite id in the high 16 bits,
 /// then the signed pixel offsets x and y.
 pub fn unpack_piece(v: u32) -> Piece {
-    ((v >> 16) as u16, ((v >> 8) & 0xff) as u8 as i8, (v & 0xff) as u8 as i8)
+    (
+        (v >> 16) as u16,
+        ((v >> 8) & 0xff) as u8 as i8,
+        (v & 0xff) as u8 as i8,
+    )
 }
 
 /// Whether the keys pressed this frame make an interact press: A or Space
@@ -345,7 +386,10 @@ pub fn interact_pressed(carrying: bool, a: bool, space: bool, s: bool) -> bool {
 
 /// The source rectangle of sprite `id`: the loaded sprite table, else the
 /// built-in value for the ids this client draws.
-pub fn sprite_rect(tables: Option<&crate::assets::ObjectTables>, id: u16) -> Option<(i32, i32, i32, i32)> {
+pub fn sprite_rect(
+    tables: Option<&crate::assets::ObjectTables>,
+    id: u16,
+) -> Option<(i32, i32, i32, i32)> {
     if let Some(v) = tables.and_then(|t| t.sprites.get(usize::from(id))) {
         let r = unpack_sprite_rect(*v);
         if r.2 > 0 && r.3 > 0 {
@@ -358,8 +402,14 @@ pub fn sprite_rect(tables: Option<&crate::assets::ObjectTables>, id: u16) -> Opt
 /// The frames of break effect `kind`, `[frame][piece]`: the loaded table,
 /// else the built-in one.
 pub fn leap_frames(tables: Option<&crate::assets::ObjectTables>, kind: usize) -> Vec<Vec<Piece>> {
-    if let Some(k) = tables.and_then(|t| t.leaps.get(kind)).filter(|k| !k.is_empty()) {
-        return k.iter().map(|f| f.iter().map(|&v| unpack_piece(v)).collect()).collect();
+    if let Some(k) = tables
+        .and_then(|t| t.leaps.get(kind))
+        .filter(|k| !k.is_empty())
+    {
+        return k
+            .iter()
+            .map(|f| f.iter().map(|&v| unpack_piece(v)).collect())
+            .collect();
     }
     builtin_leap(kind).iter().map(|f| f.to_vec()).collect()
 }
@@ -382,7 +432,11 @@ mod tests {
         assert!(o.hits_player(14.0, 30.0));
         o.ground = 33.0;
         assert!(!o.hits_player(14.0, 30.0));
-        assert_eq!(Thrown::launch_remote(65, 0.0, 0.0, 0, 1).kind, usize::MAX, "a bomb is no lift entry");
+        assert_eq!(
+            Thrown::launch_remote(65, 0.0, 0.0, 0, 1).kind,
+            usize::MAX,
+            "a bomb is no lift entry"
+        );
         assert!(Thrown::launch(0, 0.0, 0.0, 0).own);
     }
 
@@ -409,8 +463,14 @@ mod tests {
     fn a_s_and_space_throw_while_carrying_and_s_only_then() {
         assert!(interact_pressed(true, true, false, false));
         assert!(interact_pressed(true, false, true, false));
-        assert!(interact_pressed(true, false, false, true), "the sword key throws what is carried");
-        assert!(!interact_pressed(false, false, false, true), "S empty-handed is a swing, not an interact");
+        assert!(
+            interact_pressed(true, false, false, true),
+            "the sword key throws what is carried"
+        );
+        assert!(
+            !interact_pressed(false, false, false, true),
+            "S empty-handed is a swing, not an interact"
+        );
         assert!(interact_pressed(false, true, false, false));
         assert!(!interact_pressed(true, false, false, false));
     }
@@ -419,23 +479,43 @@ mod tests {
     fn carry_codes_round_trip_the_2_05_table() {
         assert_eq!(carry_wire_code(None), -1);
         assert_eq!(carry_wire_byte(None), 31);
-        let codes: Vec<i32> = CARRY_SPRITES.iter().map(|&s| carry_wire_code(Some(s))).collect();
+        let codes: Vec<i32> = CARRY_SPRITES
+            .iter()
+            .map(|&s| carry_wire_code(Some(s)))
+            .collect();
         assert_eq!(codes, vec![1, 7, 5, 3, 201]);
         assert_eq!(carry_wire_code(Some(65)), 0);
         assert_eq!(carry_wire_code(Some(66)), 200);
         assert_eq!(carry_wire_code(Some(321)), 61);
         for &s in CARRY_TABLE.iter().filter(|&&s| s >= 0) {
             let s = s as u16;
-            assert_eq!(carry_sprite_from_wire(carry_code_from_byte(carry_wire_byte(Some(s)))), Some(s), "sprite {s}");
+            assert_eq!(
+                carry_sprite_from_wire(carry_code_from_byte(carry_wire_byte(Some(s)))),
+                Some(s),
+                "sprite {s}"
+            );
         }
         assert_eq!(carry_sprite_from_wire(carry_code_from_byte(31)), None);
-        assert_eq!(carry_sprite_from_wire(carry_code_from_byte(255)), None, "GServer-v2's relayed -1");
-        assert_eq!(carry_sprite_from_wire(2), Some(261), "not in the table: the bush");
+        assert_eq!(
+            carry_sprite_from_wire(carry_code_from_byte(255)),
+            None,
+            "GServer-v2's relayed -1"
+        );
+        assert_eq!(
+            carry_sprite_from_wire(2),
+            Some(261),
+            "not in the table: the bush"
+        );
     }
 
     #[test]
     fn nine_steps_cover_the_documented_distances() {
-        for (dir, dx, dy, dz) in [(0u8, 0.0, -7.2, -9.0), (1, -9.0, 1.8, 0.0), (2, 0.0, 10.8, 9.0), (3, 9.0, 1.8, 0.0)] {
+        for (dir, dx, dy, dz) in [
+            (0u8, 0.0, -7.2, -9.0),
+            (1, -9.0, 1.8, 0.0),
+            (2, 0.0, 10.8, 9.0),
+            (3, 9.0, 1.8, 0.0),
+        ] {
             let mut t = Thrown::launch(1, 30.0, 30.0, dir);
             let start = (t.x, t.y, t.ground);
             for _ in 0..FLIGHT_TICKS {
@@ -455,7 +535,10 @@ mod tests {
         assert_eq!(leap_kind(Some(263), false), LEAP_ROCK);
         assert_eq!(leap_kind(None, false), LEAP_ROCK);
         assert_eq!(leap_kind(Some(261), true), LEAP_SPLASH);
-        assert_eq!([0, 1, 2, 3, 4].map(|k| carry_sprite(k).unwrap()), CARRY_SPRITES);
+        assert_eq!(
+            [0, 1, 2, 3, 4].map(|k| carry_sprite(k).unwrap()),
+            CARRY_SPRITES
+        );
         assert_eq!(carry_sprite(5), None);
     }
 
@@ -467,7 +550,9 @@ mod tests {
         assert_eq!(cut_leap_kind(1), LEAP_CUT_2);
         assert_eq!(builtin_leap(cut_leap_kind(0)).len(), 7);
         assert_eq!(builtin_leap(cut_leap_kind(1)).len(), 4);
-        assert!(builtin_leap(cut_leap_kind(1)).iter().all(|f| f.len() == 3 && f.iter().all(|p| p.0 == 24)));
+        assert!(builtin_leap(cut_leap_kind(1))
+            .iter()
+            .all(|f| f.len() == 3 && f.iter().all(|p| p.0 == 24)));
         assert_eq!(builtin_sprite_rect(24), Some((34, 8, 10, 8)));
     }
 

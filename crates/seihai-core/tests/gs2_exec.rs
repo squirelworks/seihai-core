@@ -9,7 +9,12 @@ use seihai_core::scripting::gs2::Script;
 use std::path::Path;
 
 fn machine(name: &str) -> Machine {
-    let bytes = std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/gs2").join(name)).unwrap();
+    let bytes = std::fs::read(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/gs2")
+            .join(name),
+    )
+    .unwrap();
     Machine::new(Script::parse(&bytes).unwrap())
 }
 
@@ -30,9 +35,25 @@ fn shared_fixture_sets_a_flag_shows_and_hides_an_image_then_sleeps() {
     assert_eq!(
         h.effects,
         [
-            Effect::SetFlag { name: "gs2seen".into(), value: Some(String::new()) },
-            Effect::Command { obj: 7, name: "showimg".into(), args: vec![Val::Num(1.0), Val::from("light2.png"), Val::Num(30.0), Val::Num(31.0)] },
-            Effect::Command { obj: 7, name: "hideimg".into(), args: vec![Val::Num(1.0)] },
+            Effect::SetFlag {
+                name: "gs2seen".into(),
+                value: Some(String::new())
+            },
+            Effect::Command {
+                obj: 7,
+                name: "showimg".into(),
+                args: vec![
+                    Val::Num(1.0),
+                    Val::from("light2.png"),
+                    Val::Num(30.0),
+                    Val::Num(31.0)
+                ]
+            },
+            Effect::Command {
+                obj: 7,
+                name: "hideimg".into(),
+                args: vec![Val::Num(1.0)]
+            },
         ]
     );
     assert_eq!(m.resume(&mut h), Outcome::Done);
@@ -51,8 +72,14 @@ fn calls_fixture_runs_a_function_with_parameters_and_a_return_value() {
         h.effects,
         [
             Effect::Say2 { text: "n=5".into() },
-            Effect::SetLevel { level: "lab3x.nw".into(), x: Some(30.5), y: Some(31.0) },
-            Effect::UnsetFlag { name: "gs2seen".into() },
+            Effect::SetLevel {
+                level: "lab3x.nw".into(),
+                x: Some(30.5),
+                y: Some(31.0)
+            },
+            Effect::UnsetFlag {
+                name: "gs2seen".into()
+            },
         ]
     );
     // `while (true)` stops at the loop limit, as in the client.
@@ -93,7 +120,13 @@ fn timers_fixture_runs_the_timeout_and_scheduled_events_frame_by_frame() {
     let names = |n: &str| n.to_string();
     assert_eq!(
         ran,
-        [(2, names("onTimeout")), (3, names("onTimeout")), (4, names("onTimeout")), (5, names("onPing")), (6, names("onKept"))]
+        [
+            (2, names("onTimeout")),
+            (3, names("onTimeout")),
+            (4, names("onTimeout")),
+            (5, names("onPing")),
+            (6, names("onKept"))
+        ]
     );
     assert_eq!(m.var(Root::This, "ticks"), Some(&Val::Num(3.0)));
     // Inside onTimeout the timer has already run out.
@@ -126,14 +159,21 @@ fn strings_fixture_runs_the_string_built_ins() {
     let mut m = machine("strings.gs2bc");
     let mut h = host();
     assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
-    let v = |n: &str| m.var(Root::This, n).cloned().unwrap_or_else(|| panic!("{n} not set"));
+    let v = |n: &str| {
+        m.var(Root::This, n)
+            .cloned()
+            .unwrap_or_else(|| panic!("{n} not set"))
+    };
     let s = |t: &str| Val::from(t);
     assert_eq!(v("trimmed"), s("Hello, Graal"));
     assert_eq!(v("len"), Val::Num(12.0));
     assert_eq!((v("at"), v("none")), (Val::Num(7.0), Val::Num(-1.0)));
     assert_eq!((v("c"), v("out")), (s("e"), s("")));
     assert_eq!((v("sub"), v("clip")), (s("Gra"), s("Hello, Graal")));
-    assert_eq!((v("st"), v("en"), v("no")), (Val::Num(1.0), Val::Num(1.0), Val::Num(0.0)));
+    assert_eq!(
+        (v("st"), v("en"), v("no")),
+        (Val::Num(1.0), Val::Num(1.0), Val::Num(0.0))
+    );
     assert_eq!((v("ch"), v("tr")), (s("A"), s("as is")));
     assert_eq!(v("f1"), s("42|    7|7    |+3|005"));
     assert_eq!(v("f2"), s("ab|    cd|ef|%|1.5"));
@@ -150,15 +190,29 @@ fn lists_fixture_builds_changes_and_walks_lists() {
     let mut h = host();
     assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
     let n = |v: f64| Val::Num(v);
-    let v = |name: &str| m.var(Root::This, name).cloned().unwrap_or_else(|| panic!("{name} not set"));
+    let v = |name: &str| {
+        m.var(Root::This, name)
+            .cloned()
+            .unwrap_or_else(|| panic!("{name} not set"))
+    };
     assert_eq!((v("n"), v("first")), (n(3.0), n(10.0)));
     // {10, "two", 30}, a[1] = 20, add 40, insert 5 at 0, delete 1,
     // remove 30, replace 0 with 7.
-    let joined: Vec<Val> = m.list(Root::This, "joined").expect("a list").iter().map(Value::val).collect();
+    let joined: Vec<Val> = m
+        .list(Root::This, "joined")
+        .expect("a list")
+        .iter()
+        .map(Value::val)
+        .collect();
     assert_eq!(joined, [n(7.0), n(20.0), n(40.0)]);
     assert_eq!((v("idx"), v("has")), (n(2.0), n(1.0)));
     assert_eq!((v("tn"), v("t2")), (n(3.0), Val::from("c")));
-    let ps: Vec<Val> = m.list(Root::This, "ps").expect("a list").iter().map(Value::val).collect();
+    let ps: Vec<Val> = m
+        .list(Root::This, "ps")
+        .expect("a list")
+        .iter()
+        .map(Value::val)
+        .collect();
     assert_eq!(ps, [n(1.0), n(3.0)]);
     assert_eq!(v("sum"), n(67.0));
     assert_eq!((v("g"), v("gn")), (n(9.0), n(2.0)));
@@ -169,7 +223,10 @@ fn lists_fixture_builds_changes_and_walks_lists() {
 #[test]
 fn missing_events_are_reported() {
     let mut m = machine("shared.gs2bc");
-    assert_eq!(m.call_event("onPlayerEnters", &[], &mut host()), Outcome::NoSuchEvent);
+    assert_eq!(
+        m.call_event("onPlayerEnters", &[], &mut host()),
+        Outcome::NoSuchEvent
+    );
 }
 
 #[test]
@@ -178,7 +235,11 @@ fn rest_fixture_runs_the_maths_ranges_types_and_with() {
     let mut h = host();
     assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
     let n = |v: f64| Val::Num(v);
-    let v = |name: &str| m.var(Root::This, name).cloned().unwrap_or_else(|| panic!("{name} not set"));
+    let v = |name: &str| {
+        m.var(Root::This, name)
+            .cloned()
+            .unwrap_or_else(|| panic!("{name} not set"))
+    };
     assert_eq!(v("e"), n(1.0));
     // gs2-parser pushes log(2, 8) as 8 then 2, and the client takes the
     // lower one as the base: log base 8 of 2.
@@ -195,7 +256,10 @@ fn rest_fixture_runs_the_maths_ranges_types_and_with() {
     assert_eq!(v("an"), n(3.0));
     // `with (player)`: `x` and `this.inw` land on the player; the null
     // `with` block is skipped.
-    assert_eq!((m.var(Root::Player, "x"), m.var(Root::Player, "inw")), (Some(&n(12.0)), Some(&n(1.0))));
+    assert_eq!(
+        (m.var(Root::Player, "x"), m.var(Root::Player, "inw")),
+        (Some(&n(12.0)), Some(&n(1.0)))
+    );
     assert_eq!((v("px"), h.x), (n(12.0), 30.0));
     assert_eq!(m.var(Root::This, "never"), None);
     assert!(h.log.is_empty(), "{:?}", h.log);
@@ -208,9 +272,18 @@ fn shared_commands_match_in_any_case_and_under_this() {
     assert!(h.command("this.hideImg", &[Val::Num(2.0)]).is_some());
     assert!(h.command("Say2", &[Val::from("hi")]).is_some());
     // GS2 has its own lists; the GS1 string-list commands are not there.
-    assert!(h.command("setstring", &[Val::from("a"), Val::from("b")]).is_none());
+    assert!(h
+        .command("setstring", &[Val::from("a"), Val::from("b")])
+        .is_none());
     assert_eq!(
         h.effects,
-        [Effect::Command { obj: 7, name: "hideimg".into(), args: vec![Val::Num(2.0)] }, Effect::Say2 { text: "hi".into() }]
+        [
+            Effect::Command {
+                obj: 7,
+                name: "hideimg".into(),
+                args: vec![Val::Num(2.0)]
+            },
+            Effect::Say2 { text: "hi".into() }
+        ]
     );
 }

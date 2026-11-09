@@ -39,7 +39,10 @@ pub(crate) fn read_bounded<R: Read>(r: R, what: &str) -> io::Result<Vec<u8>> {
     if out.len() > MAX_BODY {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            format!("{what} body is over {} MB once decompressed", MAX_BODY >> 20),
+            format!(
+                "{what} body is over {} MB once decompressed",
+                MAX_BODY >> 20
+            ),
         ));
     }
     Ok(out)

@@ -139,7 +139,10 @@ pub struct LayoutRow {
 
 /// Position of a version in chain order.
 pub fn rank(v: ClientVersion) -> usize {
-    ClientVersion::all_versions().iter().position(|&x| x == v).unwrap_or(usize::MAX)
+    ClientVersion::all_versions()
+        .iter()
+        .position(|&x| x == v)
+        .unwrap_or(usize::MAX)
 }
 
 impl LayoutRow {
@@ -172,13 +175,20 @@ pub struct Tables {
 impl Tables {
     /// The compiled-in defaults.
     pub fn builtin() -> Tables {
-        let rows = parse_layouts(BUILTIN_LAYOUTS).expect("built-in packet-layouts.tsv is valid (a test checks it)");
-        let chain = parse_chain(&crate::protocol::chain::render(crate::protocol::chain::Format::Tsv, None))
-            .expect("the generated version chain is valid tsv (a test checks it)");
+        let rows = parse_layouts(BUILTIN_LAYOUTS)
+            .expect("built-in packet-layouts.tsv is valid (a test checks it)");
+        let chain = parse_chain(&crate::protocol::chain::render(
+            crate::protocol::chain::Format::Tsv,
+            None,
+        ))
+        .expect("the generated version chain is valid tsv (a test checks it)");
         Tables {
             rows,
             chain,
-            sources: vec![(LAYOUTS_FILE.into(), "built-in".into()), (CHAIN_FILE.into(), "built-in (generated)".into())],
+            sources: vec![
+                (LAYOUTS_FILE.into(), "built-in".into()),
+                (CHAIN_FILE.into(), "built-in (generated)".into()),
+            ],
         }
     }
 
@@ -190,13 +200,15 @@ impl Tables {
         let mut t = Tables::builtin();
         let lay = dir.join(LAYOUTS_FILE);
         if lay.is_file() {
-            let text = std::fs::read_to_string(&lay).map_err(|e| format!("{}: {e}", lay.display()))?;
+            let text =
+                std::fs::read_to_string(&lay).map_err(|e| format!("{}: {e}", lay.display()))?;
             t.rows = parse_layouts(&text).map_err(|e| format!("{}: {e}", lay.display()))?;
             t.sources[0].1 = lay.display().to_string();
         }
         let ch = dir.join(CHAIN_FILE);
         if ch.is_file() {
-            let text = std::fs::read_to_string(&ch).map_err(|e| format!("{}: {e}", ch.display()))?;
+            let text =
+                std::fs::read_to_string(&ch).map_err(|e| format!("{}: {e}", ch.display()))?;
             t.chain = parse_chain(&text).map_err(|e| format!("{}: {e}", ch.display()))?;
             t.sources[1].1 = ch.display().to_string();
         }
@@ -206,15 +218,21 @@ impl Tables {
     /// Rows of one packet that apply to `v` (or all rows of the packet when
     /// `v` is `None`), in field order.
     pub fn rows_for(&self, dir: Dir, id: u32, v: Option<ClientVersion>) -> Vec<&LayoutRow> {
-        let mut r: Vec<&LayoutRow> =
-            self.rows.iter().filter(|r| r.dir == dir && r.id == id && v.is_none_or(|v| r.applies_to(v))).collect();
+        let mut r: Vec<&LayoutRow> = self
+            .rows
+            .iter()
+            .filter(|r| r.dir == dir && r.id == id && v.is_none_or(|v| r.applies_to(v)))
+            .collect();
         r.sort_by_key(|r| r.idx);
         r
     }
 
     /// The name a table row gives a packet.
     pub fn name_of(&self, dir: Dir, id: u32) -> Option<&str> {
-        self.rows.iter().find(|r| r.dir == dir && r.id == id).map(|r| r.name.as_str())
+        self.rows
+            .iter()
+            .find(|r| r.dir == dir && r.id == id)
+            .map(|r| r.name.as_str())
     }
 
     /// Ids (with their direction) that have at least one row.
@@ -234,7 +252,9 @@ fn version_cell(s: &str, line: usize, what: &str) -> Result<Option<ClientVersion
     if s == "-" {
         return Ok(None);
     }
-    ClientVersion::from_label(s).map(Some).ok_or_else(|| format!("line {line}: unknown {what} version `{s}`"))
+    ClientVersion::from_label(s)
+        .map(Some)
+        .ok_or_else(|| format!("line {line}: unknown {what} version `{s}`"))
 }
 
 /// Parse `packet-layouts.tsv`. Lines starting with `#` and blank lines are
@@ -256,7 +276,10 @@ pub fn parse_layouts(text: &str) -> Result<Vec<LayoutRow>, String> {
             continue;
         }
         if c.len() < 9 {
-            return Err(format!("line {n}: expected at least 9 columns, got {}", c.len()));
+            return Err(format!(
+                "line {n}: expected at least 9 columns, got {}",
+                c.len()
+            ));
         }
         let bad = |what: &str, v: &str| format!("line {n}: bad {what} `{v}`");
         let from = version_cell(c[6], n, "from")?;
@@ -306,7 +329,9 @@ pub fn parse_chain(text: &str) -> Result<Vec<ChainRow>, String> {
             return Err(format!("line {n}: expected 8 columns, got {}", c.len()));
         }
         rows.push(ChainRow {
-            step: c[0].parse().map_err(|_| format!("line {n}: bad step `{}`", c[0]))?,
+            step: c[0]
+                .parse()
+                .map_err(|_| format!("line {n}: bad step `{}`", c[0]))?,
             label: c[1].to_string(),
             kind: c[4].to_string(),
             area: c[5].to_string(),
@@ -351,21 +376,46 @@ pub fn lint(t: &Tables) -> Vec<String> {
         };
         if let (Some(b), Some(n)) = (builtin, t.name_of(dir, id)) {
             if b != n {
-                out.push(format!("{} {id}: table name {n} differs from the built-in name {b}", dir.label()));
+                out.push(format!(
+                    "{} {id}: table name {n} differs from the built-in name {b}",
+                    dir.label()
+                ));
             }
         }
         for &v in ClientVersion::all_versions() {
             let rows = t.rows_for(dir, id, Some(v));
             for w in rows.windows(2) {
                 if w[0].idx == w[1].idx {
-                    out.push(format!("{} {id} {}: fields {} and {} share position {}", dir.label(), v.label(), w[0].field, w[1].field, w[0].idx));
+                    out.push(format!(
+                        "{} {id} {}: fields {} and {} share position {}",
+                        dir.label(),
+                        v.label(),
+                        w[0].field,
+                        w[1].field,
+                        w[0].idx
+                    ));
                     break;
                 }
             }
-            let takes_rest = |e: Enc| matches!(e, Enc::Text | Enc::Comma | Enc::Raw | Enc::GstringList | Enc::Props | Enc::Showimg);
+            let takes_rest = |e: Enc| {
+                matches!(
+                    e,
+                    Enc::Text
+                        | Enc::Comma
+                        | Enc::Raw
+                        | Enc::GstringList
+                        | Enc::Props
+                        | Enc::Showimg
+                )
+            };
             if let Some(i) = rows.iter().position(|r| takes_rest(r.enc)) {
                 if i + 1 < rows.len() {
-                    out.push(format!("{} {id} {}: field {} takes the rest of the payload but is not last", dir.label(), v.label(), rows[i].field));
+                    out.push(format!(
+                        "{} {id} {}: field {} takes the rest of the payload but is not last",
+                        dir.label(),
+                        v.label(),
+                        rows[i].field
+                    ));
                     break;
                 }
             }

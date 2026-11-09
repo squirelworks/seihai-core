@@ -30,42 +30,150 @@ use super::crc32::crc32_update;
 /// Every file of `assets/default/`, by path relative to it, sorted. A test
 /// walks the folder and fails when this list and the folder differ.
 pub const FILES: &[(&str, &[u8])] = &[
-    ("bodies/body.gif", include_bytes!("../../../../assets/default/bodies/body.gif")),
-    ("bodies/body.png", include_bytes!("../../../../assets/default/bodies/body.png")),
-    ("gani/carry.gani", include_bytes!("../../../../assets/default/gani/carry.gani")),
-    ("gani/carrystill.gani", include_bytes!("../../../../assets/default/gani/carrystill.gani")),
-    ("gani/dead.gani", include_bytes!("../../../../assets/default/gani/dead.gani")),
-    ("gani/hurt.gani", include_bytes!("../../../../assets/default/gani/hurt.gani")),
-    ("gani/idle.gani", include_bytes!("../../../../assets/default/gani/idle.gani")),
-    ("gani/sit.gani", include_bytes!("../../../../assets/default/gani/sit.gani")),
-    ("gani/sleep.gani", include_bytes!("../../../../assets/default/gani/sleep.gani")),
-    ("gani/swim.gani", include_bytes!("../../../../assets/default/gani/swim.gani")),
-    ("gani/sword.gani", include_bytes!("../../../../assets/default/gani/sword.gani")),
-    ("gani/walk.gani", include_bytes!("../../../../assets/default/gani/walk.gani")),
-    ("heads/head0.gif", include_bytes!("../../../../assets/default/heads/head0.gif")),
-    ("heads/head0.png", include_bytes!("../../../../assets/default/heads/head0.png")),
-    ("levels/new1.nw", include_bytes!("../../../../assets/default/levels/new1.nw")),
-    ("levels/new2.nw", include_bytes!("../../../../assets/default/levels/new2.nw")),
-    ("levels/seihai_tutorial1.nw", include_bytes!("../../../../assets/default/levels/seihai_tutorial1.nw")),
-    ("levels/seihai_tutorial2.nw", include_bytes!("../../../../assets/default/levels/seihai_tutorial2.nw")),
-    ("levels/seihai_tutorial3.nw", include_bytes!("../../../../assets/default/levels/seihai_tutorial3.nw")),
-    ("levels/seihai_tutorial4.nw", include_bytes!("../../../../assets/default/levels/seihai_tutorial4.nw")),
-    ("levels/seihai_tutorial_house.nw", include_bytes!("../../../../assets/default/levels/seihai_tutorial_house.nw")),
-    ("levels/tiledefs/tiledefsOffline.txt", include_bytes!("../../../../assets/default/levels/tiledefs/tiledefsOffline.txt")),
-    ("pics1.png", include_bytes!("../../../../assets/default/pics1.png")),
-    ("shields/shield1.gif", include_bytes!("../../../../assets/default/shields/shield1.gif")),
-    ("shields/shield1.png", include_bytes!("../../../../assets/default/shields/shield1.png")),
-    ("sounds/steps.wav", include_bytes!("../../../../assets/default/sounds/steps.wav")),
-    ("sounds/steps2.wav", include_bytes!("../../../../assets/default/sounds/steps2.wav")),
-    ("sounds/sword.wav", include_bytes!("../../../../assets/default/sounds/sword.wav")),
-    ("sounds/water.wav", include_bytes!("../../../../assets/default/sounds/water.wav")),
-    ("sprites.png", include_bytes!("../../../../assets/default/sprites.png")),
-    ("state.png", include_bytes!("../../../../assets/default/state.png")),
-    ("swords/sword1.gif", include_bytes!("../../../../assets/default/swords/sword1.gif")),
-    ("swords/sword1.png", include_bytes!("../../../../assets/default/swords/sword1.png")),
-    ("tiledefs.txt", include_bytes!("../../../../assets/default/tiledefs.txt")),
-    ("tutorial/arrays.dat", include_bytes!("../../../../assets/default/tutorial/arrays.dat")),
-    ("tutorial/pics1.png", include_bytes!("../../../../assets/default/tutorial/pics1.png")),
+    (
+        "bodies/body.gif",
+        include_bytes!("../../../../assets/default/bodies/body.gif"),
+    ),
+    (
+        "bodies/body.png",
+        include_bytes!("../../../../assets/default/bodies/body.png"),
+    ),
+    (
+        "gani/carry.gani",
+        include_bytes!("../../../../assets/default/gani/carry.gani"),
+    ),
+    (
+        "gani/carrystill.gani",
+        include_bytes!("../../../../assets/default/gani/carrystill.gani"),
+    ),
+    (
+        "gani/dead.gani",
+        include_bytes!("../../../../assets/default/gani/dead.gani"),
+    ),
+    (
+        "gani/hurt.gani",
+        include_bytes!("../../../../assets/default/gani/hurt.gani"),
+    ),
+    (
+        "gani/idle.gani",
+        include_bytes!("../../../../assets/default/gani/idle.gani"),
+    ),
+    (
+        "gani/sit.gani",
+        include_bytes!("../../../../assets/default/gani/sit.gani"),
+    ),
+    (
+        "gani/sleep.gani",
+        include_bytes!("../../../../assets/default/gani/sleep.gani"),
+    ),
+    (
+        "gani/swim.gani",
+        include_bytes!("../../../../assets/default/gani/swim.gani"),
+    ),
+    (
+        "gani/sword.gani",
+        include_bytes!("../../../../assets/default/gani/sword.gani"),
+    ),
+    (
+        "gani/walk.gani",
+        include_bytes!("../../../../assets/default/gani/walk.gani"),
+    ),
+    (
+        "heads/head0.gif",
+        include_bytes!("../../../../assets/default/heads/head0.gif"),
+    ),
+    (
+        "heads/head0.png",
+        include_bytes!("../../../../assets/default/heads/head0.png"),
+    ),
+    (
+        "levels/new1.nw",
+        include_bytes!("../../../../assets/default/levels/new1.nw"),
+    ),
+    (
+        "levels/new2.nw",
+        include_bytes!("../../../../assets/default/levels/new2.nw"),
+    ),
+    (
+        "levels/seihai_tutorial1.nw",
+        include_bytes!("../../../../assets/default/levels/seihai_tutorial1.nw"),
+    ),
+    (
+        "levels/seihai_tutorial2.nw",
+        include_bytes!("../../../../assets/default/levels/seihai_tutorial2.nw"),
+    ),
+    (
+        "levels/seihai_tutorial3.nw",
+        include_bytes!("../../../../assets/default/levels/seihai_tutorial3.nw"),
+    ),
+    (
+        "levels/seihai_tutorial4.nw",
+        include_bytes!("../../../../assets/default/levels/seihai_tutorial4.nw"),
+    ),
+    (
+        "levels/seihai_tutorial_house.nw",
+        include_bytes!("../../../../assets/default/levels/seihai_tutorial_house.nw"),
+    ),
+    (
+        "levels/tiledefs/tiledefsOffline.txt",
+        include_bytes!("../../../../assets/default/levels/tiledefs/tiledefsOffline.txt"),
+    ),
+    (
+        "pics1.png",
+        include_bytes!("../../../../assets/default/pics1.png"),
+    ),
+    (
+        "shields/shield1.gif",
+        include_bytes!("../../../../assets/default/shields/shield1.gif"),
+    ),
+    (
+        "shields/shield1.png",
+        include_bytes!("../../../../assets/default/shields/shield1.png"),
+    ),
+    (
+        "sounds/steps.wav",
+        include_bytes!("../../../../assets/default/sounds/steps.wav"),
+    ),
+    (
+        "sounds/steps2.wav",
+        include_bytes!("../../../../assets/default/sounds/steps2.wav"),
+    ),
+    (
+        "sounds/sword.wav",
+        include_bytes!("../../../../assets/default/sounds/sword.wav"),
+    ),
+    (
+        "sounds/water.wav",
+        include_bytes!("../../../../assets/default/sounds/water.wav"),
+    ),
+    (
+        "sprites.png",
+        include_bytes!("../../../../assets/default/sprites.png"),
+    ),
+    (
+        "state.png",
+        include_bytes!("../../../../assets/default/state.png"),
+    ),
+    (
+        "swords/sword1.gif",
+        include_bytes!("../../../../assets/default/swords/sword1.gif"),
+    ),
+    (
+        "swords/sword1.png",
+        include_bytes!("../../../../assets/default/swords/sword1.png"),
+    ),
+    (
+        "tiledefs.txt",
+        include_bytes!("../../../../assets/default/tiledefs.txt"),
+    ),
+    (
+        "tutorial/arrays.dat",
+        include_bytes!("../../../../assets/default/tutorial/arrays.dat"),
+    ),
+    (
+        "tutorial/pics1.png",
+        include_bytes!("../../../../assets/default/tutorial/pics1.png"),
+    ),
 ];
 
 /// An identifier of the whole set: CRC-32 over each name and its bytes.
@@ -141,11 +249,17 @@ pub fn default_dir() -> Result<PathBuf, String> {
     match ensure_in(&primary) {
         Ok(d) => Ok(d),
         Err(e1) => {
-            let user = std::env::var("USER").or_else(|_| std::env::var("USERNAME")).unwrap_or_else(|_| "user".into());
+            let user = std::env::var("USER")
+                .or_else(|_| std::env::var("USERNAME"))
+                .unwrap_or_else(|_| "user".into());
             let user: String = user.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
             let fallback = std::env::temp_dir().join(format!("seihai-builtin-{user}"));
             ensure_in(&fallback).map_err(|e2| {
-                format!("cannot write the built-in assets to {} ({e1}) or {} ({e2})", primary.display(), fallback.display())
+                format!(
+                    "cannot write the built-in assets to {} ({e1}) or {} ({e2})",
+                    primary.display(),
+                    fallback.display()
+                )
             })
         }
     }
@@ -165,7 +279,11 @@ mod tests {
     fn walk(dir: &Path, rel: &str, out: &mut Vec<String>) {
         for e in fs::read_dir(dir).unwrap().flatten() {
             let name = e.file_name().to_string_lossy().into_owned();
-            let r = if rel.is_empty() { name } else { format!("{rel}/{name}") };
+            let r = if rel.is_empty() {
+                name
+            } else {
+                format!("{rel}/{name}")
+            };
             if e.path().is_dir() {
                 walk(&e.path(), &r, out);
             } else {
@@ -176,18 +294,29 @@ mod tests {
 
     #[test]
     fn the_embedded_list_is_exactly_the_default_folder() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..").join("assets").join("default");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("assets")
+            .join("default");
         let mut on_disk = Vec::new();
         walk(&root, "", &mut on_disk);
         on_disk.sort();
         let listed: Vec<&str> = FILES.iter().map(|(n, _)| *n).collect();
-        assert_eq!(on_disk, listed, "assets/default and builtin::FILES differ: add or remove the entry");
+        assert_eq!(
+            on_disk, listed,
+            "assets/default and builtin::FILES differ: add or remove the entry"
+        );
         for (n, d) in FILES {
             assert_eq!(&fs::read(root.join(n)).unwrap(), d, "{n}");
         }
         // 128 KB since the sheet holds art for all 4096 tile ids of the Graal
         // layout; 256 KB since the tutorial (its sheet, tables and levels).
-        assert!(total_size() < 256 * 1024, "the set stays small: {} bytes", total_size());
+        assert!(
+            total_size() < 256 * 1024,
+            "the set stays small: {} bytes",
+            total_size()
+        );
     }
 
     #[test]
@@ -198,7 +327,10 @@ mod tests {
         for (n, d) in FILES {
             let p = dir.join(n);
             assert_eq!(&fs::read(&p).unwrap(), d, "{n}");
-            assert!(fs::metadata(&p).unwrap().permissions().readonly(), "{n} is read-only");
+            assert!(
+                fs::metadata(&p).unwrap().permissions().readonly(),
+                "{n} is read-only"
+            );
         }
         // A tampered file and a deleted one are put back from the binary.
         let (n0, d0) = FILES[0];

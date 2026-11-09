@@ -48,7 +48,16 @@ pub fn hexdump(b: &[u8]) -> Vec<String> {
         .enumerate()
         .map(|(i, c)| {
             let hex: Vec<String> = c.iter().map(|x| format!("{x:02x}")).collect();
-            let asc: String = c.iter().map(|&x| if (0x20..0x7f).contains(&x) { x as char } else { '.' }).collect();
+            let asc: String = c
+                .iter()
+                .map(|&x| {
+                    if (0x20..0x7f).contains(&x) {
+                        x as char
+                    } else {
+                        '.'
+                    }
+                })
+                .collect();
             format!("{:04x}  {:<47}  |{}|", i * 16, hex.join(" "), asc)
         })
         .collect()
@@ -75,20 +84,36 @@ fn json_str(s: &str) -> String {
 }
 
 fn header_lines(v: &View, source: &str, tables_note: &str) -> Vec<String> {
-    let ver = v.version.map_or("unknown".to_string(), |x| x.label().to_string());
+    let ver = v
+        .version
+        .map_or("unknown".to_string(), |x| x.label().to_string());
     vec![
-        format!("capture {source}  version {ver} ({})  mask {}", v.version_note, if v.masked { "on" } else { "off" }),
+        format!(
+            "capture {source}  version {ver} ({})  mask {}",
+            v.version_note,
+            if v.masked { "on" } else { "off" }
+        ),
         format!("tables {tables_note}"),
         format!(
             "messages shown {} of {}{}",
             v.rows.len(),
             v.total,
-            if v.has_login { "  (login frames redacted: password never decoded)" } else { "" }
+            if v.has_login {
+                "  (login frames redacted: password never decoded)"
+            } else {
+                ""
+            }
         ),
     ]
 }
 
-pub fn render_view(v: &View, fmt: Format, source: &str, tables_note: &str, show_layout: bool) -> String {
+pub fn render_view(
+    v: &View,
+    fmt: Format,
+    source: &str,
+    tables_note: &str,
+    show_layout: bool,
+) -> String {
     match fmt {
         Format::Text => view_text(v, source, tables_note, show_layout),
         Format::Tsv => view_tsv(v),
@@ -97,7 +122,11 @@ pub fn render_view(v: &View, fmt: Format, source: &str, tables_note: &str, show_
 }
 
 fn fields_text(r: &Row) -> String {
-    r.fields.iter().map(|(k, val)| format!("{}={}", printable(k), printable(val))).collect::<Vec<_>>().join("  ")
+    r.fields
+        .iter()
+        .map(|(k, val)| format!("{}={}", printable(k), printable(val)))
+        .collect::<Vec<_>>()
+        .join("  ")
 }
 
 fn view_text(v: &View, source: &str, tables_note: &str, show_layout: bool) -> String {
@@ -150,10 +179,16 @@ fn view_tsv(v: &View) -> String {
         let _ = writeln!(s, "#meta version={}", esc(ver.label()));
     }
     let _ = writeln!(s, "#meta mask={}", if v.masked { "on" } else { "off" });
-    s.push_str("#conn\tdir\tt_ms\tframe\tid\tname\tlen\tsource\tfields\tlayout\tunknown\traw_hex\n");
+    s.push_str(
+        "#conn\tdir\tt_ms\tframe\tid\tname\tlen\tsource\tfields\tlayout\tunknown\traw_hex\n",
+    );
     for r in &v.rows {
         let e = &r.event;
-        let fields: Vec<String> = r.fields.iter().map(|(k, val)| format!("{}={}", esc(k), esc(val))).collect();
+        let fields: Vec<String> = r
+            .fields
+            .iter()
+            .map(|(k, val)| format!("{}={}", esc(k), esc(val)))
+            .collect();
         let unknown: Vec<String> = r.unknown.iter().map(|u| esc(u)).collect();
         let _ = writeln!(
             s,
@@ -178,7 +213,12 @@ fn view_tsv(v: &View) -> String {
 fn view_json(v: &View, source: &str, tables_note: &str) -> String {
     let mut s = String::from("{\n");
     let _ = writeln!(s, "  \"capture\": {},", json_str(source));
-    let _ = writeln!(s, "  \"version\": {},", v.version.map_or("null".to_string(), |x| json_str(x.label())));
+    let _ = writeln!(
+        s,
+        "  \"version\": {},",
+        v.version
+            .map_or("null".to_string(), |x| json_str(x.label()))
+    );
     let _ = writeln!(s, "  \"version_note\": {},", json_str(&v.version_note));
     let _ = writeln!(s, "  \"masked\": {},", v.masked);
     let _ = writeln!(s, "  \"tables\": {},", json_str(tables_note));
@@ -188,8 +228,17 @@ fn view_json(v: &View, source: &str, tables_note: &str) -> String {
     for (i, r) in v.rows.iter().enumerate() {
         let e = &r.event;
         s.push_str(if i == 0 { "\n    " } else { ",\n    " });
-        let fields: Vec<String> =
-            r.fields.iter().map(|(k, val)| format!("{{\"name\": {}, \"value\": {}}}", json_str(k), json_str(val))).collect();
+        let fields: Vec<String> = r
+            .fields
+            .iter()
+            .map(|(k, val)| {
+                format!(
+                    "{{\"name\": {}, \"value\": {}}}",
+                    json_str(k),
+                    json_str(val)
+                )
+            })
+            .collect();
         let unknown: Vec<String> = r.unknown.iter().map(|u| json_str(u)).collect();
         let _ = write!(
             s,
@@ -208,7 +257,11 @@ fn view_json(v: &View, source: &str, tables_note: &str) -> String {
             json_str(&hex_string(&r.raw))
         );
     }
-    s.push_str(if v.rows.is_empty() { "]\n}\n" } else { "\n  ]\n}\n" });
+    s.push_str(if v.rows.is_empty() {
+        "]\n}\n"
+    } else {
+        "\n  ]\n}\n"
+    });
     s
 }
 
@@ -216,7 +269,11 @@ fn view_json(v: &View, source: &str, tables_note: &str) -> String {
 // Layout reports
 
 fn range_label(from: &str, to: &str) -> String {
-    if from == to { from.to_string() } else { format!("{from} .. {to}") }
+    if from == to {
+        from.to_string()
+    } else {
+        format!("{from} .. {to}")
+    }
 }
 
 pub fn render_layouts(reports: &[LayoutReport], fmt: Format) -> String {
@@ -247,7 +304,11 @@ fn layouts_text(reports: &[LayoutReport]) -> String {
             let _ = writeln!(s, "  profiles: {c}");
         }
         for c in &rep.chain {
-            let _ = writeln!(s, "  chain: step {} ({}) {}: {}", c.step, c.label, c.field, c.detail);
+            let _ = writeln!(
+                s,
+                "  chain: step {} ({}) {}: {}",
+                c.step, c.label, c.field, c.detail
+            );
         }
         let mut layout_no = 0;
         let mut shown: Vec<(usize, Vec<super::LayoutRow>)> = Vec::new();
@@ -261,7 +322,13 @@ fn layouts_text(reports: &[LayoutReport]) -> String {
                 shown.push((layout_no, run.rows.clone()));
                 format!("  [layout {layout_no}]")
             };
-            let _ = writeln!(s, "  {:<14} {}{}", range_label(run.from, run.to), run_state(run), tag);
+            let _ = writeln!(
+                s,
+                "  {:<14} {}{}",
+                range_label(run.from, run.to),
+                run_state(run),
+                tag
+            );
         }
         for (n, rows) in &shown {
             let _ = writeln!(s, "  layout {n}:");
@@ -282,7 +349,11 @@ fn layouts_text(reports: &[LayoutReport]) -> String {
                     r.field,
                     r.enc.label(),
                     r.status.label(),
-                    if r.note.is_empty() { String::new() } else { format!("  ({})", r.note) }
+                    if r.note.is_empty() {
+                        String::new()
+                    } else {
+                        format!("  ({})", r.note)
+                    }
                 );
             }
             let refs: Vec<&super::LayoutRow> = rows.iter().collect();
@@ -294,11 +365,21 @@ fn layouts_text(reports: &[LayoutReport]) -> String {
 }
 
 fn layouts_tsv(reports: &[LayoutReport]) -> String {
-    let mut s = String::from("dir\tid\tname\tfrom\tto\thandled\tidx\tfield\tencoding\tstatus\tnote\n");
+    let mut s =
+        String::from("dir\tid\tname\tfrom\tto\thandled\tidx\tfield\tencoding\tstatus\tnote\n");
     for rep in reports {
         for run in &rep.runs {
             if run.rows.is_empty() {
-                let _ = writeln!(s, "{}\t{}\t{}\t{}\t{}\t{}\t-\t-\t-\tunknown\t", rep.dir.label(), rep.id, rep.name, run.from, run.to, run.handled);
+                let _ = writeln!(
+                    s,
+                    "{}\t{}\t{}\t{}\t{}\t{}\t-\t-\t-\tunknown\t",
+                    rep.dir.label(),
+                    rep.id,
+                    rep.name,
+                    run.from,
+                    run.to,
+                    run.handled
+                );
             }
             for r in &run.rows {
                 let _ = writeln!(
@@ -332,7 +413,11 @@ fn layouts_json(reports: &[LayoutReport]) -> String {
             json_str(rep.dir.label()),
             rep.id,
             json_str(&rep.name),
-            rep.changes.iter().map(|c| json_str(c)).collect::<Vec<_>>().join(", ")
+            rep.changes
+                .iter()
+                .map(|c| json_str(c))
+                .collect::<Vec<_>>()
+                .join(", ")
         );
         for (j, run) in rep.runs.iter().enumerate() {
             if j > 0 {
@@ -367,4 +452,3 @@ fn layouts_json(reports: &[LayoutReport]) -> String {
     s.push_str(if reports.is_empty() { "]\n" } else { "\n]\n" });
     s
 }
-

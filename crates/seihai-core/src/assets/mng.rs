@@ -117,7 +117,11 @@ impl MngAnimation {
 
 /// How long the client shows a frame of `time` `MHDR` ticks.
 pub fn frame_ms(time: i64, ticks_per_second: u32) -> u32 {
-    let tps = i64::from(if ticks_per_second == 0 { DEFAULT_TICKS } else { ticks_per_second });
+    let tps = i64::from(if ticks_per_second == 0 {
+        DEFAULT_TICKS
+    } else {
+        ticks_per_second
+    });
     let centis = time.saturating_mul(100) / tps;
     let ticks = (centis / 5).clamp(1, i64::from(u32::MAX / TICK_MS));
     ticks as u32 * TICK_MS
@@ -141,7 +145,11 @@ fn transparent_index(trns: &[u8]) -> i32 {
 }
 
 fn palette_of(plte: &[u8]) -> Vec<[u8; 3]> {
-    plte.chunks_exact(3).map(|c| [c[0], c[1], c[2]]).collect()
+    plte.as_chunks::<3>()
+        .0
+        .iter()
+        .map(|c| [c[0], c[1], c[2]])
+        .collect()
 }
 
 /// Decode a palette PNG stream into its indices: the stream is decoded with
@@ -156,7 +164,7 @@ fn decode_indices(ihdr_and_idat: &[u8], w: u32, h: u32) -> io::Result<Vec<u8>> {
     if (pw, ph) != (w, h) {
         return Err(bad("MNG frame size"));
     }
-    Ok(rgba.chunks_exact(4).map(|p| p[0]).collect())
+    Ok(rgba.as_chunks::<4>().0.iter().map(|p| p[0]).collect())
 }
 
 /// Decode an MNG into its frames the way the Graal client does (see the
@@ -180,6 +188,7 @@ fn decode_indices(ihdr_and_idat: &[u8], w: u32, h: u32) -> io::Result<Vec<u8>> {
 /// lasting delay before each frame) this gives each frame the delay of the
 /// `FRAM` before it, and the last frame 1 tick more (the lead time).
 pub fn read_mng(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<MngAnimation> {
+    type PendingFrame = (Vec<u8>, Option<Vec<[u8; 3]>>, Option<i32>);
     if !is_mng(data) {
         return Err(bad("not an MNG"));
     }
@@ -191,15 +200,21 @@ pub fn read_mng(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<MngAnim
     let mut global_palette: Option<Vec<[u8; 3]>> = None;
     let mut global_transparent = -1i32;
     // The frame being read: its `IHDR` and `IDAT` chunks as they came.
-    let mut open: Option<(Vec<u8>, Option<Vec<[u8; 3]>>, Option<i32>)> = None;
+    let mut open: Option<PendingFrame> = None;
     let mut pos = 8;
     while pos + 8 <= data.len() {
         let len = u32::from_be_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
         let tag = data[pos + 4..pos + 8].to_ascii_uppercase();
-        let Some(chunk) = data.get(pos + 8..pos + 8 + len) else { break };
+        let Some(chunk) = data.get(pos + 8..pos + 8 + len) else {
+            break;
+        };
         let raw = &data[pos..(pos + 12 + len).min(data.len())];
         pos += 12 + len;
-        let be = |at: usize| chunk.get(at..at + 4).map(|b| u32::from_be_bytes(b.try_into().unwrap()));
+        let be = |at: usize| {
+            chunk
+                .get(at..at + 4)
+                .map(|b| u32::from_be_bytes(b.try_into().unwrap()))
+        };
         match &tag[..] {
             b"MHDR" => {
                 width = be(0).unwrap_or(0);
@@ -222,7 +237,11 @@ pub fn read_mng(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<MngAnim
                 }
                 // After the mode byte, a name ended by 0; then four change
                 // flags and the delay. With no 0 the client reads from 2.
-                let at = chunk.iter().skip(1).position(|&b| b == 0).map_or(2, |i| i + 2);
+                let at = chunk
+                    .iter()
+                    .skip(1)
+                    .position(|&b| b == 0)
+                    .map_or(2, |i| i + 2);
                 if len >= at + 8 && chunk[at] > 0 {
                     cur = i64::from(be(at + 4).unwrap_or(0) as i32);
                     if chunk[at] == 2 {
@@ -233,7 +252,9 @@ pub fn read_mng(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<MngAnim
             b"TERM" => {}
             b"IHDR" => {
                 if chunk.len() < 13 || chunk[9] != 3 || !matches!(chunk[8], 4 | 8) {
-                    return Err(bad("MNG loading failed: a frame that is not a 4 or 8 bit palette image"));
+                    return Err(bad(
+                        "MNG loading failed: a frame that is not a 4 or 8 bit palette image",
+                    ));
                 }
                 if !per_layer {
                     acc += cur;
@@ -276,7 +297,14 @@ pub fn read_mng(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<MngAnim
                     if steps.len() >= MAX_FRAMES {
                         break;
                     }
-                    steps.push(Step { w, h, indices, palette, transparent, time: 0 });
+                    steps.push(Step {
+                        w,
+                        h,
+                        indices,
+                        palette,
+                        transparent,
+                        time: 0,
+                    });
                 }
             }
             b"MEND" => {
@@ -307,7 +335,11 @@ pub fn read_mng(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<MngAnim
             let row = &s.indices[y * s.w as usize..][..s.w.min(width) as usize];
             canvas[y * width as usize..][..row.len()].copy_from_slice(row);
         }
-        let mut palette = s.palette.clone().or_else(|| global_palette.clone()).unwrap_or_default();
+        let mut palette = s
+            .palette
+            .clone()
+            .or_else(|| global_palette.clone())
+            .unwrap_or_default();
         palette.resize(256, [0, 0, 0]);
         for &(i, rgb) in recolor {
             if let Some(p) = palette.get_mut(i) {
@@ -317,12 +349,28 @@ pub fn read_mng(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<MngAnim
         let clear = s.transparent.unwrap_or(global_transparent);
         let rgba = canvas
             .iter()
-            .flat_map(|&i| if i32::from(i) == clear { [0, 0, 0, 0] } else { let [r, g, b] = palette[usize::from(i)]; [r, g, b, 255] })
+            .flat_map(|&i| {
+                if i32::from(i) == clear {
+                    [0, 0, 0, 0]
+                } else {
+                    let [r, g, b] = palette[usize::from(i)];
+                    [r, g, b, 255]
+                }
+            })
             .collect();
-        frames.push(MngFrame { rgba, delay_ms: frame_ms(s.time, tps) });
+        frames.push(MngFrame {
+            rgba,
+            delay_ms: frame_ms(s.time, tps),
+        });
     }
     let rest_frame = frames.len() - 1;
-    Ok(MngAnimation { width, height, frames, repeat, rest_frame })
+    Ok(MngAnimation {
+        width,
+        height,
+        frames,
+        repeat,
+        rest_frame,
+    })
 }
 
 /// The loop count of the file's (last) `TERM`, as the client takes it.
@@ -335,9 +383,16 @@ fn term_repeat(data: &[u8]) -> MngRepeat {
             // The client keeps `iteration_max - 1` as a signed count: below
             // 0 loops for ever, else counts down once per pass. A TERM too
             // short for the field leaves 0 there, so -1.
-            let n = data.get(pos + 14..pos + 18).filter(|_| len >= 10).map_or(0, |b| u32::from_be_bytes(b.try_into().unwrap()));
+            let n = data
+                .get(pos + 14..pos + 18)
+                .filter(|_| len >= 10)
+                .map_or(0, |b| u32::from_be_bytes(b.try_into().unwrap()));
             let left = (n as i32).wrapping_sub(1);
-            repeat = if left < 0 { MngRepeat::Forever } else { MngRepeat::Times(left as u32 + 1) };
+            repeat = if left < 0 {
+                MngRepeat::Forever
+            } else {
+                MngRepeat::Times(left as u32 + 1)
+            };
         }
         if data[pos + 4..pos + 8].eq_ignore_ascii_case(b"MEND") {
             break;
@@ -351,7 +406,11 @@ fn term_repeat(data: &[u8]) -> MngRepeat {
 /// image path reads a picture.
 pub fn read_mng_rgba(data: &[u8], recolor: &[(usize, [u8; 3])]) -> io::Result<(u32, u32, Vec<u8>)> {
     let a = read_mng(data, recolor)?;
-    let first = a.frames.into_iter().next().ok_or_else(|| bad("MNG has no frame"))?;
+    let first = a
+        .frames
+        .into_iter()
+        .next()
+        .ok_or_else(|| bad("MNG has no frame"))?;
     Ok((a.width, a.height, first.rgba))
 }
 
@@ -407,15 +466,29 @@ impl ImageAnimations {
     /// come from `read`), drop the ones no longer in the map, and put each
     /// animation's frame due at `now_ms` into its entry. True when a
     /// picture changed (the frame needs drawing again).
-    pub fn update(&mut self, images: &mut HashMap<String, (u32, Vec<u8>)>, now_ms: u64, mut read: impl FnMut(&str) -> Option<Vec<u8>>) -> bool {
+    pub fn update(
+        &mut self,
+        images: &mut HashMap<String, (u32, Vec<u8>)>,
+        now_ms: u64,
+        mut read: impl FnMut(&str) -> Option<Vec<u8>>,
+    ) -> bool {
         for name in images.keys() {
             if !name.to_ascii_lowercase().ends_with(".mng") || self.checked.contains(name) {
                 continue;
             }
             self.checked.insert(name.clone());
-            let Some(anim) = read(name).and_then(|d| read_mng(&d, &[]).ok()) else { continue };
+            let Some(anim) = read(name).and_then(|d| read_mng(&d, &[]).ok()) else {
+                continue;
+            };
             if anim.frames.len() > 1 {
-                self.playing.insert(name.clone(), Playing { anim, start_ms: now_ms, shown: usize::MAX });
+                self.playing.insert(
+                    name.clone(),
+                    Playing {
+                        anim,
+                        start_ms: now_ms,
+                        shown: usize::MAX,
+                    },
+                );
             }
         }
         self.checked.retain(|n| images.contains_key(n));
@@ -426,7 +499,9 @@ impl ImageAnimations {
             if i == p.shown {
                 continue;
             }
-            let Some(entry) = images.get_mut(name) else { continue };
+            let Some(entry) = images.get_mut(name) else {
+                continue;
+            };
             // The entry is this file's picture only while it has the
             // animation's size (a recoloured body is kept under another key).
             if entry.0 != p.anim.width || entry.1.len() != p.anim.frames[i].rgba.len() {
@@ -457,7 +532,7 @@ mod tests {
         let mut rows = Vec::new();
         for _ in 0..h {
             rows.push(0u8);
-            rows.extend(std::iter::repeat(0u8).take(w as usize));
+            rows.extend(std::iter::repeat_n(0u8, w as usize));
         }
         let mut z = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
         std::io::Write::write_all(&mut z, &rows).unwrap();
@@ -493,7 +568,8 @@ mod tests {
     /// A gif2mng-shaped file: `MHDR`, `FRAM` mode 4, `TERM`, then a `FRAM`
     /// mode 2 with the delay before each frame, and a closing `FRAM`.
     fn gif2mng(w: u32, h: u32, term: Option<u32>, frames: &[(u32, Vec<u8>)]) -> Vec<u8> {
-        let mut body: Vec<(&[u8; 4], Vec<u8>)> = vec![(b"FRAM", vec![4, 0, 0, 0, 0, 0, 0, 0, 0, 0])];
+        let mut body: Vec<(&[u8; 4], Vec<u8>)> =
+            vec![(b"FRAM", vec![4, 0, 0, 0, 0, 0, 0, 0, 0, 0])];
         if let Some(n) = term {
             let mut t = vec![3, 0, 0, 0, 0, 0];
             t.extend_from_slice(&n.to_be_bytes());
@@ -512,15 +588,39 @@ mod tests {
         // As bluelampani.mng: 100, 0, 0 ms. The client shows 100, 50, 50:
         // a 0 delay is one 50 ms tick, and the last frame gets the 1-tick
         // lead time plus the closing FRAM's 0.
-        let data = gif2mng(2, 2, Some(0xFFFF_FFFF), &[(100, png_chunks(2, 2, [255, 0, 0])), (0, png_chunks(2, 2, [0, 255, 0])), (0, png_chunks(2, 2, [0, 0, 255]))]);
+        let data = gif2mng(
+            2,
+            2,
+            Some(0xFFFF_FFFF),
+            &[
+                (100, png_chunks(2, 2, [255, 0, 0])),
+                (0, png_chunks(2, 2, [0, 255, 0])),
+                (0, png_chunks(2, 2, [0, 0, 255])),
+            ],
+        );
         let a = read_mng(&data, &[]).unwrap();
         assert_eq!((a.width, a.height, a.frames.len()), (2, 2, 3));
-        assert_eq!(a.frames.iter().map(|f| f.delay_ms).collect::<Vec<_>>(), vec![100, 50, 50]);
+        assert_eq!(
+            a.frames.iter().map(|f| f.delay_ms).collect::<Vec<_>>(),
+            vec![100, 50, 50]
+        );
         assert_eq!(&a.frames[0].rgba[..4], &[255, 0, 0, 255]);
         assert_eq!(&a.frames[2].rgba[..4], &[0, 0, 255, 255]);
         assert_eq!(a.repeat, MngRepeat::Forever);
-        assert_eq!((a.frame_at(99), a.frame_at(100), a.frame_at(150), a.frame_at(199), a.frame_at(200)), (0, 1, 2, 2, 0));
-        assert_eq!(read_mng_rgba(&data, &[]).unwrap(), (2, 2, a.frames[0].rgba.clone()));
+        assert_eq!(
+            (
+                a.frame_at(99),
+                a.frame_at(100),
+                a.frame_at(150),
+                a.frame_at(199),
+                a.frame_at(200)
+            ),
+            (0, 1, 2, 2, 0)
+        );
+        assert_eq!(
+            read_mng_rgba(&data, &[]).unwrap(),
+            (2, 2, a.frames[0].rgba.clone())
+        );
     }
 
     #[test]
@@ -537,15 +637,33 @@ mod tests {
 
     #[test]
     fn term_count_and_action() {
-        let f = || vec![(100, png_chunks(1, 1, [1, 1, 1])), (100, png_chunks(1, 1, [2, 2, 2]))];
+        let f = || {
+            vec![
+                (100, png_chunks(1, 1, [1, 1, 1])),
+                (100, png_chunks(1, 1, [2, 2, 2])),
+            ]
+        };
         let a = read_mng(&gif2mng(1, 1, Some(2), &f()), &[]).unwrap();
         assert_eq!(a.repeat, MngRepeat::Times(2));
         assert_eq!(a.frame_at(150), 1);
         assert_eq!(a.frame_at(250), 0);
         assert_eq!(a.frame_at(100_000), 1);
-        assert_eq!(read_mng(&gif2mng(1, 1, Some(0), &f()), &[]).unwrap().repeat, MngRepeat::Forever, "0 loops for ever");
-        assert_eq!(read_mng(&gif2mng(1, 1, Some(0x8000_0001), &f()), &[]).unwrap().repeat, MngRepeat::Forever);
-        assert_eq!(read_mng(&gif2mng(1, 1, None, &f()), &[]).unwrap().repeat, MngRepeat::Times(1), "no TERM: once");
+        assert_eq!(
+            read_mng(&gif2mng(1, 1, Some(0), &f()), &[]).unwrap().repeat,
+            MngRepeat::Forever,
+            "0 loops for ever"
+        );
+        assert_eq!(
+            read_mng(&gif2mng(1, 1, Some(0x8000_0001), &f()), &[])
+                .unwrap()
+                .repeat,
+            MngRepeat::Forever
+        );
+        assert_eq!(
+            read_mng(&gif2mng(1, 1, None, &f()), &[]).unwrap().repeat,
+            MngRepeat::Times(1),
+            "no TERM: once"
+        );
         // The action byte is not read: action 0 with a count of 3 still loops.
         let mut data = gif2mng(1, 1, Some(3), &f());
         let at = data.windows(4).position(|w| w == b"TERM").unwrap() + 4;
@@ -609,9 +727,20 @@ mod tests {
 
     #[test]
     fn image_animations_swap_the_frame_in_the_map() {
-        let data = gif2mng(1, 1, Some(0xFFFF_FFFF), &[(100, png_chunks(1, 1, [10, 0, 0])), (100, png_chunks(1, 1, [20, 0, 0]))]);
+        let data = gif2mng(
+            1,
+            1,
+            Some(0xFFFF_FFFF),
+            &[
+                (100, png_chunks(1, 1, [10, 0, 0])),
+                (100, png_chunks(1, 1, [20, 0, 0])),
+            ],
+        );
         let mut images = HashMap::new();
-        images.insert("Lamp.mng".to_string(), read_mng_rgba(&data, &[]).map(|(w, _, px)| (w, px)).unwrap());
+        images.insert(
+            "Lamp.mng".to_string(),
+            read_mng_rgba(&data, &[]).map(|(w, _, px)| (w, px)).unwrap(),
+        );
         images.insert("still.png".to_string(), (1, vec![1, 2, 3, 255]));
         let mut anims = ImageAnimations::new();
         let reads = std::cell::Cell::new(0);
@@ -641,13 +770,27 @@ mod tests {
     #[test]
     #[ignore]
     fn real_bluelampani() {
-        let Ok(root) = std::env::var("SEIHAI_DATA_222") else { return };
-        let data = std::fs::read(std::path::Path::new(&root).join("levels/images/bluelampani.mng")).unwrap();
+        let Ok(root) = std::env::var("SEIHAI_DATA_222") else {
+            return;
+        };
+        let data = std::fs::read(std::path::Path::new(&root).join("levels/images/bluelampani.mng"))
+            .unwrap();
         let a = read_mng(&data, &[]).unwrap();
         assert_eq!((a.width, a.height, a.frames.len()), (32, 64, 3));
         assert_eq!(a.repeat, MngRepeat::Forever);
-        assert_eq!(a.frames.iter().map(|f| f.delay_ms).collect::<Vec<_>>(), vec![100, 50, 50]);
-        let yellow = |f: &MngFrame| f.rgba.chunks(4).filter(|p| p[0] > 200 && p[1] > 200 && p[2] < 80).count();
-        assert!(yellow(&a.frames[0]) < yellow(&a.frames[1]) && yellow(&a.frames[1]) < yellow(&a.frames[2]));
+        assert_eq!(
+            a.frames.iter().map(|f| f.delay_ms).collect::<Vec<_>>(),
+            vec![100, 50, 50]
+        );
+        let yellow = |f: &MngFrame| {
+            f.rgba
+                .chunks(4)
+                .filter(|p| p[0] > 200 && p[1] > 200 && p[2] < 80)
+                .count()
+        };
+        assert!(
+            yellow(&a.frames[0]) < yellow(&a.frames[1])
+                && yellow(&a.frames[1]) < yellow(&a.frames[2])
+        );
     }
 }

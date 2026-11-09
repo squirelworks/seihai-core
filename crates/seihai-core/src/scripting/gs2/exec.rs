@@ -226,7 +226,11 @@ impl Machine {
                 Val::Str(s) => Slot::Str(s.clone()),
             });
         }
-        self.frames.push(Frame { ret: None, base: 0, locals: HashMap::new() });
+        self.frames.push(Frame {
+            ret: None,
+            base: 0,
+            locals: HashMap::new(),
+        });
         self.pc = start;
         self.running = true;
         self.exec(host)
@@ -274,7 +278,10 @@ impl Machine {
     /// The timer commands. `None` if `name` is not one of them.
     fn timer_command(&mut self, name: &str, args: &[Val]) -> Option<Val> {
         let lower = name.to_ascii_lowercase();
-        let cmd = lower.strip_prefix("this.").or_else(|| lower.strip_prefix("thiso.")).unwrap_or(&lower);
+        let cmd = lower
+            .strip_prefix("this.")
+            .or_else(|| lower.strip_prefix("thiso."))
+            .unwrap_or(&lower);
         match cmd {
             "settimer" => self.timeout = frames(args.first().map_or(0.0, Val::num)),
             "scheduleevent" => {
@@ -282,12 +289,17 @@ impl Machine {
                 // GServer-v2 never fires a 0-frame event (it counts down
                 // past 0); Seihai runs it on the next frame.
                 let left = frames(args.first().map_or(0.0, Val::num)).max(1);
-                self.scheduled.push(Scheduled { left, event, args: args.get(2..).unwrap_or_default().to_vec() });
+                self.scheduled.push(Scheduled {
+                    left,
+                    event,
+                    args: args.get(2..).unwrap_or_default().to_vec(),
+                });
             }
             "cancelevents" => {
                 let event = args.first().map(Val::text).unwrap_or_default();
                 let event = event_name(&event);
-                self.scheduled.retain(|e| !e.event.eq_ignore_ascii_case(event));
+                self.scheduled
+                    .retain(|e| !e.event.eq_ignore_ascii_case(event));
                 self.due.retain(|e| !e.0.eq_ignore_ascii_case(event));
             }
             _ => return None,
@@ -305,7 +317,11 @@ impl Machine {
 
     fn find_function(&self, name: &str) -> Option<usize> {
         let public = format!("public.{name}");
-        self.script.functions.iter().find(|f| f.name == name || f.name == public).map(|f| f.start)
+        self.script
+            .functions
+            .iter()
+            .find(|f| f.name == name || f.name == public)
+            .map(|f| f.start)
     }
 
     /// What `this` is: the innermost `with` object, else the script's own.
@@ -340,14 +356,23 @@ impl Machine {
         match root {
             Some(Root::Temp) => match self.frames.last() {
                 Some(f) => f.locals.get(name).cloned().unwrap_or_default(),
-                None => self.vars.get(&(Root::Global, name.to_string())).cloned().unwrap_or_default(),
+                None => self
+                    .vars
+                    .get(&(Root::Global, name.to_string()))
+                    .cloned()
+                    .unwrap_or_default(),
             },
-            Some(Root::This | Root::ThisO) if name.eq_ignore_ascii_case("timeout") => Val::Num(self.timeout()).into(),
+            Some(Root::This | Root::ThisO) if name.eq_ignore_ascii_case("timeout") => {
+                Val::Num(self.timeout()).into()
+            }
             Some(r) => {
                 if let Some(v) = host.get_prop(r, name) {
                     return v.into();
                 }
-                self.vars.get(&(Self::store(r), name.to_string())).cloned().unwrap_or_default()
+                self.vars
+                    .get(&(Self::store(r), name.to_string()))
+                    .cloned()
+                    .unwrap_or_default()
             }
             // Unqualified: the function's locals, then the object, then the
             // level, then the global object (the 3.153 resolver's order).
@@ -396,7 +421,11 @@ impl Machine {
                 Self::store(r)
             }
             None => {
-                if let Some(f) = self.frames.last_mut().filter(|f| f.locals.contains_key(name)) {
+                if let Some(f) = self
+                    .frames
+                    .last_mut()
+                    .filter(|f| f.locals.contains_key(name))
+                {
                     f.locals.insert(name.to_string(), value);
                     return;
                 }
@@ -410,8 +439,15 @@ impl Machine {
                 }
                 // A new name goes to the global object, or inside `with`
                 // to the `with` object.
-                let new = if self.with.is_empty() { Root::Global } else { Self::store(this) };
-                [Self::store(this), Root::Level].into_iter().find(|r| self.vars.contains_key(&(*r, name.to_string()))).unwrap_or(new)
+                let new = if self.with.is_empty() {
+                    Root::Global
+                } else {
+                    Self::store(this)
+                };
+                [Self::store(this), Root::Level]
+                    .into_iter()
+                    .find(|r| self.vars.contains_key(&(*r, name.to_string())))
+                    .unwrap_or(new)
             }
         };
         self.vars.insert((target, name.to_string()), value);
@@ -422,7 +458,9 @@ impl Machine {
         match slot {
             Slot::Var(root, name) => self.read_value(root, &name, host),
             // A variable the compiler converted to an object.
-            Slot::Obj(Some((root, path))) if !path.is_empty() => self.read_value(Some(root), &path, host),
+            Slot::Obj(Some((root, path))) if !path.is_empty() => {
+                self.read_value(Some(root), &path, host)
+            }
             Slot::List(l) => Value::List(l),
             s => self.value(s, host).into(),
         }
@@ -448,7 +486,9 @@ impl Machine {
 
     /// Changes the list in the variable a slot names, if it names one.
     fn edit_list(&mut self, slot: &Slot, host: &mut dyn Host, f: impl FnOnce(&mut Vec<Value>)) {
-        let Some((root, name)) = Self::list_target(slot) else { return };
+        let Some((root, name)) = Self::list_target(slot) else {
+            return;
+        };
         let mut l = match self.read_value(root, &name, host) {
             Value::List(l) => l,
             Value::Val(_) => Vec::new(),
@@ -502,7 +542,10 @@ impl Machine {
         loop {
             steps += 1;
             if steps > STEP_LIMIT {
-                return self.stop(format!("more than {STEP_LIMIT} steps without a sleep"), host);
+                return self.stop(
+                    format!("more than {STEP_LIMIT} steps without a sleep"),
+                    host,
+                );
             }
             let Some(ins) = self.script.code.get(self.pc).cloned() else {
                 self.running = false;
@@ -514,13 +557,17 @@ impl Machine {
                 Operand::Int(v) => Some(v),
                 _ => None,
             };
-            let fault = |m: &mut Machine, host: &mut dyn Host| m.stop(format!("stack fault at {} (op {at})", ins.op), host);
+            let fault = |m: &mut Machine, host: &mut dyn Host| {
+                m.stop(format!("stack fault at {} (op {at})", ins.op), host)
+            };
             match ins.op {
                 Op::NoOp => {}
                 // Jumps. Targets are op indices.
                 Op::SetIndex => self.pc = int.unwrap_or(0).max(0) as usize,
                 Op::If | Op::SetIndexTrue => {
-                    let Some(v) = self.pop_num(host) else { return fault(self, host) };
+                    let Some(v) = self.pop_num(host) else {
+                        return fault(self, host);
+                    };
                     if (v != 0.0) == (ins.op == Op::SetIndexTrue) {
                         self.pc = int.unwrap_or(0).max(0) as usize;
                     }
@@ -528,7 +575,9 @@ impl Machine {
                 // `&&` / `||` in a value: jump keeping the deciding value,
                 // or drop it and go on to the right side.
                 Op::And | Op::Or => {
-                    let Some(top) = self.stack.last().cloned() else { return fault(self, host) };
+                    let Some(top) = self.stack.last().cloned() else {
+                        return fault(self, host);
+                    };
                     let v = self.value(top, host).num();
                     if (v != 0.0) == (ins.op == Op::Or) {
                         self.pc = int.unwrap_or(0).max(0) as usize;
@@ -537,7 +586,9 @@ impl Machine {
                     }
                 }
                 Op::InlineConditional => {
-                    let Some(top) = self.pop_val(host) else { return fault(self, host) };
+                    let Some(top) = self.pop_val(host) else {
+                        return fault(self, host);
+                    };
                     let n = top.num();
                     self.push(Slot::Num(if n != 0.0 { 1.0 } else { 0.0 }));
                 }
@@ -584,15 +635,29 @@ impl Machine {
                     }
                 }
                 Op::Sleep => {
-                    let Some(t) = self.pop_num(host) else { return fault(self, host) };
+                    let Some(t) = self.pop_num(host) else {
+                        return fault(self, host);
+                    };
                     if t > 0.0 {
                         return Outcome::Sleep(t);
                     }
                 }
 
                 // Pushes.
-                Op::TypeNumber | Op::TypeString | Op::TypeVar | Op::TypeArray | Op::TypeTrue | Op::TypeFalse | Op::TypeNull | Op::Pi
-                | Op::This | Op::ThisO | Op::Player | Op::PlayerO | Op::Level | Op::Temp => {
+                Op::TypeNumber
+                | Op::TypeString
+                | Op::TypeVar
+                | Op::TypeArray
+                | Op::TypeTrue
+                | Op::TypeFalse
+                | Op::TypeNull
+                | Op::Pi
+                | Op::This
+                | Op::ThisO
+                | Op::Player
+                | Op::PlayerO
+                | Op::Level
+                | Op::Temp => {
                     let text = self.script.string(&ins).unwrap_or("").to_string();
                     let slot = match ins.op {
                         Op::TypeNumber => Slot::Num(ins.number().unwrap_or(0.0)),
@@ -615,7 +680,9 @@ impl Machine {
                     }
                 }
                 Op::CopyLastOp => {
-                    let Some(top) = self.stack.last().cloned() else { return fault(self, host) };
+                    let Some(top) = self.stack.last().cloned() else {
+                        return fault(self, host);
+                    };
                     if !self.push(top) {
                         return fault(self, host);
                     }
@@ -633,13 +700,23 @@ impl Machine {
                     }
                 }
                 Op::ConvToFloat | Op::ConvToString => {
-                    let Some(v) = self.pop_val(host) else { return fault(self, host) };
-                    self.push(if ins.op == Op::ConvToFloat { Slot::Num(v.num()) } else { Slot::Str(v.text()) });
+                    let Some(v) = self.pop_val(host) else {
+                        return fault(self, host);
+                    };
+                    self.push(if ins.op == Op::ConvToFloat {
+                        Slot::Num(v.num())
+                    } else {
+                        Slot::Str(v.text())
+                    });
                 }
                 Op::ConvToObject => {
-                    let Some(top) = self.pop() else { return fault(self, host) };
+                    let Some(top) = self.pop() else {
+                        return fault(self, host);
+                    };
                     self.push(match top {
-                        Slot::Var(root, name) => Slot::Obj(Some((root.unwrap_or(Root::Global), name))),
+                        Slot::Var(root, name) => {
+                            Slot::Obj(Some((root.unwrap_or(Root::Global), name)))
+                        }
                         Slot::Obj(o) => Slot::Obj(o),
                         _ => Slot::Obj(None),
                     });
@@ -647,19 +724,27 @@ impl Machine {
                 // `obj.name`: a variable under the object. A null object
                 // gives a variable with no name, which reads as 0.
                 Op::MemberAccess => {
-                    let (Some(name), Some(obj)) = (self.pop(), self.pop()) else { return fault(self, host) };
+                    let (Some(name), Some(obj)) = (self.pop(), self.pop()) else {
+                        return fault(self, host);
+                    };
                     let name = match name {
                         Slot::Var(_, n) | Slot::Str(n) => n,
                         _ => String::new(),
                     };
                     self.push(match obj {
-                        Slot::Obj(Some((root, path))) if path.is_empty() => Slot::Var(Some(root), name),
-                        Slot::Obj(Some((root, path))) => Slot::Var(Some(root), format!("{path}.{name}")),
+                        Slot::Obj(Some((root, path))) if path.is_empty() => {
+                            Slot::Var(Some(root), name)
+                        }
+                        Slot::Obj(Some((root, path))) => {
+                            Slot::Var(Some(root), format!("{path}.{name}"))
+                        }
                         _ => Slot::Var(Some(Root::Global), String::new()),
                     });
                 }
                 Op::Assign => {
-                    let (Some(value), Some(target)) = (self.pop(), self.pop()) else { return fault(self, host) };
+                    let (Some(value), Some(target)) = (self.pop(), self.pop()) else {
+                        return fault(self, host);
+                    };
                     let value = self.value_full(value, host);
                     if let Slot::Var(root, name) = target {
                         if !name.is_empty() {
@@ -668,7 +753,9 @@ impl Machine {
                     }
                 }
                 Op::Inc | Op::Dec => {
-                    let Some(top) = self.stack.last().cloned() else { return fault(self, host) };
+                    let Some(top) = self.stack.last().cloned() else {
+                        return fault(self, host);
+                    };
                     let d = if ins.op == Op::Inc { 1.0 } else { -1.0 };
                     if let Slot::Var(root, name) = &top {
                         let n = self.read_var(*root, name, host).num() + d;
@@ -679,8 +766,20 @@ impl Machine {
                 }
 
                 // Arithmetic on numbers; the compiler converts the operands.
-                Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Mod | Op::Pow | Op::BitOr | Op::BitAnd | Op::BitXor | Op::Min | Op::Max => {
-                    let (Some(b), Some(a)) = (self.pop_num(host), self.pop_num(host)) else { return fault(self, host) };
+                Op::Add
+                | Op::Sub
+                | Op::Mul
+                | Op::Div
+                | Op::Mod
+                | Op::Pow
+                | Op::BitOr
+                | Op::BitAnd
+                | Op::BitXor
+                | Op::Min
+                | Op::Max => {
+                    let (Some(b), Some(a)) = (self.pop_num(host), self.pop_num(host)) else {
+                        return fault(self, host);
+                    };
                     let (ia, ib) = (client_int(a), client_int(b));
                     self.push(Slot::Num(match ins.op {
                         Op::Add => a + b,
@@ -700,12 +799,23 @@ impl Machine {
                     }));
                 }
                 Op::Random => {
-                    let (Some(b), Some(a)) = (self.pop_num(host), self.pop_num(host)) else { return fault(self, host) };
+                    let (Some(b), Some(a)) = (self.pop_num(host), self.pop_num(host)) else {
+                        return fault(self, host);
+                    };
                     let r = rand_unit();
                     self.push(Slot::Num(a + r * (b - a)));
                 }
-                Op::Not | Op::UnarySub | Op::BitInvert | Op::Int | Op::Abs | Op::Sin | Op::Cos | Op::ArcTan => {
-                    let Some(a) = self.pop_num(host) else { return fault(self, host) };
+                Op::Not
+                | Op::UnarySub
+                | Op::BitInvert
+                | Op::Int
+                | Op::Abs
+                | Op::Sin
+                | Op::Cos
+                | Op::ArcTan => {
+                    let Some(a) = self.pop_num(host) else {
+                        return fault(self, host);
+                    };
                     self.push(Slot::Num(match ins.op {
                         Op::Not => (a == 0.0) as i32 as f64,
                         Op::UnarySub => -a,
@@ -718,7 +828,9 @@ impl Machine {
                     }));
                 }
                 Op::Eq | Op::Neq | Op::Lt | Op::Gt | Op::Lte | Op::Gte => {
-                    let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else { return fault(self, host) };
+                    let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else {
+                        return fault(self, host);
+                    };
                     let c = compare(&a, &b);
                     let t = match ins.op {
                         Op::Eq => c == 0,
@@ -731,15 +843,18 @@ impl Machine {
                     self.push(Slot::Num(t as i32 as f64));
                 }
                 Op::Join => {
-                    let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else { return fault(self, host) };
+                    let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else {
+                        return fault(self, host);
+                    };
                     self.push(Slot::Str(a.text() + &b.text()));
                 }
-
 
                 // Strings (Stage D). The compiler converts the object to a
                 // string first.
                 Op::Char | Op::ObjTrim | Op::ObjLength => {
-                    let Some(v) = self.pop_val(host) else { return fault(self, host) };
+                    let Some(v) = self.pop_val(host) else {
+                        return fault(self, host);
+                    };
                     self.push(match ins.op {
                         Op::Char => Slot::Str(strings::char_of(v.num())),
                         Op::ObjTrim => Slot::Str(strings::trim(&v.text())),
@@ -747,7 +862,9 @@ impl Machine {
                     });
                 }
                 Op::ObjPos | Op::ObjCharAt | Op::ObjStarts | Op::ObjEnds => {
-                    let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else { return fault(self, host) };
+                    let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else {
+                        return fault(self, host);
+                    };
                     let (s, t) = (a.text(), b.text());
                     self.push(match ins.op {
                         Op::ObjPos => Slot::Num(strings::pos(&s, &t) as f64),
@@ -758,7 +875,9 @@ impl Machine {
                 }
                 // Always the string, the start and the length.
                 Op::ObjSubstr => {
-                    let (Some(len), Some(start), Some(s)) = (self.pop_num(host), self.pop_num(host), self.pop_val(host)) else {
+                    let (Some(len), Some(start), Some(s)) =
+                        (self.pop_num(host), self.pop_num(host), self.pop_val(host))
+                    else {
                         return fault(self, host);
                     };
                     self.push(Slot::Str(strings::substring(&s.text(), start, len)));
@@ -772,7 +891,9 @@ impl Machine {
                 // The pattern is on top, its arguments below it back to the
                 // marker, the first nearest; all of it becomes the result.
                 Op::Format => {
-                    let Some(m) = self.last_marker() else { return fault(self, host) };
+                    let Some(m) = self.last_marker() else {
+                        return fault(self, host);
+                    };
                     let mut vals = Vec::new();
                     while self.stack.len() > m + 1 {
                         let s = self.pop().unwrap();
@@ -789,7 +910,9 @@ impl Machine {
                 // Lists (Stage D). A list operand is the variable the
                 // compiler converted to an object, or a list value.
                 Op::ArrayEnd => {
-                    let Some(m) = self.last_marker() else { return fault(self, host) };
+                    let Some(m) = self.last_marker() else {
+                        return fault(self, host);
+                    };
                     let mut l = Vec::new();
                     while self.stack.len() > m + 1 {
                         let s = self.pop().unwrap();
@@ -799,17 +922,23 @@ impl Machine {
                     self.push(Slot::List(l));
                 }
                 Op::ArrayNew => {
-                    let Some(n) = self.pop_num(host) else { return fault(self, host) };
+                    let Some(n) = self.pop_num(host) else {
+                        return fault(self, host);
+                    };
                     self.push(Slot::List(lists::zeros(client_int(n))));
                 }
                 Op::ArrayNewMultidim => {
-                    let Some(n) = self.pop_num(host) else { return fault(self, host) };
+                    let Some(n) = self.pop_num(host) else {
+                        return fault(self, host);
+                    };
                     if let Some(Slot::List(l)) = self.stack.last_mut() {
                         fill_leaves(l, client_int(n));
                     }
                 }
                 Op::ObjSize => {
-                    let Some(o) = self.pop() else { return fault(self, host) };
+                    let Some(o) = self.pop() else {
+                        return fault(self, host);
+                    };
                     let n = match self.value_full(o, host) {
                         Value::List(l) => l.len() as f64,
                         Value::Val(_) => 0.0,
@@ -817,13 +946,26 @@ impl Machine {
                     self.push(Slot::Num(n));
                 }
                 Op::Array | Op::ArrayMultidim => {
-                    let j = if ins.op == Op::ArrayMultidim { self.pop_num(host) } else { Some(0.0) };
-                    let (Some(j), Some(i), Some(o)) = (j, self.pop_num(host), self.pop()) else { return fault(self, host) };
+                    let j = if ins.op == Op::ArrayMultidim {
+                        self.pop_num(host)
+                    } else {
+                        Some(0.0)
+                    };
+                    let (Some(j), Some(i), Some(o)) = (j, self.pop_num(host), self.pop()) else {
+                        return fault(self, host);
+                    };
                     let mut v = self.value_full(o, host);
-                    let path = if ins.op == Op::ArrayMultidim { vec![i, j] } else { vec![i] };
+                    let path = if ins.op == Op::ArrayMultidim {
+                        vec![i, j]
+                    } else {
+                        vec![i]
+                    };
                     for k in path {
                         v = match v {
-                            Value::List(l) => usize::try_from(client_int(k)).ok().and_then(|k| l.into_iter().nth(k)).unwrap_or_default(),
+                            Value::List(l) => usize::try_from(client_int(k))
+                                .ok()
+                                .and_then(|k| l.into_iter().nth(k))
+                                .unwrap_or_default(),
                             // A string variable indexed gives the string.
                             other => other,
                         };
@@ -831,13 +973,23 @@ impl Machine {
                     self.push(v.into());
                 }
                 Op::ArrayAssign | Op::ArrayMultidimAssign => {
-                    let Some(v) = self.pop() else { return fault(self, host) };
+                    let Some(v) = self.pop() else {
+                        return fault(self, host);
+                    };
                     let v = self.value_full(v, host);
-                    let j = if ins.op == Op::ArrayMultidimAssign { self.pop_num(host) } else { Some(-1.0) };
-                    let (Some(j), Some(i), Some(o)) = (j, self.pop_num(host), self.pop()) else { return fault(self, host) };
+                    let j = if ins.op == Op::ArrayMultidimAssign {
+                        self.pop_num(host)
+                    } else {
+                        Some(-1.0)
+                    };
+                    let (Some(j), Some(i), Some(o)) = (j, self.pop_num(host), self.pop()) else {
+                        return fault(self, host);
+                    };
                     let (i, j) = (client_int(i), client_int(j));
                     self.edit_list(&o, host, |l| {
-                        let Some(e) = usize::try_from(i).ok().and_then(|i| l.get_mut(i)) else { return };
+                        let Some(e) = usize::try_from(i).ok().and_then(|i| l.get_mut(i)) else {
+                            return;
+                        };
                         if ins.op == Op::ArrayAssign {
                             *e = v;
                         } else if let (Value::List(inner), Ok(j)) = (e, usize::try_from(j)) {
@@ -848,7 +1000,9 @@ impl Machine {
                     });
                 }
                 Op::ObjAddString | Op::ObjRemoveString => {
-                    let (Some(v), Some(o)) = (self.pop(), self.pop()) else { return fault(self, host) };
+                    let (Some(v), Some(o)) = (self.pop(), self.pop()) else {
+                        return fault(self, host);
+                    };
                     let v = self.value_full(v, host);
                     let add = ins.op == Op::ObjAddString;
                     self.edit_list(&o, host, |l| {
@@ -860,7 +1014,9 @@ impl Machine {
                     });
                 }
                 Op::ObjDeleteString => {
-                    let (Some(i), Some(o)) = (self.pop_num(host), self.pop()) else { return fault(self, host) };
+                    let (Some(i), Some(o)) = (self.pop_num(host), self.pop()) else {
+                        return fault(self, host);
+                    };
                     let i = client_int(i);
                     self.edit_list(&o, host, |l| {
                         if let Some(i) = usize::try_from(i).ok().filter(|&i| i < l.len()) {
@@ -870,7 +1026,10 @@ impl Machine {
                 }
                 // The index is on top, the value under it.
                 Op::ObjReplaceString | Op::ObjInsertString => {
-                    let (Some(i), Some(v), Some(o)) = (self.pop_num(host), self.pop(), self.pop()) else { return fault(self, host) };
+                    let (Some(i), Some(v), Some(o)) = (self.pop_num(host), self.pop(), self.pop())
+                    else {
+                        return fault(self, host);
+                    };
                     let v = self.value_full(v, host);
                     let i = client_int(i);
                     let replace = ins.op == Op::ObjReplaceString;
@@ -888,27 +1047,42 @@ impl Machine {
                     });
                 }
                 Op::ObjClear => {
-                    let Some(o) = self.pop() else { return fault(self, host) };
+                    let Some(o) = self.pop() else {
+                        return fault(self, host);
+                    };
                     self.edit_list(&o, host, |l| l.clear());
                 }
                 // The length on top, then the start, then the list.
                 Op::ObjSubarray => {
-                    let (Some(n), Some(start), Some(o)) = (self.pop_num(host), self.pop_num(host), self.pop()) else {
+                    let (Some(n), Some(start), Some(o)) =
+                        (self.pop_num(host), self.pop_num(host), self.pop())
+                    else {
                         return fault(self, host);
                     };
                     let l = self.list_of(&o, host);
-                    self.push(Slot::List(lists::subarray(&l, client_int(start), client_int(n))));
+                    self.push(Slot::List(lists::subarray(
+                        &l,
+                        client_int(start),
+                        client_int(n),
+                    )));
                 }
                 Op::ObjIndex => {
-                    let (Some(v), Some(o)) = (self.pop(), self.pop()) else { return fault(self, host) };
+                    let (Some(v), Some(o)) = (self.pop(), self.pop()) else {
+                        return fault(self, host);
+                    };
                     let v = self.value_full(v, host);
                     let l = self.list_of(&o, host);
-                    let k = l.iter().position(|e| e.same(&v, compare)).map_or(-1.0, |k| k as f64);
+                    let k = l
+                        .iter()
+                        .position(|e| e.same(&v, compare))
+                        .map_or(-1.0, |k| k as f64);
                     self.push(Slot::Num(k));
                 }
                 // `x in list`; a list `x` is in when each of its elements is.
                 Op::InObj => {
-                    let (Some(o), Some(v)) = (self.pop(), self.pop()) else { return fault(self, host) };
+                    let (Some(o), Some(v)) = (self.pop(), self.pop()) else {
+                        return fault(self, host);
+                    };
                     let v = self.value_full(v, host);
                     let l = self.list_of(&o, host);
                     let has = |x: &Value| l.iter().any(|e| e.same(x, compare));
@@ -919,7 +1093,9 @@ impl Machine {
                     self.push(Slot::Num(yes as i32 as f64));
                 }
                 Op::ObjTokenize | Op::ObjPositions => {
-                    let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else { return fault(self, host) };
+                    let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else {
+                        return fault(self, host);
+                    };
                     self.push(if ins.op == Op::ObjPositions {
                         Slot::List(lists::positions(&a.text(), &b.text()))
                     } else {
@@ -957,32 +1133,52 @@ impl Machine {
 
                 // Below the top is S1, the top S0; see `gs2-commands.md`.
                 Op::Exp => {
-                    let Some(a) = self.pop_num(host) else { return fault(self, host) };
+                    let Some(a) = self.pop_num(host) else {
+                        return fault(self, host);
+                    };
                     self.push(Slot::Num(a.exp()));
                 }
                 // log(S0) / log(S1): S1 is the base. A base of 0 or less gives 0.
                 Op::Log => {
-                    let (Some(x), Some(base)) = (self.pop_num(host), self.pop_num(host)) else { return fault(self, host) };
+                    let (Some(x), Some(base)) = (self.pop_num(host), self.pop_num(host)) else {
+                        return fault(self, host);
+                    };
                     self.push(Slot::Num(if base > 0.0 { x.ln() / base.ln() } else { 0.0 }));
                 }
                 Op::GetAngle | Op::GetDir => {
-                    let (Some(dy), Some(dx)) = (self.pop_num(host), self.pop_num(host)) else { return fault(self, host) };
-                    self.push(Slot::Num(if ins.op == Op::GetAngle { maths::angle(dx, dy) } else { maths::dir(dx, dy) }));
+                    let (Some(dy), Some(dx)) = (self.pop_num(host), self.pop_num(host)) else {
+                        return fault(self, host);
+                    };
+                    self.push(Slot::Num(if ins.op == Op::GetAngle {
+                        maths::angle(dx, dy)
+                    } else {
+                        maths::dir(dx, dy)
+                    }));
                 }
                 Op::VecX | Op::VecY => {
-                    let Some(d) = self.pop_num(host) else { return fault(self, host) };
+                    let Some(d) = self.pop_num(host) else {
+                        return fault(self, host);
+                    };
                     let (x, y) = maths::vec(d);
                     self.push(Slot::Num(if ins.op == Op::VecX { x } else { y }));
                 }
                 Op::ShiftLeft | Op::ShiftRight => {
-                    let (Some(b), Some(a)) = (self.pop_num(host), self.pop_num(host)) else { return fault(self, host) };
+                    let (Some(b), Some(a)) = (self.pop_num(host), self.pop_num(host)) else {
+                        return fault(self, host);
+                    };
                     let (a, b) = (client_int(a), client_int(b));
-                    let f = if ins.op == Op::ShiftLeft { maths::shl(a, b) } else { maths::shr(a, b) };
+                    let f = if ins.op == Op::ShiftLeft {
+                        maths::shl(a, b)
+                    } else {
+                        maths::shr(a, b)
+                    };
                     self.push(Slot::Num(f as f64));
                 }
                 // `x in |a, b|`; a list `x` is in when each element is.
                 Op::InRange => {
-                    let (Some(b), Some(a), Some(x)) = (self.pop_num(host), self.pop_num(host), self.pop()) else {
+                    let (Some(b), Some(a), Some(x)) =
+                        (self.pop_num(host), self.pop_num(host), self.pop())
+                    else {
                         return fault(self, host);
                     };
                     let inside = |v: f64| v >= a && v <= b;
@@ -995,7 +1191,9 @@ impl Machine {
                 // 0 number, 1 string, 2 object, 3 a list with elements, -1
                 // anything else (`0x53`).
                 Op::ObjType => {
-                    let Some(o) = self.pop() else { return fault(self, host) };
+                    let Some(o) = self.pop() else {
+                        return fault(self, host);
+                    };
                     let t = match o {
                         Slot::Obj(None) | Slot::Marker => -1.0,
                         Slot::Obj(Some((_, ref path))) if path.is_empty() => 2.0,
@@ -1011,21 +1209,32 @@ impl Machine {
                 // The list below, the value on top: the client's order, which
                 // is not the order gs2-parser pushes.
                 Op::ObjIndices => {
-                    let (Some(v), Some(o)) = (self.pop(), self.pop()) else { return fault(self, host) };
+                    let (Some(v), Some(o)) = (self.pop(), self.pop()) else {
+                        return fault(self, host);
+                    };
                     let v = self.value_full(v, host);
                     let l = self.list_of(&o, host);
-                    let found = l.iter().enumerate().filter(|(_, e)| e.same(&v, compare)).map(|(i, _)| Value::Val(Val::Num(i as f64))).collect();
+                    let found = l
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, e)| e.same(&v, compare))
+                        .map(|(i, _)| Value::Val(Val::Num(i as f64)))
+                        .collect();
                     self.push(Slot::List(found));
                 }
                 // `setarray(a, n)`: pads with 0 or cuts to `n` (0..=10 000).
                 Op::SetArray => {
-                    let (Some(n), Some(o)) = (self.pop_num(host), self.pop()) else { return fault(self, host) };
+                    let (Some(n), Some(o)) = (self.pop_num(host), self.pop()) else {
+                        return fault(self, host);
+                    };
                     let n = client_int(n).clamp(0, 10_000) as usize;
                     self.edit_list(&o, host, |l| l.resize(n, Value::Val(Val::Num(0.0))));
                 }
                 // A null object (or one Seihai cannot name) skips the block.
                 Op::With => {
-                    let Some(o) = self.pop() else { return fault(self, host) };
+                    let Some(o) = self.pop() else {
+                        return fault(self, host);
+                    };
                     match o {
                         Slot::Obj(Some((root, path))) if path.is_empty() => self.with.push(root),
                         other => {
@@ -1041,7 +1250,9 @@ impl Machine {
                 }
 
                 Op::Unknown(n) => host.log(format!("gs2: unknown opcode {n} at op {at}, skipped")),
-                other => host.log(format!("gs2: {other} at op {at} is not run yet (Stage D), skipped")),
+                other => host.log(format!(
+                    "gs2: {other} at op {at} is not run yet (Stage D), skipped"
+                )),
             }
         }
     }
@@ -1063,7 +1274,11 @@ impl Machine {
                 if self.frames.len() >= CALL_LIMIT {
                     return Some(self.stop("callstack overrun".into(), host));
                 }
-                self.frames.push(Frame { ret: Some(self.pc), base: m, locals: HashMap::new() });
+                self.frames.push(Frame {
+                    ret: Some(self.pc),
+                    base: m,
+                    locals: HashMap::new(),
+                });
                 self.pc = start;
                 return None;
             }
@@ -1079,7 +1294,10 @@ impl Machine {
             None => name.1.clone(),
             Some(r) => format!("{}.{}", root_name(r), name.1),
         };
-        let result = match self.timer_command(&full, &args).or_else(|| host.command(&full, &args)) {
+        let result = match self
+            .timer_command(&full, &args)
+            .or_else(|| host.command(&full, &args))
+        {
             Some(v) => v,
             None => {
                 host.log(format!("gs2: function {full} not found"));
@@ -1098,7 +1316,9 @@ impl Machine {
     /// marker and it (the first argument nearest). Missing arguments are 0.
     /// Everything back to and including the call's marker is dropped.
     fn bind_params(&mut self, host: &mut dyn Host) {
-        let Some(inner) = self.last_marker() else { return };
+        let Some(inner) = self.last_marker() else {
+            return;
+        };
         let Some(outer) = self.stack[..inner].iter().rposition(|s| *s == Slot::Marker) else {
             self.stack.truncate(inner);
             return;
@@ -1154,7 +1374,10 @@ fn root_name(r: Root) -> &'static str {
 fn compare(a: &Val, b: &Val) -> i32 {
     let ord = match (a, b) {
         (Val::Str(x), Val::Str(y)) => x.cmp(y),
-        _ => a.num().partial_cmp(&b.num()).unwrap_or(std::cmp::Ordering::Equal),
+        _ => a
+            .num()
+            .partial_cmp(&b.num())
+            .unwrap_or(std::cmp::Ordering::Equal),
     };
     ord as i32
 }
@@ -1167,7 +1390,11 @@ fn rand_unit() -> f64 {
     STATE.with(|s| {
         let mut x = s.get();
         if x == 0 {
-            x = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(1) | 1;
+            x = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(1)
+                | 1;
         }
         x ^= x << 13;
         x ^= x >> 7;
@@ -1191,7 +1418,15 @@ pub struct EffectHost {
 
 impl EffectHost {
     pub fn new(era: Era, obj: ObjId) -> EffectHost {
-        EffectHost { era, obj, x: 0.0, y: 0.0, flags: HashMap::new(), effects: Vec::new(), log: Vec::new() }
+        EffectHost {
+            era,
+            obj,
+            x: 0.0,
+            y: 0.0,
+            flags: HashMap::new(),
+            effects: Vec::new(),
+            log: Vec::new(),
+        }
     }
 }
 
@@ -1209,7 +1444,10 @@ impl Host for EffectHost {
         // Built-in names match in any case, and `this.showimg(…)` is the
         // script's own `showimg`, as for the timer commands.
         let lower = name.to_ascii_lowercase();
-        let name = lower.strip_prefix("this.").or_else(|| lower.strip_prefix("thiso.")).unwrap_or(&lower);
+        let name = lower
+            .strip_prefix("this.")
+            .or_else(|| lower.strip_prefix("thiso."))
+            .unwrap_or(&lower);
         match name {
             // `set "name"` or `set "name=value"`, as GS1 reads it.
             "set" => {
@@ -1219,7 +1457,10 @@ impl Host for EffectHost {
                 if !k.is_empty() && self.flags.get(&k).map(String::as_str) != Some(v.trim()) {
                     self.flags.insert(k.clone(), v.trim().to_string());
                     if !k.starts_with("local.") {
-                        self.effects.push(Effect::SetFlag { name: k, value: Some(v.trim().to_string()) });
+                        self.effects.push(Effect::SetFlag {
+                            name: k,
+                            value: Some(v.trim().to_string()),
+                        });
                     }
                 }
             }
@@ -1229,18 +1470,40 @@ impl Host for EffectHost {
                     self.effects.push(Effect::UnsetFlag { name: k });
                 }
             }
-            "message" => self.effects.push(Effect::Message { obj, text: text(args, 0) }),
-            "say" => self.effects.push(Effect::SaySign { index: num(args, 0) as i64 }),
-            "say2" => self.effects.push(Effect::Say2 { text: text(args, 0) }),
-            "setlevel" => self.effects.push(Effect::SetLevel { level: text(args, 0), x: None, y: None }),
-            "setlevel2" => self.effects.push(Effect::SetLevel { level: text(args, 0), x: Some(num(args, 1)), y: Some(num(args, 2)) }),
-            "setplayerprop" => self.effects.push(Effect::SetPlayerProp { code: text(args, 0), value: text(args, 1) }),
+            "message" => self.effects.push(Effect::Message {
+                obj,
+                text: text(args, 0),
+            }),
+            "say" => self.effects.push(Effect::SaySign {
+                index: num(args, 0) as i64,
+            }),
+            "say2" => self.effects.push(Effect::Say2 {
+                text: text(args, 0),
+            }),
+            "setlevel" => self.effects.push(Effect::SetLevel {
+                level: text(args, 0),
+                x: None,
+                y: None,
+            }),
+            "setlevel2" => self.effects.push(Effect::SetLevel {
+                level: text(args, 0),
+                x: Some(num(args, 1)),
+                y: Some(num(args, 2)),
+            }),
+            "setplayerprop" => self.effects.push(Effect::SetPlayerProp {
+                code: text(args, 0),
+                value: text(args, 1),
+            }),
             _ => {
                 let cmd = vocab::command_in(name, self.era)?;
                 match cmd.exec {
                     // The rest of the shared set goes out as GS1 does it
                     // (`showimg`, `hideimg`, `play`, …).
-                    Exec::Effect | Exec::Ext => self.effects.push(Effect::Command { obj, name: name.to_string(), args: args.to_vec() }),
+                    Exec::Effect | Exec::Ext => self.effects.push(Effect::Command {
+                        obj,
+                        name: name.to_string(),
+                        args: args.to_vec(),
+                    }),
                     Exec::NoExec => {}
                     // Flags, arrays and calls inside the GS1 engine; GS2 has
                     // its own forms of these (Stage D).
@@ -1267,7 +1530,11 @@ impl Host for EffectHost {
                 } else {
                     self.y = value.num();
                 }
-                self.effects.push(Effect::SetPos { obj: self.obj, x: self.x, y: self.y });
+                self.effects.push(Effect::SetPos {
+                    obj: self.obj,
+                    x: self.x,
+                    y: self.y,
+                });
                 true
             }
             _ => false,

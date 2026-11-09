@@ -6,8 +6,8 @@
 //! `gs2` reads and writes the bytecode of the GS2 compiler; `gs2::exec` runs
 //! the part that GS1 shares. `gs2::compile` is the temporary GS1 front end.
 
-pub mod engine;
 mod bytecode;
+pub mod engine;
 mod gs1;
 pub mod gs2;
 

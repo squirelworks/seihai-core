@@ -9,51 +9,69 @@ pub mod chain;
 mod compress;
 mod dispatch;
 pub mod extras;
+pub mod flagset;
 mod frame;
 mod gen3;
 mod gen5;
 pub mod layouts;
 pub mod levelcache;
+mod list;
 pub mod lobby;
+pub mod login;
 pub mod npcprops;
 pub mod offline_builds;
-mod list;
-pub mod flagset;
-pub mod login;
-pub mod seclogin;
 mod profile;
 mod props;
+pub mod seclogin;
 pub mod showimg;
 pub mod tampercheck;
-pub mod walkcadence;
 mod version;
+pub mod walkcadence;
 
 pub use board::BoardModify;
 pub use compress::{bz2_compress, bz2_decompress};
 pub use dispatch::{
-    latin1, read_gint3, read_gshort, script_text, split_messages, sword_power_from_wire, ChatKind, ChatLine, IncomingFile, LevelObject, Message, OtherLooks, OtherPlayer, ServerItem, SessionState, Splitter,
+    latin1, read_gint3, read_gshort, script_text, split_messages, sword_power_from_wire, ChatKind,
+    ChatLine, IncomingFile, LevelObject, Message, OtherLooks, OtherPlayer, ServerItem,
+    SessionState, Splitter,
 };
 pub use extras::MapSpec;
-pub use frame::{read_zlib_frame, write_zlib_frame, write_zlib_frame_best, zlib_compress, zlib_compress_best, zlib_decompress};
-pub use gen3::Gen3;
-pub use gen5::{choose_comp, read_frame, read_frame_len, read_frame_or_plain, write_frame, FrameLen, Gen5, Gen5Comp};
-pub use list::{parse_list_reply, parse_svrlist, ListReply, ServerEntry};
-pub use props::{
-    decode_pos_precise, encode_pos_classic, encode_pos_precise, parse_player_props, parse_player_props_in, parse_player_props_with, PlayerProp,
+pub use frame::{
+    read_zlib_frame, write_zlib_frame, write_zlib_frame_best, zlib_compress, zlib_compress_best,
+    zlib_decompress,
 };
+pub use gen3::Gen3;
+pub use gen5::{
+    choose_comp, read_frame, read_frame_len, read_frame_or_plain, write_frame, FrameLen, Gen5,
+    Gen5Comp,
+};
+pub use list::{parse_list_reply, parse_svrlist, ListReply, ServerEntry};
 pub use profile::{
-    by_label, profile, Basis, BuiltIn, ChatFace, ChatText, CombatRules, DeathRules, Files, Health, HudArt, IdSet, Levels, ListKind, Listserver, LoginShape, PortStatus, Props, Protocol, WindowPx,
-    ServerList, ShapeBasis, Ui, VersionProfile, BUILT_IN_14921, BUILT_IN_14922, COMBAT_139, COMBAT_200, COMBAT_201, COMBAT_205, PowerStore, MANNER_139, MANNER_141, MANNER_205, MANNER_222, Blink, HidePose, Mannerisms, ItemDrops, DROPS_133, DROPS_138, DROPS_142, PullRelease, SwimStill, DEATH_139, DEATH_205, DEATH_21, DEAD_LIST_PORT, LEGACY_LIST_PORT, LISTSERVER_HOST,
-    PROFILES, SILENT_LIST_WAIT, SUPPORTED_LIST_PORT,
+    by_label, profile, Basis, Blink, BuiltIn, ChatFace, ChatText, CombatRules, DeathRules, Files,
+    Health, HidePose, HudArt, IdSet, ItemDrops, Levels, ListKind, Listserver, LoginShape,
+    Mannerisms, PortStatus, PowerStore, Props, Protocol, PullRelease, ServerList, ShapeBasis,
+    SwimStill, Ui, VersionProfile, WindowPx, BUILT_IN_14921, BUILT_IN_14922, COMBAT_139,
+    COMBAT_200, COMBAT_201, COMBAT_205, DEAD_LIST_PORT, DEATH_139, DEATH_205, DEATH_21, DROPS_133,
+    DROPS_138, DROPS_142, LEGACY_LIST_PORT, LISTSERVER_HOST, MANNER_139, MANNER_141, MANNER_205,
+    MANNER_222, PROFILES, SILENT_LIST_WAIT, SUPPORTED_LIST_PORT,
+};
+pub use props::{
+    decode_pos_precise, encode_pos_classic, encode_pos_precise, parse_player_props,
+    parse_player_props_in, parse_player_props_with, PlayerProp,
 };
 pub use showimg::{
-    apply_showimg_update, describe_showimg_update, parse_showimg_update, showimg_message, ImgField, ImgPart, ImgRecord,
-    PlayerImage, PlayerImages, ShowImgInfo, ShowImgSender, ShowImgUpdate,
+    apply_showimg_update, describe_showimg_update, parse_showimg_update, showimg_message, ImgField,
+    ImgPart, ImgRecord, PlayerImage, PlayerImages, ShowImgInfo, ShowImgSender, ShowImgUpdate,
 };
 pub use tampercheck::{TamperImage, TamperSender, TamperWords};
 pub use version::{ClientVersion, EncryptionGen};
 
 use std::io::{self, Write};
+
+// Values retained only for the provisional compatibility writers below.
+const LEGACY_LOGIN_ID: u8 = 0x01;
+const LEGACY_LEVEL_REQUEST_ID: u8 = 0x10;
+const LEGACY_PLAYER_UPDATE_ID: u8 = 0x20;
 
 /// Retired provisional packet ids.
 ///
@@ -120,7 +138,7 @@ impl LoginRequest {
 
     /// Write the classic login line (no packet id, no framing).
     pub fn write_classic<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        let prefix = self.prefix.unwrap_or_else(|| {
+        let prefix = self.prefix.unwrap_or({
             // (rand & 0x7F) + 0x20 — printable ASCII.
             // Fixed seed-free: use a mid-range printable when not testing.
             0x41
@@ -147,7 +165,7 @@ impl LoginRequest {
         let pass = self.password.as_bytes();
         let ver = self.version.as_bytes();
 
-        w.write_all(&[PacketId::Login as u8])?;
+        w.write_all(&[LEGACY_LOGIN_ID])?;
         w.write_all(&(user.len() as u16).to_le_bytes())?;
         w.write_all(user)?;
         w.write_all(&(pass.len() as u16).to_le_bytes())?;
@@ -218,7 +236,7 @@ impl LevelRequest {
 
     pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
         let name = self.name.as_bytes();
-        w.write_all(&[PacketId::LevelRequest as u8])?;
+        w.write_all(&[LEGACY_LEVEL_REQUEST_ID])?;
         w.write_all(&(name.len() as u16).to_le_bytes())?;
         w.write_all(name)?;
         Ok(())
@@ -239,7 +257,7 @@ pub struct PlayerUpdate {
 impl PlayerUpdate {
     /// Provisional: raw f32 x/y + dir. Do not use against a real server.
     pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&[PacketId::PlayerUpdate as u8])?;
+        w.write_all(&[LEGACY_PLAYER_UPDATE_ID])?;
         w.write_all(&self.x.to_le_bytes())?;
         w.write_all(&self.y.to_le_bytes())?;
         w.write_all(&[self.dir])?;
@@ -248,7 +266,7 @@ impl PlayerUpdate {
 
     /// Classic encoding: PLPROP-style (pos * 2) as u8. Packet id still provisional.
     pub fn write_classic<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&[PacketId::PlayerUpdate as u8])?;
+        w.write_all(&[LEGACY_PLAYER_UPDATE_ID])?;
         w.write_all(&[encode_pos_classic(self.x)])?;
         w.write_all(&[encode_pos_classic(self.y)])?;
         w.write_all(&[self.dir])?;
@@ -257,7 +275,7 @@ impl PlayerUpdate {
 
     /// Precise encoding: PLPROP_X2/Y2 style u16. Packet id still provisional.
     pub fn write_precise<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&[PacketId::PlayerUpdate as u8])?;
+        w.write_all(&[LEGACY_PLAYER_UPDATE_ID])?;
         w.write_all(&encode_pos_precise(self.x).to_le_bytes())?;
         w.write_all(&encode_pos_precise(self.y).to_le_bytes())?;
         w.write_all(&[self.dir])?;
@@ -273,7 +291,7 @@ impl PlayerUpdate {
         w.write_all(&[encode_pos_classic(self.x).wrapping_add(0x20)])?;
         w.write_all(&[encode_pos_classic(self.y).wrapping_add(0x20)])?;
         w.write_all(&[self.dir.wrapping_add(0x20)])?;
-        w.write_all(&[b'\n'])?;
+        w.write_all(b"\n")?;
         Ok(())
     }
 }
@@ -374,7 +392,10 @@ mod tests {
         assert!(line(ClientVersion::V603R7, 0x79).starts_with(b"%\x99G3D0311C%guest(7Y3bdzjfwin,"));
         // The Linux 6.03r7: its own token, `linux` and four empty machine ids.
         let l = line(ClientVersion::V603R7Linux, 0x79);
-        assert!(l.starts_with(b"%\x99G3D0511C%guest(7Y3bdzjflinux,"), "{l:?}");
+        assert!(
+            l.starts_with(b"%\x99G3D0511C%guest(7Y3bdzjflinux,"),
+            "{l:?}"
+        );
         assert!(l.ends_with(b"linux,\"\",\"\",\"\",\"\""), "{l:?}");
         // Builds before 5.00 end at the password.
         assert!(line(ClientVersion::V3153, 1).ends_with(b"(7Y3bdzjf"));

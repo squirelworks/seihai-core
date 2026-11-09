@@ -100,7 +100,13 @@ pub(super) fn split_list(s: &str) -> Vec<String> {
 pub(super) fn join_list(items: &[String]) -> String {
     items
         .iter()
-        .map(|i| if i.contains(',') || i.contains('"') { format!("\"{}\"", i.replace('"', "\"\"")) } else { i.clone() })
+        .map(|i| {
+            if i.contains(',') || i.contains('"') {
+                format!("\"{}\"", i.replace('"', "\"\""))
+            } else {
+                i.clone()
+            }
+        })
         .collect::<Vec<_>>()
         .join(",")
 }
@@ -116,7 +122,17 @@ fn nv(v: &[Val], i: usize) -> f64 {
 impl<'a> Run<'a> {
     pub(super) fn new(core: &'a mut Core, obj: &'a mut ScriptObject, event: &'a str) -> Self {
         let loops = obj.script.loops;
-        Run { core, obj, event, steps: 0, ended: false, call_depth: 0, eval_depth: 0, top_pc: 0, loop_counts: vec![0; loops] }
+        Run {
+            core,
+            obj,
+            event,
+            steps: 0,
+            ended: false,
+            call_depth: 0,
+            eval_depth: 0,
+            top_pc: 0,
+            loop_counts: vec![0; loops],
+        }
     }
 
     fn era(&self) -> Era {
@@ -141,7 +157,10 @@ impl<'a> Run<'a> {
             }
             self.steps += 1;
             if self.steps > MAX_STEPS {
-                self.note(format!("stopped after {MAX_STEPS} steps in `{}`", self.event));
+                self.note(format!(
+                    "stopped after {MAX_STEPS} steps in `{}`",
+                    self.event
+                ));
                 self.ended = true;
                 return Flow::Done;
             }
@@ -156,11 +175,20 @@ impl<'a> Run<'a> {
                     self.command(cmd, args);
                     pc += 1;
                 }
-                Node::Unknown { name, raw, reason, line } => {
+                Node::Unknown {
+                    name,
+                    raw,
+                    reason,
+                    line,
+                } => {
                     self.note(format!("line {line}: `{name} {raw}` ignored ({reason})"));
                     pc += 1;
                 }
-                Node::Assign { target, op: AssignOp::Set, value: Expr::List(items) } if target.index.is_empty() => {
+                Node::Assign {
+                    target,
+                    op: AssignOp::Set,
+                    value: Expr::List(items),
+                } if target.index.is_empty() => {
                     self.set_list(&target.name, items);
                     pc += 1;
                 }
@@ -230,14 +258,22 @@ impl<'a> Run<'a> {
             return Val::default();
         };
         if self.call_depth >= MAX_CALL_DEPTH {
-            self.note(format!("calls nested deeper than {MAX_CALL_DEPTH}; run stopped"));
+            self.note(format!(
+                "calls nested deeper than {MAX_CALL_DEPTH}; run stopped"
+            ));
             self.ended = true;
             return Val::default();
         }
         // Parameters are plain variables for the length of the call.
-        let saved: Vec<(String, Option<Val>)> = f.params.iter().map(|p| (p.clone(), self.obj.vars.get(p).cloned())).collect();
+        let saved: Vec<(String, Option<Val>)> = f
+            .params
+            .iter()
+            .map(|p| (p.clone(), self.obj.vars.get(p).cloned()))
+            .collect();
         for (i, p) in f.params.iter().enumerate() {
-            self.obj.vars.insert(p.clone(), args.get(i).cloned().unwrap_or_default());
+            self.obj
+                .vars
+                .insert(p.clone(), args.get(i).cloned().unwrap_or_default());
         }
         self.call_depth += 1;
         let r = self.exec(f.entry);
@@ -258,12 +294,33 @@ impl<'a> Run<'a> {
 
     fn place(&mut self, v: &VarRef) -> Place {
         if v.index.is_empty() {
-            return Place { base: v.name.clone(), key: v.name.clone(), index: None, index2: None };
+            return Place {
+                base: v.name.clone(),
+                key: v.name.clone(),
+                index: None,
+                index2: None,
+            };
         }
-        let to_int = if self.is_board(&v.name) { board_int } else { |n: f64| n as i64 };
+        let to_int = if self.is_board(&v.name) {
+            board_int
+        } else {
+            |n: f64| n as i64
+        };
         let idx: Vec<i64> = v.index.iter().map(|e| to_int(self.eval(e).num())).collect();
-        let key = format!("{}[{}]", v.name, idx.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(","));
-        Place { base: v.name.clone(), key, index: Some(idx[0]), index2: idx.get(1).copied() }
+        let key = format!(
+            "{}[{}]",
+            v.name,
+            idx.iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        Place {
+            base: v.name.clone(),
+            key,
+            index: Some(idx[0]),
+            index2: idx.get(1).copied(),
+        }
     }
 
     fn event_flag(&self, name: &str) -> Option<bool> {
@@ -286,7 +343,9 @@ impl<'a> Run<'a> {
                 return self.status_get(&p.base).into();
             }
         } else if self.is_board(&p.base) {
-            return self.board_get(p).map_or(Val::default(), |t| Val::Num(f64::from(t)));
+            return self
+                .board_get(p)
+                .map_or(Val::default(), |t| Val::Num(f64::from(t)));
         } else if let (Some(i), Some(len)) = (p.index, self.store_get(&format!("{}#len", p.base))) {
             if i < 0 || i as f64 >= len.num() {
                 return Val::default();
@@ -342,7 +401,13 @@ impl<'a> Run<'a> {
 
     fn store_get(&self, key: &str) -> Option<Val> {
         let flag = |k: &str| {
-            self.core.flags.get(k).map(|s| if s.is_empty() { Val::Num(1.0) } else { Val::Str(s.clone()) })
+            self.core.flags.get(k).map(|s| {
+                if s.is_empty() {
+                    Val::Num(1.0)
+                } else {
+                    Val::Str(s.clone())
+                }
+            })
         };
         if key.starts_with("level.") {
             self.core.level_vars.get(key).cloned()
@@ -362,7 +427,10 @@ impl<'a> Run<'a> {
             self.core.level_vars.insert(key.to_string(), v);
         } else if key.starts_with("server.") {
             self.core.server_vars.insert(key.to_string(), v);
-        } else if key.starts_with("client.") || key.starts_with("local.") || (!key.contains('.') && self.core.flags.contains_key(key)) {
+        } else if key.starts_with("client.")
+            || key.starts_with("local.")
+            || (!key.contains('.') && self.core.flags.contains_key(key))
+        {
             self.write_flag(key, v.text());
         } else {
             self.obj.vars.insert(key.to_string(), v);
@@ -378,7 +446,10 @@ impl<'a> Run<'a> {
         }
         self.core.flags.insert(name.to_string(), value.clone());
         if !name.starts_with("local.") {
-            self.core.effects.push(Effect::SetFlag { name: name.to_string(), value: Some(value) });
+            self.core.effects.push(Effect::SetFlag {
+                name: name.to_string(),
+                value: Some(value),
+            });
         }
     }
 
@@ -429,19 +500,33 @@ impl<'a> Run<'a> {
             // The object's chat bubble: the same as `message`.
             "chat" => {
                 self.obj.message = v.text();
-                self.core.effects.push(Effect::Message { obj: id, text: v.text() });
+                self.core.effects.push(Effect::Message {
+                    obj: id,
+                    text: v.text(),
+                });
             }
             "player.chat" => {
                 self.core.player.chat = v.text();
-                self.core.effects.push(Effect::SetPlayerProp { code: "#c".into(), value: v.text() });
+                self.core.effects.push(Effect::SetPlayerProp {
+                    code: "#c".into(),
+                    value: v.text(),
+                });
             }
             "x" => {
                 self.obj.x = n;
-                self.core.effects.push(Effect::SetPos { obj: id, x: n, y: self.obj.y });
+                self.core.effects.push(Effect::SetPos {
+                    obj: id,
+                    x: n,
+                    y: self.obj.y,
+                });
             }
             "y" => {
                 self.obj.y = n;
-                self.core.effects.push(Effect::SetPos { obj: id, x: self.obj.x, y: n });
+                self.core.effects.push(Effect::SetPos {
+                    obj: id,
+                    x: self.obj.x,
+                    y: n,
+                });
             }
             "timeout" => self.set_timeout(n),
             "selectedweapon" => {
@@ -453,10 +538,16 @@ impl<'a> Run<'a> {
                 // The client's own select: the first weapon from `i` on,
                 // wrapping, that is not hidden; `i` itself if all are.
                 let i = n.floor() as usize;
-                let pick = (0..len).map(|k| (i + k) % len).find(|&j| !p.weapons[j].0.is_empty() && !p.weapons[j].0.starts_with('-')).unwrap_or(i);
+                let pick = (0..len)
+                    .map(|k| (i + k) % len)
+                    .find(|&j| !p.weapons[j].0.is_empty() && !p.weapons[j].0.starts_with('-'))
+                    .unwrap_or(i);
                 p.selected_weapon = Some(pick);
                 p.weapon = p.weapons[pick].0.clone();
-                self.core.effects.push(Effect::SetPlayerVar { name: name.to_string(), value: pick as f64 });
+                self.core.effects.push(Effect::SetPlayerVar {
+                    name: name.to_string(),
+                    value: pick as f64,
+                });
             }
             _ => {
                 let p = &mut self.core.player;
@@ -477,14 +568,21 @@ impl<'a> Run<'a> {
                     "playerdir" => self.core.player.dir,
                     _ => n,
                 };
-                self.core.effects.push(Effect::SetPlayerVar { name: name.to_string(), value });
+                self.core.effects.push(Effect::SetPlayerVar {
+                    name: name.to_string(),
+                    value,
+                });
             }
         }
     }
 
     fn set_timeout(&mut self, secs: f64) {
         self.obj.resume = None;
-        self.obj.due = if secs > 0.0 { Some(self.core.tick + secs_to_ticks(secs)) } else { None };
+        self.obj.due = if secs > 0.0 {
+            Some(self.core.tick + secs_to_ticks(secs))
+        } else {
+            None
+        };
     }
 
     // ---- expressions ----
@@ -544,7 +642,10 @@ impl<'a> Run<'a> {
             Expr::List(_) => Val::default(),
             Expr::InArray { e, name } => {
                 let x = self.eval(e);
-                let len = self.store_get(&format!("{name}#len")).map_or(0.0, |v| v.num()).max(0.0) as i64;
+                let len = self
+                    .store_get(&format!("{name}#len"))
+                    .map_or(0.0, |v| v.num())
+                    .max(0.0) as i64;
                 for i in 0..len {
                     let y = self.store_get(&format!("{name}[{i}]")).unwrap_or_default();
                     if self.equals(&x, &y) {
@@ -563,7 +664,9 @@ impl<'a> Run<'a> {
             return;
         }
         let vals: Vec<Val> = items.iter().map(|e| self.eval(e)).collect();
-        self.obj.vars.insert(format!("{name}#len"), Val::Num(vals.len() as f64));
+        self.obj
+            .vars
+            .insert(format!("{name}#len"), Val::Num(vals.len() as f64));
         for (i, v) in vals.into_iter().enumerate() {
             self.obj.vars.insert(format!("{name}[{i}]"), v);
         }
@@ -634,15 +737,22 @@ impl<'a> Run<'a> {
         };
         if name == "arraylen" {
             return match args.first() {
-                Some(Expr::Var(v)) => self.store_get(&format!("{}#len", v.name)).unwrap_or_default(),
-                Some(Expr::Str(s)) => self.store_get(&format!("{}#len", s.trim().to_ascii_lowercase())).unwrap_or_default(),
+                Some(Expr::Var(v)) => self
+                    .store_get(&format!("{}#len", v.name))
+                    .unwrap_or_default(),
+                Some(Expr::Str(s)) => self
+                    .store_get(&format!("{}#len", s.trim().to_ascii_lowercase()))
+                    .unwrap_or_default(),
                 _ => Val::default(),
             };
         }
         let vals: Vec<Val> = args.iter().map(|a| self.eval(a)).collect();
         let n = |i: usize| nv(&vals, i);
         let s = |i: usize| sv(&vals, i);
-        debug_assert!(b.args.iter().all(|k| matches!(k, ArgKind::Num | ArgKind::Text)));
+        debug_assert!(b
+            .args
+            .iter()
+            .all(|k| matches!(k, ArgKind::Num | ArgKind::Text)));
         match name {
             "abs" => Val::Num(n(0).abs()),
             "int" => Val::Num(n(0).trunc()),
@@ -658,13 +768,21 @@ impl<'a> Run<'a> {
             "startswith" => s(1).to_lowercase().starts_with(&s(0).to_lowercase()).into(),
             "indexof" => {
                 let (part, text) = (s(0).to_lowercase(), s(1).to_lowercase());
-                Val::Num(text.find(&part).map_or(-1.0, |b| text[..b].chars().count() as f64))
+                Val::Num(
+                    text.find(&part)
+                        .map_or(-1.0, |b| text[..b].chars().count() as f64),
+                )
             }
             "ascii" => Val::Num(s(0).chars().next().map_or(0.0, |c| c as u32 as f64)),
             "strcontains" => s(0).to_lowercase().contains(&s(1).to_lowercase()).into(),
             "lindexof" => {
                 let t = s(0);
-                Val::Num(split_list(&s(1)).iter().position(|i| i.trim() == t.trim()).map_or(-1.0, |p| p as f64))
+                Val::Num(
+                    split_list(&s(1))
+                        .iter()
+                        .position(|i| i.trim() == t.trim())
+                        .map_or(-1.0, |p| p as f64),
+                )
             }
             // The level's cell on the current map: -1 with no map, 0 for a
             // level not on it (as GServer-v2's GS1).
@@ -680,20 +798,34 @@ impl<'a> Run<'a> {
             // `keydown(i)`: the host's key bits (always clear while paused).
             "keydown" => {
                 let i = n(0).trunc();
-                Val::Num(if (0.0..16.0).contains(&i) && self.core.keys_down & (1 << i as u32) != 0 { 1.0 } else { 0.0 })
+                Val::Num(
+                    if (0.0..16.0).contains(&i) && self.core.keys_down & (1 << i as u32) != 0 {
+                        1.0
+                    } else {
+                        0.0
+                    },
+                )
             }
             "keydown2" => Val::Num(0.0),
             // The argument names the list (a flag), as in `#I(list,i)`.
             "sarraylen" => {
                 let list = s(0);
-                let text = self.core.flags.get(&list.trim().to_ascii_lowercase()).cloned().unwrap_or(list);
+                let text = self
+                    .core
+                    .flags
+                    .get(&list.trim().to_ascii_lowercase())
+                    .cloned()
+                    .unwrap_or(list);
                 Val::Num(split_list(&text).len() as f64)
             }
             "onwall" => {
                 let (x, y) = (n(0).floor(), n(1).floor());
                 let blocked = match &self.core.walls {
                     _ if !(0.0..64.0).contains(&x) || !(0.0..64.0).contains(&y) => true,
-                    Some(w) => w.get(y as usize * 64 + x as usize).copied().unwrap_or(false),
+                    Some(w) => w
+                        .get(y as usize * 64 + x as usize)
+                        .copied()
+                        .unwrap_or(false),
                     None => false,
                 };
                 blocked.into()
@@ -701,9 +833,10 @@ impl<'a> Run<'a> {
             "onwater" => {
                 let (x, y) = (n(0).floor(), n(1).floor());
                 let wet = match &self.core.water {
-                    Some(w) if (0.0..64.0).contains(&x) && (0.0..64.0).contains(&y) => {
-                        w.get(y as usize * 64 + x as usize).copied().unwrap_or(false)
-                    }
+                    Some(w) if (0.0..64.0).contains(&x) && (0.0..64.0).contains(&y) => w
+                        .get(y as usize * 64 + x as usize)
+                        .copied()
+                        .unwrap_or(false),
                     _ => false,
                 };
                 wet.into()
@@ -717,7 +850,12 @@ impl<'a> Run<'a> {
                 }
                 let said = self.core.player.chat.trim().to_lowercase();
                 let want = s(0).trim().to_lowercase();
-                (if name == "playersays" { said == want } else { said.contains(&want) }).into()
+                (if name == "playersays" {
+                    said == want
+                } else {
+                    said.contains(&want)
+                })
+                .into()
             }
             _ => Val::default(),
         }
@@ -745,7 +883,8 @@ impl<'a> Run<'a> {
             let code = b[i + 1] as char;
             // `#P1` to `#P30`, `#C0` to `#C4`: the digits are part of the code.
             let digits = super::lexer::code_digits(&b[i + 1..]);
-            let num: Option<usize> = (digits > 0).then(|| s[i + 2..i + 2 + digits].parse().unwrap_or(0));
+            let num: Option<usize> =
+                (digits > 0).then(|| s[i + 2..i + 2 + digits].parse().unwrap_or(0));
             let open = i + 2 + digits;
             // Argument in parentheses, if there is one.
             let (inner, end) = if b.get(open) == Some(&b'(') {
@@ -779,9 +918,19 @@ impl<'a> Run<'a> {
                 // no index or -1 (2.1 and later). Seihai keeps the ones a
                 // script set with `setcharprop`; a player's are not known.
                 ('P', x) if num.is_some() && era >= Era::V21 => {
-                    let own = x.map_or(true, |x| self.expand(x, depth + 1).trim().parse::<f64>().unwrap_or(0.0) < 0.0);
+                    let own = x.is_none_or(|x| {
+                        self.expand(x, depth + 1)
+                            .trim()
+                            .parse::<f64>()
+                            .unwrap_or(0.0)
+                            < 0.0
+                    });
                     let key = format!("#P{}", num.unwrap_or(0));
-                    Some(if own { self.obj.char_props.get(&key).cloned().unwrap_or_default() } else { String::new() })
+                    Some(if own {
+                        self.obj.char_props.get(&key).cloned().unwrap_or_default()
+                    } else {
+                        String::new()
+                    })
                 }
                 ('c', None) => Some(self.core.player.chat.clone()),
                 ('n', None) => Some(self.core.player.nick.clone()),
@@ -790,9 +939,18 @@ impl<'a> Run<'a> {
                 // `#w(i)` and `#W(i)`: name and image of weapon `i` of the
                 // whole list (2.04).
                 ('w' | 'W', Some(x)) if era >= Era::V204 => {
-                    let i = self.expand(x, depth + 1).trim().parse::<f64>().unwrap_or(-1.0);
-                    let w = (i >= 0.0).then(|| self.core.player.weapons.get(i as usize)).flatten();
-                    Some(w.map(|(n, img)| if code == 'w' { n.clone() } else { img.clone() }).unwrap_or_default())
+                    let i = self
+                        .expand(x, depth + 1)
+                        .trim()
+                        .parse::<f64>()
+                        .unwrap_or(-1.0);
+                    let w = (i >= 0.0)
+                        .then(|| self.core.player.weapons.get(i as usize))
+                        .flatten();
+                    Some(
+                        w.map(|(n, img)| if code == 'w' { n.clone() } else { img.clone() })
+                            .unwrap_or_default(),
+                    )
                 }
                 ('L', None) | ('F', None) => Some(self.core.level.clone()),
                 ('v', Some(x)) => match parse_expr(x, era) {
@@ -800,7 +958,12 @@ impl<'a> Run<'a> {
                     None => Some(String::new()),
                 },
                 ('s', Some(x)) => {
-                    let p = Place { base: x.trim().to_ascii_lowercase(), key: x.trim().to_ascii_lowercase(), index: None, index2: None };
+                    let p = Place {
+                        base: x.trim().to_ascii_lowercase(),
+                        key: x.trim().to_ascii_lowercase(),
+                        index: None,
+                        index2: None,
+                    };
                     Some(self.get(&p).text())
                 }
                 ('t', Some(x)) if era >= Era::V202 => {
@@ -808,22 +971,45 @@ impl<'a> Run<'a> {
                     let n: usize = n.trim().parse::<f64>().unwrap_or(0.0).max(0.0) as usize;
                     Some(self.core.tokens.get(n).cloned().unwrap_or_default())
                 }
-                ('T', Some(x)) if era >= Era::V202 => Some(self.expand(x, depth + 1).trim().to_string()),
+                ('T', Some(x)) if era >= Era::V202 => {
+                    Some(self.expand(x, depth + 1).trim().to_string())
+                }
                 // `#I(list,index)`: an entry of a string list (2.2 list).
                 ('I', Some(x)) if era >= Era::V21 => {
                     let (list, index) = x.rsplit_once(',').unwrap_or((x, "0"));
-                    let i = self.expand(index, depth + 1).trim().parse::<f64>().unwrap_or(0.0);
+                    let i = self
+                        .expand(index, depth + 1)
+                        .trim()
+                        .parse::<f64>()
+                        .unwrap_or(0.0);
                     let list = self.expand(list, depth + 1);
                     let name = list.trim().to_ascii_lowercase();
                     // A list is named like `#s(...)`: a flag or variable.
                     let text = self.core.flags.get(&name).cloned().unwrap_or(list);
-                    Some(if i < 0.0 { String::new() } else { split_list(&text).get(i as usize).cloned().unwrap_or_default() })
+                    Some(if i < 0.0 {
+                        String::new()
+                    } else {
+                        split_list(&text)
+                            .get(i as usize)
+                            .cloned()
+                            .unwrap_or_default()
+                    })
                 }
                 ('e', Some(x)) if era >= Era::V202 => {
                     let parts: Vec<&str> = x.splitn(3, ',').collect();
                     if parts.len() == 3 {
-                        let start = self.expand(parts[0], depth + 1).trim().parse::<f64>().unwrap_or(0.0).max(0.0) as usize;
-                        let len = self.expand(parts[1], depth + 1).trim().parse::<f64>().unwrap_or(0.0).max(0.0) as usize;
+                        let start = self
+                            .expand(parts[0], depth + 1)
+                            .trim()
+                            .parse::<f64>()
+                            .unwrap_or(0.0)
+                            .max(0.0) as usize;
+                        let len = self
+                            .expand(parts[1], depth + 1)
+                            .trim()
+                            .parse::<f64>()
+                            .unwrap_or(0.0)
+                            .max(0.0) as usize;
                         let text = self.expand(parts[2], depth + 1);
                         Some(text.chars().skip(start).take(len).collect())
                     } else {
@@ -831,7 +1017,12 @@ impl<'a> Run<'a> {
                     }
                 }
                 ('p', Some(x)) if era >= Era::V203 => {
-                    let n = self.expand(x, depth + 1).trim().parse::<f64>().unwrap_or(0.0).max(0.0) as usize;
+                    let n = self
+                        .expand(x, depth + 1)
+                        .trim()
+                        .parse::<f64>()
+                        .unwrap_or(0.0)
+                        .max(0.0) as usize;
                     Some(self.obj.params.get(n).cloned().unwrap_or_default())
                 }
                 _ => None,
@@ -862,7 +1053,9 @@ impl<'a> Run<'a> {
                 // (`#c` is the chat text, `#n` the nickname, ...). It is a
                 // code, not a message to expand: `setplayerprop #c,hi` must
                 // not turn into `setplayerprop <what was said>,hi`.
-                Arg::Text(t) if i == 0 && matches!(cmd.name, "setplayerprop" | "setcharprop") => Val::Str(t.clone()),
+                Arg::Text(t) if i == 0 && matches!(cmd.name, "setplayerprop" | "setcharprop") => {
+                    Val::Str(t.clone())
+                }
                 Arg::Text(t) => Val::Str(self.expand(t, 0)),
             })
             .collect();
@@ -875,13 +1068,17 @@ impl<'a> Run<'a> {
             // clients) moves the player to y 65 and draws its title around
             // `setfocus 30,30`, so later builds must move the view. Inferred
             // from that script, not read in a 2.1+ binary.
-            Exec::NoExec if self.era() >= Era::V21 && matches!(cmd.name, "setfocus" | "resetfocus") => {
+            Exec::NoExec
+                if self.era() >= Era::V21 && matches!(cmd.name, "setfocus" | "resetfocus") =>
+            {
                 self.effect_command(cmd.name, vals);
             }
             Exec::NoExec => self.note(format!("`{}` compiles but does nothing in 2.05", cmd.name)),
             Exec::Ext => {
                 if cmd.name == "sendtoserver" {
-                    self.core.effects.push(Effect::SendToServer { text: sv(&vals, 0) });
+                    self.core
+                        .effects
+                        .push(Effect::SendToServer { text: sv(&vals, 0) });
                 }
             }
             Exec::Engine => self.engine_command(cmd.name, &vals),
@@ -971,14 +1168,26 @@ impl<'a> Run<'a> {
                 if secs == 0.0 {
                     return;
                 }
-                self.obj.due = if secs > 0.0 { Some(self.core.tick + secs_to_ticks(secs)) } else { None };
+                self.obj.due = if secs > 0.0 {
+                    Some(self.core.tick + secs_to_ticks(secs))
+                } else {
+                    None
+                };
                 self.obj.resume = Some(self.top_pc + 1);
                 self.ended = true;
             }
             "callnpc" | "callweapon" => {
                 let idx = nv(v, 0).max(0.0) as usize;
-                let target = if name == "callnpc" { Target::Npc(idx) } else { Target::Weapon(idx) };
-                self.core.pending.push_back(Pending { target, event: sv(v, 1).trim().to_ascii_lowercase(), params: Vec::new() });
+                let target = if name == "callnpc" {
+                    Target::Npc(idx)
+                } else {
+                    Target::Weapon(idx)
+                };
+                self.core.pending.push_back(Pending {
+                    target,
+                    event: sv(v, 1).trim().to_ascii_lowercase(),
+                    params: Vec::new(),
+                });
             }
             _ => {}
         }
@@ -989,21 +1198,34 @@ impl<'a> Run<'a> {
         match name {
             "message" => {
                 self.obj.message = sv(&v, 0);
-                self.core.effects.push(Effect::Message { obj: id, text: sv(&v, 0) });
+                self.core.effects.push(Effect::Message {
+                    obj: id,
+                    text: sv(&v, 0),
+                });
             }
-            "say" => self.core.effects.push(Effect::SaySign { index: nv(&v, 0) as i64 }),
+            "say" => self.core.effects.push(Effect::SaySign {
+                index: nv(&v, 0) as i64,
+            }),
             "say2" => self.core.effects.push(Effect::Say2 { text: sv(&v, 0) }),
             "show" | "showlocal" | "hide" | "hidelocal" => {
                 let visible = name.starts_with("show");
                 self.obj.visible = visible;
-                self.core.effects.push(Effect::SetVisible { obj: id, visible, local: name.ends_with("local") });
+                self.core.effects.push(Effect::SetVisible {
+                    obj: id,
+                    visible,
+                    local: name.ends_with("local"),
+                });
             }
             "setimg" | "setgif" | "setimgpart" | "setgifpart" => {
                 let file = sv(&v, 0);
                 let part = (v.len() >= 5).then(|| (nv(&v, 1), nv(&v, 2), nv(&v, 3), nv(&v, 4)));
                 self.obj.image = file.clone();
                 self.obj.visible = true;
-                self.core.effects.push(Effect::SetImg { obj: id, file, part });
+                self.core.effects.push(Effect::SetImg {
+                    obj: id,
+                    file,
+                    part,
+                });
             }
             "setshape" => {
                 let kind = nv(&v, 0) as i64;
@@ -1011,18 +1233,37 @@ impl<'a> Run<'a> {
                 if kind == 0 || kind == 1 {
                     self.obj.w_px = nv(&v, 1).max(0.0);
                     self.obj.h_px = nv(&v, 2).max(0.0);
-                    self.core.effects.push(Effect::SetShape { obj: id, kind, w: self.obj.w_px, h: self.obj.h_px });
+                    self.core.effects.push(Effect::SetShape {
+                        obj: id,
+                        kind,
+                        w: self.obj.w_px,
+                        h: self.obj.h_px,
+                    });
                 }
             }
             "move" => {
                 let (dx, dy) = (nv(&v, 0), nv(&v, 1));
                 // Before 2.03 `move` takes only the two offsets.
-                let (time, options) = if self.era() >= Era::V203 { (nv(&v, 2), nv(&v, 3) as i64) } else { (0.0, 0) };
+                let (time, options) = if self.era() >= Era::V203 {
+                    (nv(&v, 2), nv(&v, 3) as i64)
+                } else {
+                    (0.0, 0)
+                };
                 self.obj.x += dx;
                 self.obj.y += dy;
-                self.core.effects.push(Effect::Move { obj: id, dx, dy, time, options });
+                self.core.effects.push(Effect::Move {
+                    obj: id,
+                    dx,
+                    dy,
+                    time,
+                    options,
+                });
                 if options & 8 != 0 && self.era() >= Era::V203 {
-                    self.core.pending.push_back(Pending { target: Target::Id(id), event: "movementfinished".into(), params: Vec::new() });
+                    self.core.pending.push_back(Pending {
+                        target: Target::Id(id),
+                        event: "movementfinished".into(),
+                        params: Vec::new(),
+                    });
                 }
             }
             "destroy" => {
@@ -1030,34 +1271,76 @@ impl<'a> Run<'a> {
                 self.obj.due = None;
                 self.core.effects.push(Effect::Destroy { obj: id });
             }
-            "setlevel" => self.core.effects.push(Effect::SetLevel { level: sv(&v, 0), x: None, y: None }),
-            "setlevel2" => self.core.effects.push(Effect::SetLevel { level: sv(&v, 0), x: Some(nv(&v, 1)), y: Some(nv(&v, 2)) }),
+            "setlevel" => self.core.effects.push(Effect::SetLevel {
+                level: sv(&v, 0),
+                x: None,
+                y: None,
+            }),
+            "setlevel2" => self.core.effects.push(Effect::SetLevel {
+                level: sv(&v, 0),
+                x: Some(nv(&v, 1)),
+                y: Some(nv(&v, 2)),
+            }),
             "hurt" => {
                 let half = nv(&v, 0);
                 self.core.player.hearts = (self.core.player.hearts - half / 2.0).max(0.0);
                 self.core.effects.push(Effect::Hurt { half_hearts: half });
             }
-            "setcharani" => self.core.effects.push(Effect::SetCharAni { obj: id, ani: sv(&v, 0), params: sv(&v, 1) }),
+            "setcharani" => self.core.effects.push(Effect::SetCharAni {
+                obj: id,
+                ani: sv(&v, 0),
+                params: sv(&v, 1),
+            }),
             "setcharprop" => {
-                self.obj.char_props.insert(sv(&v, 0).trim().to_string(), sv(&v, 1));
-                self.core.effects.push(Effect::SetCharProp { obj: id, code: sv(&v, 0), value: sv(&v, 1) });
+                self.obj
+                    .char_props
+                    .insert(sv(&v, 0).trim().to_string(), sv(&v, 1));
+                self.core.effects.push(Effect::SetCharProp {
+                    obj: id,
+                    code: sv(&v, 0),
+                    value: sv(&v, 1),
+                });
             }
             "setplayerprop" => {
                 if sv(&v, 0).trim() == "#c" {
                     self.core.player.chat = sv(&v, 1);
                 }
-                self.core.effects.push(Effect::SetPlayerProp { code: sv(&v, 0), value: sv(&v, 1) });
+                self.core.effects.push(Effect::SetPlayerProp {
+                    code: sv(&v, 0),
+                    value: sv(&v, 1),
+                });
             }
-            "play" | "playlooped" => self.core.effects.push(Effect::Play { obj: id, file: sv(&v, 0), looped: name == "playlooped", at: None }),
-            "play2" => self.core.effects.push(Effect::Play { obj: id, file: sv(&v, 0), looped: false, at: Some((nv(&v, 1), nv(&v, 2))) }),
-            "sendrpgmessage" => self.core.effects.push(Effect::RpgMessage { text: sv(&v, 0) }),
-            "stopsound" => self.core.effects.push(Effect::StopSound { file: sv(&v, 0) }),
+            "play" | "playlooped" => self.core.effects.push(Effect::Play {
+                obj: id,
+                file: sv(&v, 0),
+                looped: name == "playlooped",
+                at: None,
+            }),
+            "play2" => self.core.effects.push(Effect::Play {
+                obj: id,
+                file: sv(&v, 0),
+                looped: false,
+                at: Some((nv(&v, 1), nv(&v, 2))),
+            }),
+            "sendrpgmessage" => self
+                .core
+                .effects
+                .push(Effect::RpgMessage { text: sv(&v, 0) }),
+            "stopsound" => self
+                .core
+                .effects
+                .push(Effect::StopSound { file: sv(&v, 0) }),
             "stopmidi" => self.core.effects.push(Effect::StopMidi),
             "triggeraction" => {
                 let (x, y) = (nv(&v, 0), nv(&v, 1));
                 let action = sv(&v, 2).trim().to_ascii_lowercase();
                 let params = sv(&v, 3);
-                self.core.effects.push(Effect::TriggerAction { x, y, action: action.clone(), params: params.clone() });
+                self.core.effects.push(Effect::TriggerAction {
+                    x,
+                    y,
+                    action: action.clone(),
+                    params: params.clone(),
+                });
                 // Locally: the object under (x, y) gets `action<name>`.
                 self.core.pending.push_back(Pending {
                     target: Target::At(x, y),
@@ -1066,7 +1349,11 @@ impl<'a> Run<'a> {
                 });
             }
             _ => {
-                self.core.effects.push(Effect::Command { obj: id, name: name.to_string(), args: v });
+                self.core.effects.push(Effect::Command {
+                    obj: id,
+                    name: name.to_string(),
+                    args: v,
+                });
             }
         }
     }

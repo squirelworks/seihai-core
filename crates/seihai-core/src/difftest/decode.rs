@@ -16,11 +16,13 @@ use super::pcap::{read_pcap, reassemble, Stream, TcpConn};
 use super::trace::{Dir, Event, Trace, ID_BADFRAME, ID_LOGIN};
 use crate::assets::crc32;
 use crate::protocol::layouts::{
-    parse_board_heights, parse_board_modify2, parse_player_warp2, parse_server_warp, parse_showimg_relay,
+    parse_board_heights, parse_board_modify2, parse_player_warp2, parse_server_warp,
+    parse_showimg_relay,
 };
 use crate::protocol::{
-    bz2_decompress, decode_pos_precise, latin1, parse_list_reply, parse_player_props_in, read_gint3, read_gshort,
-    split_messages, zlib_decompress, ClientVersion, EncryptionGen, Gen3, Gen5, Gen5Comp, Message, Splitter,
+    bz2_decompress, decode_pos_precise, latin1, parse_list_reply, parse_player_props_in,
+    read_gint3, read_gshort, split_messages, zlib_decompress, ClientVersion, EncryptionGen, Gen3,
+    Gen5, Gen5Comp, Message, Splitter,
 };
 
 /// What to decode and how.
@@ -43,7 +45,13 @@ pub struct DecodeOptions {
 
 impl DecodeOptions {
     pub fn new(version: ClientVersion) -> Self {
-        Self { version, mask: true, client: String::new(), scenario: String::new(), keep_raw: false }
+        Self {
+            version,
+            mask: true,
+            client: String::new(),
+            scenario: String::new(),
+            keep_raw: false,
+        }
     }
 }
 
@@ -101,7 +109,9 @@ pub fn decode_conns_ex(conns: &[TcpConn], opts: &DecodeOptions) -> (Trace, Optio
 #[derive(Clone, Copy, PartialEq)]
 enum Kind {
     /// `gen5`: the `GCHAR 7` key handshake form; otherwise plain frames.
-    Listserver { gen5: bool },
+    Listserver {
+        gen5: bool,
+    },
     Gserver,
 }
 
@@ -138,7 +148,11 @@ struct Masker {
 
 impl Masker {
     fn new(on: bool) -> Self {
-        Self { on, pids: Vec::new(), account: None }
+        Self {
+            on,
+            pids: Vec::new(),
+            account: None,
+        }
     }
 
     fn pid(&mut self, id: u16) -> String {
@@ -163,7 +177,11 @@ impl Masker {
     }
 
     fn val(&self, v: impl std::fmt::Display) -> String {
-        if self.on { "<MASKED>".into() } else { v.to_string() }
+        if self.on {
+            "<MASKED>".into()
+        } else {
+            v.to_string()
+        }
     }
 }
 
@@ -180,17 +198,27 @@ struct ConnCtx<'a> {
     t0: f64,
 }
 
+struct DecodedPacket {
+    id: i32,
+    name: String,
+    len: usize,
+    fields: Fields,
+}
+
 fn push_event(
     out: &mut Vec<Event>,
     cx: &ConnCtx<'_>,
     dir: Dir,
     ts: f64,
     frame: u32,
-    id: i32,
-    name: String,
-    len: usize,
-    fields: Fields,
+    packet: DecodedPacket,
 ) {
+    let DecodedPacket {
+        id,
+        name,
+        len,
+        fields,
+    } = packet;
     let _ = (cx.stream_c, cx.stream_s);
     out.push(Event {
         conn: cx.name.to_string(),
@@ -205,14 +233,28 @@ fn push_event(
     });
 }
 
-fn decode_conn(c: &TcpConn, name: &str, kind: Kind, opts: &DecodeOptions, mask: &mut Masker) -> Vec<Event> {
-    let cx = ConnCtx { name, stream_c: &c.c2s, stream_s: &c.s2c, t0: c.t0 };
+fn decode_conn(
+    c: &TcpConn,
+    name: &str,
+    kind: Kind,
+    opts: &DecodeOptions,
+    mask: &mut Masker,
+) -> Vec<Event> {
+    let cx = ConnCtx {
+        name,
+        stream_c: &c.c2s,
+        stream_s: &c.s2c,
+        t0: c.t0,
+    };
     let mut out = Vec::new();
     let ver = opts.version;
     let listserver = matches!(kind, Kind::Listserver { .. });
     let (gen5, gen3) = match kind {
         Kind::Listserver { gen5 } => (gen5, false),
-        Kind::Gserver => (ver.encryption() == EncryptionGen::Gen5, ver.encryption() == EncryptionGen::Gen3),
+        Kind::Gserver => (
+            ver.encryption() == EncryptionGen::Gen5,
+            ver.encryption() == EncryptionGen::Gen3,
+        ),
     };
     // ---- client to server ---------------------------------------------
     let mut key: Option<u8> = None;
@@ -226,7 +268,19 @@ fn decode_conn(c: &TcpConn, name: &str, kind: Kind, opts: &DecodeOptions, mask: 
         let n = usize::from(u16::from_be_bytes([bytes[off], bytes[off + 1]]));
         let ts = c.c2s.ts_at(off);
         let Some(body) = bytes.get(off + 2..off + 2 + n) else {
-            push_event(&mut out, &cx, Dir::C2S, ts, frame_no, ID_BADFRAME, "BADFRAME".into(), bytes.len() - off, vec![f("reason", "truncated frame")]);
+            push_event(
+                &mut out,
+                &cx,
+                Dir::C2S,
+                ts,
+                frame_no,
+                DecodedPacket {
+                    id: ID_BADFRAME,
+                    name: "BADFRAME".into(),
+                    len: bytes.len() - off,
+                    fields: vec![f("reason", "truncated frame")],
+                },
+            );
             break;
         };
         off += 2 + n;
@@ -241,7 +295,19 @@ fn decode_conn(c: &TcpConn, name: &str, kind: Kind, opts: &DecodeOptions, mask: 
         let plain = match plain {
             Ok(p) => p,
             Err(why) => {
-                push_event(&mut out, &cx, Dir::C2S, ts, frame_no, ID_BADFRAME, "BADFRAME".into(), body.len(), vec![f("reason", why)]);
+                push_event(
+                    &mut out,
+                    &cx,
+                    Dir::C2S,
+                    ts,
+                    frame_no,
+                    DecodedPacket {
+                        id: ID_BADFRAME,
+                        name: "BADFRAME".into(),
+                        len: body.len(),
+                        fields: vec![f("reason", why)],
+                    },
+                );
                 first = false;
                 frame_no += 1;
                 continue;
@@ -267,7 +333,19 @@ fn decode_conn(c: &TcpConn, name: &str, kind: Kind, opts: &DecodeOptions, mask: 
                 }
             }
             let nm = if listserver { "LS_HELLO" } else { "LOGIN" };
-            push_event(&mut out, &cx, Dir::C2S, ts, frame_no, ID_LOGIN, nm.into(), line.len(), fields);
+            push_event(
+                &mut out,
+                &cx,
+                Dir::C2S,
+                ts,
+                frame_no,
+                DecodedPacket {
+                    id: ID_LOGIN,
+                    name: nm.into(),
+                    len: line.len(),
+                    fields,
+                },
+            );
         }
         for line in &lines[li.min(lines.len())..] {
             let mut msg = line.to_vec();
@@ -280,19 +358,45 @@ fn decode_conn(c: &TcpConn, name: &str, kind: Kind, opts: &DecodeOptions, mask: 
                         msg = d;
                     }
                     None => {
-                        push_event(&mut out, &cx, Dir::C2S, ts, frame_no, ID_BADFRAME, "BADMSG".into(), msg.len(), vec![f("reason", "gen-3 junk byte did not match")]);
+                        push_event(
+                            &mut out,
+                            &cx,
+                            Dir::C2S,
+                            ts,
+                            frame_no,
+                            DecodedPacket {
+                                id: ID_BADFRAME,
+                                name: "BADMSG".into(),
+                                len: msg.len(),
+                                fields: vec![f("reason", "gen-3 junk byte did not match")],
+                            },
+                        );
                         continue;
                     }
                 }
             }
-            let Some((&idb, payload)) = msg.split_first() else { continue };
+            let Some((&idb, payload)) = msg.split_first() else {
+                continue;
+            };
             let id = i32::from(idb.wrapping_sub(0x20));
             let (nm, fields) = if listserver {
                 describe_ls_c2s(id, payload, mask)
             } else {
                 describe_c2s(ver, id, payload, mask)
             };
-            push_event(&mut out, &cx, Dir::C2S, ts, frame_no, id, nm, payload.len(), fields);
+            push_event(
+                &mut out,
+                &cx,
+                Dir::C2S,
+                ts,
+                frame_no,
+                DecodedPacket {
+                    id,
+                    name: nm,
+                    len: payload.len(),
+                    fields,
+                },
+            );
             if opts.keep_raw && !listserver {
                 if let Some(e) = out.last_mut() {
                     e.raw = payload.to_vec();
@@ -302,7 +406,11 @@ fn decode_conn(c: &TcpConn, name: &str, kind: Kind, opts: &DecodeOptions, mask: 
         frame_no += 1;
     }
     // ---- server to client ---------------------------------------------
-    let mut s_cipher5: Option<Gen5> = if gen5 { key.map(|k| gen5_for(ver, listserver, k)) } else { None };
+    let mut s_cipher5: Option<Gen5> = if gen5 {
+        key.map(|k| gen5_for(ver, listserver, k))
+    } else {
+        None
+    };
     // 6.x game servers send `FF FF` + u32 lengths for long frames.
     let long = !listserver && ver.profile().protocol.gen5_long_frames;
     let mut splitter = Splitter::default();
@@ -310,11 +418,29 @@ fn decode_conn(c: &TcpConn, name: &str, kind: Kind, opts: &DecodeOptions, mask: 
     let mut off = 0;
     let mut frame_no = 0u32;
     while off + 2 <= bytes.len() {
-        let fl = if long { crate::protocol::FrameLen::Long } else { crate::protocol::FrameLen::Short };
-        let Some((head, n)) = fl.header(&bytes[off..]) else { break };
+        let fl = if long {
+            crate::protocol::FrameLen::Long
+        } else {
+            crate::protocol::FrameLen::Short
+        };
+        let Some((head, n)) = fl.header(&bytes[off..]) else {
+            break;
+        };
         let ts = c.s2c.ts_at(off);
         let Some(body) = bytes.get(off + head..off + head + n) else {
-            push_event(&mut out, &cx, Dir::S2C, ts, frame_no, ID_BADFRAME, "BADFRAME".into(), bytes.len() - off, vec![f("reason", "truncated frame")]);
+            push_event(
+                &mut out,
+                &cx,
+                Dir::S2C,
+                ts,
+                frame_no,
+                DecodedPacket {
+                    id: ID_BADFRAME,
+                    name: "BADFRAME".into(),
+                    len: bytes.len() - off,
+                    fields: vec![f("reason", "truncated frame")],
+                },
+            );
             break;
         };
         off += head + n;
@@ -326,7 +452,19 @@ fn decode_conn(c: &TcpConn, name: &str, kind: Kind, opts: &DecodeOptions, mask: 
         let plain = match plain {
             Ok(p) => p,
             Err(why) => {
-                push_event(&mut out, &cx, Dir::S2C, ts, frame_no, ID_BADFRAME, "BADFRAME".into(), body.len(), vec![f("reason", why)]);
+                push_event(
+                    &mut out,
+                    &cx,
+                    Dir::S2C,
+                    ts,
+                    frame_no,
+                    DecodedPacket {
+                        id: ID_BADFRAME,
+                        name: "BADFRAME".into(),
+                        len: body.len(),
+                        fields: vec![f("reason", why)],
+                    },
+                );
                 frame_no += 1;
                 continue;
             }
@@ -337,17 +475,26 @@ fn decode_conn(c: &TcpConn, name: &str, kind: Kind, opts: &DecodeOptions, mask: 
             // as a list and not as raw bytes.
             let reply = parse_list_reply(&plain);
             if !reply.servers.is_empty() {
-                let names: Vec<String> = reply.servers.iter().map(|s| format!("{}@{}", s.name, s.port)).collect();
+                let names: Vec<String> = reply
+                    .servers
+                    .iter()
+                    .map(|s| format!("{}@{}", s.name, s.port))
+                    .collect();
                 push_event(
                     &mut out,
                     &cx,
                     Dir::S2C,
                     ts,
                     frame_no,
-                    1000,
-                    "LS_SERVERLIST".into(),
-                    plain.len(),
-                    vec![f("servers", reply.servers.len().to_string()), f("list", names.join(","))],
+                    DecodedPacket {
+                        id: 1000,
+                        name: "LS_SERVERLIST".into(),
+                        len: plain.len(),
+                        fields: vec![
+                            f("servers", reply.servers.len().to_string()),
+                            f("list", names.join(",")),
+                        ],
+                    },
                 );
                 frame_no += 1;
                 continue;
@@ -359,7 +506,19 @@ fn decode_conn(c: &TcpConn, name: &str, kind: Kind, opts: &DecodeOptions, mask: 
             } else {
                 describe_s2c(ver, i32::from(m.id), &m.payload, mask)
             };
-            push_event(&mut out, &cx, Dir::S2C, ts, frame_no, i32::from(m.id), nm, m.payload.len(), fields);
+            push_event(
+                &mut out,
+                &cx,
+                Dir::S2C,
+                ts,
+                frame_no,
+                DecodedPacket {
+                    id: i32::from(m.id),
+                    name: nm,
+                    len: m.payload.len(),
+                    fields,
+                },
+            );
             if opts.keep_raw {
                 if let Some(e) = out.last_mut() {
                     e.raw = m.payload.clone();
@@ -394,7 +553,9 @@ fn decode_gen5_body(body: &[u8], cipher: Option<&mut Gen5>) -> Result<Vec<u8>, S
         0x06 => Gen5Comp::Bz2,
         o => return Err(format!("unknown gen-5 compression byte {o:#04x}")),
     };
-    let Some(cipher) = cipher else { return Err("no key: the login frame is missing".into()) };
+    let Some(cipher) = cipher else {
+        return Err("no key: the login frame is missing".into());
+    };
     let raw = cipher.decode(rest.to_vec(), comp);
     match comp {
         Gen5Comp::None => Ok(raw),
@@ -412,9 +573,16 @@ fn gstring(b: &[u8], i: &mut usize) -> Option<String> {
 
 /// The login line (gserver) or handshake (listserver). Returns the fields
 /// and the cipher key, if the line carries one.
-fn decode_login(line: &[u8], kind: Kind, ver: ClientVersion, mask: &mut Masker) -> (Fields, Option<u8>) {
+fn decode_login(
+    line: &[u8],
+    kind: Kind,
+    ver: ClientVersion,
+    mask: &mut Masker,
+) -> (Fields, Option<u8>) {
     let mut out = Vec::new();
-    let Some(&t) = line.first() else { return (out, None) };
+    let Some(&t) = line.first() else {
+        return (out, None);
+    };
     let typ = t.wrapping_sub(0x20);
     out.push(f("type", typ.to_string()));
     let mut i = 1;
@@ -461,7 +629,11 @@ fn hex(b: &[u8]) -> String {
 /// Raw payload: short ones as hex, long ones as length and CRC-32.
 fn generic(p: &[u8]) -> Fields {
     if p.len() <= 32 {
-        if p.is_empty() { vec![] } else { vec![f("hex", hex(p))] }
+        if p.is_empty() {
+            vec![]
+        } else {
+            vec![f("hex", hex(p))]
+        }
     } else {
         vec![f("crc", format!("{:08x}", crc32(p)))]
     }
@@ -476,7 +648,10 @@ fn describe_ls_c2s(id: i32, payload: &[u8], _mask: &Masker) -> (String, Fields) 
         0 => ("LS_NEWMAIN".into(), vec![f("text", latin1(payload))]),
         1 => {
             // account and password: never shown
-            ("LS_SERVERLIST".into(), vec![f("account", "<ACCT>"), f("password", "<PASS>")])
+            (
+                "LS_SERVERLIST".into(),
+                vec![f("account", "<ACCT>"), f("password", "<PASS>")],
+            )
         }
         _ => (format!("LS_{id}"), generic(payload)),
     }
@@ -484,7 +659,10 @@ fn describe_ls_c2s(id: i32, payload: &[u8], _mask: &Masker) -> (String, Fields) 
 
 fn gint5(b: &[u8]) -> Option<u64> {
     let c = b.get(..5)?;
-    Some(c.iter().fold(0u64, |a, &x| (a << 7) | u64::from(gchar(x) & 0x7f)))
+    Some(
+        c.iter()
+            .fold(0u64, |a, &x| (a << 7) | u64::from(gchar(x) & 0x7f)),
+    )
 }
 
 fn describe_c2s(ver: ClientVersion, id: i32, p: &[u8], mask: &mut Masker) -> (String, Fields) {
@@ -522,9 +700,18 @@ fn describe_c2s(ver: ClientVersion, id: i32, p: &[u8], mask: &mut Masker) -> (St
         // PLI_SHOWIMGPLAYER: the sender's weapon-script image list, as
         // changes (or, from the marker on, the full list).
         24 => showimg_fields(p),
-        46 => vec![f("value", p.first().map_or("-".into(), |&b| gchar(b).to_string())), f("len", p.len().to_string())],
+        46 => vec![
+            f(
+                "value",
+                p.first().map_or("-".into(), |&b| gchar(b).to_string()),
+            ),
+            f("len", p.len().to_string()),
+        ],
         37 => vec![f("language", latin1(p))],
-        39 => vec![f("len", p.len().to_string()), f("crc", format!("{:08x}", crc32(p)))],
+        39 => vec![
+            f("len", p.len().to_string()),
+            f("crc", format!("{:08x}", crc32(p))),
+        ],
         // PLI_PROCESSLIST: the client's process list, different every run
         44 => vec![f("len", p.len().to_string())],
         41 => vec![f("server", latin1(p))],
@@ -546,7 +733,11 @@ fn showimg_fields(text: &[u8]) -> Fields {
 }
 
 fn fnum(v: f32) -> String {
-    if (v - v.round()).abs() < 1e-4 { format!("{}", v.round() as i64) } else { format!("{}", (v * 100.0).round() / 100.0) }
+    if (v - v.round()).abs() < 1e-4 {
+        format!("{}", v.round() as i64)
+    } else {
+        format!("{}", (v * 100.0).round() / 100.0)
+    }
 }
 
 /// A prop stream as named fields, plus `props=` with the id order.
@@ -557,21 +748,30 @@ fn describe_props(ver: ClientVersion, p: &[u8], mask: &mut Masker) -> Fields {
     let mut used = 0;
     for pr in &props {
         used += 1 + pr.raw.len();
-        let nm = prop_name(u32::from(pr.id)).map_or_else(|| format!("P{}", pr.id), |n| n.to_string());
+        let nm =
+            prop_name(u32::from(pr.id)).map_or_else(|| format!("P{}", pr.id), |n| n.to_string());
         order.push(nm.clone());
         let raw = &pr.raw;
         let text = |r: &[u8]| mask.text(&latin1(r.get(1..).unwrap_or(&[])));
         let v = match pr.id {
             0 | 12 | 20 | 21 | 34 | 35 | 52 | 75 | 82 => text(raw),
             10 if !raw.is_empty() => text(raw),
-            8 | 9 => format!("power={},image={}", raw.first().map_or(0, |&b| gchar(b)), text(raw)),
+            8 | 9 => format!(
+                "power={},image={}",
+                raw.first().map_or(0, |&b| gchar(b)),
+                text(raw)
+            ),
             11 => format!("image={}", text(raw)),
             15 | 16 => fnum(f32::from(gchar(*raw.first().unwrap_or(&0x20))) / 2.0),
             17 => {
                 let s = gchar(*raw.first().unwrap_or(&0x20));
                 format!("{s} (dir {})", s % 4)
             }
-            13 => raw.iter().map(|&b| gchar(b).to_string()).collect::<Vec<_>>().join(","),
+            13 => raw
+                .iter()
+                .map(|&b| gchar(b).to_string())
+                .collect::<Vec<_>>()
+                .join(","),
             14 | 29 | 30 | 31 => mask.val(hex(raw)),
             78 | 79 => read_gshort(raw).map_or("?".into(), |v| fnum(decode_pos_precise(v))),
             _ if raw.len() == 1 => gchar(raw[0]).to_string(),
@@ -592,7 +792,10 @@ fn describe_s2c(ver: ClientVersion, id: i32, p: &[u8], mask: &mut Masker) -> (St
     let fields: Fields = match id {
         6 => vec![f("level", mask.text(&latin1(p)))],
         13 => match read_gshort(p) {
-            Some(pid) => vec![f("from", mask.pid(pid)), f("text", mask.text(&latin1(&p[2..])))],
+            Some(pid) => vec![
+                f("from", mask.pid(pid)),
+                f("text", mask.text(&latin1(&p[2..]))),
+            ],
             None => generic(p),
         },
         14 => match p {
@@ -636,7 +839,10 @@ fn describe_s2c(ver: ClientVersion, id: i32, p: &[u8], mask: &mut Masker) -> (St
         185 => match parse_board_heights(p) {
             Some(h) => vec![
                 f("cell", format!("{},{}", h.map_x, h.map_y)),
-                f("block", format!("{},{} {}x{}", h.block_x, h.block_y, h.width, h.height)),
+                f(
+                    "block",
+                    format!("{},{} {}x{}", h.block_x, h.block_y, h.width, h.height),
+                ),
             ],
             None => generic(p),
         },
@@ -663,7 +869,11 @@ fn describe_s2c(ver: ClientVersion, id: i32, p: &[u8], mask: &mut Masker) -> (St
                 Some((&n, tail)) if tail.len() >= usize::from(gchar(n)) => {
                     let n = usize::from(gchar(n));
                     let data = &tail[n..];
-                    let mut v = vec![f("file", latin1(&tail[..n])), f("size", data.len().to_string()), f("crc", format!("{:08x}", crc32(data)))];
+                    let mut v = vec![
+                        f("file", latin1(&tail[..n])),
+                        f("size", data.len().to_string()),
+                        f("crc", format!("{:08x}", crc32(data))),
+                    ];
                     if let Some(m) = m {
                         v.push(f("modtime", mask.val(m)));
                     }
@@ -674,15 +884,25 @@ fn describe_s2c(ver: ClientVersion, id: i32, p: &[u8], mask: &mut Masker) -> (St
         }
         0 | 3 | 1 | 100 | 101 => {
             // level board (raw), npc props, links: length and CRC only
-            vec![f("len", p.len().to_string()), f("crc", format!("{:08x}", crc32(p)))]
+            vec![
+                f("len", p.len().to_string()),
+                f("crc", format!("{:08x}", crc32(p))),
+            ]
         }
         // PLO_NEWWORLDTIME: the server clock
         42 => vec![f("time", mask.val(hex(p)))],
         // file name replies and weapon names
         30 | 34 | 45 | 156 => vec![f("text", latin1(p))],
-        44 | 45 => generic(p),
+        44 => generic(p),
         _ => {
-            if p.len() > 32 { vec![f("len", p.len().to_string()), f("crc", format!("{:08x}", crc32(p)))] } else { generic(p) }
+            if p.len() > 32 {
+                vec![
+                    f("len", p.len().to_string()),
+                    f("crc", format!("{:08x}", crc32(p))),
+                ]
+            } else {
+                generic(p)
+            }
         }
     };
     let _ = read_gint3;
@@ -736,12 +956,28 @@ mod tests {
         let mut cc = Gen5::new(key);
         let mut sc = Gen5::new(key);
         // props: X = 30.5 (61), Y = 12 (24), SPRITE 2, CURCHAT "hi dtacct"
-        let mut props = vec![0x22, 0x2f, 0x20 + 61, 0x30, 0x20 + 24, 0x31, 0x22, 0x2c, 0x20 + 9];
+        let mut props = vec![
+            0x22,
+            0x2f,
+            0x20 + 61,
+            0x30,
+            0x20 + 24,
+            0x31,
+            0x22,
+            0x2c,
+            0x20 + 9,
+        ];
         props.extend_from_slice(b"hi dtacct");
         props.push(b'\n');
         let c1 = frame5(&mut cc, &[&[46 + 0x20, 1 + 0x20, b'\n'], &props]);
         // server: PLO_LEVELNAME 6 "lv_a.nw", PLO_OTHERPLPROPS 8 pid 77 X 10
-        let s1 = frame5(&mut sc, &[b"&lv_a.nw\n", &[0x28, 0x20, 0x20 + 77, 0x2f, 0x20 + 20, b'\n']]);
+        let s1 = frame5(
+            &mut sc,
+            &[
+                b"&lv_a.nw\n",
+                &[0x28, 0x20, 0x20 + 77, 0x2f, 0x20 + 20, b'\n'],
+            ],
+        );
         synth_pcap(
             41000,
             14802,
@@ -757,8 +993,16 @@ mod tests {
 
     #[test]
     fn gen5_session_decodes_with_masks() {
-        let t = decode_pcap(&session_pcap(0x2b), &DecodeOptions::new(ClientVersion::V231)).unwrap();
-        let rows: Vec<(String, i32, String)> = t.events.iter().map(|e| (e.dir.label().into(), e.id, e.name.clone())).collect();
+        let t = decode_pcap(
+            &session_pcap(0x2b),
+            &DecodeOptions::new(ClientVersion::V231),
+        )
+        .unwrap();
+        let rows: Vec<(String, i32, String)> = t
+            .events
+            .iter()
+            .map(|e| (e.dir.label().into(), e.id, e.name.clone()))
+            .collect();
         assert_eq!(
             rows,
             vec![
@@ -804,8 +1048,16 @@ mod tests {
 
     #[test]
     fn different_keys_give_identical_traces() {
-        let a = decode_pcap(&session_pcap(0x11), &DecodeOptions::new(ClientVersion::V231)).unwrap();
-        let b = decode_pcap(&session_pcap(0x6e), &DecodeOptions::new(ClientVersion::V231)).unwrap();
+        let a = decode_pcap(
+            &session_pcap(0x11),
+            &DecodeOptions::new(ClientVersion::V231),
+        )
+        .unwrap();
+        let b = decode_pcap(
+            &session_pcap(0x6e),
+            &DecodeOptions::new(ClientVersion::V231),
+        )
+        .unwrap();
         assert_eq!(a.to_tsv(), b.to_tsv());
     }
 
@@ -817,7 +1069,11 @@ mod tests {
         let pcap = synth_pcap(
             41001,
             14802,
-            &[(1.0, true, 0x02, 1, b""), (1.1, true, 0x18, 2, &login), (1.2, true, 0x18, 2 + login.len() as u32, &bad)],
+            &[
+                (1.0, true, 0x02, 1, b""),
+                (1.1, true, 0x18, 2, &login),
+                (1.2, true, 0x18, 2 + login.len() as u32, &bad),
+            ],
         );
         let t = decode_pcap(&pcap, &DecodeOptions::new(ClientVersion::V231)).unwrap();
         assert_eq!(t.events.len(), 2);
@@ -830,7 +1086,11 @@ mod tests {
         let mut hs = vec![7 + 0x20, 0x2b + 0x20];
         hs.extend_from_slice(b"GNW30123newmain\n");
         let f1 = write_zlib_frame(&hs).unwrap();
-        let pcap = synth_pcap(41002, 14922, &[(1.0, true, 0x02, 1, b""), (1.1, true, 0x18, 2, &f1)]);
+        let pcap = synth_pcap(
+            41002,
+            14922,
+            &[(1.0, true, 0x02, 1, b""), (1.1, true, 0x18, 2, &f1)],
+        );
         let t = decode_pcap(&pcap, &DecodeOptions::new(ClientVersion::V222)).unwrap();
         assert_eq!(t.events[0].conn, "ls0");
         assert_eq!(t.events[0].name, "LS_HELLO");

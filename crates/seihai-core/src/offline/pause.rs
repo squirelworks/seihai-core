@@ -86,10 +86,22 @@ pub fn focus_pauses(version: crate::protocol::ClientVersion) -> bool {
 /// The 4.x builds send no position either: the real 4.04r2 sent STATUS 21
 /// alone on losing the focus and 20 alone on getting it back (lab,
 /// 2026-10-31).
-pub fn pause_message_bits(version: crate::protocol::ClientVersion, base: u8, bits: u8) -> (u8, bool) {
+pub fn pause_message_bits(
+    version: crate::protocol::ClientVersion,
+    base: u8,
+    bits: u8,
+) -> (u8, bool) {
     if version.encryption() == crate::protocol::EncryptionGen::Gen2 {
-        ((base & crate::protocol::login::CLASSIC_STATUS_KEPT) | bits, false)
-    } else if version.profile().protocol.lobby.is_some_and(|l| l.after_login.is_some()) {
+        (
+            (base & crate::protocol::login::CLASSIC_STATUS_KEPT) | bits,
+            false,
+        )
+    } else if version
+        .profile()
+        .protocol
+        .lobby
+        .is_some_and(|l| l.after_login.is_some())
+    {
         (base | bits, false)
     } else {
         (base | bits, true)
@@ -135,10 +147,18 @@ mod tests {
         s.reading = Some("Hello".into());
         s.toggle_pause();
         s.reading = None;
-        assert_eq!(s.pause_status(), PAUSED_STATUS, "closing the sign while paused");
+        assert_eq!(
+            s.pause_status(),
+            PAUSED_STATUS,
+            "closing the sign while paused"
+        );
         s.reading = Some("Hello".into());
         s.toggle_pause();
-        assert_eq!(s.pause_status(), PAUSED_STATUS, "unpausing while a sign is open");
+        assert_eq!(
+            s.pause_status(),
+            PAUSED_STATUS,
+            "unpausing while a sign is open"
+        );
     }
 
     #[test]
@@ -161,13 +181,21 @@ mod tests {
     #[test]
     fn gen2_focus_pause_follows_the_lab() {
         use crate::protocol::ClientVersion::*;
-        assert!([V121, V128B2, V13T, V131, V132, V133, V134].iter().all(|&v| !focus_pauses(v)));
+        assert!([V121, V128B2, V13T, V131, V132, V133, V134]
+            .iter()
+            .all(|&v| !focus_pauses(v)));
         assert!(focus_pauses(V135) && focus_pauses(V139) && focus_pauses(V222));
         assert_eq!(pause_message_bits(V139, 20, PAUSED_STATUS), (17, false));
         assert_eq!(pause_message_bits(V135, 20, PAUSED_STATUS), (17, false));
         assert_eq!(pause_message_bits(V304, 20, PAUSED_STATUS), (21, true));
-        assert_eq!(pause_message_bits(crate::protocol::ClientVersion::V404R2, 20, PAUSED_STATUS), (21, false));
-        assert_eq!(pause_message_bits(crate::protocol::ClientVersion::V420R8, 20, 0), (20, false));
+        assert_eq!(
+            pause_message_bits(crate::protocol::ClientVersion::V404R2, 20, PAUSED_STATUS),
+            (21, false)
+        );
+        assert_eq!(
+            pause_message_bits(crate::protocol::ClientVersion::V420R8, 20, 0),
+            (20, false)
+        );
     }
 
     #[test]

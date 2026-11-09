@@ -92,7 +92,10 @@ impl ShowImgSender {
     /// `None` for a profile whose build has no recorded id 24 behaviour.
     pub fn for_version(version: ClientVersion) -> Option<Self> {
         let info = version.profile().protocol.showimg?;
-        Some(Self { info, since: info.period })
+        Some(Self {
+            info,
+            since: info.period,
+        })
     }
 
     pub fn info(&self) -> ShowImgInfo {
@@ -244,7 +247,10 @@ pub fn parse_showimg_update(text: &[u8]) -> ShowImgUpdate {
 /// Keep a record when its index is in range.
 fn finish(mut out: ShowImgUpdate, index: i32, fields: Vec<ImgField>) -> ShowImgUpdate {
     if (0..=255).contains(&index) {
-        out.records.push(ImgRecord { index: index as u8, fields });
+        out.records.push(ImgRecord {
+            index: index as u8,
+            fields,
+        });
     }
     out
 }
@@ -267,7 +273,17 @@ pub struct PlayerImage {
 
 impl PlayerImage {
     fn new() -> Self {
-        Self { name: Vec::new(), x: 0, y: 0, layer: 1, part: None, colour: [200; 4], zoom: 10, order: None, mode: 0 }
+        Self {
+            name: Vec::new(),
+            x: 0,
+            y: 0,
+            layer: 1,
+            part: None,
+            colour: [200; 4],
+            zoom: 10,
+            order: None,
+            mode: 0,
+        }
     }
 }
 
@@ -335,8 +351,13 @@ pub fn describe_showimg_update(up: &ShowImgUpdate) -> String {
                 ImgField::Y(v) => s.push_str(&format!(" y={}", gc(*v))),
                 ImgField::Layer(v) => s.push_str(&format!(" layer={v}")),
                 ImgField::Part(None) => s.push_str(" part=all"),
-                ImgField::Part(Some(p)) => s.push_str(&format!(" part={},{} {}x{}", p.left, p.top, p.width, p.height)),
-                ImgField::Colour(c) => s.push_str(&format!(" colour={},{},{},{}", c[0], c[1], c[2], c[3])),
+                ImgField::Part(Some(p)) => s.push_str(&format!(
+                    " part={},{} {}x{}",
+                    p.left, p.top, p.width, p.height
+                )),
+                ImgField::Colour(c) => {
+                    s.push_str(&format!(" colour={},{},{},{}", c[0], c[1], c[2], c[3]))
+                }
                 ImgField::Zoom(z) => s.push_str(&format!(" zoom={z}/10")),
                 ImgField::Order(o) => s.push_str(&format!(" order={o}")),
                 ImgField::Mode(m) => s.push_str(&format!(" mode={m}")),
@@ -344,7 +365,11 @@ pub fn describe_showimg_update(up: &ShowImgUpdate) -> String {
         }
         parts.push(s);
     }
-    if parts.is_empty() { "(none)".to_string() } else { parts.join("; ") }
+    if parts.is_empty() {
+        "(none)".to_string()
+    } else {
+        parts.join("; ")
+    }
 }
 
 #[cfg(test)]
@@ -368,8 +393,11 @@ mod tests {
                 assert!(p.protocol.pli.contains(PLI_SHOWIMGPLAYER), "{}", p.label);
             }
         }
-        let with: Vec<&str> =
-            PROFILES.iter().filter(|p| p.protocol.showimg.is_some()).map(|p| p.label).collect();
+        let with: Vec<&str> = PROFILES
+            .iter()
+            .filter(|p| p.protocol.showimg.is_some())
+            .map(|p| p.label)
+            .collect();
         assert_eq!(with, ["2.17", "2.22", "2.31", "4.04r2", "4.20r6", "4.20r8"]);
         let i404 = ClientVersion::V404R2.profile().protocol.showimg.unwrap();
         assert!(!i404.needs_others);
@@ -502,16 +530,30 @@ mod tests {
                 ImgField::X(0x20 + 21),
                 ImgField::Y(0x20 + 8),
                 ImgField::Layer(2),
-                ImgField::Part(Some(ImgPart { left: 130, top: 5, width: 16, height: 32 })),
+                ImgField::Part(Some(ImgPart {
+                    left: 130,
+                    top: 5,
+                    width: 16,
+                    height: 32
+                })),
                 ImgField::Colour([200, 100, 0, 150]),
                 ImgField::Zoom(15),
                 ImgField::Order(3),
                 ImgField::Mode(2),
             ]
         );
-        assert_eq!(up.records[1], ImgRecord { index: 0, fields: vec![ImgField::Name(text("b"))] });
+        assert_eq!(
+            up.records[1],
+            ImgRecord {
+                index: 0,
+                fields: vec![ImgField::Name(text("b"))]
+            }
+        );
         let d = describe_showimg_update(&up);
-        assert!(d.starts_with("#3 name=a.png x=21 y=8 layer=2 part=130,5 16x32"), "{d}");
+        assert!(
+            d.starts_with("#3 name=a.png x=21 y=8 layer=2 part=130,5 16x32"),
+            "{d}"
+        );
     }
 
     /// Part values are clamped as the client clamps them, and 0x20 resets.
@@ -519,14 +561,28 @@ mod tests {
     fn part_is_clamped_and_resets() {
         // left 0x7f * 128 + 0x7f = 16383 -> 16000; width byte 0xff (223) -> 220
         let t = [
-            SHOWIMG_INDEX_BASE, 0x24, 0x21, 0x20 + 127, 0x20 + 127, 0x20, 0x20, 0xff, 0x20,
-            0x24, 0x20,
+            SHOWIMG_INDEX_BASE,
+            0x24,
+            0x21,
+            0x20 + 127,
+            0x20 + 127,
+            0x20,
+            0x20,
+            0xff,
+            0x20,
+            0x24,
+            0x20,
         ];
         let up = parse_showimg_update(&t);
         assert_eq!(
             up.records[0].fields,
             vec![
-                ImgField::Part(Some(ImgPart { left: 16000, top: 0, width: 220, height: 0 })),
+                ImgField::Part(Some(ImgPart {
+                    left: 16000,
+                    top: 0,
+                    width: 220,
+                    height: 0
+                })),
                 ImgField::Part(None),
             ]
         );
@@ -539,7 +595,13 @@ mod tests {
     fn malformed_text_stops_where_the_client_stops() {
         // Tag with no data byte.
         let up = parse_showimg_update(&[SHOWIMG_INDEX_BASE, 0x21]);
-        assert_eq!(up.records, vec![ImgRecord { index: 0, fields: vec![] }]);
+        assert_eq!(
+            up.records,
+            vec![ImgRecord {
+                index: 0,
+                fields: vec![]
+            }]
+        );
         // Short part (needs 7 more bytes).
         let up = parse_showimg_update(&[SHOWIMG_INDEX_BASE, 0x24, 0x21, 0x20, 0x20]);
         assert_eq!(up.records[0].fields, vec![]);
@@ -548,7 +610,14 @@ mod tests {
         assert_eq!(up.records[0].fields, vec![ImgField::X(0x20 + 4)]);
         // A 0x29 after the first byte is tag 9 (skipped with its data
         // byte), not a marker: the text is not a full list.
-        let up = parse_showimg_update(&[SHOWIMG_INDEX_BASE, 0x21, 0x20, SHOWIMG_FULL_MARKER, 0x21, 0x20]);
+        let up = parse_showimg_update(&[
+            SHOWIMG_INDEX_BASE,
+            0x21,
+            0x20,
+            SHOWIMG_FULL_MARKER,
+            0x21,
+            0x20,
+        ]);
         assert!(!up.full);
         assert_eq!(up.records.len(), 1);
         // Empty text is nothing.
@@ -561,7 +630,10 @@ mod tests {
     fn applying_follows_the_receiver() {
         let mut imgs = PlayerImages::new();
         // A field for an image that is not there changes nothing.
-        apply_showimg_update(&mut imgs, &parse_showimg_update(&[SHOWIMG_INDEX_BASE + 1, 0x21, 0x20 + 9]));
+        apply_showimg_update(
+            &mut imgs,
+            &parse_showimg_update(&[SHOWIMG_INDEX_BASE + 1, 0x21, 0x20 + 9]),
+        );
         assert!(imgs.is_empty());
         // Name first, then the field, in one record.
         let mut t = vec![SHOWIMG_INDEX_BASE + 1, 0x20, 0x20 + 1, b'a', 0x21, 0x20 + 9];
@@ -569,20 +641,41 @@ mod tests {
         apply_showimg_update(&mut imgs, &parse_showimg_update(&t));
         assert_eq!(imgs.len(), 2);
         assert_eq!(imgs[&1].x, 0x20 + 9);
-        assert_eq!((imgs[&1].layer, imgs[&1].colour, imgs[&1].zoom), (1, [200; 4], 10));
+        assert_eq!(
+            (imgs[&1].layer, imgs[&1].colour, imgs[&1].zoom),
+            (1, [200; 4], 10)
+        );
         // A change to image 1 only.
-        apply_showimg_update(&mut imgs, &parse_showimg_update(&[SHOWIMG_INDEX_BASE + 1, 0x22, 0x20 + 3]));
-        assert_eq!((imgs[&1].x, imgs[&1].y, imgs.len()), (0x20 + 9, 0x20 + 3, 2));
+        apply_showimg_update(
+            &mut imgs,
+            &parse_showimg_update(&[SHOWIMG_INDEX_BASE + 1, 0x22, 0x20 + 3]),
+        );
+        assert_eq!(
+            (imgs[&1].x, imgs[&1].y, imgs.len()),
+            (0x20 + 9, 0x20 + 3, 2)
+        );
         // A full list that names only image 2 drops image 1.
-        let full = [SHOWIMG_FULL_MARKER, SHOWIMG_INDEX_BASE + 2, 0x20, 0x20 + 1, b'b'];
+        let full = [
+            SHOWIMG_FULL_MARKER,
+            SHOWIMG_INDEX_BASE + 2,
+            0x20,
+            0x20 + 1,
+            b'b',
+        ];
         apply_showimg_update(&mut imgs, &parse_showimg_update(&full));
         assert_eq!(imgs.keys().copied().collect::<Vec<_>>(), vec![2]);
         // The marker alone empties the list.
         apply_showimg_update(&mut imgs, &parse_showimg_update(&[SHOWIMG_VALUE + 0x20]));
         assert!(imgs.is_empty());
         // An empty name removes one image.
-        apply_showimg_update(&mut imgs, &parse_showimg_update(&[SHOWIMG_INDEX_BASE, 0x20, 0x20 + 1, b'z']));
-        apply_showimg_update(&mut imgs, &parse_showimg_update(&[SHOWIMG_INDEX_BASE, 0x20, 0x20]));
+        apply_showimg_update(
+            &mut imgs,
+            &parse_showimg_update(&[SHOWIMG_INDEX_BASE, 0x20, 0x20 + 1, b'z']),
+        );
+        apply_showimg_update(
+            &mut imgs,
+            &parse_showimg_update(&[SHOWIMG_INDEX_BASE, 0x20, 0x20]),
+        );
         assert!(imgs.is_empty());
     }
 }

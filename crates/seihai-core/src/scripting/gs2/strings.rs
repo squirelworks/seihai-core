@@ -17,7 +17,8 @@ pub fn client_int(x: f64) -> i32 {
 /// `s.trim()`: drops leading and trailing bytes whose low 7 bits are a
 /// space (0x20 and 0xA0).
 pub fn trim(s: &str) -> String {
-    s.trim_matches(|c: char| (c as u32) & 0x7F == 0x20 && (c as u32) < 0x100).to_string()
+    s.trim_matches(|c: char| (c as u32) & 0x7F == 0x20 && (c as u32) < 0x100)
+        .to_string()
 }
 
 fn chars(s: &str) -> Vec<char> {
@@ -30,7 +31,9 @@ pub fn pos(s: &str, sub: &str) -> i32 {
     if sub.is_empty() || sub.len() > s.len() {
         return -1;
     }
-    (0..=s.len() - sub.len()).find(|&i| s[i..i + sub.len()] == sub[..]).map_or(-1, |i| i as i32)
+    (0..=s.len() - sub.len())
+        .find(|&i| s[i..i + sub.len()] == sub[..])
+        .map_or(-1, |i| i as i32)
 }
 
 /// `s.charat(i)`: that byte, or "" outside the string.
@@ -119,7 +122,12 @@ pub fn format(fmt: &str, args: &[Val]) -> String {
             // The client's float writer is not given the width or precision.
             'f' => out.push_str(&num_to_string(args.next().map_or(0.0, Val::num))),
             's' => {
-                let s: Vec<char> = args.next().map(Val::text).unwrap_or_default().chars().collect();
+                let s: Vec<char> = args
+                    .next()
+                    .map(Val::text)
+                    .unwrap_or_default()
+                    .chars()
+                    .collect();
                 let take = precision.map_or(s.len(), |p| p.min(s.len()));
                 // Padded on the left whatever the `-` flag says.
                 for _ in take..width {
@@ -162,14 +170,34 @@ mod tests {
 
     #[test]
     fn integer_conversion_rounds_down() {
-        assert_eq!((client_int(1.9), client_int(-1.5), client_int(-2.0)), (1, -2, -2));
+        assert_eq!(
+            (client_int(1.9), client_int(-1.5), client_int(-2.0)),
+            (1, -2, -2)
+        );
     }
 
     #[test]
     fn format_reads_the_pattern_as_the_client_does() {
         let n = |v: f64| Val::Num(v);
-        assert_eq!(format("%d|%5d|%-5d|%+d|%.3d", &[n(42.0), n(7.0), n(7.0), n(3.0), n(5.0)]), "42|    7|7    |+3|005");
-        assert_eq!(format("%s|%6s|%-6s|%.2s|%%|%q|", &[Val::from("ab"), Val::from("cd"), Val::from("ef"), Val::from("ghij")]), "ab|    cd|    ef|gh|%||");
+        assert_eq!(
+            format(
+                "%d|%5d|%-5d|%+d|%.3d",
+                &[n(42.0), n(7.0), n(7.0), n(3.0), n(5.0)]
+            ),
+            "42|    7|7    |+3|005"
+        );
+        assert_eq!(
+            format(
+                "%s|%6s|%-6s|%.2s|%%|%q|",
+                &[
+                    Val::from("ab"),
+                    Val::from("cd"),
+                    Val::from("ef"),
+                    Val::from("ghij")
+                ]
+            ),
+            "ab|    cd|    ef|gh|%||"
+        );
         assert_eq!(format("%d and %s", &[n(-9.5)]), "-10 and ");
         assert_eq!(format("%u", &[n(-1.0)]), "4294967295");
         assert_eq!(format("cut %", &[]), "cut ");

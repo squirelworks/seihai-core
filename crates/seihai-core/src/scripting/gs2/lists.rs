@@ -32,7 +32,12 @@ impl Value {
     pub fn val(&self) -> Val {
         match self {
             Value::Val(v) => v.clone(),
-            Value::List(l) => Val::Str(l.iter().map(|e| e.val().text()).collect::<Vec<_>>().join(",")),
+            Value::List(l) => Val::Str(
+                l.iter()
+                    .map(|e| e.val().text())
+                    .collect::<Vec<_>>()
+                    .join(","),
+            ),
         }
     }
 
@@ -44,7 +49,9 @@ impl Value {
     /// values through the executor's comparison.
     pub fn same(&self, other: &Value, cmp: fn(&Val, &Val) -> i32) -> bool {
         match (self, other) {
-            (Value::List(a), Value::List(b)) => a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.same(y, cmp)),
+            (Value::List(a), Value::List(b)) => {
+                a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.same(y, cmp))
+            }
             (Value::Val(a), Value::Val(b)) => cmp(a, b) == 0,
             _ => false,
         }
@@ -99,7 +106,10 @@ pub fn positions(s: &str, t: &str) -> Vec<Value> {
     if t.is_empty() || t.len() > s.len() {
         return Vec::new();
     }
-    (0..=s.len() - t.len()).filter(|&i| s[i..i + t.len()] == t[..]).map(|i| Value::Val(Val::Num(i as f64))).collect()
+    (0..=s.len() - t.len())
+        .filter(|&i| s[i..i + t.len()] == t[..])
+        .map(|i| Value::Val(Val::Num(i as f64)))
+        .collect()
 }
 
 /// `a.subarray(start, len)`: `start` kept to the list, a `len` below 0 runs
@@ -120,7 +130,10 @@ mod tests {
     fn tokenize_splits_on_the_given_bytes_and_keeps_quoted_tokens() {
         assert_eq!(tokenize("a b,c", " ,"), ["a", "b", "c"]);
         assert_eq!(tokenize(" a ,, b ", ","), ["a", "b"]);
-        assert_eq!(tokenize("\"x, y\",\"say \"\"hi\"\"\",\"\"", ","), ["x, y", "say \"hi\"", ""]);
+        assert_eq!(
+            tokenize("\"x, y\",\"say \"\"hi\"\"\",\"\"", ","),
+            ["x, y", "say \"hi\"", ""]
+        );
         assert!(tokenize("", " ,").is_empty());
     }
 

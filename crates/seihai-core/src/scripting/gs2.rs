@@ -176,7 +176,10 @@ ops! {
 impl Op {
     /// The opcodes whose operand is an op index to jump to.
     pub fn jumps(self) -> bool {
-        matches!(self, Op::SetIndex | Op::SetIndexTrue | Op::Or | Op::If | Op::And | Op::With | Op::ForEach)
+        matches!(
+            self,
+            Op::SetIndex | Op::SetIndexTrue | Op::Or | Op::If | Op::And | Op::With | Op::ForEach
+        )
     }
 }
 
@@ -243,7 +246,9 @@ pub struct Script {
 }
 
 fn be32(b: &[u8], at: usize) -> Result<u32, String> {
-    b.get(at..at + 4).map(|s| u32::from_be_bytes(s.try_into().unwrap())).ok_or_else(|| format!("truncated at byte {at}"))
+    b.get(at..at + 4)
+        .map(|s| u32::from_be_bytes(s.try_into().unwrap()))
+        .ok_or_else(|| format!("truncated at byte {at}"))
 }
 
 /// Strings are bytes; each byte is one character, as in the level reader.
@@ -252,7 +257,10 @@ fn latin1(b: &[u8]) -> String {
 }
 
 fn nul_terminated(b: &[u8], at: usize) -> Result<(String, usize), String> {
-    let len = b.get(at..).and_then(|s| s.iter().position(|&c| c == 0)).ok_or_else(|| format!("unterminated string at byte {at}"))?;
+    let len = b
+        .get(at..)
+        .and_then(|s| s.iter().position(|&c| c == 0))
+        .ok_or_else(|| format!("unterminated string at byte {at}"))?;
     Ok((latin1(&b[at..at + len]), at + len + 1))
 }
 
@@ -267,7 +275,9 @@ impl Script {
         while p + 8 <= data.len() {
             let ty = be32(data, p)?;
             let len = be32(data, p + 4)? as usize;
-            let body = data.get(p + 8..p + 8 + len).ok_or_else(|| format!("segment {ty} at byte {p} runs past the end"))?;
+            let body = data
+                .get(p + 8..p + 8 + len)
+                .ok_or_else(|| format!("segment {ty} at byte {p} runs past the end"))?;
             match ty {
                 SEGMENT_GS1_FLAGS => script.gs1_flags = be32(body, 0)?,
                 SEGMENT_FUNCTIONS => script.functions = read_functions(body)?,
@@ -352,7 +362,14 @@ impl Script {
             match &ins.operand {
                 Operand::None => {}
                 Operand::Str(n) => {
-                    let _ = write!(out, " #{n} {:?}", self.strings.get(*n as usize).map(String::as_str).unwrap_or("?"));
+                    let _ = write!(
+                        out,
+                        " #{n} {:?}",
+                        self.strings
+                            .get(*n as usize)
+                            .map(String::as_str)
+                            .unwrap_or("?")
+                    );
                 }
                 Operand::Int(v) if ins.op.jumps() => {
                     let _ = write!(out, " -> {v}");
@@ -480,7 +497,10 @@ fn read_code(c: &[u8]) -> Result<Vec<Instr>, String> {
         let offset = i;
         let op = Op::from_u8(c[i]);
         if c[i] >= 0xF0 {
-            return Err(format!("marker {:#x} at byte {offset} where an opcode was expected", c[i]));
+            return Err(format!(
+                "marker {:#x} at byte {offset} where an opcode was expected",
+                c[i]
+            ));
         }
         i += 1;
         let short = |n: usize| format!("{op} at byte {offset}: operand needs {n} bytes");
@@ -489,10 +509,23 @@ fn read_code(c: &[u8]) -> Result<Vec<Instr>, String> {
                 i += 1;
                 let (operand, len) = match m {
                     0xF0 => (Operand::Str(*c.get(i).ok_or_else(|| short(1))? as u32), 1),
-                    0xF1 => (Operand::Str(u16::from_be_bytes(c.get(i..i + 2).ok_or_else(|| short(2))?.try_into().unwrap()) as u32), 2),
+                    0xF1 => (
+                        Operand::Str(u16::from_be_bytes(
+                            c.get(i..i + 2).ok_or_else(|| short(2))?.try_into().unwrap(),
+                        ) as u32),
+                        2,
+                    ),
                     0xF2 => (Operand::Str(be32(c, i).map_err(|_| short(4))?), 4),
-                    0xF3 => (Operand::Int(*c.get(i).ok_or_else(|| short(1))? as i8 as i32), 1),
-                    0xF4 => (Operand::Int(i16::from_be_bytes(c.get(i..i + 2).ok_or_else(|| short(2))?.try_into().unwrap()) as i32), 2),
+                    0xF3 => (
+                        Operand::Int(*c.get(i).ok_or_else(|| short(1))? as i8 as i32),
+                        1,
+                    ),
+                    0xF4 => (
+                        Operand::Int(i16::from_be_bytes(
+                            c.get(i..i + 2).ok_or_else(|| short(2))?.try_into().unwrap(),
+                        ) as i32),
+                        2,
+                    ),
                     0xF5 => (Operand::Int(be32(c, i).map_err(|_| short(4))? as i32), 4),
                     _ => {
                         let (text, next) = nul_terminated(c, i)?;
@@ -502,10 +535,18 @@ fn read_code(c: &[u8]) -> Result<Vec<Instr>, String> {
                 i += len;
                 operand
             }
-            Some(m @ 0xF7..) => return Err(format!("{op} at byte {offset}: unknown operand marker {m:#x}")),
+            Some(m @ 0xF7..) => {
+                return Err(format!(
+                    "{op} at byte {offset}: unknown operand marker {m:#x}"
+                ))
+            }
             _ => Operand::None,
         };
-        out.push(Instr { op, operand, offset });
+        out.push(Instr {
+            op,
+            operand,
+            offset,
+        });
     }
     Ok(out)
 }
@@ -527,8 +568,8 @@ mod tests {
         // OP_TYPE_NUMBER -2 (F3), 300 (F4), 100000 (F5), "0.25" (F6);
         // OP_TYPE_STRING #1 (F0), #300 (F1); OP_IF -> 7 (F4); OP_RET.
         let code = [
-            20, 0xF3, 0xFE, 20, 0xF4, 0x01, 0x2C, 20, 0xF5, 0, 1, 0x86, 0xA0, 20, 0xF6, b'0', b'.', b'2', b'5', 0,
-            21, 0xF0, 1, 21, 0xF1, 0x01, 0x2C, 4, 0xF4, 0, 7, 7,
+            20, 0xF3, 0xFE, 20, 0xF4, 0x01, 0x2C, 20, 0xF5, 0, 1, 0x86, 0xA0, 20, 0xF6, b'0', b'.',
+            b'2', b'5', 0, 21, 0xF0, 1, 21, 0xF1, 0x01, 0x2C, 4, 0xF4, 0, 7, 7,
         ];
         let ins = read_code(&code).unwrap();
         let nums: Vec<f64> = ins.iter().filter_map(Instr::number).collect();
@@ -549,11 +590,20 @@ mod tests {
     #[test]
     fn bad_input_is_an_error() {
         assert!(read_code(&[20, 0xF4, 0]).is_err(), "short operand");
-        assert!(read_code(&[20, 0xF6, b'1']).is_err(), "unterminated decimal");
+        assert!(
+            read_code(&[20, 0xF6, b'1']).is_err(),
+            "unterminated decimal"
+        );
         assert!(read_code(&[20, 0xF9]).is_err(), "unknown marker");
         assert!(read_code(&[0xF3, 1]).is_err(), "marker in opcode position");
-        assert!(Script::parse(&[0, 0, 0, 4, 0, 0, 0, 9, 1]).is_err(), "segment past the end");
-        assert!(Script::parse(&[0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0]).is_err(), "no bytecode");
+        assert!(
+            Script::parse(&[0, 0, 0, 4, 0, 0, 0, 9, 1]).is_err(),
+            "segment past the end"
+        );
+        assert!(
+            Script::parse(&[0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0]).is_err(),
+            "no bytecode"
+        );
     }
 
     fn parse_test_code(code: &[u8], strings: &[u8], functions: &[u8]) -> Result<Script, String> {
@@ -640,12 +690,17 @@ mod tests {
     #[test]
     fn writer_roundtrips_the_fixtures() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/gs2");
-        for name in ["shared", "control", "calls", "timers", "strings", "lists", "objects", "rest"] {
+        for name in [
+            "shared", "control", "calls", "timers", "strings", "lists", "objects", "rest",
+        ] {
             let bytes = std::fs::read(dir.join(format!("{name}.gs2bc"))).unwrap();
             let script = Script::parse(&bytes).unwrap();
             let again = Script::parse(&script.write()).unwrap();
             assert_eq!(again.disassemble(), script.disassemble(), "{name}");
-            assert_eq!((again.functions, again.strings, again.gs1_flags), (script.functions, script.strings.clone(), script.gs1_flags));
+            assert_eq!(
+                (again.functions, again.strings, again.gs1_flags),
+                (script.functions, script.strings.clone(), script.gs1_flags)
+            );
         }
         // Some backward jumps in the other fixtures are 16 bits wide even
         // when the target fits in a byte. `write` uses the smallest width.

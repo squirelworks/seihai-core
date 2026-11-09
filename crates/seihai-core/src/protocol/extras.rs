@@ -110,7 +110,10 @@ mod tests {
     #[test]
     fn map_spec_as_seen() {
         let m = parse_map_spec(b"bigmap2.txt,bigmap.png,0,0").unwrap();
-        assert_eq!((m.txt.as_str(), m.png.as_str(), m.x, m.y), ("bigmap2.txt", "bigmap.png", 0.0, 0.0));
+        assert_eq!(
+            (m.txt.as_str(), m.png.as_str(), m.x, m.y),
+            ("bigmap2.txt", "bigmap.png", 0.0, 0.0)
+        );
         // The sample in gs2lib's header has non-zero x and y.
         let m = parse_map_spec(b"zodiacminimap.txt,zodiacworldminimap3.png,10,10").unwrap();
         assert_eq!((m.x, m.y), (10.0, 10.0));
@@ -134,8 +137,14 @@ mod tests {
 
     #[test]
     fn start_message_is_trimmed_and_typed() {
-        assert_eq!(parse_start_message(b"  <html>hi</html>\r\n"), ("<html>hi</html>".to_string(), false));
-        assert_eq!(parse_start_message(b"{\\rtf1\\ansi hello}"), ("{\\rtf1\\ansi hello}".to_string(), true));
+        assert_eq!(
+            parse_start_message(b"  <html>hi</html>\r\n"),
+            ("<html>hi</html>".to_string(), false)
+        );
+        assert_eq!(
+            parse_start_message(b"{\\rtf1\\ansi hello}"),
+            ("{\\rtf1\\ansi hello}".to_string(), true)
+        );
         assert_eq!(parse_start_message(b""), (String::new(), false));
     }
 
@@ -156,7 +165,10 @@ mod tests {
     fn level_mod_time_is_gint5_unix_time() {
         // 1_781_284_436 (2026-06-12) as GINT5: 7-bit groups, high first, +0x20.
         let v: u64 = 1_781_284_436;
-        let b: Vec<u8> = (0..5).rev().map(|i| (((v >> (7 * i)) & 0x7F) as u8) + 0x20).collect();
+        let b: Vec<u8> = (0..5)
+            .rev()
+            .map(|i| (((v >> (7 * i)) & 0x7F) as u8) + 0x20)
+            .collect();
         assert_eq!(parse_level_mod_time(&b), Some(1_781_284_436));
         assert_eq!(parse_level_mod_time(&b[..4]), None);
     }
@@ -171,7 +183,10 @@ mod tests {
             parse_text_list(b"Online,Away,DND,Eating,Hiding,No PMs,RPing,Sparring,PKing").len(),
             9
         );
-        assert_eq!(parse_text_list(b"Server,Staff,Manager"), vec!["Server", "Staff", "Manager"]);
+        assert_eq!(
+            parse_text_list(b"Server,Staff,Manager"),
+            vec!["Server", "Staff", "Manager"]
+        );
         assert!(parse_text_list(b"").is_empty());
     }
 }

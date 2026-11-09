@@ -192,15 +192,32 @@ pub fn diff(real: &Trace, seihai: &Trace, opts: &DiffOptions) -> Report {
                 for dir in [Dir::C2S, Dir::S2C] {
                     let a: Vec<&Event> = real.stream(conn, dir).collect();
                     let b: Vec<&Event> = seihai.stream(conn, dir).collect();
-                    rep.streams.push(StreamCount { conn: conn.clone(), dir, real: a.len(), seihai: b.len() });
+                    rep.streams.push(StreamCount {
+                        conn: conn.clone(),
+                        dir,
+                        real: a.len(),
+                        seihai: b.len(),
+                    });
                     compare_stream(conn, dir, &a, &b, opts, &mut rep.divergences);
                 }
             }
         }
     }
     rep.divergences.sort_by(|x, y| {
-        (x.severity, x.category, &x.conn, x.dir.map(|d| d as u8), x.real_pos.or(x.seihai_pos))
-            .cmp(&(y.severity, y.category, &y.conn, y.dir.map(|d| d as u8), y.real_pos.or(y.seihai_pos)))
+        (
+            x.severity,
+            x.category,
+            &x.conn,
+            x.dir.map(|d| d as u8),
+            x.real_pos.or(x.seihai_pos),
+        )
+            .cmp(&(
+                y.severity,
+                y.category,
+                &y.conn,
+                y.dir.map(|d| d as u8),
+                y.real_pos.or(y.seihai_pos),
+            ))
     });
     rep
 }
@@ -235,7 +252,14 @@ fn runs<'a>(evs: &[&'a Event], dir: Dir, opts: &DiffOptions) -> Vec<Run<'a>> {
                 r.count += 1;
                 r.events.push(e);
             }
-            _ => out.push(Run { id: e.id, pos, count: 1, first: e, events: vec![e], frame_new: new }),
+            _ => out.push(Run {
+                id: e.id,
+                pos,
+                count: 1,
+                first: e,
+                events: vec![e],
+                frame_new: new,
+            }),
         }
     }
     out
@@ -245,7 +269,7 @@ fn label(e: &Event) -> String {
     format!("{} ({})", e.name, e.id)
 }
 
-fn median(v: &mut Vec<i64>) -> i64 {
+fn median(v: &mut [i64]) -> i64 {
     v.sort_unstable();
     v[v.len() / 2]
 }
@@ -281,11 +305,27 @@ fn compare_stream(
             n.entry(e.id).or_insert((0, e.name.clone())).0 += 1;
         }
         for (id, (c, nm)) in n {
-            out.push(mk(Severity::Info, Category::Noise, id, &nm, None, None, format!("{who} trace has {c} x {nm}, left out (harness artifact)")));
+            out.push(mk(
+                Severity::Info,
+                Category::Noise,
+                id,
+                &nm,
+                None,
+                None,
+                format!("{who} trace has {c} x {nm}, left out (harness artifact)"),
+            ));
         }
     }
-    let a: Vec<&Event> = a_all.iter().copied().filter(|e| !has(&opts.noise, dir, e.id)).collect();
-    let b: Vec<&Event> = b_all.iter().copied().filter(|e| !has(&opts.noise, dir, e.id)).collect();
+    let a: Vec<&Event> = a_all
+        .iter()
+        .copied()
+        .filter(|e| !has(&opts.noise, dir, e.id))
+        .collect();
+    let b: Vec<&Event> = b_all
+        .iter()
+        .copied()
+        .filter(|e| !has(&opts.noise, dir, e.id))
+        .collect();
     let ra = runs(&a, dir, opts);
     let rb = runs(&b, dir, opts);
     let ids_a: BTreeMap<i32, usize> = a.iter().fold(BTreeMap::new(), |mut m, e| {
@@ -307,16 +347,43 @@ fn compare_stream(
         if !ids_b.contains_key(&id) {
             let e = a.iter().find(|e| e.id == id).unwrap();
             let pos = a.iter().position(|e| e.id == id);
-            let sev = if id < 0 { Severity::High } else { sev_dir(Severity::High) };
-            out.push(mk(sev, Category::MissingId, id, &e.name, pos, None, format!("the real client has {n} x {} here; Seihai never sends it", label(e))));
+            let sev = if id < 0 {
+                Severity::High
+            } else {
+                sev_dir(Severity::High)
+            };
+            out.push(mk(
+                sev,
+                Category::MissingId,
+                id,
+                &e.name,
+                pos,
+                None,
+                format!(
+                    "the real client has {n} x {} here; Seihai never sends it",
+                    label(e)
+                ),
+            ));
         }
     }
     for (&id, &n) in &ids_b {
         if !ids_a.contains_key(&id) {
             let e = b.iter().find(|e| e.id == id).unwrap();
             let pos = b.iter().position(|e| e.id == id);
-            let sev = if id < 0 { Severity::High } else { sev_dir(Severity::High) };
-            out.push(mk(sev, Category::ExtraId, id, &e.name, None, pos, format!("Seihai sends {n} x {} the real client never sent", label(e))));
+            let sev = if id < 0 {
+                Severity::High
+            } else {
+                sev_dir(Severity::High)
+            };
+            out.push(mk(
+                sev,
+                Category::ExtraId,
+                id,
+                &e.name,
+                None,
+                pos,
+                format!("Seihai sends {n} x {} the real client never sent", label(e)),
+            ));
         }
     }
     // Fields compared as sets over the whole stream.
@@ -325,7 +392,11 @@ fn compare_stream(
             continue;
         }
         let vals = |evs: &[&Event]| -> std::collections::BTreeSet<String> {
-            evs.iter().filter(|e| e.id == *id).filter_map(|e| e.field(key)).map(str::to_string).collect()
+            evs.iter()
+                .filter(|e| e.id == *id)
+                .filter_map(|e| e.field(key))
+                .map(str::to_string)
+                .collect()
         };
         let (sa, sb) = (vals(&a), vals(&b));
         if sa == sb {
@@ -333,8 +404,18 @@ fn compare_stream(
         }
         let only_a: Vec<&String> = sa.difference(&sb).collect();
         let only_b: Vec<&String> = sb.difference(&sa).collect();
-        let nm = a.iter().chain(b.iter()).find(|e| e.id == *id).map_or(String::new(), |e| e.name.clone());
-        let list = |v: &[&String]| if v.is_empty() { "-".to_string() } else { v.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ") };
+        let nm = a
+            .iter()
+            .chain(b.iter())
+            .find(|e| e.id == *id)
+            .map_or(String::new(), |e| e.name.clone());
+        let list = |v: &[&String]| {
+            if v.is_empty() {
+                "-".to_string()
+            } else {
+                v.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+            }
+        };
         out.push(mk(
             sev_dir(Severity::Medium),
             Category::Field,
@@ -342,7 +423,11 @@ fn compare_stream(
             &nm,
             a.iter().position(|e| e.id == *id),
             b.iter().position(|e| e.id == *id),
-            format!("{nm} ({id}) {key} values differ: only the real client: [{}]; only Seihai: [{}]", list(&only_a), list(&only_b)),
+            format!(
+                "{nm} ({id}) {key} values differ: only the real client: [{}]; only Seihai: [{}]",
+                list(&only_a),
+                list(&only_b)
+            ),
         ));
     }
     // Alignment of the collapsed runs.
@@ -350,7 +435,11 @@ fn compare_stream(
     let mut t = vec![vec![0u32; m + 1]; n + 1];
     for i in (0..n).rev() {
         for j in (0..m).rev() {
-            t[i][j] = if ra[i].id == rb[j].id { t[i + 1][j + 1] + 1 } else { t[i + 1][j].max(t[i][j + 1]) };
+            t[i][j] = if ra[i].id == rb[j].id {
+                t[i + 1][j + 1] + 1
+            } else {
+                t[i + 1][j].max(t[i][j + 1])
+            };
         }
     }
     let mut pairs: Vec<(usize, usize)> = Vec::new();
@@ -376,33 +465,59 @@ fn compare_stream(
     for &i in &un_a {
         let r = &ra[i];
         if ids_b.contains_key(&r.id) {
-            let e = order.entry(r.id).or_insert((vec![], vec![], r.first.name.clone()));
+            let e = order
+                .entry(r.id)
+                .or_insert((vec![], vec![], r.first.name.clone()));
             e.0.push(r.pos);
         }
     }
     for &j in &un_b {
         let r = &rb[j];
         if ids_a.contains_key(&r.id) {
-            let e = order.entry(r.id).or_insert((vec![], vec![], r.first.name.clone()));
+            let e = order
+                .entry(r.id)
+                .or_insert((vec![], vec![], r.first.name.clone()));
             e.1.push(r.pos);
         }
     }
     for (id, (pa, pb, nm)) in order {
         let ctx = |runs: &[Run<'_>], pos: usize| -> String {
             let k = runs.iter().position(|r| r.pos == pos).unwrap_or(0);
-            let before = k.checked_sub(1).map(|p| format!("{}", runs[p].first.name)).unwrap_or_else(|| "(start)".into());
-            let after = runs.get(k + 1).map(|r| r.first.name.clone()).unwrap_or_else(|| "(end)".into());
+            let before = k
+                .checked_sub(1)
+                .map(|p| runs[p].first.name.to_string())
+                .unwrap_or_else(|| "(start)".into());
+            let after = runs
+                .get(k + 1)
+                .map(|r| r.first.name.clone())
+                .unwrap_or_else(|| "(end)".into());
             format!("between {before} and {after}")
         };
         let mut d = format!("{nm} ({id}) is placed differently: ");
         if let Some(&p) = pa.first() {
-            let _ = write!(d, "real has it {} (message {p}) where Seihai has other messages; ", ctx(&ra, p));
+            let _ = write!(
+                d,
+                "real has it {} (message {p}) where Seihai has other messages; ",
+                ctx(&ra, p)
+            );
         }
         if let Some(&p) = pb.first() {
-            let _ = write!(d, "Seihai has it {} (message {p}) where the real client has other messages; ", ctx(&rb, p));
+            let _ = write!(
+                d,
+                "Seihai has it {} (message {p}) where the real client has other messages; ",
+                ctx(&rb, p)
+            );
         }
         let _ = write!(d, "{} unmatched run(s) real, {} Seihai", pa.len(), pb.len());
-        out.push(mk(sev_dir(Severity::Medium), Category::Order, id, &nm, pa.first().copied(), pb.first().copied(), d));
+        out.push(mk(
+            sev_dir(Severity::Medium),
+            Category::Order,
+            id,
+            &nm,
+            pa.first().copied(),
+            pb.first().copied(),
+            d,
+        ));
     }
     // Matched runs: fields and frame bundling.
     let mut seen_first_props = false;
@@ -414,7 +529,9 @@ fn compare_stream(
         if dir == Dir::C2S && x.id == 2 {
             seen_first_props = true;
         }
-        let entry = bundling.entry(x.id).or_insert((0, 0, x.pos, x.first.name.clone()));
+        let entry = bundling
+            .entry(x.id)
+            .or_insert((0, 0, x.pos, x.first.name.clone()));
         entry.1 += 1;
         if i > 0 && j > 0 && x.frame_new != y.frame_new {
             entry.0 += 1;
@@ -441,25 +558,69 @@ fn compare_stream(
             if *cnt > 1 {
                 continue; // report each field of each id once, with the first example
             }
-            let sev = if x.id < 0 { Severity::High } else if dir == Dir::C2S { Severity::Medium } else { Severity::Low };
+            let sev = if x.id < 0 {
+                Severity::High
+            } else if dir == Dir::C2S {
+                Severity::Medium
+            } else {
+                Severity::Low
+            };
             let detail = if k == "props" {
                 let set = |v: &Option<String>| -> Vec<String> {
-                    v.as_deref().unwrap_or("").split(',').filter(|s| !s.is_empty()).map(str::to_string).collect()
+                    v.as_deref()
+                        .unwrap_or("")
+                        .split(',')
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_string)
+                        .collect()
                 };
                 let (sa, sb) = (set(&va), set(&vb));
                 let oa: Vec<&String> = sa.iter().filter(|p| !sb.contains(p)).collect();
                 let ob: Vec<&String> = sb.iter().filter(|p| !sa.contains(p)).collect();
-                let j = |v: &[&String]| if v.is_empty() { "-".to_string() } else { v.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(",") };
+                let j = |v: &[&String]| {
+                    if v.is_empty() {
+                        "-".to_string()
+                    } else {
+                        v.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(",")
+                    }
+                };
                 if oa.is_empty() && ob.is_empty() {
-                    format!("{} property order: real {} | Seihai {}", label(x.first), show(&va), show(&vb))
+                    format!(
+                        "{} property order: real {} | Seihai {}",
+                        label(x.first),
+                        show(&va),
+                        show(&vb)
+                    )
                 } else {
-                    format!("{} property set: only the real client [{}]; only Seihai [{}]", label(x.first), j(&oa), j(&ob))
+                    format!(
+                        "{} property set: only the real client [{}]; only Seihai [{}]",
+                        label(x.first),
+                        j(&oa),
+                        j(&ob)
+                    )
                 }
             } else {
-                let at = if pairwise && x.count > 1 { format!(" (message {} of the run)", m + 1) } else { String::new() };
-                format!("{} field {k}{at}: real {} | Seihai {}", label(x.first), show(&va), show(&vb))
+                let at = if pairwise && x.count > 1 {
+                    format!(" (message {} of the run)", m + 1)
+                } else {
+                    String::new()
+                };
+                format!(
+                    "{} field {k}{at}: real {} | Seihai {}",
+                    label(x.first),
+                    show(&va),
+                    show(&vb)
+                )
             };
-            out.push(mk(sev, Category::Field, x.id, &x.first.name, Some(x.pos), Some(y.pos), detail));
+            out.push(mk(
+                sev,
+                Category::Field,
+                x.id,
+                &x.first.name,
+                Some(x.pos),
+                Some(y.pos),
+                detail,
+            ));
         }
     }
     for (id, (bad, total, pos, nm)) in bundling {
@@ -482,7 +643,18 @@ fn compare_stream(
             continue;
         }
         let e = a.iter().find(|e| e.id == id).unwrap();
-        out.push(mk(Severity::Low, Category::Count, id, &e.name, a.iter().position(|e| e.id == id), b.iter().position(|e| e.id == id), format!("{} sent {na} x by the real client, {nb} x by Seihai", label(e))));
+        out.push(mk(
+            Severity::Low,
+            Category::Count,
+            id,
+            &e.name,
+            a.iter().position(|e| e.id == id),
+            b.iter().position(|e| e.id == id),
+            format!(
+                "{} sent {na} x by the real client, {nb} x by Seihai",
+                label(e)
+            ),
+        ));
     }
     // Timing of steady cadences.
     for (&id, &na) in &ids_a {
@@ -507,7 +679,18 @@ fn compare_stream(
         let allow = opts.jitter_ms.max(ma / 5);
         if (steady || has(&opts.periodic, dir, id)) && (ma - mb).abs() > allow {
             let e = a.iter().find(|e| e.id == id).unwrap();
-            out.push(mk(Severity::Low, Category::Timing, id, &e.name, None, None, format!("{} interval: real median {ma} ms, Seihai {mb} ms (allowed {allow} ms)", label(e))));
+            out.push(mk(
+                Severity::Low,
+                Category::Timing,
+                id,
+                &e.name,
+                None,
+                None,
+                format!(
+                    "{} interval: real median {ma} ms, Seihai {mb} ms (allowed {allow} ms)",
+                    label(e)
+                ),
+            ));
         }
     }
 }
@@ -539,13 +722,21 @@ fn field_diffs(
         }
     }
     let walk = dir == Dir::C2S && a.id == 2;
-    let props_as_set = opts.set_fields.iter().any(|(d, i, f)| *d == dir && *i == a.id && f == "props");
+    let props_as_set = opts
+        .set_fields
+        .iter()
+        .any(|(d, i, f)| *d == dir && *i == a.id && f == "props");
     let mut out = Vec::new();
     for k in keys {
         if props_as_set && a.field(k).is_none() != b.field(k).is_none() {
             continue; // a different prop set is reported once, as a set
         }
-        if opts.ignore_fields.iter().any(|i| i == k) || opts.set_fields.iter().any(|(d, i, f)| *d == dir && *i == a.id && f == k) {
+        if opts.ignore_fields.iter().any(|i| i == k)
+            || opts
+                .set_fields
+                .iter()
+                .any(|(d, i, f)| *d == dir && *i == a.id && f == k)
+        {
             continue;
         }
         let (va, vb) = (a.field(k), b.field(k));
@@ -558,7 +749,10 @@ fn field_diffs(
             if walk && !first_props {
                 continue;
             }
-            if let (Some(x), Some(y)) = (va.and_then(|s| s.parse::<f32>().ok()), vb.and_then(|s| s.parse::<f32>().ok())) {
+            if let (Some(x), Some(y)) = (
+                va.and_then(|s| s.parse::<f32>().ok()),
+                vb.and_then(|s| s.parse::<f32>().ok()),
+            ) {
                 if (x - y).abs() <= opts.pos_tol {
                     continue;
                 }
@@ -569,7 +763,11 @@ fn field_diffs(
         if walk && !first_props && (k == "props" || k == "SPRITE") {
             continue;
         }
-        out.push((k.to_string(), va.map(str::to_string), vb.map(str::to_string)));
+        out.push((
+            k.to_string(),
+            va.map(str::to_string),
+            vb.map(str::to_string),
+        ));
     }
     out
 }
@@ -577,7 +775,9 @@ fn field_diffs(
 impl Report {
     /// Divergences that count (not info).
     pub fn ranked(&self) -> impl Iterator<Item = &Divergence> {
-        self.divergences.iter().filter(|d| d.severity != Severity::Info)
+        self.divergences
+            .iter()
+            .filter(|d| d.severity != Severity::Info)
     }
 
     pub fn count(&self, s: Severity) -> usize {
@@ -585,7 +785,9 @@ impl Report {
     }
 
     pub fn to_tsv(&self) -> String {
-        let mut s = String::from("rank\tseverity\tcategory\tconn\tdir\tid\tname\treal_pos\tseihai_pos\tdetail\n");
+        let mut s = String::from(
+            "rank\tseverity\tcategory\tconn\tdir\tid\tname\treal_pos\tseihai_pos\tdetail\n",
+        );
         for (i, d) in self.divergences.iter().enumerate() {
             let _ = writeln!(
                 s,
@@ -606,7 +808,12 @@ impl Report {
     }
 
     pub fn to_text(&self) -> String {
-        let meta = |m: &[(String, String)], k: &str| m.iter().find(|(a, _)| a == k).map(|(_, v)| v.clone()).unwrap_or_else(|| "?".into());
+        let meta = |m: &[(String, String)], k: &str| {
+            m.iter()
+                .find(|(a, _)| a == k)
+                .map(|(_, v)| v.clone())
+                .unwrap_or_else(|| "?".into())
+        };
         let mut s = String::new();
         let _ = writeln!(
             s,
@@ -618,7 +825,14 @@ impl Report {
         );
         s.push_str("\nMessages per stream (real / Seihai)\n");
         for c in &self.streams {
-            let _ = writeln!(s, "  {} {}: {} / {}", c.conn, c.dir.label(), c.real, c.seihai);
+            let _ = writeln!(
+                s,
+                "  {} {}: {} / {}",
+                c.conn,
+                c.dir.label(),
+                c.real,
+                c.seihai
+            );
         }
         let _ = writeln!(
             s,
@@ -660,7 +874,10 @@ mod tests {
             id,
             name: name.into(),
             len: 1,
-            fields: fields.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            fields: fields
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             raw: Vec::new(),
         }
     }
@@ -680,8 +897,20 @@ mod tests {
         vec![
             c(-1, "LOGIN", 0, 0, &[("token", "GNW28015")]),
             c(46, "ENTERLEVEL", 1, 10, &[("value", "1")]),
-            c(2, "PLAYERPROPS", 1, 10, &[("X", "30"), ("Y", "30.5"), ("props", "X,Y")]),
-            c(2, "PLAYERPROPS", 2, 300, &[("X", "31"), ("Y", "30.5"), ("props", "X,Y")]),
+            c(
+                2,
+                "PLAYERPROPS",
+                1,
+                10,
+                &[("X", "30"), ("Y", "30.5"), ("props", "X,Y")],
+            ),
+            c(
+                2,
+                "PLAYERPROPS",
+                2,
+                300,
+                &[("X", "31"), ("Y", "30.5"), ("props", "X,Y")],
+            ),
             c(6, "TOALL", 3, 900, &[("text", "hi")]),
         ]
     }
@@ -696,7 +925,16 @@ mod tests {
     #[test]
     fn walk_count_and_positions_are_tolerated() {
         let mut b = base();
-        b.insert(4, c(2, "PLAYERPROPS", 2, 500, &[("X", "40"), ("Y", "30.5"), ("props", "X,Y")]));
+        b.insert(
+            4,
+            c(
+                2,
+                "PLAYERPROPS",
+                2,
+                500,
+                &[("X", "40"), ("Y", "30.5"), ("props", "X,Y")],
+            ),
+        );
         b[2].fields[0].1 = "30.4".into(); // first props within tolerance
         let r = diff(&tr(base()), &tr(b), &DiffOptions::default());
         assert_eq!(r.ranked().count(), 0, "{}", r.to_text());
@@ -705,9 +943,24 @@ mod tests {
     #[test]
     fn a_prop_set_used_by_one_side_only_in_later_walk_updates_is_reported() {
         let mut b = base();
-        b.insert(4, c(2, "PLAYERPROPS", 2, 500, &[("X", "40"), ("Y", "30.5"), ("props", "X,Y,SPRITE")]));
+        b.insert(
+            4,
+            c(
+                2,
+                "PLAYERPROPS",
+                2,
+                500,
+                &[("X", "40"), ("Y", "30.5"), ("props", "X,Y,SPRITE")],
+            ),
+        );
         let r = diff(&tr(base()), &tr(b), &DiffOptions::default());
-        assert!(r.ranked().any(|d| d.category == Category::Field && d.detail.contains("only Seihai: [X,Y,SPRITE]")), "{}", r.to_text());
+        assert!(
+            r.ranked()
+                .any(|d| d.category == Category::Field
+                    && d.detail.contains("only Seihai: [X,Y,SPRITE]")),
+            "{}",
+            r.to_text()
+        );
     }
 
     #[test]
@@ -715,14 +968,36 @@ mod tests {
         let walk = |step: i64, n: i64| -> Vec<Event> {
             let mut v = vec![c(-1, "LOGIN", 0, 0, &[])];
             for k in 0..n {
-                v.push(c(2, "PLAYERPROPS", 1 + k as u32, 100 + k * step, &[("X", "30"), ("props", "X")]));
+                v.push(c(
+                    2,
+                    "PLAYERPROPS",
+                    1 + k as u32,
+                    100 + k * step,
+                    &[("X", "30"), ("props", "X")],
+                ));
             }
             v
         };
-        let slow = diff(&tr(walk(50, 20)), &tr(walk(64, 20)), &DiffOptions::default());
-        assert!(slow.ranked().any(|d| d.category == Category::Timing), "{}", slow.to_text());
-        let same = diff(&tr(walk(50, 20)), &tr(walk(52, 20)), &DiffOptions::default());
-        assert!(!same.ranked().any(|d| d.category == Category::Timing), "{}", same.to_text());
+        let slow = diff(
+            &tr(walk(50, 20)),
+            &tr(walk(64, 20)),
+            &DiffOptions::default(),
+        );
+        assert!(
+            slow.ranked().any(|d| d.category == Category::Timing),
+            "{}",
+            slow.to_text()
+        );
+        let same = diff(
+            &tr(walk(50, 20)),
+            &tr(walk(52, 20)),
+            &DiffOptions::default(),
+        );
+        assert!(
+            !same.ranked().any(|d| d.category == Category::Timing),
+            "{}",
+            same.to_text()
+        );
     }
 
     #[test]
@@ -731,9 +1006,16 @@ mod tests {
         b.remove(1); // no 46
         b.push(c(24, "SHOWIMGPLAYER", 4, 1000, &[("value", "9")]));
         let r = diff(&tr(base()), &tr(b), &DiffOptions::default());
-        let cats: Vec<(Severity, Category, Option<i32>)> = r.ranked().map(|d| (d.severity, d.category, d.id)).collect();
-        assert!(cats.contains(&(Severity::High, Category::MissingId, Some(46))), "{cats:?}");
-        assert!(cats.contains(&(Severity::High, Category::ExtraId, Some(24))), "{cats:?}");
+        let cats: Vec<(Severity, Category, Option<i32>)> =
+            r.ranked().map(|d| (d.severity, d.category, d.id)).collect();
+        assert!(
+            cats.contains(&(Severity::High, Category::MissingId, Some(46))),
+            "{cats:?}"
+        );
+        assert!(
+            cats.contains(&(Severity::High, Category::ExtraId, Some(24))),
+            "{cats:?}"
+        );
     }
 
     #[test]
@@ -751,7 +1033,10 @@ mod tests {
             c(46, "ENTERLEVEL", 3, 90, &[]),
         ];
         let r = diff(&tr(a), &tr(b), &DiffOptions::default());
-        let d: Vec<&Divergence> = r.ranked().filter(|d| d.category == Category::Order).collect();
+        let d: Vec<&Divergence> = r
+            .ranked()
+            .filter(|d| d.category == Category::Order)
+            .collect();
         assert_eq!(d.len(), 1, "{}", r.to_text());
         assert_eq!(d[0].id, Some(46));
         assert!(d[0].detail.contains("ENTERLEVEL"));
@@ -765,7 +1050,12 @@ mod tests {
         b[3].frame = 3;
         b[4].frame = 4;
         let r = diff(&tr(a), &tr(b), &DiffOptions::default());
-        assert!(r.ranked().any(|d| d.category == Category::Bundling && d.id == Some(2)), "{}", r.to_text());
+        assert!(
+            r.ranked()
+                .any(|d| d.category == Category::Bundling && d.id == Some(2)),
+            "{}",
+            r.to_text()
+        );
     }
 
     #[test]
@@ -783,7 +1073,9 @@ mod tests {
         let mut b = base();
         b[2].fields[0].1 = "35".into();
         let r = diff(&tr(base()), &tr(b), &DiffOptions::default());
-        assert!(r.ranked().any(|d| d.category == Category::Field && d.detail.contains("field X")));
+        assert!(r
+            .ranked()
+            .any(|d| d.category == Category::Field && d.detail.contains("field X")));
     }
 
     #[test]
@@ -791,17 +1083,27 @@ mod tests {
         let mk = |step: i64| -> Vec<Event> {
             let mut v = base();
             for k in 0..6 {
-                v.push(c(39, "TAMPERCHECK", 10 + k, 1000 + step * i64::from(k), &[("len", "10")]));
+                v.push(c(
+                    39,
+                    "TAMPERCHECK",
+                    10 + k,
+                    1000 + step * i64::from(k),
+                    &[("len", "10")],
+                ));
             }
             v
         };
         let same = diff(&tr(mk(3200)), &tr(mk(3300)), &DiffOptions::default());
         assert_eq!(same.ranked().count(), 0, "{}", same.to_text());
         let off = diff(&tr(mk(3200)), &tr(mk(5100)), &DiffOptions::default());
-        assert!(off.ranked().any(|d| d.category == Category::Timing && d.id == Some(39)));
+        assert!(off
+            .ranked()
+            .any(|d| d.category == Category::Timing && d.id == Some(39)));
         // A timer message that is not there at all is missing, not a timing issue.
         let gone = diff(&tr(mk(3200)), &tr(base()), &DiffOptions::default());
-        assert!(gone.ranked().any(|d| d.category == Category::MissingId && d.id == Some(39)));
+        assert!(gone
+            .ranked()
+            .any(|d| d.category == Category::MissingId && d.id == Some(39)));
     }
 
     #[test]
@@ -837,7 +1139,9 @@ mod tests {
         let r = diff(&tr(a), &tr(b), &DiffOptions::default());
         let ranked: Vec<&Divergence> = r.ranked().collect();
         assert_eq!(ranked[0].dir, Some(Dir::C2S));
-        assert!(ranked.iter().any(|d| d.dir == Some(Dir::S2C) && d.severity < Severity::Info));
+        assert!(ranked
+            .iter()
+            .any(|d| d.dir == Some(Dir::S2C) && d.severity < Severity::Info));
         let tsv = r.to_tsv();
         assert!(tsv.starts_with("rank\tseverity\t"));
         assert_eq!(tsv.lines().count(), r.divergences.len() + 1);
@@ -852,8 +1156,15 @@ mod tests {
         b.push(c(23, "WANTFILE", 5, 100, &[("file", "body.png")]));
         b.push(c(23, "WANTFILE", 5, 100, &[("file", "lv_a.nw")]));
         let r = diff(&tr(a), &tr(b), &DiffOptions::default());
-        let d = r.ranked().find(|d| d.category == Category::Field && d.id == Some(23)).unwrap();
-        assert!(d.detail.contains("only the real client: [head0.png]"), "{}", d.detail);
+        let d = r
+            .ranked()
+            .find(|d| d.category == Category::Field && d.id == Some(23))
+            .unwrap();
+        assert!(
+            d.detail.contains("only the real client: [head0.png]"),
+            "{}",
+            d.detail
+        );
         assert!(d.detail.contains("only Seihai: [lv_a.nw]"), "{}", d.detail);
         // Same set in another order: no divergence.
         let mut a2 = base();
@@ -862,7 +1173,12 @@ mod tests {
         let mut b2 = base();
         b2.push(c(23, "WANTFILE", 5, 100, &[("file", "y.png")]));
         b2.push(c(23, "WANTFILE", 5, 100, &[("file", "x.png")]));
-        assert_eq!(diff(&tr(a2), &tr(b2), &DiffOptions::default()).ranked().count(), 0);
+        assert_eq!(
+            diff(&tr(a2), &tr(b2), &DiffOptions::default())
+                .ranked()
+                .count(),
+            0
+        );
     }
 
     #[test]
@@ -874,27 +1190,65 @@ mod tests {
             }
             v
         };
-        let r = diff(&tr(adj(&["a.nw", "b.nw", "c.nw"])), &tr(adj(&["c.nw", "b.nw", "a.nw"])), &DiffOptions::default());
-        let d = r.ranked().find(|d| d.category == Category::Field && d.id == Some(35)).unwrap();
+        let r = diff(
+            &tr(adj(&["a.nw", "b.nw", "c.nw"])),
+            &tr(adj(&["c.nw", "b.nw", "a.nw"])),
+            &DiffOptions::default(),
+        );
+        let d = r
+            .ranked()
+            .find(|d| d.category == Category::Field && d.id == Some(35))
+            .unwrap();
         assert!(d.detail.contains("message 1 of the run"), "{}", d.detail);
         // A different count is a count difference, not a field mismatch.
-        let r = diff(&tr(adj(&["a.nw", "b.nw"])), &tr(adj(&["a.nw", "b.nw", "c.nw"])), &DiffOptions::default());
-        assert!(r.ranked().any(|d| d.category == Category::Count && d.id == Some(35)));
+        let r = diff(
+            &tr(adj(&["a.nw", "b.nw"])),
+            &tr(adj(&["a.nw", "b.nw", "c.nw"])),
+            &DiffOptions::default(),
+        );
+        assert!(r
+            .ranked()
+            .any(|d| d.category == Category::Count && d.id == Some(35)));
     }
 
     #[test]
     fn a_different_prop_set_is_one_finding_not_one_per_prop() {
         let a = vec![
             c(-1, "LOGIN", 0, 0, &[]),
-            c(2, "PLAYERPROPS", 1, 10, &[("props", "X2,Y2"), ("X2", "30"), ("Y2", "30.5")]),
+            c(
+                2,
+                "PLAYERPROPS",
+                1,
+                10,
+                &[("props", "X2,Y2"), ("X2", "30"), ("Y2", "30.5")],
+            ),
         ];
         let b = vec![
             c(-1, "LOGIN", 0, 0, &[]),
-            c(2, "PLAYERPROPS", 1, 10, &[("props", "X,Y,SPRITE"), ("X", "30"), ("Y", "30.5"), ("SPRITE", "3 (dir 3)")]),
+            c(
+                2,
+                "PLAYERPROPS",
+                1,
+                10,
+                &[
+                    ("props", "X,Y,SPRITE"),
+                    ("X", "30"),
+                    ("Y", "30.5"),
+                    ("SPRITE", "3 (dir 3)"),
+                ],
+            ),
         ];
         let r = diff(&tr(a), &tr(b), &DiffOptions::default());
-        let f: Vec<&Divergence> = r.ranked().filter(|d| d.category == Category::Field).collect();
+        let f: Vec<&Divergence> = r
+            .ranked()
+            .filter(|d| d.category == Category::Field)
+            .collect();
         assert_eq!(f.len(), 1, "{}", r.to_text());
-        assert!(f[0].detail.contains("only the real client: [X2,Y2]") && f[0].detail.contains("only Seihai: [X,Y,SPRITE]"), "{}", f[0].detail);
+        assert!(
+            f[0].detail.contains("only the real client: [X2,Y2]")
+                && f[0].detail.contains("only Seihai: [X,Y,SPRITE]"),
+            "{}",
+            f[0].detail
+        );
     }
 }

@@ -57,9 +57,12 @@ impl AssetRoot {
     /// Where sound effects live: `<root>/sounds`, as in every client
     /// folder, or `<root>/levels/sounds`. The first that exists wins.
     pub fn sounds_dir(&self) -> Option<PathBuf> {
-        [self.root.join("sounds"), self.root.join("levels").join("sounds")]
-            .into_iter()
-            .find(|p| p.is_dir())
+        [
+            self.root.join("sounds"),
+            self.root.join("levels").join("sounds"),
+        ]
+        .into_iter()
+        .find(|p| p.is_dir())
     }
 
     /// Find a GANI by file name in `gani/`, `levels/ganis/` (the 2.22

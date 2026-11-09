@@ -26,17 +26,39 @@
 //! are not sent: Seihai has no UDP.
 
 use super::OfflineSession;
-use crate::sound::SoundEvent;
 use crate::items::{self, FloorItem, ItemEvent};
+use crate::sound::SoundEvent;
 
 /// The item clock: one life step every 50 ms.
 pub const ITEM_TICK_MS: u64 = 50;
 
 /// The item table's names, in the `PLO_ITEMADD` order (the CHEST names).
 pub const ITEM_NAMES: [&str; 25] = [
-    "greenrupee", "bluerupee", "redrupee", "bombs", "darts", "heart", "glove1", "bow", "bomb", "shield", "sword", "fullheart", "superbomb",
-    "battleaxe", "goldensword", "mirrorshield", "glove2", "lizardshield", "lizardsword", "goldrupee", "fireball", "fireblast", "nukeshot",
-    "joltbomb", "spinattack",
+    "greenrupee",
+    "bluerupee",
+    "redrupee",
+    "bombs",
+    "darts",
+    "heart",
+    "glove1",
+    "bow",
+    "bomb",
+    "shield",
+    "sword",
+    "fullheart",
+    "superbomb",
+    "battleaxe",
+    "goldensword",
+    "mirrorshield",
+    "glove2",
+    "lizardshield",
+    "lizardsword",
+    "goldrupee",
+    "fireball",
+    "fireblast",
+    "nukeshot",
+    "joltbomb",
+    "spinattack",
 ];
 
 /// The most rupees, bombs and arrows the 2.05 pickup gives up to.
@@ -91,7 +113,8 @@ impl OfflineSession {
     /// Show the item of the chest at `(x, y)` one tile above it; its end is
     /// an item timeout there.
     pub(crate) fn show_chest_item(&mut self, x: i32, y: i32) {
-        self.chest_shows.push((x as f32, (y - 1) as f32, CHEST_SHOW_TICKS));
+        self.chest_shows
+            .push((x as f32, (y - 1) as f32, CHEST_SHOW_TICKS));
     }
 
     /// An item the server put down (`PLO_ITEMADD`).
@@ -124,9 +147,18 @@ impl OfflineSession {
                 continue;
             }
             let can_take = !self.life.is_dead();
-            for e in items::tick(&mut self.floor_items, self.player_x, self.player_y, can_take) {
+            for e in items::tick(
+                &mut self.floor_items,
+                self.player_x,
+                self.player_y,
+                can_take,
+            ) {
                 if let ItemEvent::Taken { item, x, y } = e {
-                    self.sound_events.push(SoundEvent { file: "extra.wav".into(), x: x + 1.0, y: y + 1.0 });
+                    self.sound_events.push(SoundEvent {
+                        file: "extra.wav".into(),
+                        x: x + 1.0,
+                        y: y + 1.0,
+                    });
                     // A laid glove, sword or shield is no server item: it
                     // is given here and nothing is sent (2.05).
                     if !online || !self.drops.server_take || !items::is_floor_item(item) {
@@ -149,14 +181,21 @@ impl OfflineSession {
         events
             .into_iter()
             .filter_map(|e| match e {
-                ItemEvent::Rolled { item, x, y } => d.add_to_server.then(|| items::item_add_message(item, x, y)),
+                ItemEvent::Rolled { item, x, y } => {
+                    d.add_to_server.then(|| items::item_add_message(item, x, y))
+                }
                 // A lay: 1.38 on (the builds that tell the server of an item
                 // they add), floor items only.
-                ItemEvent::Laid { item, x, y } => (lay_to_server(d) && items::is_floor_item(item)).then(|| items::item_add_message(item, x, y)),
+                ItemEvent::Laid { item, x, y } => (lay_to_server(d) && items::is_floor_item(item))
+                    .then(|| items::item_add_message(item, x, y)),
                 ItemEvent::Taken { item, .. } if !items::is_floor_item(item) => None,
-                ItemEvent::Taken { item, x, y } if d.server_take => Some(items::item_take_message(item, x, y)),
+                ItemEvent::Taken { item, x, y } if d.server_take => {
+                    Some(items::item_take_message(item, x, y))
+                }
                 ItemEvent::Taken { x, y, .. } => Some(items::item_del_message(x, y)),
-                ItemEvent::Expired { x, y } => d.del_on_expiry.then(|| items::item_del_message(x, y)),
+                ItemEvent::Expired { x, y } => {
+                    d.del_on_expiry.then(|| items::item_del_message(x, y))
+                }
             })
             .collect()
     }

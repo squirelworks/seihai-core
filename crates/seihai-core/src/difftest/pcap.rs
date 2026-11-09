@@ -26,12 +26,20 @@ pub struct Packet {
 
 fn rd16(b: &[u8], le: bool) -> u16 {
     let a = [b[0], b[1]];
-    if le { u16::from_le_bytes(a) } else { u16::from_be_bytes(a) }
+    if le {
+        u16::from_le_bytes(a)
+    } else {
+        u16::from_be_bytes(a)
+    }
 }
 
 fn rd32(b: &[u8], le: bool) -> u32 {
     let a = [b[0], b[1], b[2], b[3]];
-    if le { u32::from_le_bytes(a) } else { u32::from_be_bytes(a) }
+    if le {
+        u32::from_le_bytes(a)
+    } else {
+        u32::from_be_bytes(a)
+    }
 }
 
 /// Parse a pcap file into its IPv4 TCP segments, in file order.
@@ -63,10 +71,14 @@ pub fn read_pcap(data: &[u8]) -> Result<Vec<Packet>, String> {
         let ts = f64::from(sec) + f64::from(frac) / if nanos { 1e9 } else { 1e6 };
         let ip = match link {
             1 => ethernet_payload(rec),
-            113 => rec.get(16..).filter(|_| rec.len() > 15 && rd16(&rec[14..], false) == 0x0800),
+            113 => rec
+                .get(16..)
+                .filter(|_| rec.len() > 15 && rd16(&rec[14..], false) == 0x0800),
             // Linux cooked v2 (`tcpdump -i any` on current libpcap): 20-byte
             // header, protocol type in the first two bytes.
-            276 => rec.get(20..).filter(|_| rec.len() > 19 && rd16(rec, false) == 0x0800),
+            276 => rec
+                .get(20..)
+                .filter(|_| rec.len() > 19 && rd16(rec, false) == 0x0800),
             101 | 12 => Some(rec),
             0 => rec.get(4..),
             _ => None,
@@ -183,10 +195,21 @@ pub fn reassemble(packets: &[Packet]) -> Vec<TcpConn> {
     }
     let mut conns: BTreeMap<Key, Acc> = BTreeMap::new();
     for (n, p) in packets.iter().enumerate() {
-        let k: Key = if p.src <= p.dst { (p.src, p.dst) } else { (p.dst, p.src) };
+        let k: Key = if p.src <= p.dst {
+            (p.src, p.dst)
+        } else {
+            (p.dst, p.src)
+        };
         let acc = conns.entry(k).or_insert_with(|| {
             // The first packet decides the client unless a SYN says otherwise.
-            Acc { client: p.src, server: p.dst, t0: p.ts, order: n, c: Half::default(), s: Half::default() }
+            Acc {
+                client: p.src,
+                server: p.dst,
+                t0: p.ts,
+                order: n,
+                c: Half::default(),
+                s: Half::default(),
+            }
         });
         if p.syn && !p.ack && acc.client != p.src {
             // A pure SYN comes from the client.
@@ -255,7 +278,11 @@ pub(crate) mod tests {
     use super::*;
 
     /// Build a little-endian Ethernet pcap from `(time, from_client, flags, seq, payload)`.
-    pub fn synth_pcap(client_port: u16, server_port: u16, pkts: &[(f64, bool, u8, u32, &[u8])]) -> Vec<u8> {
+    pub fn synth_pcap(
+        client_port: u16,
+        server_port: u16,
+        pkts: &[(f64, bool, u8, u32, &[u8])],
+    ) -> Vec<u8> {
         let mut f = Vec::new();
         f.extend_from_slice(&0xa1b2_c3d4u32.to_le_bytes());
         f.extend_from_slice(&[2, 0, 4, 0]);
@@ -263,7 +290,11 @@ pub(crate) mod tests {
         f.extend_from_slice(&65535u32.to_le_bytes());
         f.extend_from_slice(&1u32.to_le_bytes());
         for &(t, c2s, flags, seq, payload) in pkts {
-            let (sp, dp) = if c2s { (client_port, server_port) } else { (server_port, client_port) };
+            let (sp, dp) = if c2s {
+                (client_port, server_port)
+            } else {
+                (server_port, client_port)
+            };
             let mut fr = vec![0u8; 12];
             fr.extend_from_slice(&[0x08, 0x00]);
             let tcp_len = 20 + payload.len();
@@ -362,7 +393,11 @@ pub(crate) mod tests {
         let pcap = synth_pcap(
             40002,
             14922,
-            &[(1.0, false, 0x12, 7, b""), (1.1, true, 0x02, 3, b""), (1.2, true, 0x18, 4, b"x")],
+            &[
+                (1.0, false, 0x12, 7, b""),
+                (1.1, true, 0x02, 3, b""),
+                (1.2, true, 0x18, 4, b"x"),
+            ],
         );
         let c = &reassemble(&read_pcap(&pcap).unwrap())[0];
         assert_eq!(c.client.1, 40002);
@@ -377,7 +412,8 @@ pub(crate) mod tests {
         out.extend_from_slice(&link.to_le_bytes());
         let mut i = 24;
         while i + 16 <= eth.len() {
-            let caplen = u32::from_le_bytes([eth[i + 8], eth[i + 9], eth[i + 10], eth[i + 11]]) as usize;
+            let caplen =
+                u32::from_le_bytes([eth[i + 8], eth[i + 9], eth[i + 10], eth[i + 11]]) as usize;
             let ip = &eth[i + 16 + 14..i + 16 + caplen];
             let mut fr = vec![0u8; hdr];
             if link == 113 {
@@ -400,7 +436,12 @@ pub(crate) mod tests {
         let eth = synth_pcap(
             40003,
             14801,
-            &[(1.0, true, 0x02, 10, b""), (1.1, false, 0x12, 50, b""), (1.2, true, 0x18, 11, b"abc"), (1.3, false, 0x18, 51, b"xyz")],
+            &[
+                (1.0, true, 0x02, 10, b""),
+                (1.1, false, 0x12, 50, b""),
+                (1.2, true, 0x18, 11, b"abc"),
+                (1.3, false, 0x18, 51, b"xyz"),
+            ],
         );
         let want = reassemble(&read_pcap(&eth).unwrap());
         for link in [113, 276] {

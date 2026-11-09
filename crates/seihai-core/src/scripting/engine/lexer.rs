@@ -32,9 +32,12 @@ pub struct Spanned {
 // `=<`, `=>` and `<>` are in the 2.05 client's comparison table beside
 // `<=`, `>=` and `!=`. `.` is the field after an index (`npcs[i].x`).
 // `:=` is a plain assignment (2gta's "Space Storm" weapon is written with it).
-const OPS2: &[&str] = &["==", "!=", "<=", ">=", "=<", "=>", "<>", "&&", "||", "+=", "-=", "*=", "/=", "++", "--", ":="];
+const OPS2: &[&str] = &[
+    "==", "!=", "<=", ">=", "=<", "=>", "<>", "&&", "||", "+=", "-=", "*=", "/=", "++", "--", ":=",
+];
 const OPS1: &[&str] = &[
-    "+", "-", "*", "/", "%", "^", "=", "<", ">", "!", "(", ")", "{", "}", "[", "]", ",", ";", "|", ":", "?", "@", ".",
+    "+", "-", "*", "/", "%", "^", "=", "<", ">", "!", "(", ")", "{", "}", "[", "]", ",", ";", "|",
+    ":", "?", "@", ".",
 ];
 
 /// The digits that belong to a message code whose letter starts `code`:
@@ -42,7 +45,11 @@ const OPS1: &[&str] = &[
 /// the 2.2 command list. Other codes are one character.
 pub fn code_digits(code: &[u8]) -> usize {
     match code.first() {
-        Some(b'P' | b'C') => code[1..].iter().take(2).take_while(|d| d.is_ascii_digit()).count(),
+        Some(b'P' | b'C') => code[1..]
+            .iter()
+            .take(2)
+            .take_while(|d| d.is_ascii_digit())
+            .count(),
         _ => 0,
     }
 }
@@ -59,7 +66,13 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     pub fn new(src: &'a str) -> Self {
-        Lexer { src, b: src.as_bytes(), pos: 0, line: 1, last_quoted: false }
+        Lexer {
+            src,
+            b: src.as_bytes(),
+            pos: 0,
+            line: 1,
+            last_quoted: false,
+        }
     }
 
     pub fn at_end(&mut self) -> bool {
@@ -83,7 +96,9 @@ impl<'a> Lexer<'a> {
                 }
                 Some(b'/') if self.b.get(self.pos + 1) == Some(&b'*') => {
                     self.pos += 2;
-                    while self.pos < self.b.len() && !(self.b[self.pos] == b'*' && self.b.get(self.pos + 1) == Some(&b'/')) {
+                    while self.pos < self.b.len()
+                        && !(self.b[self.pos] == b'*' && self.b.get(self.pos + 1) == Some(&b'/'))
+                    {
                         if self.b[self.pos] == b'\n' {
                             self.line += 1;
                         }
@@ -96,14 +111,29 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Legacy token reader, including an explicit EOF token. New callers
+    /// can use [`Self::next_token`] or the standard iterator interface.
+    #[expect(
+        clippy::should_implement_trait,
+        reason = "Retain the public explicit-EOF token API for existing parsers"
+    )]
+    pub fn next(&mut self) -> Spanned {
+        self.next_token()
+    }
+
     /// Next token. Characters that start no token are skipped as `Op`
     /// would be wrong for them; they come back as a one-character `Str`
     /// so the parser can report them.
-    pub fn next(&mut self) -> Spanned {
+    pub fn next_token(&mut self) -> Spanned {
         self.skip_blank();
         let start = self.pos;
         let line = self.line;
-        let mk = |tok, end| Spanned { tok, start, end, line };
+        let mk = |tok, end| Spanned {
+            tok,
+            start,
+            end,
+            line,
+        };
         let Some(&c) = self.b.get(self.pos) else {
             return mk(Tok::Eof, start);
         };
@@ -148,12 +178,15 @@ impl<'a> Lexer<'a> {
             self.pos = i.min(self.b.len());
             return mk(Tok::Str(text), self.pos);
         }
-        if c.is_ascii_digit() || (c == b'.' && self.b.get(self.pos + 1).is_some_and(|d| d.is_ascii_digit())) {
+        if c.is_ascii_digit()
+            || (c == b'.' && self.b.get(self.pos + 1).is_some_and(|d| d.is_ascii_digit()))
+        {
             let mut i = self.pos;
             while i < self.b.len() && self.b[i].is_ascii_digit() {
                 i += 1;
             }
-            if self.b.get(i) == Some(&b'.') && self.b.get(i + 1).is_some_and(|d| d.is_ascii_digit()) {
+            if self.b.get(i) == Some(&b'.') && self.b.get(i + 1).is_some_and(|d| d.is_ascii_digit())
+            {
                 i += 1;
                 while i < self.b.len() && self.b[i].is_ascii_digit() {
                     i += 1;
@@ -161,7 +194,11 @@ impl<'a> Lexer<'a> {
             }
             // Flag names may start with a digit (`2wallgizone`): a number
             // run straight into letters is a name.
-            if self.b.get(i).is_some_and(|d| d.is_ascii_alphabetic() || *d == b'_') {
+            if self
+                .b
+                .get(i)
+                .is_some_and(|d| d.is_ascii_alphabetic() || *d == b'_')
+            {
                 while i < self.b.len() && (self.b[i].is_ascii_alphanumeric() || self.b[i] == b'_') {
                     i += 1;
                 }
@@ -178,7 +215,11 @@ impl<'a> Lexer<'a> {
             while i < self.b.len()
                 && (self.b[i].is_ascii_alphanumeric()
                     || self.b[i] == b'_'
-                    || (self.b[i] == b'.' && self.b.get(i + 1).is_some_and(|d| d.is_ascii_alphanumeric() || *d == b'_')))
+                    || (self.b[i] == b'.'
+                        && self
+                            .b
+                            .get(i + 1)
+                            .is_some_and(|d| d.is_ascii_alphanumeric() || *d == b'_')))
             {
                 i += 1;
             }
@@ -253,7 +294,11 @@ impl<'a> Lexer<'a> {
                 i += 1;
                 continue;
             }
-            if depth == 0 && brace == 0 && stops.contains(&c) && !(paren > 0 && matches!(c, b',' | b')')) {
+            if depth == 0
+                && brace == 0
+                && stops.contains(&c)
+                && !(paren > 0 && matches!(c, b',' | b')'))
+            {
                 break;
             }
             if depth == 0 && c == b'(' {
@@ -284,7 +329,11 @@ impl<'a> Lexer<'a> {
         self.pos = i;
         let text = self.src[start..i].trim();
         self.last_quoted = false;
-        if text.len() >= 2 && text.starts_with('"') && text.ends_with('"') && !text[1..text.len() - 1].contains('"') {
+        if text.len() >= 2
+            && text.starts_with('"')
+            && text.ends_with('"')
+            && !text[1..text.len() - 1].contains('"')
+        {
             self.last_quoted = true;
             text[1..text.len() - 1].to_string()
         } else {
@@ -293,9 +342,29 @@ impl<'a> Lexer<'a> {
     }
 }
 
+impl Iterator for Lexer<'_> {
+    type Item = Spanned;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let token = self.next_token();
+        (!matches!(token.tok, Tok::Eof)).then_some(token)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn iterator_omits_eof_without_changing_the_token_api() {
+        let mut lexer = Lexer::new(" // comment\n X 2");
+        let first = Iterator::next(&mut lexer).unwrap();
+        assert_eq!((first.tok, first.line), (Tok::Ident("x".into()), 2));
+        assert_eq!(lexer.next().tok, Tok::Num(2.0));
+        assert!(Iterator::next(&mut lexer).is_none());
+        assert!(Iterator::next(&mut lexer).is_none());
+        assert_eq!(lexer.next().tok, Tok::Eof);
+    }
 
     fn toks(src: &str) -> Vec<Tok> {
         let mut l = Lexer::new(src);
@@ -317,7 +386,10 @@ mod tests {
 
     #[test]
     fn numbers_strings_and_codes() {
-        assert_eq!(toks("12 3.5 .25"), vec![Tok::Num(12.0), Tok::Num(3.5), Tok::Num(0.25)]);
+        assert_eq!(
+            toks("12 3.5 .25"),
+            vec![Tok::Num(12.0), Tok::Num(3.5), Tok::Num(0.25)]
+        );
         assert_eq!(toks("\"hi there\""), vec![Tok::Str("hi there".into())]);
         assert_eq!(toks("#c"), vec![Tok::Str("#c".into())]);
         assert_eq!(toks("#v(this.a+1)"), vec![Tok::Str("#v(this.a+1)".into())]);
@@ -325,7 +397,14 @@ mod tests {
 
     #[test]
     fn names_may_start_with_a_digit() {
-        assert_eq!(toks("2wallgizone 12 3x"), vec![Tok::Ident("2wallgizone".into()), Tok::Num(12.0), Tok::Ident("3x".into())]);
+        assert_eq!(
+            toks("2wallgizone 12 3x"),
+            vec![
+                Tok::Ident("2wallgizone".into()),
+                Tok::Num(12.0),
+                Tok::Ident("3x".into())
+            ]
+        );
     }
 
     #[test]
@@ -372,6 +451,9 @@ mod tests {
 
     #[test]
     fn stray_bytes_do_not_stop_the_lexer() {
-        assert_eq!(toks("~ x"), vec![Tok::Str("~".into()), Tok::Ident("x".into())]);
+        assert_eq!(
+            toks("~ x"),
+            vec![Tok::Str("~".into()), Tok::Ident("x".into())]
+        );
     }
 }

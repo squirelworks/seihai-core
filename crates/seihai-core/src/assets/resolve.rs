@@ -41,8 +41,24 @@ use crate::protocol::VersionProfile;
 /// Player and item art folders under `levels/` in the 2.22 data folder.
 /// The same names are also tried directly under the root (older layouts).
 pub const IMAGE_CATEGORIES: &[&str] = &[
-    "images", "ganis", "bodies", "heads", "hats", "shields", "swords", "weapons", "bomys", "baddies", "emoticons",
-    "horses", "backpals", "smilies", "letters", "snapshot", "webgifs", "tutorial",
+    "images",
+    "ganis",
+    "bodies",
+    "heads",
+    "hats",
+    "shields",
+    "swords",
+    "weapons",
+    "bomys",
+    "baddies",
+    "emoticons",
+    "horses",
+    "backpals",
+    "smilies",
+    "letters",
+    "snapshot",
+    "webgifs",
+    "tutorial",
 ];
 
 /// The player-art folders a GIF build reads as `.gif` only.
@@ -103,12 +119,26 @@ pub struct AssetResolver {
 impl AssetResolver {
     /// One folder (the user's), no cache and no built-in set.
     pub fn new(root: AssetRoot, profile: &'static VersionProfile) -> Self {
-        Self { game_cache: None, cache: None, user: Some(root), builtin: None, builtin_levels: true, profile }
+        Self {
+            game_cache: None,
+            cache: None,
+            user: Some(root),
+            builtin: None,
+            builtin_levels: true,
+            profile,
+        }
     }
 
     /// A resolver with no folder yet: add layers with the `with_*` methods.
     pub fn empty(profile: &'static VersionProfile) -> Self {
-        Self { game_cache: None, cache: None, user: None, builtin: None, builtin_levels: true, profile }
+        Self {
+            game_cache: None,
+            cache: None,
+            user: None,
+            builtin: None,
+            builtin_levels: true,
+            profile,
+        }
     }
 
     /// Set (or clear) the user's asset folder.
@@ -167,7 +197,12 @@ impl AssetResolver {
     /// # Panics
     /// If the resolver has no folder at all (no layer was added).
     pub fn root(&self) -> &AssetRoot {
-        self.user.as_ref().or(self.builtin.as_ref()).or(self.game_cache.as_ref()).or(self.cache.as_ref()).expect("an AssetResolver has at least one folder")
+        self.user
+            .as_ref()
+            .or(self.builtin.as_ref())
+            .or(self.game_cache.as_ref())
+            .or(self.cache.as_ref())
+            .expect("an AssetResolver has at least one folder")
     }
 
     pub fn user_root(&self) -> Option<&AssetRoot> {
@@ -199,7 +234,10 @@ impl AssetResolver {
     /// only the built-in set exists. With both caches the settings' one is
     /// written only as a fallback or a copy (see `DownloadStore::store`).
     pub fn download_root(&self) -> Option<&AssetRoot> {
-        self.game_cache.as_ref().or(self.cache.as_ref()).or(self.user.as_ref())
+        self.game_cache
+            .as_ref()
+            .or(self.cache.as_ref())
+            .or(self.user.as_ref())
     }
 
     pub fn profile(&self) -> &'static VersionProfile {
@@ -226,11 +264,16 @@ impl AssetResolver {
     /// Which layer a path found by this resolver is in.
     pub fn layer_of(&self, path: &Path) -> Option<Layer> {
         let mut best: Option<(Layer, usize)> = None;
-        for (layer, r) in [(Layer::Cache, &self.game_cache), (Layer::Cache, &self.cache), (Layer::Assets, &self.user), (Layer::Builtin, &self.builtin)] {
+        for (layer, r) in [
+            (Layer::Cache, &self.game_cache),
+            (Layer::Cache, &self.cache),
+            (Layer::Assets, &self.user),
+            (Layer::Builtin, &self.builtin),
+        ] {
             if let Some(r) = r {
                 if path.starts_with(&r.root) {
                     let depth = r.root.components().count();
-                    if best.map_or(true, |(_, d)| depth > d) {
+                    if best.is_none_or(|(_, d)| depth > d) {
                         best = Some((layer, depth));
                     }
                 }
@@ -265,9 +308,18 @@ impl AssetResolver {
                 }
                 vec![rel]
             }
-            None => self.profile.level_extensions().iter().map(|e| format!("{rel}{e}")).collect(),
+            None => self
+                .profile
+                .level_extensions()
+                .iter()
+                .map(|e| format!("{rel}{e}"))
+                .collect(),
         };
-        for (_, r) in self.roots(true).into_iter().filter(|(l, _)| !cache_only || *l == Layer::Cache) {
+        for (_, r) in self
+            .roots(true)
+            .into_iter()
+            .filter(|(l, _)| !cache_only || *l == Layer::Cache)
+        {
             let dirs = [r.root.join(DOWNLOADS), r.root.clone(), r.root.join("maps")];
             if let Some(p) = first_in(&dirs, &candidates) {
                 return Some(p);
@@ -288,7 +340,8 @@ impl AssetResolver {
     /// (`documentation/file-cache.md`), so it matches.
     pub fn level_at_mod_time(&self, name: &str, server_mod_time: Option<u32>) -> Option<PathBuf> {
         let want = server_mod_time?;
-        self.level_in(name, true).filter(|p| crate::filecache::mod_time_of(p) == Some(want))
+        self.level_in(name, true)
+            .filter(|p| crate::filecache::mod_time_of(p) == Some(want))
     }
 
     /// Does this version open files with this level extension (".nw")?
@@ -351,7 +404,11 @@ impl AssetResolver {
 
     fn gani_in_layers(&self, name: &str, keep: impl Fn(Layer) -> bool) -> Option<PathBuf> {
         let rel = clean_name(name)?;
-        let file = if has_ext(&rel) { rel } else { format!("{rel}.gani") };
+        let file = if has_ext(&rel) {
+            rel
+        } else {
+            format!("{rel}.gani")
+        };
         for (_, r) in self.roots(false).into_iter().filter(|(l, _)| keep(*l)) {
             let dirs = [
                 r.gani_dir(),
@@ -395,8 +452,16 @@ impl AssetResolver {
     pub fn image_in(&self, category: &str, name: &str) -> Option<PathBuf> {
         let rel = clean_name(name)?;
         let gif_only = self.gif_only_player_art(category);
-        let candidates = if gif_only { vec![with_ext(&rel, ".gif")] } else { self.image_names(&rel) };
-        let cat = if category.is_empty() { None } else { Some(clean_name(category)?) };
+        let candidates = if gif_only {
+            vec![with_ext(&rel, ".gif")]
+        } else {
+            self.image_names(&rel)
+        };
+        let cat = if category.is_empty() {
+            None
+        } else {
+            Some(clean_name(category)?)
+        };
         // The built-in .gif player art stands in for a 2.05 install's own
         // pictures. When the assets folder has player art of its own (a
         // `bodies` or `heads` folder, at its root or under `levels/`), a GIF
@@ -407,7 +472,12 @@ impl AssetResolver {
         self.image_pass(cat.as_deref(), &candidates, skip_builtin)
     }
 
-    fn image_pass(&self, cat: Option<&str>, candidates: &[String], skip_builtin: bool) -> Option<PathBuf> {
+    fn image_pass(
+        &self,
+        cat: Option<&str>,
+        candidates: &[String],
+        skip_builtin: bool,
+    ) -> Option<PathBuf> {
         for (layer, root) in self.roots(false) {
             if skip_builtin && layer == Layer::Builtin {
                 continue;
@@ -440,12 +510,15 @@ impl AssetResolver {
 
     /// The assets folder has a `category` folder, at its root or under `levels/`.
     fn user_has_folder(&self, category: &str) -> bool {
-        self.user.as_ref().is_some_and(|u| u.root.join(category).is_dir() || u.root.join(DOWNLOADS).join(category).is_dir())
+        self.user.as_ref().is_some_and(|u| {
+            u.root.join(category).is_dir() || u.root.join(DOWNLOADS).join(category).is_dir()
+        })
     }
 
     /// See [`image_in`](Self::image_in): player art of a GIF build.
     fn gif_only_player_art(&self, category: &str) -> bool {
-        self.profile.files.image_ext.eq_ignore_ascii_case(".gif") && PLAYER_ART.iter().any(|c| c.eq_ignore_ascii_case(category))
+        self.profile.files.image_ext.eq_ignore_ascii_case(".gif")
+            && PLAYER_ART.iter().any(|c| c.eq_ignore_ascii_case(category))
     }
 
     fn image_names(&self, rel: &str) -> Vec<String> {
@@ -499,10 +572,19 @@ impl AssetResolver {
     /// Find a sound effect. `.wav` is added to a bare name.
     pub fn sound(&self, name: &str) -> Option<PathBuf> {
         let rel = clean_name(name.trim_start_matches('+'))?;
-        let file = if has_ext(&rel) { rel } else { format!("{rel}.wav") };
+        let file = if has_ext(&rel) {
+            rel
+        } else {
+            format!("{rel}.wav")
+        };
         for (_, root) in self.roots(false) {
             let r = &root.root;
-            let dirs = [r.join("sounds"), r.join(DOWNLOADS).join("sounds"), r.join(DOWNLOADS), r.clone()];
+            let dirs = [
+                r.join("sounds"),
+                r.join(DOWNLOADS).join("sounds"),
+                r.join(DOWNLOADS),
+                r.clone(),
+            ];
             if let Some(p) = first_in(&dirs, std::slice::from_ref(&file)) {
                 return Some(p);
             }
@@ -513,7 +595,11 @@ impl AssetResolver {
     /// Find a music file. `.mid` is added to a bare name (the common case).
     pub fn music(&self, name: &str) -> Option<PathBuf> {
         let rel = clean_name(name)?;
-        let file = if has_ext(&rel) { rel } else { format!("{rel}.mid") };
+        let file = if has_ext(&rel) {
+            rel
+        } else {
+            format!("{rel}.mid")
+        };
         for (_, root) in self.roots(false) {
             let r = &root.root;
             let dirs = [
@@ -540,10 +626,14 @@ impl AssetResolver {
     pub fn tile_types(&self) -> Option<(PathBuf, TileTypesFile)> {
         for (_, root) in self.roots(false) {
             let r = &root.root;
-            if let Some(p) = first_in(&[r.clone(), r.join(DOWNLOADS)], &["tiledefs.txt".to_string()]) {
+            if let Some(p) = first_in(
+                &[r.clone(), r.join(DOWNLOADS)],
+                &["tiledefs.txt".to_string()],
+            ) {
                 return Some((p, TileTypesFile::Text));
             }
-            if let Some(p) = first_in(&[r.clone(), r.join(DOWNLOADS)], &["arrays.dat".to_string()]) {
+            if let Some(p) = first_in(&[r.clone(), r.join(DOWNLOADS)], &["arrays.dat".to_string()])
+            {
                 return Some((p, TileTypesFile::ArraysDat));
             }
         }
@@ -555,7 +645,10 @@ impl AssetResolver {
         let rel = clean_name(name)?;
         for (_, root) in self.roots(false) {
             let r = &root.root;
-            if let Some(p) = first_in(&[r.join(DOWNLOADS).join("tiledefs"), r.join("tiledefs")], std::slice::from_ref(&rel)) {
+            if let Some(p) = first_in(
+                &[r.join(DOWNLOADS).join("tiledefs"), r.join("tiledefs")],
+                std::slice::from_ref(&rel),
+            ) {
                 return Some(p);
             }
         }
@@ -569,7 +662,12 @@ impl AssetResolver {
         for (_, root) in self.roots(false) {
             let dir = root.root.join(DOWNLOADS).join("tiledefs");
             let mut v: Vec<PathBuf> = fs::read_dir(&dir)
-                .map(|rd| rd.flatten().map(|e| e.path()).filter(|p| p.is_file()).collect())
+                .map(|rd| {
+                    rd.flatten()
+                        .map(|e| e.path())
+                        .filter(|p| p.is_file())
+                        .collect()
+                })
                 .unwrap_or_default();
             if !v.is_empty() {
                 v.sort();
@@ -620,7 +718,9 @@ pub(crate) fn clean_name(name: &str) -> Option<String> {
 /// `".nw"`, `".png"`: the extension of the last component, with the dot.
 fn ext_of(rel: &str) -> Option<&str> {
     let last = rel.rsplit('/').next().unwrap_or(rel);
-    last.rfind('.').filter(|&i| i > 0 && i + 1 < last.len()).map(|i| &last[i..])
+    last.rfind('.')
+        .filter(|&i| i > 0 && i + 1 < last.len())
+        .map(|i| &last[i..])
 }
 
 fn has_ext(rel: &str) -> bool {
@@ -629,7 +729,12 @@ fn has_ext(rel: &str) -> bool {
 
 /// A level extension if the name has one of the four Seihai knows.
 fn level_ext(rel: &str) -> Option<&str> {
-    ext_of(rel).filter(|e| matches!(e.to_ascii_lowercase().as_str(), ".nw" | ".graal" | ".zelda" | ".gmap"))
+    ext_of(rel).filter(|e| {
+        matches!(
+            e.to_ascii_lowercase().as_str(),
+            ".nw" | ".graal" | ".zelda" | ".gmap"
+        )
+    })
 }
 
 /// The first existing file, trying each directory in order and, inside
@@ -667,7 +772,9 @@ pub(crate) fn lookup(dir: &Path, rel: &str) -> Option<PathBuf> {
         let mut exact = None;
         let mut folded = None;
         for e in fs::read_dir(&cur).ok()?.flatten() {
-            let Some(n) = e.file_name().to_str().map(str::to_owned) else { continue };
+            let Some(n) = e.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
             if !n.eq_ignore_ascii_case(c) || e.path().is_dir() == last {
                 continue;
             }
@@ -710,7 +817,17 @@ mod tests {
         assert_eq!(clean_name("a\\b.png").as_deref(), Some("a/b.png"));
         assert_eq!(clean_name("./a.png").as_deref(), Some("a.png"));
         assert_eq!(clean_name("\"quoted.png\"").as_deref(), Some("quoted.png"));
-        for bad in ["", "..", "../x", "a/../../x", "/etc/passwd", "c:/x", "c:\\x", "a\0b", "///"] {
+        for bad in [
+            "",
+            "..",
+            "../x",
+            "a/../../x",
+            "/etc/passwd",
+            "c:/x",
+            "c:\\x",
+            "a\0b",
+            "///",
+        ] {
             assert_eq!(clean_name(bad), None, "{bad:?}");
         }
     }
@@ -722,8 +839,14 @@ mod tests {
         crate::filecache::set_mod_time(&d.join("new1.nw"), 1_000).unwrap();
         let r = AssetResolver::empty(ClientVersion::V222.profile()).with_cache(Some(d.clone()));
         // The server's time for the level: the file is its copy.
-        assert_eq!(r.level_at_mod_time("new1.nw", Some(1_000)), Some(d.join("new1.nw")));
-        assert_eq!(r.level_at_mod_time("NEW1", Some(1_000)), Some(d.join("new1.nw")));
+        assert_eq!(
+            r.level_at_mod_time("new1.nw", Some(1_000)),
+            Some(d.join("new1.nw"))
+        );
+        assert_eq!(
+            r.level_at_mod_time("NEW1", Some(1_000)),
+            Some(d.join("new1.nw"))
+        );
         // Another time, or none sent yet: the server's board wins.
         assert_eq!(r.level_at_mod_time("new1.nw", Some(1_001)), None);
         assert_eq!(r.level_at_mod_time("new1.nw", None), None);
@@ -742,11 +865,18 @@ mod tests {
         let r = AssetResolver::empty(ClientVersion::V222.profile())
             .with_assets(Some(AssetRoot::new(&install)))
             .with_cache(Some(cache.clone()));
-        assert_eq!(r.level("new1.nw"), Some(install.join("new1.nw")), "offline lookups still see it");
+        assert_eq!(
+            r.level("new1.nw"),
+            Some(install.join("new1.nw")),
+            "offline lookups still see it"
+        );
         assert_eq!(r.level_at_mod_time("new1.nw", Some(1_000)), None);
         touch(&cache, "levels/new1.nw");
         crate::filecache::set_mod_time(&cache.join("levels/new1.nw"), 1_000).unwrap();
-        assert_eq!(r.level_at_mod_time("new1.nw", Some(1_000)), Some(cache.join("levels/new1.nw")));
+        assert_eq!(
+            r.level_at_mod_time("new1.nw", Some(1_000)),
+            Some(cache.join("levels/new1.nw"))
+        );
     }
 
     /// The F5 window's "open offline" copy: the server cache's file at
@@ -761,7 +891,10 @@ mod tests {
             .with_cache(Some(cache.clone()));
         assert_eq!(r.cached_level("onlinestartlocal.nw"), None);
         touch(&cache, "levels/onlinestartlocal.nw");
-        assert_eq!(r.cached_level("onlinestartlocal.nw"), Some(cache.join("levels/onlinestartlocal.nw")));
+        assert_eq!(
+            r.cached_level("onlinestartlocal.nw"),
+            Some(cache.join("levels/onlinestartlocal.nw"))
+        );
     }
 
     #[test]
@@ -797,9 +930,19 @@ mod tests {
         assert_eq!(old.level("c.gmap"), None);
         assert_eq!(old.level("b"), Some(d.join("b.graal")));
         // 2.05 and later: all three.
-        for v in [ClientVersion::V205, ClientVersion::V217, ClientVersion::V222, ClientVersion::V231] {
+        for v in [
+            ClientVersion::V205,
+            ClientVersion::V217,
+            ClientVersion::V222,
+            ClientVersion::V231,
+        ] {
             let r = resolver(&d, v);
-            assert!(r.level("a.nw").is_some() && r.level("b.graal").is_some() && r.level("c.gmap").is_some(), "{v:?}");
+            assert!(
+                r.level("a.nw").is_some()
+                    && r.level("b.graal").is_some()
+                    && r.level("c.gmap").is_some(),
+                "{v:?}"
+            );
         }
         let _ = fs::remove_dir_all(&d);
     }
@@ -814,16 +957,26 @@ mod tests {
         for p in crate::protocol::PROFILES.iter() {
             let r = AssetResolver::new(AssetRoot::new(&d), p);
             // An explicit name is found whatever case the disk has.
-            assert_eq!(r.level("level11.zelda"), Some(d.join("levels/Level11.Zelda")), "{}", p.label);
+            assert_eq!(
+                r.level("level11.zelda"),
+                Some(d.join("levels/Level11.Zelda")),
+                "{}",
+                p.label
+            );
             assert!(r.opens(".zelda") && r.opens(".ZELDA"), "{}", p.label);
             // A bare name: the build's own order, `.zelda` after `.graal`.
             assert_eq!(r.level("only"), Some(d.join("only.zelda")), "{}", p.label);
-            assert_eq!(r.level("house1"), Some(d.join("house1.graal")), "{}", p.label);
+            assert_eq!(
+                r.level("house1"),
+                Some(d.join("house1.graal")),
+                "{}",
+                p.label
+            );
             // No swap for a named extension that is missing.
             assert_eq!(r.level("house2.zelda"), None);
         }
         // A build whose profile does not read Z3-V1 would not open it.
-        let mut p = ClientVersion::V139.profile().clone();
+        let mut p = *ClientVersion::V139.profile();
         p.levels.zelda = false;
         let p: &'static VersionProfile = Box::leak(Box::new(p));
         let r = AssetResolver::new(AssetRoot::new(&d), p);
@@ -840,7 +993,10 @@ mod tests {
         let old = resolver(&d, ClientVersion::V139);
         assert_eq!(old.gani("walk.gani"), None);
         let new = resolver(&d, ClientVersion::V222);
-        assert_eq!(new.gani("walk.gani"), Some(d.join("levels/ganis/Walk.gani")));
+        assert_eq!(
+            new.gani("walk.gani"),
+            Some(d.join("levels/ganis/Walk.gani"))
+        );
         assert_eq!(new.gani("walk"), Some(d.join("levels/ganis/Walk.gani")));
         assert_eq!(new.gani("idle.gani"), Some(d.join("gani/idle.gani")));
         assert_eq!(new.gani("../walk.gani"), None);
@@ -860,17 +1016,37 @@ mod tests {
         touch(&d, "levels/ganis/mywalk.gani");
         touch(&cache, "levels/ganis/sword.gani");
         touch(&cache, "levels/ganis/push.gani");
-        let r = AssetResolver::new(AssetRoot::new(&d), ClientVersion::V139.profile()).with_cache(Some(cache.clone()));
+        let r = AssetResolver::new(AssetRoot::new(&d), ClientVersion::V139.profile())
+            .with_cache(Some(cache.clone()));
         assert_eq!(r.gani("walk.gani"), None, "no GANI files as such");
-        assert_eq!(r.pose_gani("walk.gani"), Some(d.join("levels/ganis/walk.gani")));
+        assert_eq!(
+            r.pose_gani("walk.gani"),
+            Some(d.join("levels/ganis/walk.gani"))
+        );
         assert_eq!(r.pose_gani("walk"), Some(d.join("levels/ganis/walk.gani")));
-        assert_eq!(r.pose_gani("sword.gani"), Some(d.join("levels/ganis/sword.gani")), "the user's copy, not the server's");
-        assert_eq!(r.pose_gani("push.gani"), None, "a server's file is never read");
+        assert_eq!(
+            r.pose_gani("sword.gani"),
+            Some(d.join("levels/ganis/sword.gani")),
+            "the user's copy, not the server's"
+        );
+        assert_eq!(
+            r.pose_gani("push.gani"),
+            None,
+            "a server's file is never read"
+        );
         assert_eq!(r.pose_gani("lift.gani"), None, "1.39 has no lift pose");
-        assert_eq!(r.pose_gani("mywalk.gani"), None, "a server's own animation is not built in");
+        assert_eq!(
+            r.pose_gani("mywalk.gani"),
+            None,
+            "a server's own animation is not built in"
+        );
         // A GANI build reads them as GANIs, cache first.
-        let n = AssetResolver::new(AssetRoot::new(&d), ClientVersion::V222.profile()).with_cache(Some(cache.clone()));
-        assert_eq!(n.pose_gani("sword.gani"), Some(cache.join("levels/ganis/sword.gani")));
+        let n = AssetResolver::new(AssetRoot::new(&d), ClientVersion::V222.profile())
+            .with_cache(Some(cache.clone()));
+        assert_eq!(
+            n.pose_gani("sword.gani"),
+            Some(cache.join("levels/ganis/sword.gani"))
+        );
         let _ = fs::remove_dir_all(&d);
         let _ = fs::remove_dir_all(&cache);
     }
@@ -889,15 +1065,27 @@ mod tests {
         touch(&d, "maps/map.png");
         let r = resolver(&d, ClientVersion::V222);
         assert_eq!(r.image("pics1.png"), Some(d.join("pics1.png")));
-        assert_eq!(r.image_in("bodies", "body.png"), Some(d.join("levels/bodies/body.png")));
+        assert_eq!(
+            r.image_in("bodies", "body.png"),
+            Some(d.join("levels/bodies/body.png"))
+        );
         // No category hint: still found by name.
         assert_eq!(r.image("head0.png"), Some(d.join("levels/heads/head0.png")));
         assert_eq!(r.image("door.png"), Some(d.join("levels/images/door.png")));
-        assert_eq!(r.image("alienpics.png"), Some(d.join("levels/webgifs/Alienpics.png")));
+        assert_eq!(
+            r.image("alienpics.png"),
+            Some(d.join("levels/webgifs/Alienpics.png"))
+        );
         // GANI sprite sheets sit beside the GANIs; map pictures in maps/.
-        assert_eq!(r.image("gralats.png"), Some(d.join("levels/ganis/gralats.png")));
+        assert_eq!(
+            r.image("gralats.png"),
+            Some(d.join("levels/ganis/gralats.png"))
+        );
         assert_eq!(r.image("map.png"), Some(d.join("maps/map.png")));
-        assert_eq!(r.gani("bomy_idle.gani"), Some(d.join("levels/bomys/bomy_idle.gani")));
+        assert_eq!(
+            r.gani("bomy_idle.gani"),
+            Some(d.join("levels/bomys/bomy_idle.gani"))
+        );
         // Old layout: the category folder straight under the root.
         assert_eq!(r.image("old.png"), Some(d.join("swords/old.png")));
         // A bare name gets the profile's extension, then the others.
@@ -918,13 +1106,22 @@ mod tests {
         touch(&d, "levels/images/door.gif");
         let old = resolver(&d, ClientVersion::V205);
         // 2.05 asks for head0.png and gets the GIF, as the real client reads.
-        assert_eq!(old.image_in("heads", "head0.png"), Some(d.join("levels/heads/head0.gif")));
+        assert_eq!(
+            old.image_in("heads", "head0.png"),
+            Some(d.join("levels/heads/head0.gif"))
+        );
         // No GIF body: the real 2.05 draws none, and finds none here either.
         assert_eq!(old.image_in("bodies", "body.png"), None);
         // Only player art: other images keep the name's extension.
-        assert_eq!(old.image_in("images", "door.png"), Some(d.join("levels/images/door.png")));
+        assert_eq!(
+            old.image_in("images", "door.png"),
+            Some(d.join("levels/images/door.png"))
+        );
         let new = resolver(&d, ClientVersion::V222);
-        assert_eq!(new.image_in("heads", "head0.png"), Some(d.join("levels/heads/head0.png")));
+        assert_eq!(
+            new.image_in("heads", "head0.png"),
+            Some(d.join("levels/heads/head0.png"))
+        );
         let _ = fs::remove_dir_all(&d);
     }
 
@@ -935,12 +1132,23 @@ mod tests {
         touch(&ours, "bodies/body.gif");
         // A PNG-only folder with its own bodies: no body at all, as the real 2.05.
         touch(&d, "pngonly/levels/bodies/body.png");
-        let p = AssetResolver::new(AssetRoot::new(&d.join("pngonly")), ClientVersion::V205.profile()).with_builtin(Some(ours.clone()));
+        let p = AssetResolver::new(
+            AssetRoot::new(d.join("pngonly")),
+            ClientVersion::V205.profile(),
+        )
+        .with_builtin(Some(ours.clone()));
         assert_eq!(p.image_in("bodies", "body.png"), None);
         // A folder without player art: the built-in GIF.
         fs::create_dir_all(d.join("empty")).unwrap();
-        let e = AssetResolver::new(AssetRoot::new(&d.join("empty")), ClientVersion::V205.profile()).with_builtin(Some(ours.clone()));
-        assert_eq!(e.image_in("bodies", "body.png"), Some(ours.join("bodies/body.gif")));
+        let e = AssetResolver::new(
+            AssetRoot::new(d.join("empty")),
+            ClientVersion::V205.profile(),
+        )
+        .with_builtin(Some(ours.clone()));
+        assert_eq!(
+            e.image_in("bodies", "body.png"),
+            Some(ours.join("bodies/body.gif"))
+        );
         let _ = fs::remove_dir_all(&d);
     }
 
@@ -981,11 +1189,23 @@ mod tests {
         touch(&d, "levels/tiledefs/b.txt");
         touch(&d, "levels/tiledefs/a.txt");
         let r = resolver(&d, ClientVersion::V222);
-        assert_eq!(r.tile_types(), Some((d.join("arrays.dat"), TileTypesFile::ArraysDat)));
+        assert_eq!(
+            r.tile_types(),
+            Some((d.join("arrays.dat"), TileTypesFile::ArraysDat))
+        );
         touch(&d, "tiledefs.txt");
-        assert_eq!(r.tile_types(), Some((d.join("tiledefs.txt"), TileTypesFile::Text)));
+        assert_eq!(
+            r.tile_types(),
+            Some((d.join("tiledefs.txt"), TileTypesFile::Text))
+        );
         let files = r.tiledef_files();
-        assert_eq!(files, vec![d.join("levels/tiledefs/a.txt"), d.join("levels/tiledefs/b.txt")]);
+        assert_eq!(
+            files,
+            vec![
+                d.join("levels/tiledefs/a.txt"),
+                d.join("levels/tiledefs/b.txt")
+            ]
+        );
         let _ = fs::remove_dir_all(&d);
     }
 

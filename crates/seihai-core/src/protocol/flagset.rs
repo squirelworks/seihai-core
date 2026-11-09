@@ -16,7 +16,11 @@ pub const PLI_FLAGDEL: u8 = 19;
 /// The message for one flag: `PLI_FLAGSET` with `name=value` (`name` alone
 /// for an empty value), or `PLI_FLAGDEL` with the name when `value` is `None`.
 pub fn flag_message(name: &str, value: Option<&str>) -> Vec<u8> {
-    let id = if value.is_some() { PLI_FLAGSET } else { PLI_FLAGDEL };
+    let id = if value.is_some() {
+        PLI_FLAGSET
+    } else {
+        PLI_FLAGDEL
+    };
     let mut m = vec![id + 0x20];
     m.extend(name.bytes());
     if let Some(v) = value.filter(|v| !v.is_empty()) {
@@ -34,7 +38,10 @@ mod tests {
     #[test]
     fn the_message_is_flagset_with_name_equals_value() {
         // The bytes of the real 2.22 client's `gr.x=30`.
-        assert_eq!(flag_message("gr.x", Some("30")), [18 + 0x20, 0x67, 0x72, 0x2e, 0x78, 0x3d, 0x33, 0x30, b'\n']);
+        assert_eq!(
+            flag_message("gr.x", Some("30")),
+            [18 + 0x20, 0x67, 0x72, 0x2e, 0x78, 0x3d, 0x33, 0x30, b'\n']
+        );
         assert_eq!(flag_message("door", Some("")), b"\x32door\n");
         assert_eq!(flag_message("door", None), b"\x33door\n");
     }

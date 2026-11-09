@@ -26,9 +26,11 @@ use std::time::Duration;
 use super::OfflineSession;
 use crate::assets::{DrawLayer, Level, Npc};
 use crate::protocol::npcprops::{
-    half_tiles, npc_props_message, Head, NpcProps, PropValue, BLOCK_DONTBLOCK, BLOCK_PULLABLE, BLOCK_PUSHABLE, CHARACTER_IMAGE, DEFAULT_NPC_COLORS,
-    NPCPROP_BLOCKFLAGS, NPCPROP_BODY, NPCPROP_COLORS, NPCPROP_GANI, NPCPROP_GATTRIB1, NPCPROP_HEAD, NPCPROP_IMAGE, NPCPROP_MESSAGE, NPCPROP_NICKNAME,
-    NPCPROP_SPRITE, NPCPROP_VISFLAGS, NPCPROP_X, NPCPROP_Y, VIS_CLIENT, VIS_DEFAULT, VIS_OVER, VIS_UNDER, VIS_VISIBLE,
+    half_tiles, npc_props_message, Head, NpcProps, PropValue, BLOCK_DONTBLOCK, BLOCK_PULLABLE,
+    BLOCK_PUSHABLE, CHARACTER_IMAGE, DEFAULT_NPC_COLORS, NPCPROP_BLOCKFLAGS, NPCPROP_BODY,
+    NPCPROP_COLORS, NPCPROP_GANI, NPCPROP_GATTRIB1, NPCPROP_HEAD, NPCPROP_IMAGE, NPCPROP_MESSAGE,
+    NPCPROP_NICKNAME, NPCPROP_SPRITE, NPCPROP_VISFLAGS, NPCPROP_X, NPCPROP_Y, VIS_CLIENT,
+    VIS_DEFAULT, VIS_OVER, VIS_UNDER, VIS_VISIBLE,
 };
 
 const OUR_BITS: u8 = BLOCK_DONTBLOCK | BLOCK_PULLABLE | BLOCK_PUSHABLE;
@@ -81,7 +83,11 @@ fn char_props(n: &Npc) -> Option<CharProps> {
     let gani = n.ani.clone()?;
     let mut colors = DEFAULT_NPC_COLORS;
     for (i, c) in colors.iter_mut().enumerate() {
-        if let Some(v) = n.props.get(&format!("#C{i}")).and_then(|v| crate::looks::color_value(v)) {
+        if let Some(v) = n
+            .props
+            .get(&format!("#C{i}"))
+            .and_then(|v| crate::looks::color_value(v))
+        {
             *c = v;
         }
     }
@@ -89,9 +95,21 @@ fn char_props(n: &Npc) -> Option<CharProps> {
         Some(h) => Head::Name(h.to_string()),
         None => Head::Index(0),
     };
-    let body = n.body.clone().filter(|b| !b.trim().is_empty()).unwrap_or_else(|| "body.png".into());
-    let attrs = [1, 2, 3, 4, 5].map(|i| n.props.get(&format!("#P{i}")).cloned().unwrap_or_default());
-    Some(CharProps { gani, sprite: n.dir, colors, head, body, attrs })
+    let body = n
+        .body
+        .clone()
+        .filter(|b| !b.trim().is_empty())
+        .unwrap_or_else(|| "body.png".into());
+    let attrs =
+        [1, 2, 3, 4, 5].map(|i| n.props.get(&format!("#P{i}")).cloned().unwrap_or_default());
+    Some(CharProps {
+        gani,
+        sprite: n.dir,
+        colors,
+        head,
+        body,
+        attrs,
+    })
 }
 
 /// Put the props a server record carries on a level NPC.
@@ -181,18 +199,27 @@ pub enum Linked {
 impl OfflineSession {
     /// Take one `PLO_NPCPROPS` record for NPC `id` into the current level.
     pub fn take_server_npc(&mut self, id: u32, p: &NpcProps) -> Linked {
-        let Some(level) = self.current_level.as_mut() else { return Linked::None };
+        let Some(level) = self.current_level.as_mut() else {
+            return Linked::None;
+        };
         if let Some(i) = level.npcs.iter().position(|n| n.server_id == Some(id)) {
             apply(&mut level.npcs[i], p);
             return Linked::Known(i);
         }
-        let (Some(image), Some(x), Some(y)) = (p.image.as_deref(), p.x, p.y) else { return Linked::None };
+        let (Some(image), Some(x), Some(y)) = (p.image.as_deref(), p.x, p.y) else {
+            return Linked::None;
+        };
         if let Some(i) = file_twin(level, image, x, y) {
             level.npcs[i].server_id = Some(id);
             apply(&mut level.npcs[i], p);
             return Linked::Known(i);
         }
-        let mut n = Npc::new(image.to_string(), x, y, p.script.clone().unwrap_or_default());
+        let mut n = Npc::new(
+            image.to_string(),
+            x,
+            y,
+            p.script.clone().unwrap_or_default(),
+        );
         n.server_id = Some(id);
         apply(&mut n, p);
         level.npcs.push(n);
@@ -204,7 +231,10 @@ impl OfflineSession {
 /// position (to the half tile the server sends).
 fn file_twin(level: &Level, image: &str, x: f32, y: f32) -> Option<usize> {
     level.npcs.iter().position(|n| {
-        n.server_id.is_none() && n.image.eq_ignore_ascii_case(image) && half_tiles(n.x) == half_tiles(x) && half_tiles(n.y) == half_tiles(y)
+        n.server_id.is_none()
+            && n.image.eq_ignore_ascii_case(image)
+            && half_tiles(n.x) == half_tiles(x)
+            && half_tiles(n.y) == half_tiles(y)
     })
 }
 
@@ -373,7 +403,8 @@ impl ServerNpcSync {
             return Vec::new();
         }
         // A long frame does not owe the rounds it skipped.
-        self.since = Duration::from_nanos((self.since.as_nanos() % NPC_SEND_INTERVAL.as_nanos()) as u64);
+        self.since =
+            Duration::from_nanos((self.since.as_nanos() % NPC_SEND_INTERVAL.as_nanos()) as u64);
         self.changes(level)
     }
 
@@ -383,15 +414,24 @@ impl ServerNpcSync {
         let mut out = Vec::new();
         for n in &level.npcs {
             let Some(id) = n.server_id else { continue };
-            let Some(k) = self.known.get_mut(&id) else { continue };
+            let Some(k) = self.known.get_mut(&id) else {
+                continue;
+            };
             let mut props = Vec::new();
             let ch = char_props(n);
-            let image = if ch.is_some() { CHARACTER_IMAGE } else { n.image.as_str() };
+            let image = if ch.is_some() {
+                CHARACTER_IMAGE
+            } else {
+                n.image.as_str()
+            };
             if !image.eq_ignore_ascii_case(&k.image) {
                 k.image = image.to_string();
                 props.push((NPCPROP_IMAGE, PropValue::Text(image.to_string())));
             }
-            for (prop, now, was) in [(NPCPROP_X, half_tiles(n.x), &mut k.x), (NPCPROP_Y, half_tiles(n.y), &mut k.y)] {
+            for (prop, now, was) in [
+                (NPCPROP_X, half_tiles(n.x), &mut k.x),
+                (NPCPROP_Y, half_tiles(n.y), &mut k.y),
+            ] {
                 if now != *was {
                     *was = now;
                     props.push((prop, PropValue::Byte(now)));
@@ -414,7 +454,11 @@ impl ServerNpcSync {
             if let Some(c) = &ch {
                 // A `setcharani` sends GANI again even when it is the same.
                 let again = std::mem::replace(&mut k.ani_calls, n.ani_calls) != n.ani_calls;
-                if again || !c.gani.eq_ignore_ascii_case(k.gani.trim_end_matches(".gani")) {
+                if again
+                    || !c
+                        .gani
+                        .eq_ignore_ascii_case(k.gani.trim_end_matches(".gani"))
+                {
                     k.gani = c.gani.clone();
                     props.push((NPCPROP_GANI, PropValue::Text(c.gani.clone())));
                 }
@@ -474,37 +518,81 @@ mod tests {
     }
 
     fn record(image: &str, x: f32, y: f32) -> NpcProps {
-        NpcProps { image: Some(image.into()), script: Some("if (created) { canbepushed; }\n".into()), x: Some(x), y: Some(y), ..NpcProps::default() }
+        NpcProps {
+            image: Some(image.into()),
+            script: Some("if (created) { canbepushed; }\n".into()),
+            x: Some(x),
+            y: Some(y),
+            ..NpcProps::default()
+        }
     }
 
     #[test]
     fn a_server_npc_with_no_twin_is_added() {
         let mut s = session("GLEVNW01\n");
-        assert_eq!(s.take_server_npc(1001, &record("labblock.gif", 30.0, 25.0)), Linked::Added(0));
+        assert_eq!(
+            s.take_server_npc(1001, &record("labblock.gif", 30.0, 25.0)),
+            Linked::Added(0)
+        );
         let n = &s.current_level.as_ref().unwrap().npcs[0];
-        assert_eq!((n.image.as_str(), n.x, n.y, n.server_id), ("labblock.gif", 30.0, 25.0, Some(1001)));
+        assert_eq!(
+            (n.image.as_str(), n.x, n.y, n.server_id),
+            ("labblock.gif", 30.0, 25.0, Some(1001))
+        );
         assert!(n.script.contains("canbepushed"));
         // A later update moves it; a partial record for an unknown id adds nothing.
-        assert_eq!(s.take_server_npc(1001, &NpcProps { y: Some(24.0), ..NpcProps::default() }), Linked::Known(0));
+        assert_eq!(
+            s.take_server_npc(
+                1001,
+                &NpcProps {
+                    y: Some(24.0),
+                    ..NpcProps::default()
+                }
+            ),
+            Linked::Known(0)
+        );
         assert_eq!(s.current_level.as_ref().unwrap().npcs[0].y, 24.0);
-        assert_eq!(s.take_server_npc(7, &NpcProps { y: Some(1.0), ..NpcProps::default() }), Linked::None);
+        assert_eq!(
+            s.take_server_npc(
+                7,
+                &NpcProps {
+                    y: Some(1.0),
+                    ..NpcProps::default()
+                }
+            ),
+            Linked::None
+        );
     }
 
     #[test]
     fn the_level_files_twin_takes_the_id() {
-        let mut s = session("GLEVNW01\nNPC LabBlock.gif 30 25\n//\nNPCEND\nNPC other.png 30 25\n//\nNPCEND\n");
-        assert_eq!(s.take_server_npc(1001, &record("labblock.gif", 30.0, 25.0)), Linked::Known(0));
+        let mut s = session(
+            "GLEVNW01\nNPC LabBlock.gif 30 25\n//\nNPCEND\nNPC other.png 30 25\n//\nNPCEND\n",
+        );
+        assert_eq!(
+            s.take_server_npc(1001, &record("labblock.gif", 30.0, 25.0)),
+            Linked::Known(0)
+        );
         let l = s.current_level.as_ref().unwrap();
         assert_eq!(l.npcs.len(), 2);
-        assert_eq!((l.npcs[0].server_id, l.npcs[1].server_id), (Some(1001), None));
+        assert_eq!(
+            (l.npcs[0].server_id, l.npcs[1].server_id),
+            (Some(1001), None)
+        );
         // Moved on the server: no twin, so it is the server's NPC.
-        assert_eq!(s.take_server_npc(1002, &record("other.png", 31.0, 25.0)), Linked::Added(2));
+        assert_eq!(
+            s.take_server_npc(1002, &record("other.png", 31.0, 25.0)),
+            Linked::Added(2)
+        );
     }
 
     #[test]
     fn server_block_flags_set_push_pull_and_block() {
         let mut s = session("GLEVNW01\n");
-        let p = NpcProps { block_flags: Some(BLOCK_PULLABLE | BLOCK_DONTBLOCK), ..record("a.png", 1.0, 1.0) };
+        let p = NpcProps {
+            block_flags: Some(BLOCK_PULLABLE | BLOCK_DONTBLOCK),
+            ..record("a.png", 1.0, 1.0)
+        };
         s.take_server_npc(5, &p);
         let n = &s.current_level.as_ref().unwrap().npcs[0];
         assert!(n.pullable && !n.pushable && !n.blocks);
@@ -527,8 +615,14 @@ mod tests {
         assert!(!sync.switch_level(Some("b.nw"), true));
         assert!(sync.switch_level(Some("A.nw"), true), "parked, back");
         assert!(sync.changes(&level).is_empty(), "nothing again");
-        assert!(!sync.switch_level(Some("house.nw"), false), "a plain warp off the gmap");
-        assert!(!sync.switch_level(Some("a.nw"), true), "off the gmap forgot it");
+        assert!(
+            !sync.switch_level(Some("house.nw"), false),
+            "a plain warp off the gmap"
+        );
+        assert!(
+            !sync.switch_level(Some("a.nw"), true),
+            "off the gmap forgot it"
+        );
     }
 
     #[test]
@@ -539,17 +633,29 @@ mod tests {
         let mut sync = ServerNpcSync::default();
         sync.heard(1001, &p, &s.current_level.as_ref().unwrap().npcs[0]);
         // The first look: VISFLAGS 81 (the server gave none), as 2.05.
-        assert_eq!(sync.changes(s.current_level.as_ref().unwrap()), vec![b"# '\x89-q\n".to_vec()]);
+        assert_eq!(
+            sync.changes(s.current_level.as_ref().unwrap()),
+            vec![b"# '\x89-q\n".to_vec()]
+        );
         assert!(sync.changes(s.current_level.as_ref().unwrap()).is_empty());
         // `canbepushed` ran: BLOCKFLAGS 8, as the 2.05 client sent it.
         s.current_level.as_mut().unwrap().npcs[0].pushable = true;
-        assert_eq!(sync.changes(s.current_level.as_ref().unwrap()), vec![b"# '\x89.(\n".to_vec()]);
+        assert_eq!(
+            sync.changes(s.current_level.as_ref().unwrap()),
+            vec![b"# '\x89.(\n".to_vec()]
+        );
         // Pushed up one tile: Y only (48 half tiles).
         s.current_level.as_mut().unwrap().npcs[0].y = 24.0;
-        assert_eq!(sync.changes(s.current_level.as_ref().unwrap()), vec![b"# '\x89#P\n".to_vec()]);
+        assert_eq!(
+            sync.changes(s.current_level.as_ref().unwrap()),
+            vec![b"# '\x89#P\n".to_vec()]
+        );
         assert!(sync.changes(s.current_level.as_ref().unwrap()).is_empty());
         // Another player moved it: the server's value is not sent back.
-        let moved = NpcProps { x: Some(31.0), ..NpcProps::default() };
+        let moved = NpcProps {
+            x: Some(31.0),
+            ..NpcProps::default()
+        };
         s.take_server_npc(1001, &moved);
         sync.heard(1001, &moved, &s.current_level.as_ref().unwrap().npcs[0]);
         assert!(sync.changes(s.current_level.as_ref().unwrap()).is_empty());
@@ -562,7 +668,10 @@ mod tests {
         let mut s = session("GLEVNW01\n");
         let p = record("labblock.gif", 30.0, 25.0);
         s.take_server_npc(1001, &p);
-        let mut sync = ServerNpcSync { settle_first: true, ..ServerNpcSync::default() };
+        let mut sync = ServerNpcSync {
+            settle_first: true,
+            ..ServerNpcSync::default()
+        };
         sync.heard(1001, &p, &s.current_level.as_ref().unwrap().npcs[0]);
         // The script made it a character: no VISFLAGS, IMAGE, GANI or BODY.
         s.current_level.as_mut().unwrap().npcs[0].ani = Some("idle".into());
@@ -570,7 +679,10 @@ mod tests {
         assert!(sync.changes(s.current_level.as_ref().unwrap()).is_empty());
         // A push later still goes out (Y, 48 half tiles).
         s.current_level.as_mut().unwrap().npcs[0].y = 24.0;
-        assert_eq!(sync.changes(s.current_level.as_ref().unwrap()), vec![b"# '\x89#P\n".to_vec()]);
+        assert_eq!(
+            sync.changes(s.current_level.as_ref().unwrap()),
+            vec![b"# '\x89#P\n".to_vec()]
+        );
     }
 
     #[test]
@@ -586,7 +698,10 @@ mod tests {
     fn vis_flags_follow_the_2_05_client() {
         let first = |server: Option<u8>, f: &dyn Fn(&mut Npc)| {
             let mut s = session("GLEVNW01\n");
-            let p = NpcProps { vis_flags: server, ..record("a.png", 1.0, 1.0) };
+            let p = NpcProps {
+                vis_flags: server,
+                ..record("a.png", 1.0, 1.0)
+            };
             s.take_server_npc(5, &p);
             f(&mut s.current_level.as_mut().unwrap().npcs[0]);
             let mut sync = ServerNpcSync::default();
@@ -609,16 +724,26 @@ mod tests {
     #[test]
     fn image_and_message_go_out_in_prop_order() {
         let mut s = session("GLEVNW01\n");
-        let p = NpcProps { vis_flags: Some(81), ..record("a.png", 1.0, 1.0) };
+        let p = NpcProps {
+            vis_flags: Some(81),
+            ..record("a.png", 1.0, 1.0)
+        };
         s.take_server_npc(1118, &p);
         let mut sync = ServerNpcSync::default();
         sync.heard(1118, &p, &s.current_level.as_ref().unwrap().npcs[0]);
         let n = &mut s.current_level.as_mut().unwrap().npcs[0];
         n.image = "bomb1.png".into();
         n.message = "hi".into();
-        assert_eq!(sync.changes(s.current_level.as_ref().unwrap()), vec![b"# (~ )bomb1.png/\"hi\n".to_vec()]);
+        assert_eq!(
+            sync.changes(s.current_level.as_ref().unwrap()),
+            vec![b"# (~ )bomb1.png/\"hi\n".to_vec()]
+        );
         // The server's message and image are taken, not sent back.
-        let back = NpcProps { message: Some("yo".into()), image: Some("c.png".into()), ..NpcProps::default() };
+        let back = NpcProps {
+            message: Some("yo".into()),
+            image: Some("c.png".into()),
+            ..NpcProps::default()
+        };
         s.take_server_npc(1118, &back);
         sync.heard(1118, &back, &s.current_level.as_ref().unwrap().npcs[0]);
         assert_eq!(s.current_level.as_ref().unwrap().npcs[0].message, "yo");

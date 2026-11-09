@@ -30,11 +30,11 @@ impl Pcm {
 }
 
 const STEP_TABLE: [i32; 89] = [
-    7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66, 73, 80, 88, 97, 107,
-    118, 130, 143, 157, 173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449, 494, 544, 598, 658, 724, 796, 876, 963,
-    1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066, 2272, 2499, 2749, 3024, 3327, 3660, 4026, 4428, 4871, 5358, 5894,
-    6484, 7132, 7845, 8630, 9493, 10442, 11487, 12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794,
-    32767,
+    7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66,
+    73, 80, 88, 97, 107, 118, 130, 143, 157, 173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449,
+    494, 544, 598, 658, 724, 796, 876, 963, 1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066, 2272,
+    2499, 2749, 3024, 3327, 3660, 4026, 4428, 4871, 5358, 5894, 6484, 7132, 7845, 8630, 9493,
+    10442, 11487, 12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767,
 ];
 const INDEX_TABLE: [i32; 8] = [-1, -1, -1, -1, 2, 4, 6, 8];
 
@@ -43,7 +43,12 @@ fn u16le(b: &[u8], at: usize) -> Option<u16> {
 }
 
 fn u32le(b: &[u8], at: usize) -> Option<u32> {
-    Some(u32::from_le_bytes([*b.get(at)?, *b.get(at + 1)?, *b.get(at + 2)?, *b.get(at + 3)?]))
+    Some(u32::from_le_bytes([
+        *b.get(at)?,
+        *b.get(at + 1)?,
+        *b.get(at + 2)?,
+        *b.get(at + 3)?,
+    ]))
 }
 
 struct Fmt {
@@ -89,10 +94,8 @@ pub fn decode_wav(bytes: &[u8]) -> Result<Pcm, String> {
                     bits,
                 });
             }
-            b"data" => {
-                if data.is_none() {
-                    data = Some(body);
-                }
+            b"data" if data.is_none() => {
+                data = Some(body);
             }
             _ => {}
         }
@@ -109,13 +112,32 @@ pub fn decode_wav(bytes: &[u8]) -> Result<Pcm, String> {
     }
     let samples = match (fmt.tag, fmt.bits) {
         (1, 8) => data.iter().map(|b| ((*b as i16) - 128) << 8).collect(),
-        (1, 16) => data.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]])).collect(),
-        (1, 24) => data.chunks_exact(3).map(|c| i16::from_le_bytes([c[1], c[2]])).collect(),
-        (1, 32) => data.chunks_exact(4).map(|c| i16::from_le_bytes([c[2], c[3]])).collect(),
+        (1, 16) => data
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| i16::from_le_bytes([c[0], c[1]]))
+            .collect(),
+        (1, 24) => data
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|c| i16::from_le_bytes([c[1], c[2]]))
+            .collect(),
+        (1, 32) => data
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|c| i16::from_le_bytes([c[2], c[3]]))
+            .collect(),
         (17, 4) => decode_ima(data, &fmt)?,
         (tag, bits) => return Err(format!("unsupported WAV format tag {tag} at {bits} bits")),
     };
-    Ok(Pcm { channels: fmt.channels, rate: fmt.rate, samples })
+    Ok(Pcm {
+        channels: fmt.channels,
+        rate: fmt.rate,
+        samples,
+    })
 }
 
 /// Microsoft IMA ADPCM: blocks with a 4-byte header per channel (the
@@ -124,7 +146,7 @@ pub fn decode_wav(bytes: &[u8]) -> Result<Pcm, String> {
 fn decode_ima(data: &[u8], fmt: &Fmt) -> Result<Vec<i16>, String> {
     let ch = fmt.channels as usize;
     let align = fmt.block_align;
-    if align < 4 * ch || (align - 4 * ch) % (4 * ch) != 0 {
+    if align < 4 * ch || !(align - 4 * ch).is_multiple_of(4 * ch) {
         return Err(format!("bad IMA ADPCM block size {align}"));
     }
     let mut out = Vec::new();
@@ -167,21 +189,47 @@ fn decode_ima(data: &[u8], fmt: &Fmt) -> Result<Vec<i16>, String> {
                 }
             }
         }
-        let n = chan[0].len();
-        for i in 0..n {
-            for c in 0..ch {
-                out.push(chan[c][i]);
+        for (i, _) in chan[0].iter().enumerate() {
+            for channel in chan.iter().take(ch) {
+                out.push(channel[i]);
             }
         }
     }
     Ok(out)
 }
 
+/// A tiny mono 8-bit PCM WAV for tests: `len` samples at `rate`.
+#[cfg(test)]
+pub(crate) fn test_wav(rate: u32, len: usize) -> Vec<u8> {
+    let mut out = b"RIFF".to_vec();
+    out.extend(((36 + len) as u32).to_le_bytes());
+    out.extend(b"WAVEfmt ");
+    out.extend(16u32.to_le_bytes());
+    out.extend(1u16.to_le_bytes());
+    out.extend(1u16.to_le_bytes());
+    out.extend(rate.to_le_bytes());
+    out.extend(rate.to_le_bytes());
+    out.extend(1u16.to_le_bytes());
+    out.extend(8u16.to_le_bytes());
+    out.extend(b"data");
+    out.extend((len as u32).to_le_bytes());
+    out.extend(std::iter::repeat_n(128u8, len));
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn wav(tag: u16, channels: u16, rate: u32, bits: u16, block_align: u16, extra: &[u8], data: &[u8]) -> Vec<u8> {
+    fn wav(
+        tag: u16,
+        channels: u16,
+        rate: u32,
+        bits: u16,
+        block_align: u16,
+        extra: &[u8],
+        data: &[u8],
+    ) -> Vec<u8> {
         let mut fmt = Vec::new();
         fmt.extend(tag.to_le_bytes());
         fmt.extend(channels.to_le_bytes());
@@ -211,7 +259,10 @@ mod tests {
 
     #[test]
     fn pcm16_stereo_and_duration() {
-        let data: Vec<u8> = [100i16, -100, 200, -200].iter().flat_map(|s| s.to_le_bytes()).collect();
+        let data: Vec<u8> = [100i16, -100, 200, -200]
+            .iter()
+            .flat_map(|s| s.to_le_bytes())
+            .collect();
         let p = decode_wav(&wav(1, 2, 8000, 16, 4, &[], &data)).unwrap();
         assert_eq!(p.samples, vec![100, -100, 200, -200]);
         assert_eq!(p.frames(), 2);
@@ -245,7 +296,9 @@ mod tests {
         assert!(decode_wav(b"RIFF0000WAVEjunk").is_err());
         assert!(decode_wav(b"not a wav file at all").is_err());
         // mu-law (tag 7) is not supported.
-        assert!(decode_wav(&wav(7, 1, 8000, 8, 1, &[], &[0, 1])).unwrap_err().contains("tag 7"));
+        assert!(decode_wav(&wav(7, 1, 8000, 8, 1, &[], &[0, 1]))
+            .unwrap_err()
+            .contains("tag 7"));
         // A fmt with no data chunk.
         let mut b = wav(1, 1, 8000, 8, 1, &[], &[]);
         b.truncate(b.len() - 8);
@@ -301,24 +354,4 @@ mod tests {
         }
         eprintln!("decoded {n} files");
     }
-}
-
-
-/// A tiny mono 8-bit PCM WAV for tests: `len` samples at `rate`.
-#[cfg(test)]
-pub(crate) fn test_wav(rate: u32, len: usize) -> Vec<u8> {
-    let mut out = b"RIFF".to_vec();
-    out.extend(((36 + len) as u32).to_le_bytes());
-    out.extend(b"WAVEfmt ");
-    out.extend(16u32.to_le_bytes());
-    out.extend(1u16.to_le_bytes());
-    out.extend(1u16.to_le_bytes());
-    out.extend(rate.to_le_bytes());
-    out.extend(rate.to_le_bytes());
-    out.extend(1u16.to_le_bytes());
-    out.extend(8u16.to_le_bytes());
-    out.extend(b"data");
-    out.extend((len as u32).to_le_bytes());
-    out.extend(std::iter::repeat(128u8).take(len));
-    out
 }

@@ -58,9 +58,12 @@ impl LevelCache {
     /// The entry for `name` (see [`same_level`]).
     pub fn get(&self, name: &str) -> Option<&CachedLevel> {
         let key = name.to_ascii_lowercase();
-        self.levels
-            .get(&key)
-            .or_else(|| self.levels.iter().find(|(k, _)| same_level(k, name)).map(|(_, v)| v))
+        self.levels.get(&key).or_else(|| {
+            self.levels
+                .iter()
+                .find(|(k, _)| same_level(k, name))
+                .map(|(_, v)| v)
+        })
     }
 
     /// The mod time a `PLI_LEVELWARPMOD` for `name` would carry.
@@ -91,7 +94,13 @@ mod tests {
     use super::*;
 
     fn lvl(t: u32) -> CachedLevel {
-        CachedLevel { mod_time: t, board: vec![0; 4096], board_lines: vec![], links: vec!["x".into()], signs: vec![] }
+        CachedLevel {
+            mod_time: t,
+            board: vec![0; 4096],
+            board_lines: vec![],
+            links: vec!["x".into()],
+            signs: vec![],
+        }
     }
 
     #[test]
