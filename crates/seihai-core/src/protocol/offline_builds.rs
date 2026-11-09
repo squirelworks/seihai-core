@@ -154,7 +154,9 @@ pub const OFFLINE_BUILDS: &[OfflineBuild] = &[
         "1st Graal",
         "1stgraal-1",
         "1998-09-06",
-        "Z<base>",
+        // Published static branch: Z + level base + 2. The live Zhouse12
+        // join alone cannot distinguish house1 + 2 from a base of house12.
+        "Z<base>2",
         "Zelda2",
         Z3,
     ),
@@ -162,6 +164,8 @@ pub const OFFLINE_BUILDS: &[OfflineBuild] = &[
         "2nd Graal",
         "2ndgraal",
         "1998-09-16",
+        // Provisional: the exact per-level construction was not traced for
+        // this build. Do not infer it from 1st Graal's branch.
         "Z<base>",
         "Zelda2",
         GR01,
@@ -390,6 +394,21 @@ mod tests {
             assert!(b.display().ends_with("offline-only)"));
             assert!(!b.reason().is_empty());
         }
+    }
+
+    /// The published static 1st Graal branch appends 2 after the level
+    /// base. This catalogue test does not execute a native relay client.
+    #[test]
+    fn first_graal_room_and_launcher_reason_keep_the_suffix() {
+        let first = by_label("1st Graal").unwrap();
+        assert_eq!(first.room(), Some("Z<base>2"));
+        assert_eq!(first.offline, relay("Z<base>2", Some("Zelda2"), 14801));
+        assert!(first.reason().contains("`Z<base>2`"));
+        assert_eq!(first.plays_as, ClientVersion::V121);
+        assert!(first.display().ends_with("offline-only)"));
+
+        // A room template is not a token-based game-server profile.
+        assert!(ClientVersion::from_label(first.label).is_none());
     }
 
     /// Java Graal joins `G2<level>`, 5th Graal `G3<level>`. GServ links only
