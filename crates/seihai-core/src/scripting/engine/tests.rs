@@ -43,6 +43,23 @@ fn created_runs_its_block_only() {
     assert_eq!(messages(&mut w), vec!["entered"]);
 }
 
+/// `playerleaves` is the NPC-server's event (2.x server scripts): it runs
+/// its block in a 2.1-era world, and a 2.05 world, whose clients have no
+/// such event, does not run it.
+#[test]
+fn playerleaves_runs_from_the_21_era() {
+    let src = "if (playerenters) { message entered; }\nif (playerleaves) { message left; }";
+    let (mut w, id) = npc(src);
+    w.fire(id, "playerleaves", &[]);
+    assert_eq!(messages(&mut w), vec!["left"]);
+    w.fire(id, "playerenters", &[]);
+    assert_eq!(messages(&mut w), vec!["entered"]);
+
+    let (mut w, id) = npc_in(src, Era::V205);
+    w.fire(id, "playerleaves", &[]);
+    assert!(messages(&mut w).is_empty());
+}
+
 #[test]
 fn start_all_runs_created_once() {
     let (mut w, _) = npc("if (created) { this.n++; message hi; }");

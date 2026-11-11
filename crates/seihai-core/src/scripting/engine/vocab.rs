@@ -434,6 +434,12 @@ pub static EVENTS: &[(&str, Era)] = &[
     ("playerdies", V201),
     ("playerhurt", V201),
     ("movementfinished", V203),
+    // Server-side: the NPC-server (2001, 2.x scripts) runs it when a player
+    // leaves the NPC's level, not on disconnect (Graal_analysis
+    // `tools/npcserver-2001.md`). It is absent from the 2.05, 2.17.1 and
+    // 2.22 clients that were searched, so no client fires it; a client
+    // script that tests it reads false, as an unknown flag does there.
+    ("playerleaves", V21),
 ];
 
 /// First era an event name exists in, or `None` if it is not an event.
@@ -731,6 +737,7 @@ mod tests {
         assert!(builtin_fn("ascii", Era::V21).is_some());
         assert_eq!(event_since("playerdies"), Some(Era::V201));
         assert_eq!(event_since("actionpushed"), Some(Era::V203));
+        assert_eq!(event_since("playerleaves"), Some(Era::V21));
         assert_eq!(event_since("action"), None);
         assert!(builtin_var("vecx", Era::V202).is_none());
         assert!(builtin_var("vecx", Era::V203).is_some());

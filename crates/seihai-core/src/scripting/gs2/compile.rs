@@ -412,9 +412,9 @@ pub fn gs2_event_function(event: &str) -> String {
 
 const EVENT_WORDS: &[&str] = &[
     "movement", "selected", "finished", "shooted", "reading", "exploded", "timeout", "created",
-    "weapon", "player", "touchs", "enters", "thrown", "pushed", "pulled", "compus", "action",
-    "chats", "other", "baddy", "fired", "comps", "shot", "pelt", "hurt", "dies", "dead", "lays",
-    "item", "ends", "was", "me", "by",
+    "weapon", "player", "touchs", "enters", "leaves", "thrown", "pushed", "pulled", "compus",
+    "action", "chats", "other", "baddy", "fired", "comps", "shot", "pelt", "hurt", "dies", "dead",
+    "lays", "item", "ends", "was", "me", "by",
 ];
 
 fn is_event(name: &str, era: Era) -> bool {
@@ -2194,6 +2194,7 @@ mod tests {
         assert_eq!(gs2_event_function("playerchats"), "onPlayerChats");
         assert_eq!(gs2_event_function("playertouchsme"), "onPlayerTouchsMe");
         assert_eq!(gs2_event_function("weaponfired"), "onWeaponFired");
+        assert_eq!(gs2_event_function("playerleaves"), "onPlayerLeaves");
     }
 
     #[test]
