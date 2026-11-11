@@ -308,6 +308,15 @@ impl Listserver {
         self
     }
 
+    /// The same entry dialled on another port, with what a public run
+    /// found there. For a login whose reply differs from its kind's rule
+    /// (3.x: gen-5, but only 14923 sends the list without an account).
+    pub const fn on_port(mut self, port: u16, status: PortStatus) -> Self {
+        self.port = port;
+        self.status = status;
+        self
+    }
+
     /// `host:port`, as typed into the launcher or given to `--online`.
     pub fn addr(&self) -> String {
         format!("{}:{}", self.host, self.port)
@@ -1403,9 +1412,13 @@ mod tests {
                         ListKind::Supported
                     };
                     assert_eq!(l.kind, want, "{}", p.label);
+                    // 3.x sends a gen-5 login but is dialled on 14923:
+                    // 14922 answered it with the account error only, 14923
+                    // with the list (public run, 2026-11-11).
+                    let g3d = p.label.starts_with('3');
                     assert_eq!(
                         l.port,
-                        if want == ListKind::Legacy {
+                        if want == ListKind::Legacy || g3d {
                             14923
                         } else {
                             14922
@@ -1413,7 +1426,7 @@ mod tests {
                         "{}",
                         p.label
                     );
-                    assert_eq!(l.port, l.kind.port(), "{}", p.label);
+                    assert_eq!(l.port == l.kind.port(), !g3d, "{}", p.label);
                     assert_ne!(l.port, DEAD_LIST_PORT, "{}", p.label);
                     // The kind is the login the code sends: gen-5 only for a gen-5 profile.
                     assert_eq!(
@@ -1490,7 +1503,7 @@ mod tests {
             confirmed,
             [
                 "1.41", "2.1", "2.12", "2.13", "2.14", "2.15", "2.16", "2.17", "2.22", "2.3",
-                "2.31"
+                "2.31", "3.04", "3.153"
             ]
         );
         // The profiles that now send shape A (real 2.00 and 2.05, and the

@@ -232,7 +232,7 @@ step	label	token	basis	kind	area	field	detail
 30	2.31	GNW28015	binary	unknown	pli	-	the TOML's pli_changes (21 out, 46 in) disagrees with its pli_sent list, which lacks 44; a real client sent 44, so the row keeps it
 30	2.31	GNW28015	binary	unknown	live	-	no game-server login on a public server; only the list reply was checked (2026-10-25)
 30	2.31	GNW28015	binary	source	-	-	binary (same code as 2.22) and lab: its own tampercheck constant and timer re-send, id 24 every 5.13 s whether or not others are in the level, post-login frame without the idle.gani request
-31	3.04	G3D03014	binary	changed	protocol	listserver	listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14922 (supported, assumed), token G3D30123, login shape D (login frame captured from a real client)
+31	3.04	G3D03014	binary	changed	protocol	listserver	listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14923 (supported, confirmed), token G3D30123, login shape D (login frame captured from a real client)
 31	3.04	G3D03014	binary	changed	protocol	plo (server ids handled)	+44 HASNPCSERVER, +101 BOARDPACKET, +102 FILE; -170 GHOSTMODE, -177 NEWWORLDMODE, -182 LISTPROCESSES, -183 HASPROCESSRUNNING, -189 MOVE2 (81 -> 79 ids)
 31	3.04	G3D03014	binary	changed	protocol	pli (client ids sent)	+21 PUTNPC, +36 HITOBJECTS, +81 PROFILESET; -39 TAMPERCHECK, -44 PROCESSLIST, -46 ENTERLEVEL (42 -> 42 ids)
 31	3.04	G3D03014	binary	changed	protocol	tampercheck	yes -> no
@@ -244,7 +244,7 @@ step	label	token	basis	kind	area	field	detail
 31	3.04	G3D03014	binary	changed	props	other-player props	-78 X2, -79 Y2, -80 Z2 (67 -> 64 ids)
 31	3.04	G3D03014	binary	changed	props	npc_max	77 -> 73
 31	3.04	G3D03014	binary	changed	props	precise_pos	yes -> no
-31	3.04	G3D03014	binary	unknown	listserver	-	port 14922 and the G3D token were checked against the lab listserver only, never the public one
+31	3.04	G3D03014	binary	unknown	listserver	-	the public listserver sent its list on 14923 to Seihai's G3D30123 login with a made-up account (2026-11-11); a real 3.04 was not run against it, and 14922 with a real account was not tried
 31	3.04	G3D03014	binary	unknown	login	-	UDPPORT (31) is left out of the first props, as for every build (no UDP socket); the nickname is the account, where the real client sends the start window's nickname field
 31	3.04	G3D03014	binary	unknown	ui	-	the Torque front end (start window, options, themes, chat as white text with a blue shadow) is not modelled; the 2.31 UI row is kept
 31	3.04	G3D03014	binary	unknown	other props	-	the props it parses for other players are taken as 2.31's without 78-80
@@ -261,7 +261,7 @@ step	label	token	basis	kind	area	field	detail
 32	3.153	G3D28015	binary	unknown	login	-	the first frame (5, 37, 34 bigmap.txt, 34 minimap.txt, the two 34s sent twice) and the first props (OSTYPE mac, code page 1250) were seen in the lab; the head and default-weapon checks are 3.04's
 32	3.153	G3D28015	binary	unknown	3d	-	the 3D mode (Torque GameConnection, Graal3D protocol 19, on UDP listed port + 1) is not modelled here; seihai-ato::torque has its profile
 32	3.153	G3D28015	binary	source	-	-	binary (Mac OS X PPC Mach-O) and one lab run on Mac OS X 10.4 in qemu (Graal_analysis version-profiles/lab-mac-tiger-2026-10-31.md: listserver shape D seen (id 7 and id 1 in one plain zlib frame), X2/Y2 walking, first props with OSTYPE mac and code page 1250, no 18 sent): OSTYPE mac; PLO 67, 74, 82, 104, 131-134, 187 and MOVE2 (189) in, 44 out; RC file browser, script upload and text request ids; X2/Y2/Z2; UDP off in the shipped prefs
-33	4.04r2	G3D17026	binary	changed	protocol	listserver	listserver.graal.in:14922 (supported, assumed), token G3D30123, login shape D (login frame captured from a real client) -> none
+33	4.04r2	G3D17026	binary	changed	protocol	listserver	listserver.graal.in:14923 (supported, confirmed), token G3D30123, login shape D (login frame captured from a real client) -> none
 33	4.04r2	G3D17026	binary	changed	protocol	plo (server ids handled)	+105 UPDATEPACKAGESIZE, +106 UPDATEPACKAGEDONE, +170 GHOSTMODE, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +190 SERVERLISTCONNECTED, +191 SHOOT2, +193 UNKNOWN193, +194 CLEARWEAPONS, +195 LOADGANI (88 -> 98 ids)
 33	4.04r2	G3D17026	binary	changed	protocol	pli (client ids sent)	+44 PROCESSLIST, +47 VERIFYWANTSEND, +79 RC_CHAT, +92 RC_FILEBROWSER_DOWN, +130 REQUESTUPDATEBOARD, +161 UPDATECLASS; -40 SHOOT, -43 MUTEPLAYER (54 -> 58 ids)
 33	4.04r2	G3D17026	binary	changed	protocol	showimg (id 24)	none -> every 5145 ms

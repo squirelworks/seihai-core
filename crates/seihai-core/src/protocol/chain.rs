@@ -29,9 +29,9 @@ use super::profile::{
     Basis, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, ItemDrops, Levels,
     ListKind, Listserver, LoginShape, Mannerisms, PortStatus, Props, Protocol, ServerList,
     ShapeBasis, Ui, VersionProfile, WindowPx, COMBAT_139, COMBAT_200, COMBAT_201, COMBAT_205,
-    DEATH_139, DEATH_205, DEATH_21, DROPS_133, DROPS_138, DROPS_142, MANNER_139, MANNER_141,
-    MANNER_205, MANNER_222, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217,
-    TAMPER_222, TAMPER_230, TAMPER_231,
+    DEATH_139, DEATH_205, DEATH_21, DROPS_133, DROPS_138, DROPS_142, LEGACY_LIST_PORT, MANNER_139,
+    MANNER_141, MANNER_205, MANNER_222, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404,
+    TAMPER_217, TAMPER_222, TAMPER_230, TAMPER_231,
 };
 use super::showimg::ShowImgInfo;
 use super::tampercheck::TamperInfo;
@@ -1048,7 +1048,10 @@ pub const CHAIN: &[Step] = &[
             pli: IdDelta::plus_minus(&[21, 36, 81], &[39, 44, 46]),
             listserver: Some(Some(
                 Listserver::new(ListKind::Supported, PortStatus::Assumed, Some("G3D30123"))
-                    .shape(LoginShape::Gen5OneFrame, ShapeBasis::Captured),
+                    .shape(LoginShape::Gen5OneFrame, ShapeBasis::Captured)
+                    // Public run, 2026-11-11: 14922 sent only the account
+                    // error, 14923 the list and then the error.
+                    .on_port(LEGACY_LIST_PORT, PortStatus::Confirmed),
             )),
             tampercheck: Some(false),
             tamper: Some(None),
@@ -1064,7 +1067,7 @@ pub const CHAIN: &[Step] = &[
         },
         source: "binary (Linux i386 ELF) and one lab run on GServer-v2 (Graal_analysis version-profiles/lab-304-linux-2026-10-30.md): PLO and PLI sets, props up to 76 (parsed to 74), NPC props to 73, no tampercheck, no showimg timer (UDP 15 instead), listserver id 7 with G3D30123",
         unknown: &[
-            Unknown { area: "listserver", what: "port 14922 and the G3D token were checked against the lab listserver only, never the public one" },
+            Unknown { area: "listserver", what: "the public listserver sent its list on 14923 to Seihai's G3D30123 login with a made-up account (2026-11-11); a real 3.04 was not run against it, and 14922 with a real account was not tried" },
             Unknown { area: "login", what: "UDPPORT (31) is left out of the first props, as for every build (no UDP socket); the nickname is the account, where the real client sends the start window's nickname field" },
             Unknown { area: "ui", what: "the Torque front end (start window, options, themes, chat as white text with a blue shadow) is not modelled; the 2.31 UI row is kept" },
             Unknown { area: "other props", what: "the props it parses for other players are taken as 2.31's without 78-80" },
@@ -1082,7 +1085,10 @@ pub const CHAIN: &[Step] = &[
             // Same G3D30123 login as 3.04; the 2026-10-31 Tiger lab run sent shape D (id 7 and id 1 in one plain frame).
             listserver: Some(Some(
                 Listserver::new(ListKind::Supported, PortStatus::Assumed, Some("G3D30123"))
-                    .shape(LoginShape::Gen5OneFrame, ShapeBasis::Captured),
+                    .shape(LoginShape::Gen5OneFrame, ShapeBasis::Captured)
+                    // Public run, 2026-11-11: 14922 sent only the account
+                    // error, 14923 the list and then the error.
+                    .on_port(LEGACY_LIST_PORT, PortStatus::Confirmed),
             )),
             login: Some(Some(LOGIN_3153)),
             udp_off_by_default: Some(true),

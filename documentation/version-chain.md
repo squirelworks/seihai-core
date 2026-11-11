@@ -428,7 +428,7 @@ Generated; do not edit between the markers.
 
 #### 3.04 (`G3D03014`, binary)
 
-- protocol: **listserver**: listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14922 (supported, assumed), token G3D30123, login shape D (login frame captured from a real client)
+- protocol: **listserver**: listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14923 (supported, confirmed), token G3D30123, login shape D (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +44 HASNPCSERVER, +101 BOARDPACKET, +102 FILE; -170 GHOSTMODE, -177 NEWWORLDMODE, -182 LISTPROCESSES, -183 HASPROCESSRUNNING, -189 MOVE2 (81 -> 79 ids)
 - protocol: **pli (client ids sent)**: +21 PUTNPC, +36 HITOBJECTS, +81 PROFILESET; -39 TAMPERCHECK, -44 PROCESSLIST, -46 ENTERLEVEL (42 -> 42 ids)
 - protocol: **tampercheck**: yes -> no
@@ -440,7 +440,7 @@ Generated; do not edit between the markers.
 - props: **other-player props**: -78 X2, -79 Y2, -80 Z2 (67 -> 64 ids)
 - props: **npc_max**: 77 -> 73
 - props: **precise_pos**: yes -> no
-- unknown (listserver): port 14922 and the G3D token were checked against the lab listserver only, never the public one
+- unknown (listserver): the public listserver sent its list on 14923 to Seihai's G3D30123 login with a made-up account (2026-11-11); a real 3.04 was not run against it, and 14922 with a real account was not tried
 - unknown (login): UDPPORT (31) is left out of the first props, as for every build (no UDP socket); the nickname is the account, where the real client sends the start window's nickname field
 - unknown (ui): the Torque front end (start window, options, themes, chat as white text with a blue shadow) is not modelled; the 2.31 UI row is kept
 - unknown (other props): the props it parses for other players are taken as 2.31's without 78-80
@@ -463,7 +463,7 @@ Generated; do not edit between the markers.
 
 #### 4.04r2 (`G3D17026`, binary, linked 2006-03-03)
 
-- protocol: **listserver**: listserver.graal.in:14922 (supported, assumed), token G3D30123, login shape D (login frame captured from a real client) -> none
+- protocol: **listserver**: listserver.graal.in:14923 (supported, confirmed), token G3D30123, login shape D (login frame captured from a real client) -> none
 - protocol: **plo (server ids handled)**: +105 UPDATEPACKAGESIZE, +106 UPDATEPACKAGEDONE, +170 GHOSTMODE, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +190 SERVERLISTCONNECTED, +191 SHOOT2, +193 UNKNOWN193, +194 CLEARWEAPONS, +195 LOADGANI (88 -> 98 ids)
 - protocol: **pli (client ids sent)**: +44 PROCESSLIST, +47 VERIFYWANTSEND, +79 RC_CHAT, +92 RC_FILEBROWSER_DOWN, +130 REQUESTUPDATEBOARD, +161 UPDATECLASS; -40 SHOOT, -43 MUTEPLAYER (54 -> 58 ids)
 - protocol: **showimg (id 24)**: none -> every 5145 ms
