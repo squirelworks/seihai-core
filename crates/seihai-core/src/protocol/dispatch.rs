@@ -490,6 +490,9 @@ pub struct SessionState {
     pub own_attrs: [Option<String>; 5],
     /// Read prop 10 as the pre-2.1 bow slot.
     pub bow_prop10: bool,
+    /// `PLO_OTHERPLPROPS` starts with a one-GCHAR player id (1.35), not a
+    /// GSHORT (1.36 on).
+    pub other_id_gchar: bool,
     /// Server→client ids this client version handles. Others are counted
     /// in `ignored` and dropped, as that client would. `None` takes all.
     pub known_plo: Option<IdSet>,
@@ -678,6 +681,9 @@ impl SessionState {
         Self {
             file_has_modtime: p.files.modtime,
             bow_prop10: p.props.bow_prop10,
+            // Original 1.35 reads the other player's id as one GCHAR
+            // (exact-build static evidence, graal-client-repro#179).
+            other_id_gchar: version == ClientVersion::V135,
             known_plo: Some(p.protocol.plo),
             own_prop_ids: Some(p.props.own),
             other_prop_ids: Some(p.props.other),
@@ -768,9 +774,12 @@ impl SessionState {
             8 => {
                 // PLO_OTHERPLPROPS — parse position and store.
                 self.other_props.push((msg.id, msg.payload.clone()));
-                if let Some(u) =
-                    parse_other_player(&msg.payload, self.bow_prop10, self.other_prop_ids.as_ref())
-                {
+                if let Some(u) = parse_other_player(
+                    &msg.payload,
+                    self.other_id_gchar,
+                    self.bow_prop10,
+                    self.other_prop_ids.as_ref(),
+                ) {
                     self.apply_other(u);
                 }
             }
@@ -1856,19 +1865,25 @@ struct OtherUpdate {
     left: bool,
 }
 
-/// Parse one `PLO_OTHERPLPROPS` payload: `GSHORT id` + prop stream.
+/// Parse one `PLO_OTHERPLPROPS` payload: the player id (one GCHAR when
+/// `id_gchar`, as 1.35 sends it, else a GSHORT) + prop stream.
 fn parse_other_player(
     payload: &[u8],
+    id_gchar: bool,
     bow_prop10: bool,
     accepted: Option<&IdSet>,
 ) -> Option<OtherUpdate> {
-    let id = read_gshort(payload)?;
+    let (id, id_len) = if id_gchar {
+        (u16::from(payload.first()?.wrapping_sub(0x20)), 1)
+    } else {
+        (read_gshort(payload)?, 2)
+    };
     let mut u = OtherUpdate {
         id,
         ..Default::default()
     };
     let text = |raw: &[u8]| latin1(raw.get(1..).unwrap_or(&[]));
-    for prop in parse_player_props_in(&payload[2..], bow_prop10, accepted) {
+    for prop in parse_player_props_in(&payload[id_len..], bow_prop10, accepted) {
         match prop.id {
             0 => u.nick = Some(text(&prop.raw)),
             34 => u.account = Some(text(&prop.raw)).filter(|a| !a.is_empty()),
@@ -2092,13 +2107,14 @@ mod tests {
 
     #[test]
     fn carrysprite_19_names_what_another_player_holds() {
-        let mut u = parse_other_player(&[0x20, 0x22, 19 + 0x20, 1 + 0x20], false, None).unwrap();
+        let mut u =
+            parse_other_player(&[0x20, 0x22, 19 + 0x20, 1 + 0x20], false, false, None).unwrap();
         assert_eq!(u.carry, Some(Some(261)), "1 is the bush");
-        u = parse_other_player(&[0x20, 0x22, 19 + 0x20, 31], false, None).unwrap();
+        u = parse_other_player(&[0x20, 0x22, 19 + 0x20, 31], false, false, None).unwrap();
         assert_eq!(u.carry, Some(None), "-1: empty hands");
-        u = parse_other_player(&[0x20, 0x22, 19 + 0x20, 201 + 0x20], false, None).unwrap();
+        u = parse_other_player(&[0x20, 0x22, 19 + 0x20, 201 + 0x20], false, false, None).unwrap();
         assert_eq!(u.carry, Some(Some(239)));
-        u = parse_other_player(&[0x20, 0x22, 15 + 0x20, 0x40], false, None).unwrap();
+        u = parse_other_player(&[0x20, 0x22, 15 + 0x20, 0x40], false, false, None).unwrap();
         assert_eq!(u.carry, None, "no prop 19: unchanged");
     }
 
@@ -2114,7 +2130,7 @@ mod tests {
         p.extend(b"red.png");
         p.extend([g(10), g(4)]);
         p.extend(b"walk");
-        let u = parse_other_player(&p, false, None).unwrap();
+        let u = parse_other_player(&p, false, false, None).unwrap();
         assert_eq!(u.sword_power, Some(3));
         let want = |s: &str| Some(s.to_string());
         assert_eq!(
@@ -2134,6 +2150,7 @@ mod tests {
         let u = parse_other_player(
             &[0x20, 0x22, g(8), g(2), g(9), g(0), g(11), g(4)],
             false,
+            false,
             None,
         )
         .unwrap();
@@ -2143,8 +2160,10 @@ mod tests {
         );
         // A later update without the props keeps them.
         let mut st = SessionState::default();
-        st.apply_other(parse_other_player(&p, false, None).unwrap());
-        st.apply_other(parse_other_player(&[0x20, 0x22, g(15), g(20)], false, None).unwrap());
+        st.apply_other(parse_other_player(&p, false, false, None).unwrap());
+        st.apply_other(
+            parse_other_player(&[0x20, 0x22, g(15), g(20)], false, false, None).unwrap(),
+        );
         assert_eq!(st.others[0].looks.shield.as_deref(), Some("shield2.png"));
     }
 
@@ -2652,6 +2671,20 @@ mod tests {
     /// `PLO_OTHERPLPROPS` for player `id` with a prop stream.
     fn other(id: u16, props: &[u8]) -> Vec<u8> {
         [&[8 + 0x20][..], &gs(id), props, b"\n"].concat()
+    }
+
+    /// 1.35 reads the other player's id as one GCHAR; 1.36 reads a GSHORT.
+    #[test]
+    fn otherplprops_id_is_one_byte_for_1_35() {
+        let props = [15 + 0x20, 40 + 0x20, 16 + 0x20, 50 + 0x20];
+        let mut st = SessionState::for_version(ClientVersion::V135);
+        st.apply_body(&[&[8 + 0x20, 7 + 0x20][..], &props, b"\n"].concat());
+        let got: Vec<_> = st.others.iter().map(|o| (o.id, o.x, o.y)).collect();
+        assert_eq!(got, vec![(7, 20.0, 25.0)]);
+        let mut st = SessionState::for_version(ClientVersion::V136);
+        st.apply_body(&other(7, &props));
+        let got: Vec<_> = st.others.iter().map(|o| (o.id, o.x, o.y)).collect();
+        assert_eq!(got, vec![(7, 20.0, 25.0)]);
     }
 
     #[test]
