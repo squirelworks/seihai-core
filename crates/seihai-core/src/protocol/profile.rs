@@ -141,7 +141,7 @@ pub enum Basis {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServerList {
     /// No listserver: the client connects straight to one game server.
-    Direct { default: &'static str },
+    Direct,
     /// A listserver with one list.
     Single,
     /// A listserver with this many tabs (2.14: company and playerworlds;
@@ -262,25 +262,6 @@ impl ShapeBasis {
     }
 }
 
-/// The host and port the client binary itself carries. A historical fact:
-/// it is not what Seihai dials.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BuiltIn {
-    pub host: &'static str,
-    pub port: u16,
-}
-
-/// What the 2.00 to 2.05 builds carry (DES-hidden): `www.graalonline.com:14921`.
-pub const BUILT_IN_14921: BuiltIn = BuiltIn {
-    host: "www.graalonline.com",
-    port: 14921,
-};
-/// What the 2.1 test builds carry: `www.graalonline.com:14922`.
-pub const BUILT_IN_14922: BuiltIn = BuiltIn {
-    host: "www.graalonline.com",
-    port: 14922,
-};
-
 /// Listserver login.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Listserver {
@@ -290,8 +271,6 @@ pub struct Listserver {
     pub port: u16,
     pub kind: ListKind,
     pub status: PortStatus,
-    /// What the binary carries, where it was read. History only.
-    pub built_in: Option<BuiltIn>,
     /// Token sent at listserver login. 2.22 and 2.31 send `GNW30123`
     /// inside id 7; older clients send their game token.
     pub token: Option<&'static str>,
@@ -306,12 +285,7 @@ impl Listserver {
     /// shape B with an unknown basis (what Seihai sent before the lab
     /// captures), gen-5 is shape C, captured. Use [`Self::shape`] to set
     /// another.
-    pub const fn new(
-        kind: ListKind,
-        status: PortStatus,
-        built_in: Option<BuiltIn>,
-        token: Option<&'static str>,
-    ) -> Self {
+    pub const fn new(kind: ListKind, status: PortStatus, token: Option<&'static str>) -> Self {
         let (shape, shape_basis) = match kind {
             ListKind::Legacy => (LoginShape::NewmainAccount, ShapeBasis::Unknown),
             ListKind::Supported => (LoginShape::Gen5, ShapeBasis::Captured),
@@ -321,7 +295,6 @@ impl Listserver {
             port: kind.port(),
             kind,
             status,
-            built_in,
             token,
             shape,
             shape_basis,
@@ -942,7 +915,7 @@ impl VersionProfile {
             EncryptionGen::Gen5 => "gen 5 (XOR + zlib/bz2)",
         };
         let list = match self.ui.server_list {
-            ServerList::Direct { .. } => "no listserver".to_string(),
+            ServerList::Direct => "no listserver".to_string(),
             ServerList::Single => "server list".to_string(),
             ServerList::Tabs(n) => format!("server list, {n} tabs"),
         };
@@ -1175,8 +1148,6 @@ mod tests {
         list_host: Option<String>,
         list_kind: Option<String>,
         list_status: Option<String>,
-        built_in_host: Option<String>,
-        built_in_port: Option<u16>,
     }
 
     fn parse_ids(s: &str) -> Option<IdSet> {
@@ -1201,7 +1172,7 @@ mod tests {
             .filter(|l| !l.starts_with('#') && !l.is_empty())
             .map(|l| {
                 let c: Vec<&str> = l.split('\t').collect();
-                assert_eq!(c.len(), 15, "{l}");
+                assert_eq!(c.len(), 13, "{l}");
                 TomlRow {
                     label: c[0].to_string(),
                     token: c[1].to_string(),
@@ -1217,8 +1188,6 @@ mod tests {
                     list_host: opt(c[10]),
                     list_kind: opt(c[11]),
                     list_status: opt(c[12]),
-                    built_in_host: opt(c[13]),
-                    built_in_port: c[14].parse().ok(),
                 }
             })
             .collect()
@@ -1296,14 +1265,6 @@ mod tests {
                     .to_string()
                 }) == want_status,
             );
-            check(
-                "built-in host",
-                ls.and_then(|l| l.built_in).map(|b| b.host.to_string()) == t.built_in_host,
-            );
-            check(
-                "built-in port",
-                ls.and_then(|l| l.built_in).map(|b| b.port) == t.built_in_port,
-            );
             // 2.16: its TOML entry keeps the 2.15 prop limit but notes that
             // 54-74 arrive in 2.16; the row follows the note.
             if t.label != "2.16" {
@@ -1366,16 +1327,6 @@ mod tests {
             }
             assert_ne!(p.version.listserver_port(), DEAD_LIST_PORT, "{}", p.label);
         }
-        // The dead port is still recorded as history: the 2.00 to 2.05 builds carry it.
-        let built_in = |v: ClientVersion| profile(v).protocol.listserver.and_then(|l| l.built_in);
-        assert_eq!(
-            built_in(ClientVersion::V200).map(|b| b.port),
-            Some(DEAD_LIST_PORT)
-        );
-        assert_eq!(
-            built_in(ClientVersion::V205).map(|b| b.port),
-            Some(DEAD_LIST_PORT)
-        );
     }
 
     /// Every profile with a listserver, and every version through
@@ -1657,7 +1608,7 @@ mod tests {
     fn ui_switches() {
         assert!(matches!(
             profile(ClientVersion::V139).ui.server_list,
-            ServerList::Direct { .. }
+            ServerList::Direct
         ));
         assert!(profile(ClientVersion::V139).ui.chat_recall);
         assert!(!profile(ClientVersion::V138).ui.chat_recall);

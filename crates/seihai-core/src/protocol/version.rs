@@ -195,7 +195,7 @@ impl ClientVersion {
     pub fn listserver(self) -> Listserver {
         let ls = self.list_version().profile().protocol.listserver;
         ls.unwrap_or(
-            Listserver::new(ListKind::Legacy, PortStatus::Assumed, None, None).shape(
+            Listserver::new(ListKind::Legacy, PortStatus::Assumed, None).shape(
                 super::profile::LoginShape::NewmainOnly,
                 super::profile::ShapeBasis::Inferred,
             ),

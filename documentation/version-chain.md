@@ -107,7 +107,7 @@ Generated; do not edit between the markers.
 - unknown (pli): the binaries 1.21 to 1.32 show only the send ids passed as constants; the ids below the highest one are taken as sent
 - unknown (other props): 1.21 to 1.32 have no separate parser for other players' props; 1.33's set is kept
 - unknown (live): not run: the 1.21 install is an InstallShield setup
-- source: origin row (binary of 1.21, Graal_analysis client-internals/version-profiles/v121-v132.toml): login id 0 with token, account and password; zlib on every flush; no UDP; default server www.graalonline.com:14804; main form 648×509
+- source: origin row (binary of 1.21, Graal_analysis client-internals/version-profiles/v121-v132.toml): login id 0 with token, account and password; zlib on every flush; no UDP; main form 648×509
 
 #### 1.28 beta 2 (`GSERV013`, binary, linked 1999-11-23)
 
@@ -132,7 +132,6 @@ Generated; do not edit between the markers.
 #### 1.31 (`GSERV016`, binary, linked 1999-12-07)
 
 - protocol: **plo (server ids handled)**: +40 HURTPLAYER (41 -> 42 ids)
-- ui: **server_list**: direct (www.graalonline.com:14804) -> direct (www.graalonline.com:14900)
 - source: binary: PLO 40, default port 14900 (14804 before), noudp= and fixedudpport= options
 
 #### 1.32 (`GSERV018`, binary, linked 2000-01-12)
@@ -196,7 +195,7 @@ Generated; do not edit between the markers.
 #### 1.41 (`GNW13110`, binary)
 
 - protocol: **encryption**: Gen2 -> Gen3
-- protocol: **listserver**: none -> listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape S (login frame captured from a real client)
+- protocol: **listserver**: none -> listserver.graal.in:14923 (legacy, confirmed), login shape S (login frame captured from a real client)
 - protocol: **pli (client ids sent)**: -31 PACKETCOUNT (35 -> 34 ids)
 - props: **own-player props**: +35 BODYIMG, +36 RATING (35 -> 37 ids)
 - props: **other-player props**: +35 BODYIMG, +36 RATING (23 -> 25 ids)
@@ -204,7 +203,7 @@ Generated; do not edit between the markers.
 - levels: **nw**: no -> yes
 - life: **death**: 1.39 rules (respawn to max hearts, no AP bands) -> 2.05 rules (name-group test)
 - life: **combat**: 1.39 rules (one swing step a tick, the rest 2.05) -> 2.05 rules
-- ui: **server_list**: direct (www.graalonline.com:14900) -> one list
+- ui: **server_list**: direct -> one list
 - ui: **window**: 648×508 -> 648×514
 - ui: **gs1_commands**: 111 -> 126
 - unknown (drops): the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced
@@ -216,7 +215,7 @@ Generated; do not edit between the markers.
 
 #### 1.42 (`GNW08011`, binary, linked 2001-01-10)
 
-- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), built in listserver.graal.in:14923, login shape S (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), login shape S (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, assumed), login shape A (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +42 NEWWORLDTIME, +44 HASNPCSERVER, +45 FILEUPTODATE, +150 NPCDEL2, +151 HIDENPCS, +153 SAY2 (45 -> 51 ids)
 - protocol: **pli (client ids sent)**: +34 UPDATEFILE (34 -> 35 ids)
 - life: **death**: 2.05 rules (name-group test) -> none
@@ -243,11 +242,11 @@ Generated; do not edit between the markers.
 - unknown (life): death read in the 2.00 r0 decompile; 2.00 r1 to 2.04 checked by their constants only (timer cap, input gate, dead bit, respawn AP steps). No real 2.00 death was captured yet
 - unknown (listserver): Seihai now sends the real 2.00 frame (shape A, captured in the lab: id 0 `newmain` only, no account). That frame has not been run on the public service. The 2026-10-25 matrix used Seihai's older classic login (shape B), which 14923 answered with a plain zlib id-0 list (4 rows) while 14922 stayed silent; the port is assumed for shape A until a run. A real 2.00's reply was not captured
 - unknown (token): the token is not in gs2lib, so a stock GServer-v2 does not know it
-- source: binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, .nw loader dropped, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)
+- source: binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, .nw loader dropped, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25
 
 #### 2.01 (`GNW23021`, binary, linked 2001-03-08)
 
-- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured)
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), login shape A (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, assumed), login shape A (login frame inferred, not captured)
 - protocol: **plo (server ids handled)**: +46 HITOBJECTS, +156 SETACTIVELEVEL (53 -> 55 ids)
 - protocol: **pli (client ids sent)**: +35 ADJACENTLEVEL, +36 HITOBJECTS (35 -> 37 ids)
 - life: **combat**: 2.00 rules (raw sword power, fewer packet gates) -> 2.01 rules (raw sword power)
@@ -289,7 +288,7 @@ Generated; do not edit between the markers.
 
 #### 2.05 (`GNW03081`, binary, linked 2001-08-16)
 
-- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client)
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), login shape A (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +168 UNKNOWN168 (58 -> 59 ids)
 - levels: **nw**: no -> yes
 - levels: **gmap**: no -> yes
@@ -302,7 +301,7 @@ Generated; do not edit between the markers.
 
 #### 2.1 (`GNW31101`, inferred)
 
-- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), built in www.graalonline.com:14921, login shape A (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14922, login shape B (login frame inferred, not captured; no evidence for this shape)
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), login shape A (login frame captured from a real client) -> listserver.graal.in:14923 (legacy, confirmed), login shape B (login frame inferred, not captured; no evidence for this shape)
 - protocol: **plo (server ids handled)**: +49 PLAYERWARP2, +169 UPGRADEURL, +170 GHOSTMODE, +171 BIGMAP, +172 MINIMAP, +173 GHOSTTEXT, +174 GHOSTICON (59 -> 66 ids)
 - props: **own-player props**: +43 GMAPLEVELX, +44 GMAPLEVELY, +45 Z (43 -> 46 ids)
 - props: **other-player props**: +43 GMAPLEVELX, +44 GMAPLEVELY, +45 Z (31 -> 34 ids)
@@ -362,7 +361,7 @@ Generated; do not edit between the markers.
 
 #### 2.17 (`GNW22122`, binary)
 
-- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), built in www.graalonline.com:14922, login shape B (login frame inferred, not captured; no evidence for this shape) -> listserver.graal.in:14923 (legacy, confirmed), login shape B (login frame captured from a real client)
+- protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), login shape B (login frame inferred, not captured; no evidence for this shape) -> listserver.graal.in:14923 (legacy, confirmed), login shape B (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +175 SHOOT, +176 KINGDOMSMODE, +177 NEWWORLDMODE, +179 RPGWINDOW, +181 UNKNOWN181, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +184 TAKESCREENSHOT, +185 BOARDHEIGHTS (70 -> 79 ids)
 - protocol: **pli (client ids sent)**: +39 TAMPERCHECK, +40 SHOOT, +43 MUTEPLAYER, +44 PROCESSLIST, +45 PROCESSRUNNING (40 -> 45 ids)
 - protocol: **tampercheck**: no -> yes
@@ -429,7 +428,7 @@ Generated; do not edit between the markers.
 
 #### 3.04 (`G3D03014`, binary)
 
-- protocol: **listserver**: listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame captured from a real client)
+- protocol: **listserver**: listserver.graal.in:14922 (supported, confirmed), token GNW30123, login shape C (login frame captured from a real client) -> listserver.graal.in:14922 (supported, assumed), token G3D30123, login shape D (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +44 HASNPCSERVER, +101 BOARDPACKET, +102 FILE; -170 GHOSTMODE, -177 NEWWORLDMODE, -182 LISTPROCESSES, -183 HASPROCESSRUNNING, -189 MOVE2 (81 -> 79 ids)
 - protocol: **pli (client ids sent)**: +21 PUTNPC, +36 HITOBJECTS, +81 PROFILESET; -39 TAMPERCHECK, -44 PROCESSLIST, -46 ENTERLEVEL (42 -> 42 ids)
 - protocol: **tampercheck**: yes -> no
@@ -464,13 +463,13 @@ Generated; do not edit between the markers.
 
 #### 4.04r2 (`G3D17026`, binary, linked 2006-03-03)
 
-- protocol: **listserver**: listserver.graal.in:14922 (supported, assumed), built in listserver.graalonline.com:14922, token G3D30123, login shape D (login frame captured from a real client) -> none
+- protocol: **listserver**: listserver.graal.in:14922 (supported, assumed), token G3D30123, login shape D (login frame captured from a real client) -> none
 - protocol: **plo (server ids handled)**: +105 UPDATEPACKAGESIZE, +106 UPDATEPACKAGEDONE, +170 GHOSTMODE, +182 LISTPROCESSES, +183 HASPROCESSRUNNING, +190 SERVERLISTCONNECTED, +191 SHOOT2, +193 UNKNOWN193, +194 CLEARWEAPONS, +195 LOADGANI (88 -> 98 ids)
 - protocol: **pli (client ids sent)**: +44 PROCESSLIST, +47 VERIFYWANTSEND, +79 RC_CHAT, +92 RC_FILEBROWSER_DOWN, +130 REQUESTUPDATEBOARD, +161 UPDATECLASS; -40 SHOOT, -43 MUTEPLAYER (54 -> 58 ids)
 - protocol: **showimg (id 24)**: none -> every 5145 ms
 - protocol: **login frame**: head and default-weapon files, props without head or colours with OS mac and code page 1250, status icons -> none
 - protocol: **login lobby**: none -> first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252
-- ui: **server_list**: 3 tabs -> direct (loginserver.graalonline.com:14900)
+- ui: **server_list**: 3 tabs -> direct
 - ui: **chat_text**: ChatText { face: TempusSans, height: 24 } -> ChatText { face: Arial, height: 24 }
 - unknown (pli): the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34, 38 and 46 seen in the lab; the 2026-10-31 live run saw 2, 4, 9, 23, 24, 34, 37, 38, 44, 46, 152, 154 and 157, all in the set)
 - unknown (login): Seihai sends the three machine fields as an empty quoted string, as for 5.00r7; the real client sends three MD5s

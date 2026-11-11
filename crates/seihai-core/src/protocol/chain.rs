@@ -26,12 +26,12 @@ use super::lobby::{
 };
 use super::login::{LoginInfo, LOGIN_217, LOGIN_222, LOGIN_231, LOGIN_304, LOGIN_3153};
 use super::profile::{
-    Basis, BuiltIn, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, ItemDrops,
-    Levels, ListKind, Listserver, LoginShape, Mannerisms, PortStatus, Props, Protocol, ServerList,
-    ShapeBasis, Ui, VersionProfile, WindowPx, BUILT_IN_14921, BUILT_IN_14922, COMBAT_139,
-    COMBAT_200, COMBAT_201, COMBAT_205, DEATH_139, DEATH_205, DEATH_21, DROPS_133, DROPS_138,
-    DROPS_142, MANNER_139, MANNER_141, MANNER_205, MANNER_222, SHOWIMG_217, SHOWIMG_222,
-    SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222, TAMPER_230, TAMPER_231,
+    Basis, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, ItemDrops, Levels,
+    ListKind, Listserver, LoginShape, Mannerisms, PortStatus, Props, Protocol, ServerList,
+    ShapeBasis, Ui, VersionProfile, WindowPx, COMBAT_139, COMBAT_200, COMBAT_201, COMBAT_205,
+    DEATH_139, DEATH_205, DEATH_21, DROPS_133, DROPS_138, DROPS_142, MANNER_139, MANNER_141,
+    MANNER_205, MANNER_222, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217,
+    TAMPER_222, TAMPER_230, TAMPER_231,
 };
 use super::showimg::ShowImgInfo;
 use super::tampercheck::TamperInfo;
@@ -407,9 +407,7 @@ pub const ORIGIN: VersionProfile = VersionProfile {
         combat: None,
     },
     ui: Ui {
-        server_list: ServerList::Direct {
-            default: "www.graalonline.com:14804",
-        },
+        server_list: ServerList::Direct,
         chat_recall: false,
         hud: HudArt::Letters,
         minimap: false,
@@ -448,7 +446,7 @@ pub const CHAIN: &[Step] = &[
         date: "1999-05-10",
         basis: Basis::Binary,
         delta: Delta::NONE,
-        source: "origin row (binary of 1.21, Graal_analysis client-internals/version-profiles/v121-v132.toml): login id 0 with token, account and password; zlib on every flush; no UDP; default server www.graalonline.com:14804; main form 648×509",
+        source: "origin row (binary of 1.21, Graal_analysis client-internals/version-profiles/v121-v132.toml): login id 0 with token, account and password; zlib on every flush; no UDP; main form 648×509",
         unknown: &[
             Unknown { area: "levels", what: "Z3-V1 (.zelda): every binary from 1st Graal to 2.31 compares the level magic with Z3-V1.03 and Z3-V1.04, so the column is yes for every build; whether a build also tries .zelda for a bare level name is in no binary (Seihai tries .graal, then .zelda)" },
             Unknown { area: "pli", what: "the binaries 1.21 to 1.32 show only the send ids passed as constants; the ids below the highest one are taken as sent" },
@@ -500,7 +498,6 @@ pub const CHAIN: &[Step] = &[
         basis: Basis::Binary,
         delta: Delta {
             plo: IdDelta::plus(&[40]),
-            server_list: Some(ServerList::Direct { default: "www.graalonline.com:14900" }),
             ..Delta::NONE
         },
         source: "binary: PLO 40, default port 14900 (14804 before), noudp= and fixedudpport= options",
@@ -624,7 +621,7 @@ pub const CHAIN: &[Step] = &[
             // Shape S: the real 1.41 rev 1 sends nothing and waits for the
             // list (lab, 2026-10-30).
             listserver: Some(Some(
-                Listserver::new(ListKind::Legacy, PortStatus::Confirmed, Some(BuiltIn { host: "listserver.graal.in", port: 14923 }), None)
+                Listserver::new(ListKind::Legacy, PortStatus::Confirmed, None)
                     .shape(LoginShape::Silent, ShapeBasis::Captured),
             )),
             pli: IdDelta::plus_minus(&[], &[31]),
@@ -658,11 +655,10 @@ pub const CHAIN: &[Step] = &[
         date: "2001-01-10",
         basis: Basis::Binary,
         delta: Delta {
-            // Classic login: 14923 (matrix run, 2026-10-25). The build itself carries
-            // www.graalonline.com:14921 (dead).
+            // Classic login: 14923 (matrix run, 2026-10-25).
             listserver: Some(Some(
                 // Captured: the real NewMain 26 sent id 0 `newmain` only (lab, 2026-10-30).
-                Listserver::new(ListKind::Legacy, PortStatus::Assumed, Some(BUILT_IN_14921), None).shape(LoginShape::NewmainOnly, ShapeBasis::Captured),
+                Listserver::new(ListKind::Legacy, PortStatus::Assumed, None).shape(LoginShape::NewmainOnly, ShapeBasis::Captured),
             )),
             plo: IdDelta::plus(&[42, 44, 45, 150, 151, 153]),
             pli: IdDelta::plus(&[34]),
@@ -690,9 +686,9 @@ pub const CHAIN: &[Step] = &[
         basis: Basis::Binary,
         delta: Delta {
             // 14923 is the port that answers a classic login (checked 2026-10-25, twice for
-            // 2.00). The build itself carries www.graalonline.com:14921, which is dead.
+            // 2.00).
             listserver: Some(Some(
-                Listserver::new(ListKind::Legacy, PortStatus::Assumed, Some(BUILT_IN_14921), None).shape(LoginShape::NewmainOnly, ShapeBasis::Captured),
+                Listserver::new(ListKind::Legacy, PortStatus::Assumed, None).shape(LoginShape::NewmainOnly, ShapeBasis::Captured),
             )),
             plo: IdDelta::plus(&[154, 155]),
             combat: Some(Some(COMBAT_200)),
@@ -702,7 +698,7 @@ pub const CHAIN: &[Step] = &[
             nw: Some(false),
             ..Delta::NONE
         },
-        source: "binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, .nw loader dropped, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25 (built-in www.graalonline.com:14921)",
+        source: "binary (2.00 r0 to r3, no differences): PLO 154/155, GS1 134 to 142, .nw loader dropped, combat rules read in r0; death rules as 2.05 (timer 30, input after 27, dead bit from 28, respawn hearts by AP, name-group entry save), read in r0 and checked in the machine code of every 2.00 to 2.04 build; 2.00 fires no playerdies (the event starts in 2.01); list port 14923 from the public checks of 2026-10-25",
         unknown: &[
             Unknown { area: "life", what: "combat read in 2.00 r0 only (Graal_analysis client-internals/combat-200-204.md); r1 to r3 assumed the same. Not run against a real client" },
             Unknown { area: "login", what: "props sent at login (verified for 2.05 only)" },
@@ -721,7 +717,7 @@ pub const CHAIN: &[Step] = &[
             // Listserver: the 2.00 login shape A as a best guess (the builds carry the same
             // built-in list as 2.00 and 2.05), so inferred, not captured; later steps carry it.
             listserver: Some(Some(
-                Listserver::new(ListKind::Legacy, PortStatus::Assumed, Some(BUILT_IN_14921), None).shape(LoginShape::NewmainOnly, ShapeBasis::Inferred),
+                Listserver::new(ListKind::Legacy, PortStatus::Assumed, None).shape(LoginShape::NewmainOnly, ShapeBasis::Inferred),
             )),
             plo: IdDelta::plus(&[46, 156]),
             pli: IdDelta::plus(&[35, 36]),
@@ -802,7 +798,7 @@ pub const CHAIN: &[Step] = &[
             // This profile sends the classic login, so it takes the classic-login port, 14923
             // (not checked with this login: see the unknown entry).
             listserver: Some(Some(
-                Listserver::new(ListKind::Legacy, PortStatus::Assumed, Some(BUILT_IN_14921), None).shape(LoginShape::NewmainOnly, ShapeBasis::Captured),
+                Listserver::new(ListKind::Legacy, PortStatus::Assumed, None).shape(LoginShape::NewmainOnly, ShapeBasis::Captured),
             )),
             plo: IdDelta::plus(&[168]),
             nw: Some(true),
@@ -830,8 +826,8 @@ pub const CHAIN: &[Step] = &[
         basis: Basis::Inferred,
         delta: Delta {
             // Classic login: 14923 (checked for 2.1 and 2.12 to 2.16 on 2026-10-25; 14922 stayed
-            // silent). The 2.1 test builds carry www.graalonline.com:14922.
-            listserver: Some(Some(Listserver::new(ListKind::Legacy, PortStatus::Confirmed, Some(BUILT_IN_14922), None))), // shape B, no evidence
+            // silent).
+            listserver: Some(Some(Listserver::new(ListKind::Legacy, PortStatus::Confirmed, None))), // shape B, no evidence
             plo: IdDelta { plus: &[49], plus_ranges: &[(169, 174)], ..IdDelta::NONE },
             own_props: IdDelta { plus_ranges: &[(43, 45)], ..IdDelta::NONE },
             other_props: IdDelta { plus_ranges: &[(43, 45)], ..IdDelta::NONE },
@@ -933,7 +929,7 @@ pub const CHAIN: &[Step] = &[
             // Classic login: 14923 (checked 2026-10-25; 14922 stayed silent). The host and port
             // the client reads come from arrays2.dat, not the binary.
             listserver: Some(Some(
-                Listserver::new(ListKind::Legacy, PortStatus::Confirmed, None, None).shape(LoginShape::NewmainAccount, ShapeBasis::Captured),
+                Listserver::new(ListKind::Legacy, PortStatus::Confirmed, None).shape(LoginShape::NewmainAccount, ShapeBasis::Captured),
             )),
             plo: IdDelta { plus: &[179], plus_ranges: &[(175, 177), (181, 185)], ..IdDelta::NONE },
             pli: IdDelta::plus(&[39, 40, 43, 44, 45]),
@@ -964,7 +960,7 @@ pub const CHAIN: &[Step] = &[
             client_type: Some(5),
             encryption: Some(EncryptionGen::Gen5),
             // Gen-5 login: 14922 (the current list, 2026-10-25); 14923 answers it too.
-            listserver: Some(Some(Listserver::new(ListKind::Supported, PortStatus::Confirmed, None, Some("GNW30123")))),
+            listserver: Some(Some(Listserver::new(ListKind::Supported, PortStatus::Confirmed, Some("GNW30123")))),
             plo: IdDelta::plus(&[186]),
             pli: IdDelta::plus_minus(&[], &[36, 45, 81]),
             tamper: Some(Some(TAMPER_222)),
@@ -993,7 +989,7 @@ pub const CHAIN: &[Step] = &[
             // Gen-5 login like 2.31: 14922 answered it on 2026-10-25 (no 2.3 build exists).
             // No 2.3 build exists, so shape C is inferred from 2.31, not captured.
             listserver: Some(Some(
-                Listserver::new(ListKind::Supported, PortStatus::Confirmed, None, Some("GNW30123")).shape(LoginShape::Gen5, ShapeBasis::Inferred),
+                Listserver::new(ListKind::Supported, PortStatus::Confirmed, Some("GNW30123")).shape(LoginShape::Gen5, ShapeBasis::Inferred),
             )),
             tamper: Some(Some(TAMPER_230)),
             showimg: Some(None),
@@ -1023,7 +1019,7 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Binary,
         delta: Delta {
-            listserver: Some(Some(Listserver::new(ListKind::Supported, PortStatus::Confirmed, None, Some("GNW30123")))),
+            listserver: Some(Some(Listserver::new(ListKind::Supported, PortStatus::Confirmed, Some("GNW30123")))),
             tamper: Some(Some(TAMPER_231)),
             showimg: Some(Some(SHOWIMG_231)),
             login: Some(Some(LOGIN_231)),
@@ -1051,8 +1047,7 @@ pub const CHAIN: &[Step] = &[
             // and ENTERLEVEL (46) out.
             pli: IdDelta::plus_minus(&[21, 36, 81], &[39, 44, 46]),
             listserver: Some(Some(
-                // The address built into the binary; license/license.graal names the one used.
-                Listserver::new(ListKind::Supported, PortStatus::Assumed, Some(BuiltIn { host: "listserver.graalonline.com", port: 14922 }), Some("G3D30123"))
+                Listserver::new(ListKind::Supported, PortStatus::Assumed, Some("G3D30123"))
                     .shape(LoginShape::Gen5OneFrame, ShapeBasis::Captured),
             )),
             tampercheck: Some(false),
@@ -1086,7 +1081,7 @@ pub const CHAIN: &[Step] = &[
             pli: IdDelta::plus(&[46, 50, 93, 96, 97, 98, 152, 154, 155, 156, 157, 158]),
             // Same G3D30123 login as 3.04; the 2026-10-31 Tiger lab run sent shape D (id 7 and id 1 in one plain frame).
             listserver: Some(Some(
-                Listserver::new(ListKind::Supported, PortStatus::Assumed, Some(BuiltIn { host: "listserver.graalonline.com", port: 14922 }), Some("G3D30123"))
+                Listserver::new(ListKind::Supported, PortStatus::Assumed, Some("G3D30123"))
                     .shape(LoginShape::Gen5OneFrame, ShapeBasis::Captured),
             )),
             login: Some(Some(LOGIN_3153)),
@@ -1131,7 +1126,7 @@ pub const CHAIN: &[Step] = &[
             login: Some(None),
             lobby: Some(Some(LOBBY_404)),
             showimg: Some(Some(SHOWIMG_404)),
-            server_list: Some(ServerList::Direct { default: "loginserver.graalonline.com:14900" }),
+            server_list: Some(ServerList::Direct),
             chat_text: Some(ChatText { face: ChatFace::Arial, height: 24 }),
             ..Delta::NONE
         },
@@ -1538,9 +1533,6 @@ fn listserver_text(l: &Option<Listserver>) -> String {
                     PortStatus::Assumed => "assumed",
                 }
             );
-            if let Some(b) = l.built_in {
-                t.push_str(&format!(", built in {}:{}", b.host, b.port));
-            }
             if let Some(tok) = l.token {
                 t.push_str(&format!(", token {tok}"));
             }
@@ -1665,7 +1657,7 @@ fn window_text(w: &WindowPx) -> String {
 
 fn list_text(l: &ServerList) -> String {
     match l {
-        ServerList::Direct { default } => format!("direct ({default})"),
+        ServerList::Direct => "direct".into(),
         ServerList::Single => "one list".into(),
         ServerList::Tabs(n) => format!("{n} tabs"),
     }
@@ -2133,7 +2125,7 @@ mod tests {
     /// Behaviour is unchanged: every build that existed before the chain
     /// resolves to exactly the row that was written out by hand. One row was
     /// changed on purpose afterwards: every listserver is now `Listserver {
-    /// host, port, kind, status, built_in, token }` on listserver.graal.in
+    /// host, port, kind, status, token }` on listserver.graal.in
     /// (classic login 14923, gen-5 login 14922; the old rows had the bare port the
     /// build carries, mostly the dead 14921). 2.17 then got its id 24
     /// sender (lab, 2026-10-30, `documentation/difftest-217.md` item 3).
