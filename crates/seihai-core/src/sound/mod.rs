@@ -6,12 +6,18 @@
 //! `documentation/audio.md`), decodes the `.wav` from the asset folder, and
 //! hands the result to a [`SoundOut`] backend.
 //!
-//! The backend here is [`NullSound`], which plays nothing, so the client
-//! runs on a box with no sound card and with no sound files. A real device
-//! backend lives in the client binary (`seihai-mae`, `audio-rodio` feature).
+//! The backends here are [`NullSound`], which plays nothing, so a client
+//! runs on a box with no sound card and with no sound files, and
+//! [`RodioSound`], the device output, behind the `audio` feature.
+//! [`default_backend`] picks the one a client starts with.
 
 mod engine;
+#[cfg(feature = "audio")]
+mod rodio_out;
 mod wav;
+
+#[cfg(feature = "audio")]
+pub use rodio_out::RodioSound;
 
 pub use engine::{
     pan_for, wanted_name, Outcome, SoundEngine, SoundEvent, MAX_VOICES, PAN_PER_TILE,
@@ -108,9 +114,43 @@ impl SoundOut for RecordingSound {
     }
 }
 
+/// The best backend this build has: the device one when the `audio`
+/// feature is on and a device opens, otherwise [`NullSound`]. The string
+/// says which and why, for one startup log line.
+pub fn default_backend() -> (Box<dyn SoundOut>, String) {
+    #[cfg(feature = "audio")]
+    {
+        match RodioSound::open() {
+            Ok(b) => (Box::new(b), "audio device opened".to_string()),
+            Err(e) => (
+                Box::new(NullSound),
+                format!("no audio device ({e}); sound is silent"),
+            ),
+        }
+    }
+    #[cfg(not(feature = "audio"))]
+    {
+        (
+            Box::new(NullSound),
+            "built without the audio feature; sound is silent".to_string(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn default_backend_without_the_feature_is_null() {
+        let (b, why) = default_backend();
+        if cfg!(feature = "audio") {
+            assert!(!why.is_empty());
+        } else {
+            assert_eq!(b.kind(), "null");
+            assert!(why.contains("audio feature"));
+        }
+    }
 
     #[test]
     fn centre_pan_is_full_both_sides() {
