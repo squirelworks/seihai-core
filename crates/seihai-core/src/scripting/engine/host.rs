@@ -279,6 +279,14 @@ impl SessionScripts {
         self.apply(session);
     }
 
+    /// Level NPC `index` is gone (the server deleted it, and the caller
+    /// takes it off the level's list): its script object goes, and the
+    /// objects of the NPCs after it follow the list's new indices. No event
+    /// runs. False if no script object had that index.
+    pub fn remove_npc(&mut self, index: usize) -> bool {
+        self.world.remove_npc(index)
+    }
+
     /// The server moved level NPC `index` (another player pushed it): the
     /// script sees the new `x` and `y`. No event runs.
     pub fn set_npc_pos(&mut self, index: usize, x: f32, y: f32) {
@@ -1064,6 +1072,38 @@ mod tests {
         SIGN 5 5\n\
         Read me\n\
         SIGNEND\n";
+
+    /// A deleted NPC's script object goes and the ones after it follow the
+    /// level list's new indices, so effects still land on the right NPC.
+    #[test]
+    fn a_removed_npc_takes_its_script_and_the_rest_close_up() {
+        let mut s = session(
+            "GLEVNW01\nNPC a.png 1 1\nNPCEND\nNPC b.png 2 2\nNPCEND\nNPC c.png 3 3\nNPCEND\n",
+        );
+        let mut sc = SessionScripts::new(ClientVersion::V222);
+        sc.load_level(&mut s, "three.nw");
+        assert!(sc.remove_npc(0));
+        s.current_level.as_mut().unwrap().npcs.remove(0);
+        let left: Vec<_> = sc
+            .world
+            .ids()
+            .into_iter()
+            .filter_map(|id| sc.world.obj(id))
+            .filter(|o| o.kind == ObjKind::Npc)
+            .map(|o| (o.tag, o.image.clone()))
+            .collect();
+        assert_eq!(left, [(0, "b.png".to_string()), (1, "c.png".to_string())]);
+        assert!(!sc.remove_npc(5), "no such NPC");
+        sc.set_npc_pos(1, 9.0, 9.0);
+        let c = sc
+            .world
+            .ids()
+            .into_iter()
+            .filter_map(|id| sc.world.obj(id))
+            .find(|o| o.image == "c.png")
+            .map(|o| (o.x, o.y));
+        assert_eq!(c, Some((9.0, 9.0)));
+    }
 
     /// The 2.05 tutorial's map NPC (`tutorial_b-4.graal`).
     #[test]
