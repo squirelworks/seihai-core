@@ -358,8 +358,10 @@ fn detect(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors> {
         );
         c
     };
+    // GS1 at the given version first, then GS2; GS1 newer than the
+    // version only once GS2 has failed too.
     if looks_gs1(src) {
-        if let Ok(c) = gs1_script(src, era, mode) {
+        if let Ok(c) = gs1_script(src, era, Mode::Strict) {
             return Ok(guessed(c));
         }
     }

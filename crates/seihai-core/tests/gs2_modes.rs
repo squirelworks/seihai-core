@@ -271,3 +271,15 @@ fn a_gs1_with_keeps_plain_variables_on_the_npc() {
     let nested = "if (created) { with (a) { with (b) { n = 1; } } }";
     assert!(compile_gs1(nested, Era::V21).is_err());
 }
+
+#[test]
+fn detect_tries_gs2_before_later_gs1() {
+    // Looks like GS1, fails as GS1 2.05, and is valid GS2: read as GS2.
+    let src = "if (created) {\n  this.a = {0,1,2,3};\n}";
+    let got = compile(src, Language::Detect(Era::V205), Mode::Legacy).unwrap();
+    assert_eq!(got.front, Front::Gs2);
+    assert!(!got
+        .warnings
+        .iter()
+        .any(|w| w.quirk == Quirk::LaterGs1(Era::V205)));
+}
