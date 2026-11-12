@@ -441,3 +441,40 @@ fn gs1_codes_and_ranges_inside_gs2() {
     // GS1's `in <a, b>` is the same range as `in |a, b|`.
     assert_eq!(f("if (x in <1, 3>) y = 1;"), f("if (x in |1, 3|) y = 1;"));
 }
+
+#[test]
+fn v5_corpus_shapes() {
+    for stmt in [
+        "(@\"go\" @ n)(1, 2);",
+        "x = (@\"go\")(1);",
+        "switch (x) { case 1: (@\"go\")(); break; }",
+        "return x = 1;",
+        "f(1).text @= \"a\";",
+        "a[f(1)] += 2;",
+    ] {
+        let src = format!("function g() {{ {stmt} }}");
+        assert!(
+            compile_gs2(&src).is_ok(),
+            "{src}: {:?}",
+            compile_gs2(&src).err()
+        );
+    }
+    assert!(compile_gs2(
+        "function g(\"a\", b) { x = a; };\n;\nconst K = 2 * 3;\nfunction h() { y = K; }"
+    )
+    .is_ok());
+    // `a[f()] += v` calls f once: the element read as a place, then stored.
+    let got = f("a[f(1)] += 2;");
+    assert_eq!(got.iter().filter(|o| *o == "OP_CALL").count(), 1);
+    assert_eq!(
+        got[got.len() - 6..],
+        names(&[
+            "ARRAY",
+            "COPY_LAST_OP",
+            "CONV_TO_FLOAT",
+            "TYPE_NUMBER",
+            "ADD",
+            "ASSIGN"
+        ])
+    );
+}

@@ -1852,6 +1852,16 @@ impl Builder {
                 self.gs1 = gs1;
                 k
             }
+            Gs2Expr::DynCall { name, args } => {
+                self.op(Op::TypeArray);
+                for a in args.iter().rev() {
+                    self.value(a);
+                }
+                self.value(name);
+                self.op(Op::ConvToString);
+                self.op(Op::Call);
+                Kind::Other
+            }
             Gs2Expr::InValue { e, list } => {
                 self.value(e);
                 self.value(list);
@@ -2056,6 +2066,32 @@ impl Builder {
             // the lowered form does the same with the fixture-checked
             // element read and write. The index is pushed twice, so it
             // must not call anything.
+            if self.index_has_call(target) && !self.gs1 {
+                // GS2 with an index that calls: read the element once as a
+                // place (`OP_ARRAY`, as `a[i]++` does) and store through it,
+                // so the call runs once (Seihai's form).
+                let Some(dims) = self.element(target) else {
+                    return;
+                };
+                self.op(if dims == 1 {
+                    Op::Array
+                } else {
+                    Op::ArrayMultidim
+                });
+                self.op(Op::CopyLastOp);
+                self.op(Op::ConvToFloat);
+                self.numeric(value);
+                self.op(match op {
+                    AssignOp::Add => Op::Add,
+                    AssignOp::Sub => Op::Sub,
+                    AssignOp::Mul => Op::Mul,
+                    AssignOp::Div => Op::Div,
+                    AssignOp::Mod => Op::Mod,
+                    AssignOp::Set => unreachable!(),
+                });
+                self.op(Op::Assign);
+                return;
+            }
             if self.index_has_call(target) {
                 self.err(format!(
                     "`{}` on an array element whose index calls a function is not lowered; \
@@ -3382,6 +3418,10 @@ fn parse_gs2(src: &str) -> Result<(Vec<Item>, Spellings), CompileErrors> {
         if p.eof() {
             break;
         }
+        // A stray `;` between top-level items.
+        if p.eat(";") {
+            continue;
+        }
         let public = p.eat_id("public");
         if p.eat_id("function") {
             let mut item = p.function()?;
@@ -3578,6 +3618,11 @@ impl<'a> Gs2<'a> {
     /// of a GUI control, kept whole as the function's name as the Preagonal
     /// baselines do) or `temp.x` as a parameter.
     fn dotted_ident(&mut self) -> Result<String, CompileErrors> {
+        // `function f("a")`: a parameter written as a string is that name.
+        if let GTok::Str(text) = self.peek_tok() {
+            self.bump();
+            return Ok(text);
+        }
         let mut name = self.ident()?;
         while self.eat(".") {
             name.push('.');
@@ -3661,7 +3706,7 @@ impl<'a> Gs2<'a> {
             let v = if self.sees(";") || self.sees("}") {
                 None
             } else {
-                Some(self.expr()?)
+                Some(self.assigned_value()?)
             };
             self.end_stmt()?;
             return Ok(Stmt::Return(v));
@@ -3883,6 +3928,13 @@ impl<'a> Gs2<'a> {
             Expr::Call { name, .. } => name == "makevar",
             _ => false,
         };
+        if settable && self.eat("@=") {
+            // `f(1).text @= "x"`: `… = … @ "x"`.
+            let value = self.expr()?;
+            self.end_stmt()?;
+            let value = Expr::Bin(BinOp::Cat, Box::new(e.clone()), Box::new(value));
+            return Ok(Stmt::Gs2(Box::new(Gs2Stmt::SetPart { target: e, value })));
+        }
         if settable {
             if let Some(op) = self.assign_op() {
                 let mut value = self.assigned_value()?;
@@ -3911,6 +3963,7 @@ impl<'a> Gs2<'a> {
                     g.as_ref(),
                     Gs2Expr::Method { .. }
                         | Gs2Expr::DynMethod { .. }
+                        | Gs2Expr::DynCall { .. }
                         | Gs2Expr::New { .. }
                         | Gs2Expr::PostStep { .. }
                         | Gs2Expr::PreStep { .. }
@@ -4459,6 +4512,12 @@ impl<'a> Gs2<'a> {
                     }));
                 }
                 self.expect(")")?;
+                // `(@"name" @ n)(args)`: a call by a name worked out at run
+                // time (Seihai's form: the name as a string, then the call).
+                if self.eat("(") {
+                    let args = self.arg_list()?;
+                    return Ok(Expr::Gs2(Box::new(Gs2Expr::DynCall { name: e, args })));
+                }
                 Ok(e)
             }
             GTok::Code(code) => Ok(Expr::Gs2(Box::new(Gs2Expr::Gs1Text(code)))),
@@ -4495,10 +4554,8 @@ impl<'a> Gs2<'a> {
                 Expr::Num(x) => Ok(Expr::Num(-x)),
                 _ => unreachable!(),
             },
-            _ => Err(CompileErrors::one(
-                self.line,
-                "a `const` value must be a number or a string",
-            )),
+            // Any other value is put in where the name is read.
+            other => Ok(other),
         }
     }
 
