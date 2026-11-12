@@ -931,6 +931,8 @@ struct Builder {
     era: Era,
     line: u32,
     spellings: Spellings,
+    /// The script's own function names, lower case.
+    script_fns: Vec<String>,
 }
 
 fn emit_items(
@@ -964,6 +966,7 @@ fn emit_items(
         era,
         line: 0,
         spellings,
+        script_fns: seen.keys().map(|k| k.to_ascii_lowercase()).collect(),
     };
     for item in items {
         if item.top {
@@ -1994,6 +1997,17 @@ impl Builder {
         self.op(Op::IndexDec);
     }
 
+    /// A `TYPE_VAR name`, `OP_CALL` pair from `start` on whose name is one
+    /// of the script's own functions.
+    fn calls_script_fn(&self, start: usize) -> bool {
+        self.code[start..].windows(2).any(|w| {
+            w[1].op == Op::Call
+                && w[0].op == Op::TypeVar
+                && matches!(&w[0].operand, Operand::Str(i)
+                    if self.script_fns.contains(&self.strings[*i as usize].to_ascii_lowercase()))
+        })
+    }
+
     /// The loops a `with` body may leave. GS1 refuses leaving the block
     /// (checked before), so its body starts with none; GS2 keeps them.
     fn block_loops(&mut self) -> Option<Vec<Loop>> {
@@ -2025,8 +2039,33 @@ impl Builder {
         self.op(Op::ConvToObject);
         let hole = self.hole(Op::With);
         let outer = self.block_loops();
+        let start = self.here();
         self.stmt(body);
         self.restore_loops(outer);
+        // A GS1 command inside `with` acts on the swapped player or NPC
+        // (`tools/npcserver-2001.md`), and a GS2 call inside `with` runs
+        // against the `with` object, so a command lowered to a call by name
+        // keeps its meaning. One lowered to an explicit `player` does not:
+        // GS2's `player` is not swapped.
+        // The notes also say the script's own functions still run as the
+        // original NPC, where GS2 would look the name up on the object
+        // first, so a call to one of them is refused.
+        if self.gs1 && self.calls_script_fn(start) {
+            self.err(
+                "a call to one of the script's own functions inside a GS1 `with` is not lowered \
+                 (GS1 runs it as the original NPC, GS2 looks it up on the `with` object first)",
+            );
+        }
+        if self.gs1
+            && self.code[start..]
+                .iter()
+                .any(|i| matches!(i.op, Op::Player | Op::PlayerO))
+        {
+            self.err(
+                "a GS1 command on the player inside `with` is not lowered \
+                 (GS1 swaps the player there, GS2's `player` stays the same)",
+            );
+        }
         self.op(Op::WithEnd);
         let after = self.here();
         self.patch(hole, after);
@@ -2038,18 +2077,13 @@ impl Builder {
     /// written, plain script variables (`i`, `j`) keep working, and script
     /// functions still run as the original NPC. GS2 resolves a plain name on
     /// the `with` object first and runs a bare call against it, so a body
-    /// whose meaning would change is refused: calls and commands, a write to
-    /// a plain name that is not a built-in property, and the `player`,
-    /// `client.` and `level.` names (GS1 switches them with the object, GS2
-    /// does not).
+    /// whose meaning would change is refused: a write to a plain name that
+    /// is not a built-in property, and the `player`, `client.` and `level.`
+    /// names (GS1 switches them with the object, GS2 does not). Calls to the
+    /// script's own functions and commands that reach the player are
+    /// refused after the body is emitted (`with_stmt`); other commands act
+    /// on the `with` object in both.
     fn gs1_with_problem(&self, body: &Stmt) -> Option<String> {
-        if self.stmt_has_call(body) || stmt_has_command(body) {
-            return Some(
-                "a GS1 `with` body that calls a function or runs a command is not lowered \
-                 (GS1 runs it as the original NPC, GS2 against the `with` object)"
-                    .into(),
-            );
-        }
         let mut problem = None;
         let era = self.era;
         stmt_names(body, &mut |name, write| {
@@ -2325,6 +2359,13 @@ impl Builder {
             self.op(Op::ConvToFloat);
             self.emit_int(0);
             self.op(Op::Gte);
+            return true;
+        }
+        // GS1 `getplayer(account)` (2.17.1 on, used as `with (getplayer(a))`)
+        // is the player with that account; the 3.153 client registers
+        // `findplayer` for the same lookup.
+        if self.gs1 && name == "getplayer" && args.len() == 1 {
+            self.call_ops("findplayer", args);
             return true;
         }
         if self.gs1 && gs1_fn_without_gs2(name) {
@@ -2947,27 +2988,6 @@ fn is_wait(name: &str) -> bool {
 
 fn expr_waits(e: &Expr) -> bool {
     mentions_call(e, "sleep") || mentions_call(e, "waitfor")
-}
-
-/// The statement runs a GS1 command (other than `sleep`, which
-/// `with_escape` reports).
-fn stmt_has_command(s: &Stmt) -> bool {
-    match s {
-        Stmt::Block(v) => v.iter().any(stmt_has_command),
-        Stmt::If { then, els, .. } => {
-            stmt_has_command(then) || els.as_deref().is_some_and(stmt_has_command)
-        }
-        Stmt::While { body, .. } | Stmt::With { body, .. } => stmt_has_command(body),
-        Stmt::For {
-            init, step, body, ..
-        } => {
-            init.as_deref().is_some_and(stmt_has_command)
-                || step.as_deref().is_some_and(stmt_has_command)
-                || stmt_has_command(body)
-        }
-        Stmt::Command { .. } | Stmt::Call { .. } | Stmt::Unknown { .. } => true,
-        _ => false,
-    }
 }
 
 /// Every variable name in a statement, with `true` for a written one.
