@@ -161,6 +161,9 @@ pub static COMMANDS: &[Cmd] = &[
     c("setshape", "RRR", V200, Effect),
     c("setshape2", "RRN", V204, Effect),
     c("seteffect", "RRRR", V200, Effect),
+    // From 2.17.1 (`npc-library/gs1-commands-by-version.md`): 0 light,
+    // 1 transparency, 2 holes. The 3.153 GS2 client registers the same name.
+    c("seteffectmode", "R", V21, Effect),
     c("setcoloreffect", "RRRR", V200, Effect),
     c("setzoomeffect", "R", V200, Effect),
     c("move", "RRRR", V200, Effect),
