@@ -409,6 +409,15 @@ pub enum LevelObject {
 /// Lines kept in the chat history.
 pub const CHAT_HISTORY: usize = 200;
 
+/// One `PLO_NPCDEL2` (150): NPC `id` is gone from `level`. `after` is how
+/// many `SessionState::npc_changes` were queued when it came.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NpcDelete {
+    pub level: String,
+    pub id: u32,
+    pub after: usize,
+}
+
 /// Minimal session state built from the level-entry packets.
 #[derive(Debug, Default)]
 pub struct SessionState {
@@ -429,6 +438,10 @@ pub struct SessionState {
     pub server_npcs: std::collections::BTreeMap<u32, (Option<String>, NpcProps)>,
     /// `PLO_NPCPROPS` updates in arrival order, taken by the game loop.
     pub npc_changes: Vec<(u32, NpcProps)>,
+    /// `PLO_NPCDEL2` (150) deletes in arrival order, taken by the game loop:
+    /// the level named, the NPC id, and how many `npc_changes` came before
+    /// it (so a loop that takes both can keep their order).
+    pub npc_deletes: Vec<NpcDelete>,
     /// `PLO_NPCBYTECODE` (131): the compiled GS2 script of a server NPC, as
     /// sent (see `documentation/gs2-receive.md`). Only builds that handle
     /// 131 (3.153) fill it. Nothing here runs it.
@@ -1158,6 +1171,22 @@ impl SessionState {
             }
             150 => {
                 if let Some(d) = parse_npc_del2(&msg.payload) {
+                    // The NPC is gone from the level named: forget its record
+                    // and script when they are that level's (or have none).
+                    if let Ok(id) = u32::try_from(d.1) {
+                        let ours = self.server_npcs.get(&id).is_some_and(|(l, _)| {
+                            l.as_deref().is_none_or(|l| l.eq_ignore_ascii_case(&d.0))
+                        });
+                        if ours {
+                            self.server_npcs.remove(&id);
+                            self.npc_bytecode.remove(&id);
+                        }
+                        self.npc_deletes.push(NpcDelete {
+                            level: d.0.clone(),
+                            id,
+                            after: self.npc_changes.len(),
+                        });
+                    }
                     self.last_npc_del = Some(d);
                     self.npc_dels += 1;
                 }
