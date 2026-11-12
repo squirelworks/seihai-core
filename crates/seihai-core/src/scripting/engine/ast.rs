@@ -135,8 +135,18 @@ pub enum Gs2Expr {
     Text(Expr),
     /// `obj.(expr)`: the member whose name is the value of `expr`.
     DynMember { obj: Expr, name: Expr },
+    /// `obj.(expr)(args)`: a call of that member.
+    DynMethod {
+        obj: Expr,
+        name: Expr,
+        args: Vec<Expr>,
+    },
+    /// `function (…) { … }` as a value; the name of the function made for it.
+    Lambda(String),
     /// `x++` / `x--` used as a value: the old value, then the step.
     PostStep { target: Expr, delta: f64 },
+    /// `++x` / `--x` used as a value: the step, then the new value.
+    PreStep { target: Expr, delta: f64 },
     /// `(x = v)`, `(x += v)` used as a value: the place after the store.
     AssignValue {
         target: Expr,
@@ -166,14 +176,19 @@ impl Gs2Expr {
             Gs2Expr::Bits { a, b, .. } => vec![a, b],
             Gs2Expr::Text(e) => vec![e],
             Gs2Expr::DynMember { obj, name } => vec![obj, name],
-            Gs2Expr::PostStep { target, .. } => vec![target],
+            Gs2Expr::DynMethod { obj, name, args } => [obj, name].into_iter().chain(args).collect(),
+            Gs2Expr::Lambda(_) => Vec::new(),
+            Gs2Expr::PostStep { target, .. } | Gs2Expr::PreStep { target, .. } => vec![target],
             Gs2Expr::AssignValue { target, value, .. } => vec![target, value],
         }
     }
 
     /// The form may run script or host code (a method or `new`).
     pub fn calls(&self) -> bool {
-        matches!(self, Gs2Expr::Method { .. } | Gs2Expr::New { .. })
+        matches!(
+            self,
+            Gs2Expr::Method { .. } | Gs2Expr::DynMethod { .. } | Gs2Expr::New { .. }
+        )
     }
 }
 
@@ -186,6 +201,7 @@ impl Gs2Stmt {
             Gs2Stmt::Eval(_) | Gs2Stmt::SetPart { .. } => Vec::new(),
             Gs2Stmt::NewBlock { body, .. } => body.iter().collect(),
             Gs2Stmt::Chain { .. } => Vec::new(),
+            Gs2Stmt::Gs1(s) => vec![s],
         }
     }
 
@@ -199,6 +215,7 @@ impl Gs2Stmt {
             Gs2Stmt::Eval(e) => vec![e],
             Gs2Stmt::SetPart { target, value } => vec![target, value],
             Gs2Stmt::NewBlock { name, .. } => vec![name],
+            Gs2Stmt::Gs1(_) => Vec::new(),
             Gs2Stmt::Chain { targets, value } => targets
                 .iter()
                 .flat_map(|t| t.index.iter())
@@ -238,6 +255,9 @@ pub enum Gs2Stmt {
     },
     /// `a = b = … = value`: every target set to the value.
     Chain { targets: Vec<VarRef>, value: Expr },
+    /// A GS1 command written GS1-style inside GS2 (`setimgpart a.png,0,0,8,8;`),
+    /// parsed and lowered as GS1.
+    Gs1(Stmt),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
