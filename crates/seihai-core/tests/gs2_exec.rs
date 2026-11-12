@@ -301,3 +301,33 @@ fn gs2_top_level_code_runs_from_op_zero_around_functions() {
     assert_eq!(m.var(Root::This, "b"), Some(&Val::Num(12.0)));
     assert_eq!(m.var(Root::This, "c"), None);
 }
+
+#[test]
+fn leaving_a_with_block_by_break_continue_or_return_closes_it() {
+    use seihai_core::scripting::gs2::compile::compile_gs2;
+    let src = "function g() { with (player) { return 4; } }\n\
+               function onCreated() {\n\
+                 for (i = 0; i < 3; i++) { with (player) { a = 1; break; } }\n\
+                 b = 1;\n\
+                 for (i = 0; i < 2; i++) { with (player) { c = 1; continue; } }\n\
+                 d = 1;\n\
+                 this.r = g();\n\
+                 e = 1;\n\
+               }\n";
+    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let mut h = host();
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    let one = Some(&Val::Num(1.0));
+    assert_eq!(
+        (m.var(Root::Player, "a"), m.var(Root::Player, "c")),
+        (one, one)
+    );
+    for name in ["b", "d", "e"] {
+        assert_eq!(
+            m.var(Root::Player, name),
+            None,
+            "{name} landed on the player"
+        );
+    }
+    assert_eq!(m.var(Root::This, "r"), Some(&Val::Num(4.0)));
+}

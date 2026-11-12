@@ -1314,14 +1314,19 @@ impl Builder {
                     return;
                 }
                 if !target.index.is_empty() {
-                    self.err(format!(
-                        "`{}` on an array element has no fixture-checked GS2 form; write `a[i] = a[i] {} 1`",
-                        if *delta < 0.0 { "--" } else { "++" },
-                        if *delta < 0.0 { "-" } else { "+" },
-                    ));
-                    return;
+                    // GS2 `a[i]++` (Preagonal probe): the element read
+                    // (`OP_ARRAY`), then `OP_INC` on it.
+                    let Some(dims) = self.element(target) else {
+                        return;
+                    };
+                    self.op(if dims == 1 {
+                        Op::Array
+                    } else {
+                        Op::ArrayMultidim
+                    });
+                } else {
+                    self.place(&target.name);
                 }
-                self.place(&target.name);
                 self.op(if *delta < 0.0 { Op::Dec } else { Op::Inc });
                 self.op(Op::IndexDec);
             }
@@ -1363,10 +1368,8 @@ impl Builder {
             // encoding, no fixture.
             Gs2Stmt::SetPart { target, value } => match target {
                 Expr::Gs2(g) => match g.as_ref() {
-                    Gs2Expr::Member { obj, name } => {
-                        self.value(obj);
-                        self.emit_var(name);
-                        self.op(Op::MemberAccess);
+                    Gs2Expr::Member { .. } | Gs2Expr::DynMember { .. } => {
+                        self.value(target);
                         self.value(value);
                         self.op(Op::Assign);
                     }
@@ -1385,6 +1388,13 @@ impl Builder {
                     }
                     _ => self.err("that assignment target is not lowered"),
                 },
+                // `makevar("a.b") = v` (Preagonal probe): the name,
+                // `OP_MAKEVAR`, the value, `OP_ASSIGN`.
+                Expr::Call { .. } => {
+                    self.value(target);
+                    self.value(value);
+                    self.op(Op::Assign);
+                }
                 _ => self.err("that assignment target is not lowered"),
             },
             Gs2Stmt::Switch { value, arms } => self.switch_stmt(value, arms),
@@ -1658,11 +1668,113 @@ impl Builder {
                 }
                 Kind::Other
             }
-            Gs2Expr::Shift { left, a, b } => {
+            // `5 & 3` is the two numbers and `OP_BWA` (Preagonal probe).
+            Gs2Expr::Bits { kind, a, b } => {
                 self.numeric(a);
                 self.numeric(b);
-                self.op(if *left { Op::ShiftLeft } else { Op::ShiftRight });
+                self.op(match kind {
+                    BitKind::Shl => Op::ShiftLeft,
+                    BitKind::Shr => Op::ShiftRight,
+                    BitKind::And => Op::BitAnd,
+                    BitKind::Or => Op::BitOr,
+                });
                 Kind::Number
+            }
+            // `(@x).y` pushes x and `OP_CONV_TO_STRING` (Preagonal probe).
+            Gs2Expr::Text(e) => {
+                self.value(e);
+                self.op(Op::ConvToString);
+                Kind::Other
+            }
+            // `obj.(n)`: the object, the name as a string, member access.
+            // Seihai's form: the Preagonal output for `obj.(@n)` adds the
+            // name to the object as numbers.
+            Gs2Expr::DynMember { obj, name } => {
+                self.object(obj);
+                self.value(name);
+                self.op(Op::ConvToString);
+                self.op(Op::MemberAccess);
+                Kind::Other
+            }
+            // `y = x++` (Preagonal probe): x, `OP_COPY_LAST_OP`,
+            // `OP_CONV_TO_FLOAT`, `OP_SWAP_LAST_OPS`, `OP_INC`,
+            // `OP_INDEX_DEC`, leaving the old number.
+            Gs2Expr::PostStep { target, delta } => {
+                if !self.step_place(target) {
+                    return Kind::Other;
+                }
+                self.op(Op::CopyLastOp);
+                self.op(Op::ConvToFloat);
+                self.op(Op::SwapLastOps);
+                self.op(if *delta < 0.0 { Op::Dec } else { Op::Inc });
+                self.op(Op::IndexDec);
+                Kind::Number
+            }
+            // `y = (x = 2)` (Preagonal probe): x, `OP_COPY_LAST_OP`, the
+            // value, `OP_ASSIGN`, leaving x. For `+=` and the others Seihai
+            // copies the place once more, so x is still there after the
+            // store (the Preagonal output does not, and leaves nothing).
+            Gs2Expr::AssignValue { target, op, value } => {
+                if !self.step_place(target) {
+                    return Kind::Other;
+                }
+                self.op(Op::CopyLastOp);
+                if *op == AssignOp::Set {
+                    self.value(value);
+                } else {
+                    self.op(Op::CopyLastOp);
+                    self.op(Op::ConvToFloat);
+                    self.numeric(value);
+                    self.op(match op {
+                        AssignOp::Add => Op::Add,
+                        AssignOp::Sub => Op::Sub,
+                        AssignOp::Mul => Op::Mul,
+                        AssignOp::Div => Op::Div,
+                        AssignOp::Mod => Op::Mod,
+                        AssignOp::Set => unreachable!(),
+                    });
+                }
+                self.op(Op::Assign);
+                Kind::Other
+            }
+        }
+    }
+
+    /// The place an expression names, for `x++` or `(x = v)` used as a
+    /// value: a plain or dotted name, `makevar(…)`, or a member.
+    fn step_place(&mut self, target: &Expr) -> bool {
+        match target {
+            Expr::Var(v) if v.index.is_empty() => {
+                self.place(&v.name);
+                true
+            }
+            Expr::Var(v) => {
+                let Some(dims) = self.element(v) else {
+                    return false;
+                };
+                self.op(if dims == 1 {
+                    Op::Array
+                } else {
+                    Op::ArrayMultidim
+                });
+                true
+            }
+            Expr::Call { name, .. } if name == "makevar" => {
+                self.value(target);
+                true
+            }
+            Expr::Gs2(g)
+                if matches!(
+                    g.as_ref(),
+                    Gs2Expr::Member { .. } | Gs2Expr::DynMember { .. }
+                ) =>
+            {
+                self.value(target);
+                true
+            }
+            _ => {
+                self.err("that is not something `++`, `--` or `=` can change");
+                false
             }
         }
     }
@@ -1769,6 +1881,7 @@ impl Builder {
             AssignOp::Sub => Op::Sub,
             AssignOp::Mul => Op::Mul,
             AssignOp::Div => Op::Div,
+            AssignOp::Mod => Op::Mod,
             AssignOp::Set => unreachable!(),
         });
         self.op(Op::Assign);
@@ -1776,7 +1889,10 @@ impl Builder {
 
     /// `a[i] = v` and `a[i, j] = v`: object, indexes, value, assign op.
     fn element_assign(&mut self, target: &VarRef, op: AssignOp, value: &Expr) {
-        if op != AssignOp::Set && self.gs1 {
+        if op != AssignOp::Set {
+            // `a[i] += v` is `a[i] = a[i] + v`. For GS2 this is Seihai's
+            // form: the Preagonal (gs2-parser) output copies the index, not
+            // the element, and so stores `i + v`.
             // GS1 `a[i] += v` is `a[i] = a[i] + v`: the GS1 interpreter
             // reads the element, works the number out and stores it, and
             // the lowered form does the same with the fixture-checked
@@ -1795,6 +1911,7 @@ impl Builder {
                 AssignOp::Sub => BinOp::Sub,
                 AssignOp::Mul => BinOp::Mul,
                 AssignOp::Div => BinOp::Div,
+                AssignOp::Mod => BinOp::Mod,
                 AssignOp::Set => unreachable!(),
             };
             let sum = Expr::Bin(
@@ -1803,14 +1920,6 @@ impl Builder {
                 Box::new(value.clone()),
             );
             self.element_assign(target, AssignOp::Set, &sum);
-            return;
-        }
-        if op != AssignOp::Set {
-            self.err(format!(
-                "`{}` on an array element has no fixture-checked GS2 form; write `a[i] = a[i] {} v`",
-                op.symbol(),
-                op.symbol().trim_end_matches('='),
-            ));
             return;
         }
         if self.gs1 && matches!(value, Expr::List(_)) {
@@ -1831,7 +1940,7 @@ impl Builder {
     /// Pushes an indexed variable as an object followed by its indexes and
     /// returns how many indexes there are, or `None` after an error.
     fn element(&mut self, v: &VarRef) -> Option<usize> {
-        if let Some(problem) = element_problem(v) {
+        if let Some(problem) = element_problem(v, self.gs1) {
             self.err(problem);
             return None;
         }
@@ -1850,7 +1959,7 @@ impl Builder {
     /// `OP_WITH` past the block, the body, `OP_WITHEND`, then
     /// `addcontrol(object)` on the object outside and `OP_INDEX_DEC`.
     fn new_block(&mut self, ty: &str, name: &Expr, body: &[Stmt]) {
-        if let Some(problem) = body.iter().find_map(|s| with_escape(s, false)) {
+        if let Some(problem) = body.iter().find_map(|s| with_escape(s, false, !self.gs1)) {
             self.err(problem);
             return;
         }
@@ -1870,11 +1979,11 @@ impl Builder {
         self.op(Op::Assign);
         self.op(Op::ConvToObject);
         let hole = self.hole(Op::With);
-        let outer = std::mem::take(&mut self.loops);
+        let outer = self.block_loops();
         for s in body {
             self.stmt(s);
         }
-        self.loops = outer;
+        self.restore_loops(outer);
         self.op(Op::WithEnd);
         let after = self.here();
         self.patch(hole, after);
@@ -1885,12 +1994,24 @@ impl Builder {
         self.op(Op::IndexDec);
     }
 
+    /// The loops a `with` body may leave. GS1 refuses leaving the block
+    /// (checked before), so its body starts with none; GS2 keeps them.
+    fn block_loops(&mut self) -> Option<Vec<Loop>> {
+        self.gs1.then(|| std::mem::take(&mut self.loops))
+    }
+
+    fn restore_loops(&mut self, outer: Option<Vec<Loop>>) {
+        if let Some(outer) = outer {
+            self.loops = outer;
+        }
+    }
+
     /// `with (target) body` in the fixture's encoding (`rest.gs2bc`,
     /// `objects.gs2bc`): the target, `OP_CONV_TO_OBJECT`, `OP_WITH` to just
     /// past the block, the body, `OP_WITHEND`.
     fn with_stmt(&mut self, target: &Expr, body: &Stmt, line: u32) {
         self.line = line;
-        if let Some(problem) = with_escape(body, false) {
+        if let Some(problem) = with_escape(body, false, !self.gs1) {
             self.err(problem);
             return;
         }
@@ -1903,11 +2024,9 @@ impl Builder {
         self.value(target);
         self.op(Op::ConvToObject);
         let hole = self.hole(Op::With);
-        // A loop outside the block cannot be left from inside it (refused
-        // above), so the body starts with no enclosing loop.
-        let outer = std::mem::take(&mut self.loops);
+        let outer = self.block_loops();
         self.stmt(body);
-        self.loops = outer;
+        self.restore_loops(outer);
         self.op(Op::WithEnd);
         let after = self.here();
         self.patch(hole, after);
@@ -2759,58 +2878,63 @@ impl Builder {
 /// `return`, a `sleep` or `waitfor`, or a `break`/`continue` that would
 /// leave the block. The NPC server's notes say the old object is not
 /// restored then, and no fixture shows GS2 leaving a block early.
-fn with_escape(s: &Stmt, in_loop: bool) -> Option<&'static str> {
+fn with_escape(s: &Stmt, in_loop: bool, gs2: bool) -> Option<&'static str> {
+    // GS2 keeps a `return`, `sleep` or `waitfor` inside a block: the
+    // executor closes the function's open blocks when it returns.
+    let waits = |e: &Expr| !gs2 && expr_waits(e);
+    let wait_name = |n: &str| !gs2 && is_wait(n);
     let blocked = "`return`, `sleep`, `waitfor`, or a `break`/`continue` that leaves a `with` block, is not lowered";
     match s {
-        Stmt::Block(v) => v.iter().find_map(|s| with_escape(s, in_loop)),
-        Stmt::If { cond, then, els } => (expr_waits(cond))
+        Stmt::Block(v) => v.iter().find_map(|s| with_escape(s, in_loop, gs2)),
+        Stmt::If { cond, then, els } => (waits(cond))
             .then_some(blocked)
-            .or_else(|| with_escape(then, in_loop))
-            .or_else(|| els.as_deref().and_then(|e| with_escape(e, in_loop))),
-        Stmt::While { cond, body } => expr_waits(cond)
+            .or_else(|| with_escape(then, in_loop, gs2))
+            .or_else(|| els.as_deref().and_then(|e| with_escape(e, in_loop, gs2))),
+        Stmt::While { cond, body } => waits(cond)
             .then_some(blocked)
-            .or_else(|| with_escape(body, true)),
+            .or_else(|| with_escape(body, true, gs2)),
         Stmt::For {
             init,
             cond,
             step,
             body,
         } => {
-            if cond.as_ref().is_some_and(expr_waits) {
+            if cond.as_ref().is_some_and(waits) {
                 return Some(blocked);
             }
             init.as_deref()
-                .and_then(|s| with_escape(s, in_loop))
-                .or_else(|| step.as_deref().and_then(|s| with_escape(s, true)))
-                .or_else(|| with_escape(body, true))
+                .and_then(|s| with_escape(s, in_loop, gs2))
+                .or_else(|| step.as_deref().and_then(|s| with_escape(s, true, gs2)))
+                .or_else(|| with_escape(body, true, gs2))
         }
-        Stmt::With { body, .. } => with_escape(body, false),
-        Stmt::Return(_) => Some(blocked),
-        Stmt::Break | Stmt::Continue => (!in_loop).then_some(blocked),
-        Stmt::Command { name, args, .. } => (is_wait(name)
-            || args
-                .iter()
-                .any(|a| matches!(a, Arg::Num(e) if expr_waits(e))))
+        Stmt::With { body, .. } => with_escape(body, false, gs2),
+        Stmt::Return(_) => (!gs2).then_some(blocked),
+        // GS2 jumps straight out (Preagonal probe: `OP_SET_INDEX` past
+        // `OP_WITHEND`); the executor closes the block on the jump.
+        Stmt::Break | Stmt::Continue => (!gs2 && !in_loop).then_some(blocked),
+        Stmt::Command { name, args, .. } => (wait_name(name)
+            || args.iter().any(|a| matches!(a, Arg::Num(e) if waits(e))))
         .then_some(blocked),
-        Stmt::Call { name, args } => {
-            (is_wait(name) || args.iter().any(expr_waits)).then_some(blocked)
-        }
+        Stmt::Call { name, args } => (wait_name(name) || args.iter().any(waits)).then_some(blocked),
         Stmt::Assign { target, value, .. } => {
-            (target.index.iter().any(expr_waits) || expr_waits(value)).then_some(blocked)
+            (target.index.iter().any(waits) || waits(value)).then_some(blocked)
         }
-        Stmt::IncDec { target, .. } => target.index.iter().any(expr_waits).then_some(blocked),
+        Stmt::IncDec { target, .. } => target.index.iter().any(waits).then_some(blocked),
         Stmt::Function { .. } | Stmt::Unknown { .. } => None,
         Stmt::Gs2(g) => {
-            if g.exprs().into_iter().any(expr_waits) {
+            if g.exprs().into_iter().any(waits) {
                 return Some(blocked);
             }
             match g.as_ref() {
                 // `break` leaves the `switch`, not the block; a `continue`
                 // is refused when it is emitted (no loop inside the block).
-                Gs2Stmt::Switch { .. } | Gs2Stmt::ForEach { .. } => {
-                    g.bodies().into_iter().find_map(|s| with_escape(s, true))
+                Gs2Stmt::Switch { .. } | Gs2Stmt::ForEach { .. } => g
+                    .bodies()
+                    .into_iter()
+                    .find_map(|s| with_escape(s, true, gs2)),
+                Gs2Stmt::NewBlock { body, .. } => {
+                    body.iter().find_map(|s| with_escape(s, false, gs2))
                 }
-                Gs2Stmt::NewBlock { body, .. } => body.iter().find_map(|s| with_escape(s, false)),
                 Gs2Stmt::Eval(_) | Gs2Stmt::SetPart { .. } | Gs2Stmt::Chain { .. } => None,
             }
         }
@@ -2946,7 +3070,7 @@ fn expr_names(e: &Expr, f: &mut dyn FnMut(&str, bool)) {
 }
 
 /// Why an indexed variable is not lowered, if it is not.
-fn element_problem(v: &VarRef) -> Option<String> {
+fn element_problem(v: &VarRef, gs1: bool) -> Option<String> {
     if v.field_after_index {
         return Some(format!(
             "a field after an index (`{}`) is not lowered by this temporary front end",
@@ -2960,7 +3084,10 @@ fn element_problem(v: &VarRef) -> Option<String> {
             v.index.len()
         ));
     }
-    if matches!(v.name.as_str(), "board" | "tiles") {
+    // GS2 `tiles[x, y]` and `board[i]` are ordinary element reads and
+    // writes (Preagonal probe). Whether GS1's level board maps onto them is
+    // not checked, so the GS1 front end still refuses them.
+    if gs1 && matches!(v.name.as_str(), "board" | "tiles") {
         return Some(format!(
             "`{}[..]` has no fixture-checked GS2 encoding; it is not lowered",
             v.name
@@ -3098,6 +3225,9 @@ fn parse_gs2(src: &str) -> Result<(Vec<Item>, Spellings), CompileErrors> {
         if let Some(message) = p.bad.take() {
             return Err(CompileErrors::one(p.line, message));
         }
+        if matches!(&s, Stmt::Block(v) if v.is_empty()) {
+            continue;
+        }
         match items.last_mut() {
             Some(last) if last.top => last.body.push(s),
             _ => items.push(Item::top(vec![s])),
@@ -3117,6 +3247,8 @@ struct Gs2<'a> {
     new_body: Option<Vec<Stmt>>,
     /// How each decimal literal was written, by value (see [`Spellings`]).
     spellings: Spellings,
+    /// `const` and `enum` names (lowercase), folded where they are read.
+    consts: HashMap<String, Expr>,
 }
 
 /// The source text of decimal literals, keyed by the bits of their absolute
@@ -3181,6 +3313,7 @@ impl<'a> Gs2<'a> {
             bad: None,
             new_body: None,
             spellings: Spellings::default(),
+            consts: HashMap::new(),
         }
     }
 
@@ -3284,7 +3417,60 @@ impl<'a> Gs2<'a> {
         if self.eat_id("switch") {
             return self.switch_stmt();
         }
-        if self.eat_id("public") || self.eat_id("enum") || self.eat_id("const") {
+        if self.eat_id("const") {
+            // `const NAME = value;`: folded where it is read, no code
+            // (Preagonal probe: `const C = 1; y = C;` is `y = 1`).
+            loop {
+                let name = self.ident()?;
+                self.expect("=")?;
+                let value = self.const_value()?;
+                self.consts.insert(name.to_ascii_lowercase(), value);
+                if !self.eat(",") {
+                    break;
+                }
+            }
+            self.expect(";")?;
+            return Ok(Stmt::Block(Vec::new()));
+        }
+        if self.eat_id("enum") {
+            // `enum Name { A, B = 5, C }`: numbers from 0, or from a given
+            // value. Seihai folds them like `const`; the Preagonal output
+            // reads a bare member as a variable.
+            let prefix = if self.sees("{") {
+                None
+            } else {
+                Some(self.ident()?.to_ascii_lowercase())
+            };
+            self.expect("{")?;
+            let mut next = 0.0;
+            while !self.eat("}") {
+                let name = self.ident()?;
+                if self.eat("=") {
+                    match self.const_value()? {
+                        Expr::Num(n) => next = n,
+                        _ => {
+                            return Err(CompileErrors::one(
+                                self.line,
+                                "an `enum` value must be a number",
+                            ))
+                        }
+                    }
+                }
+                let lower = name.to_ascii_lowercase();
+                if let Some(p) = &prefix {
+                    self.consts.insert(format!("{p}::{lower}"), Expr::Num(next));
+                }
+                self.consts.insert(lower, Expr::Num(next));
+                next += 1.0;
+                if !self.eat(",") {
+                    self.expect("}")?;
+                    break;
+                }
+            }
+            self.eat(";");
+            return Ok(Stmt::Block(Vec::new()));
+        }
+        if self.eat_id("public") {
             return Err(CompileErrors::one(
                 self.line,
                 "that statement is not in this temporary GS2 compiler",
@@ -3304,6 +3490,19 @@ impl<'a> Gs2<'a> {
             return Ok(Stmt::IncDec { target, delta });
         }
         let e = self.expr()?;
+        if let Expr::Gs2(g) = &e {
+            if let Gs2Expr::PostStep {
+                target: Expr::Var(v),
+                delta,
+            } = g.as_ref()
+            {
+                self.expect(";")?;
+                return Ok(Stmt::IncDec {
+                    target: v.clone(),
+                    delta: *delta,
+                });
+            }
+        }
         if let Some(body) = self.new_body.take() {
             return match e {
                 Expr::Gs2(g) => match *g {
@@ -3373,9 +3572,15 @@ impl<'a> Gs2<'a> {
                 });
             }
         }
-        if matches!(&e, Expr::Gs2(g) if matches!(g.as_ref(), Gs2Expr::Member { .. } | Gs2Expr::Index { .. }))
-            && self.eat("=")
-        {
+        let settable = match &e {
+            Expr::Gs2(g) => matches!(
+                g.as_ref(),
+                Gs2Expr::Member { .. } | Gs2Expr::Index { .. } | Gs2Expr::DynMember { .. }
+            ),
+            Expr::Call { name, .. } => name == "makevar",
+            _ => false,
+        };
+        if settable && self.eat("=") {
             let value = self.expr()?;
             self.expect(";")?;
             return Ok(Stmt::Gs2(Box::new(Gs2Stmt::SetPart { target: e, value })));
@@ -3383,7 +3588,15 @@ impl<'a> Gs2<'a> {
         self.expect(";")?;
         match e {
             Expr::Call { name, args } => Ok(Stmt::Call { name, args }),
-            Expr::Gs2(g) if matches!(g.as_ref(), Gs2Expr::Method { .. } | Gs2Expr::New { .. }) => {
+            Expr::Gs2(g)
+                if matches!(
+                    g.as_ref(),
+                    Gs2Expr::Method { .. }
+                        | Gs2Expr::New { .. }
+                        | Gs2Expr::PostStep { .. }
+                        | Gs2Expr::AssignValue { .. }
+                ) =>
+            {
                 Ok(Stmt::Gs2(Box::new(Gs2Stmt::Eval(Expr::Gs2(g)))))
             }
             _ => Err(CompileErrors::one(
@@ -3471,6 +3684,18 @@ impl<'a> Gs2<'a> {
     }
 
     fn simple_from(&mut self, e: Expr) -> Result<Stmt, CompileErrors> {
+        if let Expr::Gs2(g) = &e {
+            if let Gs2Expr::PostStep {
+                target: Expr::Var(v),
+                delta,
+            } = g.as_ref()
+            {
+                return Ok(Stmt::IncDec {
+                    target: v.clone(),
+                    delta: *delta,
+                });
+            }
+        }
         let Expr::Var(v) = e else {
             return Err(CompileErrors::one(
                 self.line,
@@ -3609,9 +3834,16 @@ impl<'a> Gs2<'a> {
             };
             self.bump();
             let rhs = self.binary(prec + 1)?;
-            if text == "<<" || text == ">>" {
-                lhs = Expr::Gs2(Box::new(Gs2Expr::Shift {
-                    left: text == "<<",
+            let bits = match text {
+                "<<" => Some(BitKind::Shl),
+                ">>" => Some(BitKind::Shr),
+                "&" => Some(BitKind::And),
+                "|" => Some(BitKind::Or),
+                _ => None,
+            };
+            if let Some(kind) = bits {
+                lhs = Expr::Gs2(Box::new(Gs2Expr::Bits {
+                    kind,
                     a: lhs,
                     b: rhs,
                 }));
@@ -3656,12 +3888,14 @@ impl<'a> Gs2<'a> {
             "||" => (1, BinOp::Or),
             "&&" => (2, BinOp::And),
             "@" => (3, BinOp::Cat),
+            // Below `<` so that `x in |a, b|` still closes its range.
+            "&" | "|" => (3, BinOp::Mul),
             "SPC" => (3, BinOp::CatSpc),
             "NL" => (3, BinOp::CatNl),
             "TAB" => (3, BinOp::CatTab),
-            "<" | "<=" => (4, if text == "<" { BinOp::Lt } else { BinOp::Le }),
-            ">" | ">=" => (5, if text == ">" { BinOp::Gt } else { BinOp::Ge }),
-            "==" | "!=" => (6, if text == "==" { BinOp::Eq } else { BinOp::Ne }),
+            "<" | "<=" | "=<" => (4, if text == "<" { BinOp::Lt } else { BinOp::Le }),
+            ">" | ">=" | "=>" => (5, if text == ">" { BinOp::Gt } else { BinOp::Ge }),
+            "==" | "!=" | "<>" => (6, if text == "==" { BinOp::Eq } else { BinOp::Ne }),
             "<<" | ">>" => (7, BinOp::Mul),
             "+" | "-" => (8, if text == "+" { BinOp::Add } else { BinOp::Sub }),
             "*" | "/" | "%" | "^" => (
@@ -3704,6 +3938,12 @@ impl<'a> Gs2<'a> {
     fn postfix(&mut self, mut e: Expr) -> Result<Expr, CompileErrors> {
         loop {
             if self.eat(".") {
+                if self.eat("(") {
+                    let n = self.expr()?;
+                    self.expect(")")?;
+                    e = Expr::Gs2(Box::new(Gs2Expr::DynMember { obj: e, name: n }));
+                    continue;
+                }
                 let name = self.ident()?;
                 if self.eat("(") {
                     let args = self.arg_list()?;
@@ -3722,6 +3962,14 @@ impl<'a> Gs2<'a> {
                 }
                 self.expect("]")?;
                 e = Expr::Gs2(Box::new(Gs2Expr::Index { obj: e, index }));
+            } else if self.sees("++") || self.sees("--") {
+                let delta = if self.eat("++") {
+                    1.0
+                } else {
+                    self.bump();
+                    -1.0
+                };
+                e = Expr::Gs2(Box::new(Gs2Expr::PostStep { target: e, delta }));
             } else {
                 return Ok(e);
             }
@@ -3758,8 +4006,24 @@ impl<'a> Gs2<'a> {
                     let args = self.arg_list()?;
                     return Ok(Expr::Call { name, args });
                 }
+                if let Some(v) = self.consts.get(&name.to_ascii_lowercase()).cloned() {
+                    if !self.sees(".") && !self.sees("[") {
+                        return Ok(v);
+                    }
+                }
                 while self.sees(".") {
                     self.bump();
+                    if self.eat("(") {
+                        // `a.b.(expr)`: a member named by a value.
+                        let n = self.expr()?;
+                        self.expect(")")?;
+                        let obj = Expr::Var(VarRef {
+                            name,
+                            index: Vec::new(),
+                            field_after_index: false,
+                        });
+                        return Ok(Expr::Gs2(Box::new(Gs2Expr::DynMember { obj, name: n })));
+                    }
                     let part = self.ident()?;
                     if self.eat("(") {
                         // `a.b.f(x)`: a method on the dotted name before it.
@@ -3795,9 +4059,22 @@ impl<'a> Gs2<'a> {
                 }))
             }
             GTok::Op("(") => {
-                let e = self.expr()?;
+                let mut e = self.expr()?;
+                // `(x = v)`, `(x += v)`: an assignment used as a value.
+                if let Some(op) = self.assign_op() {
+                    let value = self.expr()?;
+                    e = Expr::Gs2(Box::new(Gs2Expr::AssignValue {
+                        target: e,
+                        op,
+                        value,
+                    }));
+                }
                 self.expect(")")?;
                 Ok(e)
+            }
+            GTok::Op("@") => {
+                let e = self.unary()?;
+                Ok(Expr::Gs2(Box::new(Gs2Expr::Text(e))))
             }
             GTok::Op("{") => {
                 let mut values = Vec::new();
@@ -3817,6 +4094,21 @@ impl<'a> Gs2<'a> {
                 "`in` ranges are written in GS1; this GS2 parser does not accept `|`",
             )),
             _ => Err(CompileErrors::one(self.line, "expected an expression")),
+        }
+    }
+
+    /// A `const` or `enum` value: a number, a string, or a negative number.
+    fn const_value(&mut self) -> Result<Expr, CompileErrors> {
+        match self.expr()? {
+            v @ (Expr::Num(_) | Expr::Str(_)) => Ok(v),
+            Expr::Unary(UnOp::Neg, n) if matches!(*n, Expr::Num(_)) => match *n {
+                Expr::Num(x) => Ok(Expr::Num(-x)),
+                _ => unreachable!(),
+            },
+            _ => Err(CompileErrors::one(
+                self.line,
+                "a `const` value must be a number or a string",
+            )),
         }
     }
 
@@ -3842,6 +4134,7 @@ impl<'a> Gs2<'a> {
             GTok::Op("-=") => AssignOp::Sub,
             GTok::Op("*=") => AssignOp::Mul,
             GTok::Op("/=") => AssignOp::Div,
+            GTok::Op("%=") => AssignOp::Mod,
             _ => return None,
         };
         self.bump();
@@ -4001,20 +4294,29 @@ impl<'a> Gs2<'a> {
         if c.is_ascii_alphabetic() || c == b'_' || c == b'$' {
             let start = self.i;
             self.i += 1;
-            while self.i < self.b.len()
-                && (self.b[self.i].is_ascii_alphanumeric()
-                    || self.b[self.i] == b'_'
-                    || self.b[self.i] == b'$')
-            {
-                self.i += 1;
+            // `$pref::Video::x` is one name (Preagonal probe).
+            loop {
+                match self.b.get(self.i) {
+                    Some(c) if c.is_ascii_alphanumeric() || *c == b'_' || *c == b'$' => self.i += 1,
+                    Some(b':')
+                        if self.b.get(self.i + 1) == Some(&b':')
+                            && self
+                                .b
+                                .get(self.i + 2)
+                                .is_some_and(|c| c.is_ascii_alphabetic() || *c == b'_') =>
+                    {
+                        self.i += 2
+                    }
+                    _ => break,
+                }
             }
             let text = String::from_utf8_lossy(&self.b[start..self.i]).into_owned();
             return GTok::Id(text);
         }
         const OPS: &[&str] = &[
-            "<<", ">>", "||", "&&", "==", "!=", "<=", ">=", "+=", "-=", "*=", "/=", "%=", "@=",
-            ":=", "++", "--", "+", "-", "*", "/", "%", "^", "=", "<", ">", "!", "(", ")", "{", "}",
-            "[", "]", ",", ";", ".", "@", "|", ":", "?",
+            "<<", ">>", "||", "&&", "==", "!=", "<>", "<=", ">=", "=<", "=>", "+=", "-=", "*=",
+            "/=", "%=", "@=", ":=", "++", "--", "+", "-", "*", "/", "%", "^", "=", "<", ">", "!",
+            "(", ")", "{", "}", "[", "]", ",", ";", ".", "@", "|", "&", ":", "?",
         ];
         let rest = &self.b[self.i..];
         for op in OPS {
