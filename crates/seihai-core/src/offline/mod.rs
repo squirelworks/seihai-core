@@ -6441,9 +6441,7 @@ mod tests {
             sprites: vec![0; 111],
             ..Default::default()
         };
-        for id in 107..=110 {
-            t.sprites[id] = (8 << 6) | 8;
-        }
+        t.sprites[107..=110].fill((8 << 6) | 8);
         t
     }
 
