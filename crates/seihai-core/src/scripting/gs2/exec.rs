@@ -112,6 +112,9 @@ struct Frame {
     /// Stack height where the return value goes (set by `OP_JMP`).
     base: usize,
     locals: HashMap<String, Value>,
+    /// `with` blocks open when the function was entered: a `return` from
+    /// inside a block closes the ones the function opened.
+    with_depth: usize,
 }
 
 /// A `scheduleevent` waiting for its frame.
@@ -139,6 +142,11 @@ pub struct Machine {
     due: Vec<(String, Vec<Val>)>,
     /// The objects of the `with` blocks the run is in, innermost last.
     with: Vec<Root>,
+    /// For each open `with`: the first op of its body, the op its
+    /// `OP_WITH` skips to, and the call depth it was opened at. A jump out
+    /// of the body (`break`/`continue`, which the compiler emits as a
+    /// plain jump past `OP_WITHEND`) closes it.
+    with_span: Vec<(usize, usize, usize)>,
 }
 
 /// Seconds to whole frames, as GServer-v2 does it: `(int)(t * 20)`.
@@ -173,6 +181,7 @@ impl Machine {
             scheduled: Vec::new(),
             due: Vec::new(),
             with: Vec::new(),
+            with_span: Vec::new(),
         }
     }
 
@@ -204,6 +213,7 @@ impl Machine {
         self.frames.clear();
         self.loops.clear();
         self.with.clear();
+        self.with_span.clear();
         self.pc = 0;
         self.running = true;
         self.exec(host)
@@ -219,6 +229,7 @@ impl Machine {
         self.frames.clear();
         self.loops.clear();
         self.with.clear();
+        self.with_span.clear();
         self.stack.push(Slot::Marker);
         for a in args.iter().rev() {
             self.stack.push(match a {
@@ -227,6 +238,7 @@ impl Machine {
             });
         }
         self.frames.push(Frame {
+            with_depth: self.with.len(),
             ret: None,
             base: 0,
             locals: HashMap::new(),
@@ -343,6 +355,7 @@ impl Machine {
         self.stack.clear();
         self.frames.clear();
         self.with.clear();
+        self.with_span.clear();
         Outcome::Stopped(why)
     }
 
@@ -563,7 +576,16 @@ impl Machine {
             match ins.op {
                 Op::NoOp => {}
                 // Jumps. Targets are op indices.
-                Op::SetIndex => self.pc = int.unwrap_or(0).max(0) as usize,
+                Op::SetIndex => {
+                    self.pc = int.unwrap_or(0).max(0) as usize;
+                    while let Some(&(start, end, depth)) = self.with_span.last() {
+                        if depth != self.frames.len() || (start..end).contains(&self.pc) {
+                            break;
+                        }
+                        self.with_span.pop();
+                        self.with.pop();
+                    }
+                }
                 Op::If | Op::SetIndexTrue => {
                     let Some(v) = self.pop_num(host) else {
                         return fault(self, host);
@@ -622,6 +644,8 @@ impl Machine {
                         None => Value::default(),
                     };
                     self.stack.truncate(frame.base);
+                    self.with.truncate(frame.with_depth);
+                    self.with_span.truncate(frame.with_depth);
                     match frame.ret {
                         Some(pc) => {
                             self.pc = pc;
@@ -1236,7 +1260,11 @@ impl Machine {
                         return fault(self, host);
                     };
                     match o {
-                        Slot::Obj(Some((root, path))) if path.is_empty() => self.with.push(root),
+                        Slot::Obj(Some((root, path))) if path.is_empty() => {
+                            self.with.push(root);
+                            let end = int.unwrap_or(0).max(0) as usize;
+                            self.with_span.push((self.pc, end, self.frames.len()));
+                        }
                         other => {
                             if let Slot::Obj(Some((_, path))) = other {
                                 host.log(format!("gs2: with ({path}) at op {at}: Seihai has no object references, block skipped"));
@@ -1247,6 +1275,7 @@ impl Machine {
                 }
                 Op::WithEnd => {
                     self.with.pop();
+                    self.with_span.pop();
                 }
 
                 Op::Unknown(n) => host.log(format!("gs2: unknown opcode {n} at op {at}, skipped")),
@@ -1275,6 +1304,7 @@ impl Machine {
                     return Some(self.stop("callstack overrun".into(), host));
                 }
                 self.frames.push(Frame {
+                    with_depth: self.with.len(),
                     ret: Some(self.pc),
                     base: m,
                     locals: HashMap::new(),

@@ -129,8 +129,29 @@ pub enum Gs2Expr {
     New { ty: String, args: Vec<Expr> },
     /// `new[n]`, `new[n][m]`.
     NewArray(Vec<Expr>),
-    /// `a << b`, `a >> b`.
-    Shift { left: bool, a: Expr, b: Expr },
+    /// `a << b`, `a >> b`, `a & b`, `a | b`.
+    Bits { kind: BitKind, a: Expr, b: Expr },
+    /// `@x`: the value as a string.
+    Text(Expr),
+    /// `obj.(expr)`: the member whose name is the value of `expr`.
+    DynMember { obj: Expr, name: Expr },
+    /// `x++` / `x--` used as a value: the old value, then the step.
+    PostStep { target: Expr, delta: f64 },
+    /// `(x = v)`, `(x += v)` used as a value: the place after the store.
+    AssignValue {
+        target: Expr,
+        op: AssignOp,
+        value: Expr,
+    },
+}
+
+/// The bit operators of [`Gs2Expr::Bits`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BitKind {
+    Shl,
+    Shr,
+    And,
+    Or,
 }
 
 impl Gs2Expr {
@@ -142,7 +163,11 @@ impl Gs2Expr {
             Gs2Expr::Index { obj, index } => std::iter::once(obj).chain(index).collect(),
             Gs2Expr::New { args, .. } => args.iter().collect(),
             Gs2Expr::NewArray(dims) => dims.iter().collect(),
-            Gs2Expr::Shift { a, b, .. } => vec![a, b],
+            Gs2Expr::Bits { a, b, .. } => vec![a, b],
+            Gs2Expr::Text(e) => vec![e],
+            Gs2Expr::DynMember { obj, name } => vec![obj, name],
+            Gs2Expr::PostStep { target, .. } => vec![target],
+            Gs2Expr::AssignValue { target, value, .. } => vec![target, value],
         }
     }
 
@@ -159,6 +184,8 @@ impl Gs2Stmt {
             Gs2Stmt::Switch { arms, .. } => arms.iter().flat_map(|a| a.body.iter()).collect(),
             Gs2Stmt::ForEach { body, .. } => vec![body],
             Gs2Stmt::Eval(_) | Gs2Stmt::SetPart { .. } => Vec::new(),
+            Gs2Stmt::NewBlock { body, .. } => body.iter().collect(),
+            Gs2Stmt::Chain { .. } => Vec::new(),
         }
     }
 
@@ -171,6 +198,12 @@ impl Gs2Stmt {
             Gs2Stmt::ForEach { list, .. } => vec![list],
             Gs2Stmt::Eval(e) => vec![e],
             Gs2Stmt::SetPart { target, value } => vec![target, value],
+            Gs2Stmt::NewBlock { name, .. } => vec![name],
+            Gs2Stmt::Chain { targets, value } => targets
+                .iter()
+                .flat_map(|t| t.index.iter())
+                .chain(std::iter::once(value))
+                .collect(),
         }
     }
 }
@@ -196,6 +229,15 @@ pub enum Gs2Stmt {
     /// `target = value` where the target is a member or element of a value
     /// that is not a plain dotted name (`findplayer(n).chat = …`).
     SetPart { target: Expr, value: Expr },
+    /// `new Type(name) { body }`: make the object, run the body with it as
+    /// the current object, then add it as a control of the object outside.
+    NewBlock {
+        ty: String,
+        name: Expr,
+        body: Vec<Stmt>,
+    },
+    /// `a = b = … = value`: every target set to the value.
+    Chain { targets: Vec<VarRef>, value: Expr },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -205,6 +247,7 @@ pub enum AssignOp {
     Sub,
     Mul,
     Div,
+    Mod,
 }
 
 impl AssignOp {
@@ -215,6 +258,7 @@ impl AssignOp {
             AssignOp::Sub => "-=",
             AssignOp::Mul => "*=",
             AssignOp::Div => "/=",
+            AssignOp::Mod => "%=",
         }
     }
 }

@@ -251,9 +251,8 @@ fn commands_and_functions_without_gs2_are_errors() {
     let err = compile::compile_gs1("if (created) { if (playersays(hello)) hide; }\n", Era::V205)
         .unwrap_err();
     assert!(err.to_string().contains("playersays"), "{err}");
-    let err =
-        compile::compile_gs1("if (created) { with (player) { hide; } }\n", Era::V21).unwrap_err();
-    assert!(err.to_string().contains("`with` body"), "{err}");
+    // A command inside `with` runs against the `with` object in both.
+    assert!(compile::compile_gs1("if (created) { with (player) { hide; } }\n", Era::V21).is_ok());
     let err = compile::compile_gs1(
         "function onCreated() { hide; }\nfunction onCreated() { show; }\n",
         Era::V205,
@@ -655,15 +654,45 @@ fn element_forms_without_a_fixture_stay_errors() {
             .to_string();
         assert!(error.contains(want), "{source}: {error}");
     }
-    // The GS2 front keeps them errors: its own encoding has no fixture.
-    for stmt in ["this.a[0] += 1;", "this.a[0]++;"] {
-        let source = format!("function onCreated() {{ {stmt} }}");
-        let error = compile::compile_gs2(&source).unwrap_err().to_string();
-        assert!(
-            error.contains("no fixture-checked GS2 form"),
-            "{source}: {error}"
-        );
-    }
+    // The GS2 front compiles them: `a[i] += v` as `a[i] = a[i] + v`
+    // (Seihai's form), `a[i]++` as the element read and `OP_INC`.
+    let s = compile::compile_gs2("function onCreated() { this.a[0] += 1; }").unwrap();
+    assert_eq!(
+        &ops(&s)[4..],
+        [
+            "OP_THIS",
+            "OP_TYPE_VAR",
+            "OP_MEMBER_ACCESS",
+            "OP_CONV_TO_OBJECT",
+            "OP_TYPE_NUMBER",
+            "OP_THIS",
+            "OP_TYPE_VAR",
+            "OP_MEMBER_ACCESS",
+            "OP_CONV_TO_OBJECT",
+            "OP_TYPE_NUMBER",
+            "OP_ARRAY",
+            "OP_CONV_TO_FLOAT",
+            "OP_TYPE_NUMBER",
+            "OP_ADD",
+            "OP_ARRAY_ASSIGN",
+            "OP_TYPE_NUMBER",
+            "OP_RET",
+            "OP_RET",
+        ]
+    );
+    let s = compile::compile_gs2("function onCreated() { a[i]++; }").unwrap();
+    assert_eq!(
+        &ops(&s)[4..11],
+        [
+            "OP_TYPE_VAR",
+            "OP_CONV_TO_OBJECT",
+            "OP_TYPE_VAR",
+            "OP_CONV_TO_FLOAT",
+            "OP_ARRAY",
+            "OP_INC",
+            "OP_INDEX_DEC",
+        ]
+    );
     // A field or a second index after an index is a GS2 postfix form: the
     // element, then `OP_MEMBER_ACCESS` or another `OP_ARRAY` (no fixture).
     for stmt in ["this.x = npcs[0].x;", "this.x = this.a[0][1];"] {
@@ -883,13 +912,14 @@ fn gs1_with_over_an_element_lowers_and_reads_outer_variables() {
 }
 
 /// Bodies whose GS1 meaning GS2 would change are refused, as are ways out
-/// of the block the NPC server's notes warn about.
+/// of the block the NPC server's notes warn about. Commands and calls are
+/// lowered (both run against the `with` object) unless they reach the
+/// player, which GS1 swaps there and GS2 does not.
 #[test]
 fn gs1_with_bodies_that_change_meaning_stay_errors() {
     for (body, needle) in [
-        ("hide;", "runs a command"),
-        ("setlevel2 a.nw,30,30;", "runs a command"),
-        ("this.a = next();", "calls a function"),
+        ("message #a;", "command on the player"),
+        ("this.a = next();", "script's own functions"),
         ("sleep 1;", "`sleep`"),
         ("return;", "`return`"),
         ("i = 1;", "script variable `i`"),
@@ -914,11 +944,11 @@ fn gs1_with_bodies_that_change_meaning_stay_errors() {
     .unwrap_err()
     .to_string();
     assert!(err.contains("leaves a `with` block"), "{err}");
-    let err =
-        compile::compile_gs2("function onCreated() { while (1) { with (player) { break; } } }")
-            .unwrap_err()
-            .to_string();
-    assert!(err.contains("leaves a `with` block"), "{err}");
+    // GS2 jumps straight out; the executor closes the block.
+    assert!(compile::compile_gs2(
+        "function onCreated() { while (1) { with (player) { break; } } }"
+    )
+    .is_ok());
     // Before 2.1 `with` is not GS1.
     assert!(
         compile::compile_gs1("if (created) { with (this.o) { x = 1; } }\n", Era::V205).is_err()
@@ -1087,4 +1117,23 @@ fn gs2_assigns_to_members_and_elements_of_values() {
         Era::V21,
     )
     .unwrap();
+}
+
+/// `with (getplayer(acct))` (2.17.1 on) becomes `with (findplayer(acct))`,
+/// and commands in the body stay calls by name.
+#[test]
+fn gs1_with_bodies_keep_commands_and_calls() {
+    let s = compile::compile_gs1(
+        "function next() { return 1; }\nif (created) { with (getplayer(this.acct)) { hide; setlevel2 a.nw,30,30; this.a = strlen(#s(this.b)); } }\n",
+        Era::V21,
+    )
+    .unwrap();
+    assert!(s.strings.iter().any(|t| t == "findplayer"));
+    let names = ops(&s);
+    let w = names.iter().position(|n| n == "OP_WITH").unwrap();
+    let end = names.iter().position(|n| n == "OP_WITHEND").unwrap();
+    assert_eq!(
+        names[w + 1..end].iter().filter(|n| *n == "OP_CALL").count(),
+        2
+    );
 }
