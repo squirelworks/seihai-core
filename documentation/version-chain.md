@@ -54,6 +54,22 @@ Step {
 
 The resolver is a `const fn`, so `PROFILES` is built at compile time and keeps its type, `&'static [VersionProfile]`.
 
+## Script engines
+
+`VersionProfile::scripts` says whether a build runs GS1 and GS2: `yes`, `no` or
+`unknown`. It is the one place that says which clients run GS2, so the launcher,
+the clients and seihai-servertools read it rather than a version cut-off. It is set
+in the chain only from evidence, and a unit test
+(`script_engines_follow_the_evidence`) holds the GS2 half to that evidence:
+
+| Field | `yes` | `no` | `unknown` |
+|---|---|---|---|
+| `gs2` | the binary handles `PLO_NPCBYTECODE` (131), the packet that carries a compiled GS2 script: 3.153 (whose GS2 VM was also read, `gs2-executor.md`) and every binary build after it | the binary's server-id set has no 131: every classic binary from 1.21 to 2.31, and 3.04 | builds with no binary: 2.1 to 2.16, 2.3, 6.015, 6.034 |
+| `gs1` | the GS1 command table was read from the binary (1.21 to 2.05, `gs1_commands`), or the per-build vocabulary notes cover it (2.17, 2.22, 2.31) | none | 3.04 and later (nothing read about GS1 there yet), and builds with no binary |
+
+When a capture or a binary read settles an `unknown`, set it on that step with
+the source in the step's comment.
+
 ## The handler-change table
 
 `seihai --version-chain` prints, for each step, what changed against the step before: server ids the client gains or loses a handler for, client ids it can send, prop ids its parsers accept, framing and login, files, levels, death and combat rules, UI switches. Then the step's `unknown` entries and `source`. Ids carry their gs2lib names.
@@ -314,6 +330,8 @@ Generated; do not edit between the markers.
 - ui: **minimap**: no -> yes
 - ui: **log_window**: no -> yes
 - ui: **ghost_mode**: no -> yes
+- scripts: **gs1**: yes -> unknown
+- scripts: **gs2**: no -> unknown
 - unknown (binary): no 2.1 release binary; every value of this step is inferred
 - unknown (token): the 2.1 test builds still send the 2.05 token, so GNW31101 is from gs2lib only
 - unknown (protocol): PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169
@@ -371,6 +389,8 @@ Generated; do not edit between the markers.
 - props: **npc_max**: 43 -> 73
 - levels: **heights**: no -> yes
 - ui: **window**: 648×514 -> 644×507
+- scripts: **gs1**: unknown -> yes
+- scripts: **gs2**: unknown -> no
 - unknown (props): other-player prop parser was not read; the 2.22 set is used
 - unknown (ui): GS1 command count was not read; 161 is carried
 - unknown (login): the real 2.17.1 login to a lab listserver was captured: shape B (one plain zlib frame, id 0 `newmain` then id 1 with the account, no token), which Seihai sends. What the public service does for a real 2.17.1 was not observed; Seihai's frame got a legacy list on 14923 and no reply on 14922 on 2026-10-25 (with the default zlib header 78 9C; Seihai now sends 78 DA like the real client, not yet run)
@@ -408,6 +428,8 @@ Generated; do not edit between the markers.
 - props: **precise_pos**: no -> yes
 - files: **large_file_size**: no -> yes
 - ui: **editor**: yes -> no
+- scripts: **gs1**: yes -> unknown
+- scripts: **gs2**: no -> unknown
 - unknown (binary): no 2.3 binary; the whole step is the 2.31 values
 - unknown (listserver): the port was checked with Seihai's gen-5 login only (2026-10-25); no real 2.3 client was captured
 - unknown (tampercheck): constant of this build; the re-send rule is taken from 2.31
@@ -422,6 +444,8 @@ Generated; do not edit between the markers.
 - protocol: **tamper**: unknown words, re-send Timer -> known words, re-send Timer
 - protocol: **showimg (id 24)**: none -> every 5130 ms
 - protocol: **login frame**: none -> files, process list, props with OS wind and code page 1252, status icons
+- scripts: **gs1**: unknown -> yes
+- scripts: **gs2**: unknown -> no
 - unknown (pli): the TOML's pli_changes (21 out, 46 in) disagrees with its pli_sent list, which lacks 44; a real client sent 44, so the row keeps it
 - unknown (live): no game-server login on a public server; only the list reply was checked (2026-10-25)
 - source: binary (same code as 2.22) and lab: its own tampercheck constant and timer re-send, id 24 every 5.13 s whether or not others are in the level, post-login frame without the idle.gani request
@@ -440,6 +464,7 @@ Generated; do not edit between the markers.
 - props: **other-player props**: -78 X2, -79 Y2, -80 Z2 (67 -> 64 ids)
 - props: **npc_max**: 77 -> 73
 - props: **precise_pos**: yes -> no
+- scripts: **gs1**: yes -> unknown
 - unknown (listserver): the public listserver sent its list on 14923 to Seihai's G3D30123 login with a made-up account (2026-11-11); a real 3.04 was not run against it, and 14922 with a real account was not tried
 - unknown (login): UDPPORT (31) is left out of the first props, as for every build (no UDP socket); the nickname is the account, where the real client sends the start window's nickname field
 - unknown (ui): the Torque front end (start window, options, themes, chat as white text with a blue shadow) is not modelled; the 2.31 UI row is kept
@@ -456,6 +481,7 @@ Generated; do not edit between the markers.
 - props: **other-player props**: +78 X2, +79 Y2, +80 Z2 (64 -> 67 ids)
 - props: **npc_max**: 73 -> 77
 - props: **precise_pos**: no -> yes
+- scripts: **gs2**: no -> yes
 - unknown (pli): 2, 3, 15, 24, 29 and 80 are taken from 3.04; the PPC scan did not resolve those call sites
 - unknown (login): the first frame (5, 37, 34 bigmap.txt, 34 minimap.txt, the two 34s sent twice) and the first props (OSTYPE mac, code page 1250) were seen in the lab; the head and default-weapon checks are 3.04's
 - unknown (3d): the 3D mode (Torque GameConnection, Graal3D protocol 19, on UDP listed port + 1) is not modelled here; seihai-ato::torque has its profile
@@ -560,6 +586,7 @@ Generated; do not edit between the markers.
 #### 6.015 (`G3D3007A`, inferred)
 
 - protocol: **plo (server ids handled)**: -175 SHOOT, -184 TAKESCREENSHOT (93 -> 91 ids)
+- scripts: **gs2**: yes -> unknown
 - unknown (binary): no 6.00r7 or 6.01r5 binary; every value of this step is inferred
 - unknown (token): G3D3007A comes from GServer-v2's allowedversions.txt and gs2lib only; no 6.00r7 or 6.01r5 login was captured
 - unknown (plo): Linux 6.01r1's set; whether 6.00r7 (the earlier of the two builds) already drops 175 and 184 is not known
@@ -586,6 +613,7 @@ Generated; do not edit between the markers.
 #### 6.03r7 (`G3D0311C`, binary, linked 2012-11-16)
 
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
+- scripts: **gs2**: unknown -> yes
 - unknown (token): the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)
 - source: unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date; draws no tiles before the warp
 
@@ -596,4 +624,5 @@ Generated; do not edit between the markers.
 - unknown (lab): the Linux client was not run; the Windows 6.03r7 lab run (2026-10-31) stands in for it
 - unknown (files): Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for
 - source: binary (Linux x64 ELF, not packed): token stored as the scrambled string g3d0511c, login list linux plus four machine ids (eth0 MAC md5, /etc inode md5, empty, kernel string); PLO and PLI sets are the ones the Windows row took from it; gs2lib names the token 6.037 (Linux)
+
 <!-- version-chain:end -->

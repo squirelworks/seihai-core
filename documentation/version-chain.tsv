@@ -148,6 +148,8 @@ step	label	token	basis	kind	area	field	detail
 21	2.1	GNW31101	inferred	changed	ui	minimap	no -> yes
 21	2.1	GNW31101	inferred	changed	ui	log_window	no -> yes
 21	2.1	GNW31101	inferred	changed	ui	ghost_mode	no -> yes
+21	2.1	GNW31101	inferred	changed	scripts	gs1	yes -> unknown
+21	2.1	GNW31101	inferred	changed	scripts	gs2	no -> unknown
 21	2.1	GNW31101	inferred	unknown	binary	-	no 2.1 release binary; every value of this step is inferred
 21	2.1	GNW31101	inferred	unknown	token	-	the 2.1 test builds still send the 2.05 token, so GNW31101 is from gs2lib only
 21	2.1	GNW31101	inferred	unknown	protocol	-	PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169
@@ -187,6 +189,8 @@ step	label	token	basis	kind	area	field	detail
 27	2.17	GNW22122	binary	changed	props	npc_max	43 -> 73
 27	2.17	GNW22122	binary	changed	levels	heights	no -> yes
 27	2.17	GNW22122	binary	changed	ui	window	648×514 -> 644×507
+27	2.17	GNW22122	binary	changed	scripts	gs1	unknown -> yes
+27	2.17	GNW22122	binary	changed	scripts	gs2	unknown -> no
 27	2.17	GNW22122	binary	unknown	props	-	other-player prop parser was not read; the 2.22 set is used
 27	2.17	GNW22122	binary	unknown	ui	-	GS1 command count was not read; 161 is carried
 27	2.17	GNW22122	binary	unknown	login	-	the real 2.17.1 login to a lab listserver was captured: shape B (one plain zlib frame, id 0 `newmain` then id 1 with the account, no token), which Seihai sends. What the public service does for a real 2.17.1 was not observed; Seihai's frame got a legacy list on 14923 and no reply on 14922 on 2026-10-25 (with the default zlib header 78 9C; Seihai now sends 78 DA like the real client, not yet run)
@@ -218,6 +222,8 @@ step	label	token	basis	kind	area	field	detail
 29	2.3	GNW14015	inferred	changed	props	precise_pos	no -> yes
 29	2.3	GNW14015	inferred	changed	files	large_file_size	no -> yes
 29	2.3	GNW14015	inferred	changed	ui	editor	yes -> no
+29	2.3	GNW14015	inferred	changed	scripts	gs1	yes -> unknown
+29	2.3	GNW14015	inferred	changed	scripts	gs2	no -> unknown
 29	2.3	GNW14015	inferred	unknown	binary	-	no 2.3 binary; the whole step is the 2.31 values
 29	2.3	GNW14015	inferred	unknown	listserver	-	the port was checked with Seihai's gen-5 login only (2026-10-25); no real 2.3 client was captured
 29	2.3	GNW14015	inferred	unknown	tampercheck	-	constant of this build; the re-send rule is taken from 2.31
@@ -229,6 +235,8 @@ step	label	token	basis	kind	area	field	detail
 30	2.31	GNW28015	binary	changed	protocol	tamper	unknown words, re-send Timer -> known words, re-send Timer
 30	2.31	GNW28015	binary	changed	protocol	showimg (id 24)	none -> every 5130 ms
 30	2.31	GNW28015	binary	changed	protocol	login frame	none -> files, process list, props with OS wind and code page 1252, status icons
+30	2.31	GNW28015	binary	changed	scripts	gs1	unknown -> yes
+30	2.31	GNW28015	binary	changed	scripts	gs2	unknown -> no
 30	2.31	GNW28015	binary	unknown	pli	-	the TOML's pli_changes (21 out, 46 in) disagrees with its pli_sent list, which lacks 44; a real client sent 44, so the row keeps it
 30	2.31	GNW28015	binary	unknown	live	-	no game-server login on a public server; only the list reply was checked (2026-10-25)
 30	2.31	GNW28015	binary	source	-	-	binary (same code as 2.22) and lab: its own tampercheck constant and timer re-send, id 24 every 5.13 s whether or not others are in the level, post-login frame without the idle.gani request
@@ -244,6 +252,7 @@ step	label	token	basis	kind	area	field	detail
 31	3.04	G3D03014	binary	changed	props	other-player props	-78 X2, -79 Y2, -80 Z2 (67 -> 64 ids)
 31	3.04	G3D03014	binary	changed	props	npc_max	77 -> 73
 31	3.04	G3D03014	binary	changed	props	precise_pos	yes -> no
+31	3.04	G3D03014	binary	changed	scripts	gs1	yes -> unknown
 31	3.04	G3D03014	binary	unknown	listserver	-	the public listserver sent its list on 14923 to Seihai's G3D30123 login with a made-up account (2026-11-11); a real 3.04 was not run against it, and 14922 with a real account was not tried
 31	3.04	G3D03014	binary	unknown	login	-	UDPPORT (31) is left out of the first props, as for every build (no UDP socket); the nickname is the account, where the real client sends the start window's nickname field
 31	3.04	G3D03014	binary	unknown	ui	-	the Torque front end (start window, options, themes, chat as white text with a blue shadow) is not modelled; the 2.31 UI row is kept
@@ -257,6 +266,7 @@ step	label	token	basis	kind	area	field	detail
 32	3.153	G3D28015	binary	changed	props	other-player props	+78 X2, +79 Y2, +80 Z2 (64 -> 67 ids)
 32	3.153	G3D28015	binary	changed	props	npc_max	73 -> 77
 32	3.153	G3D28015	binary	changed	props	precise_pos	no -> yes
+32	3.153	G3D28015	binary	changed	scripts	gs2	no -> yes
 32	3.153	G3D28015	binary	unknown	pli	-	2, 3, 15, 24, 29 and 80 are taken from 3.04; the PPC scan did not resolve those call sites
 32	3.153	G3D28015	binary	unknown	login	-	the first frame (5, 37, 34 bigmap.txt, 34 minimap.txt, the two 34s sent twice) and the first props (OSTYPE mac, code page 1250) were seen in the lab; the head and default-weapon checks are 3.04's
 32	3.153	G3D28015	binary	unknown	3d	-	the 3D mode (Torque GameConnection, Graal3D protocol 19, on UDP listed port + 1) is not modelled here; seihai-ato::torque has its profile
@@ -331,6 +341,7 @@ step	label	token	basis	kind	area	field	detail
 41	6.00r2	G3D26090	binary	unknown	ui	-	whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
 41	6.00r2	G3D26090	binary	source	-	-	unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24, 6.x long frame lengths
 42	6.015	G3D3007A	inferred	changed	protocol	plo (server ids handled)	-175 SHOOT, -184 TAKESCREENSHOT (93 -> 91 ids)
+42	6.015	G3D3007A	inferred	changed	scripts	gs2	yes -> unknown
 42	6.015	G3D3007A	inferred	unknown	binary	-	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
 42	6.015	G3D3007A	inferred	unknown	token	-	G3D3007A comes from GServer-v2's allowedversions.txt and gs2lib only; no 6.00r7 or 6.01r5 login was captured
 42	6.015	G3D3007A	inferred	unknown	plo	-	Linux 6.01r1's set; whether 6.00r7 (the earlier of the two builds) already drops 175 and 184 is not known
@@ -351,6 +362,7 @@ step	label	token	basis	kind	area	field	detail
 43	6.034	G3D2505C	inferred	unknown	date	-	link date not known
 43	6.034	G3D2505C	inferred	source	-	-	GServer-v2's allowedversions.txt (G3D2505C for 6.0.3.4) and stock gs2lib (CLVER_6_034); PLO and PLI from Linux 6.03r7 (92 PLO ids, 60 send ids); the rest as 6.015
 44	6.03r7	G3D0311C	binary	changed	protocol	login lobby	first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
+44	6.03r7	G3D0311C	binary	changed	scripts	gs2	unknown -> yes
 44	6.03r7	G3D0311C	binary	unknown	token	-	the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)
 44	6.03r7	G3D0311C	binary	source	-	-	unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date; draws no tiles before the warp
 45	6.03r7 Linux	G3D0511C	binary	changed	protocol	login lobby	first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends linux,"","","",""

@@ -27,11 +27,11 @@ use super::lobby::{
 use super::login::{LoginInfo, LOGIN_217, LOGIN_222, LOGIN_231, LOGIN_304, LOGIN_3153};
 use super::profile::{
     Basis, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, ItemDrops, Levels,
-    ListKind, Listserver, LoginShape, Mannerisms, PortStatus, Props, Protocol, ServerList,
-    ShapeBasis, Ui, VersionProfile, WindowPx, COMBAT_139, COMBAT_200, COMBAT_201, COMBAT_205,
-    DEATH_139, DEATH_205, DEATH_21, DROPS_133, DROPS_138, DROPS_142, LEGACY_LIST_PORT, MANNER_139,
-    MANNER_141, MANNER_205, MANNER_222, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404,
-    TAMPER_217, TAMPER_222, TAMPER_230, TAMPER_231,
+    ListKind, Listserver, LoginShape, Mannerisms, PortStatus, Props, Protocol, Runs, Scripts,
+    ServerList, ShapeBasis, Ui, VersionProfile, WindowPx, COMBAT_139, COMBAT_200, COMBAT_201,
+    COMBAT_205, DEATH_139, DEATH_205, DEATH_21, DROPS_133, DROPS_138, DROPS_142, LEGACY_LIST_PORT,
+    MANNER_139, MANNER_141, MANNER_205, MANNER_222, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231,
+    SHOWIMG_404, TAMPER_217, TAMPER_222, TAMPER_230, TAMPER_231,
 };
 use super::showimg::ShowImgInfo;
 use super::tampercheck::TamperInfo;
@@ -180,6 +180,8 @@ pub struct Delta {
     pub mannerisms: Option<Mannerisms>,
     // Who drops bush and pot items.
     pub drops: Option<ItemDrops>,
+    // Script engines.
+    pub scripts: Option<Scripts>,
 }
 
 impl Delta {
@@ -234,6 +236,7 @@ impl Delta {
         gs1_commands: None,
         mannerisms: None,
         drops: None,
+        scripts: None,
     };
 }
 
@@ -337,6 +340,7 @@ pub const fn apply(prev: VersionProfile, s: &Step) -> VersionProfile {
     p.ui.gs1_commands = pick(p.ui.gs1_commands, d.gs1_commands);
     p.mannerisms = pick(p.mannerisms, d.mannerisms);
     p.drops = pick(p.drops, d.drops);
+    p.scripts = pick(p.scripts, d.scripts);
     p
 }
 
@@ -432,6 +436,8 @@ pub const ORIGIN: VersionProfile = VersionProfile {
     mannerisms: MANNER_139,
     // The roll is in every build from the 4th alpha; 1.3 read.
     drops: DROPS_133,
+    // The GS1 command table is read from 1.21 (`gs1_commands`); no 131.
+    scripts: Scripts::GS1,
 };
 
 // -- The chain. -------------------------------------------------------------
@@ -825,6 +831,8 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Inferred,
         delta: Delta {
+            // No binary: neither engine is known (version-chain.md, "Script engines").
+            scripts: Some(Scripts::UNKNOWN),
             // Classic login: 14923 (checked for 2.1 and 2.12 to 2.16 on 2026-10-25; 14922 stayed
             // silent).
             listserver: Some(Some(Listserver::new(ListKind::Legacy, PortStatus::Confirmed, None))), // shape B, no evidence
@@ -926,6 +934,8 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Binary,
         delta: Delta {
+            // GS1 vocabulary notes cover 2.17; its server ids have no 131.
+            scripts: Some(Scripts::GS1),
             // Classic login: 14923 (checked 2026-10-25; 14922 stayed silent). The host and port
             // the client reads come from arrays2.dat, not the binary.
             listserver: Some(Some(
@@ -984,6 +994,7 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Inferred,
         delta: Delta {
+            scripts: Some(Scripts::UNKNOWN),
             plo: IdDelta::plus_minus(&[84, 189], &[44]),
             pli: IdDelta::plus_minus(&[46], &[21]),
             // Gen-5 login like 2.31: 14922 answered it on 2026-10-25 (no 2.3 build exists).
@@ -1019,6 +1030,8 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Binary,
         delta: Delta {
+            // GS1 vocabulary notes cover 2.31; its server ids have no 131.
+            scripts: Some(Scripts::GS1),
             listserver: Some(Some(Listserver::new(ListKind::Supported, PortStatus::Confirmed, Some("GNW30123")))),
             tamper: Some(Some(TAMPER_231)),
             showimg: Some(Some(SHOWIMG_231)),
@@ -1041,6 +1054,8 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Binary,
         delta: Delta {
+            // No 131 in its server ids; nothing read on GS1.
+            scripts: Some(Scripts { gs1: Runs::Unknown, gs2: Runs::No }),
             // Against 2.31: 44, 101 and 102 in; 170, 177, 182, 183 and MOVE2 (189) out.
             plo: IdDelta::plus_minus(&[44, 101, 102], &[170, 177, 182, 183, 189]),
             // PUTNPC (21), 36 and 81 in; TAMPERCHECK (39), PROCESSLIST (44)
@@ -1080,6 +1095,8 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Binary,
         delta: Delta {
+            // 131 handled and its GS2 VM read (gs2-executor.md); nothing read on GS1.
+            scripts: Some(Scripts { gs1: Runs::Unknown, gs2: Runs::Yes }),
             plo: IdDelta::plus_minus(&[67, 74, 82, 104, 131, 132, 133, 134, 187, 189], &[44]),
             pli: IdDelta::plus(&[46, 50, 93, 96, 97, 98, 152, 154, 155, 156, 157, 158]),
             // Same G3D30123 login as 3.04; the 2026-10-31 Tiger lab run sent shape D (id 7 and id 1 in one plain frame).
@@ -1324,6 +1341,7 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Inferred,
         delta: Delta {
+            scripts: Some(Scripts::UNKNOWN),
             // Linux 6.01r1 (2011-09-18): 6.00r2's set without 175 and 184 (91 ids).
             plo: IdDelta::plus_minus(&[], &[175, 184]),
             // 6.00r2's send set is already Linux 6.01r1's, so no change.
@@ -1374,7 +1392,12 @@ pub const CHAIN: &[Step] = &[
         basis: Basis::Binary,
         // 6.015 and 6.034 before it already carry 6.03r7's id sets. No tiles
         // before the warp (lab screenshots, as 5.31r4).
-        delta: Delta { lobby: Some(Some(LOBBY_531)), ..Delta::NONE },
+        delta: Delta {
+            lobby: Some(Some(LOBBY_531)),
+            // A binary again after the two inferred 6.0x rows: 131 handled.
+            scripts: Some(Scripts { gs1: Runs::Unknown, gs2: Runs::Yes }),
+            ..Delta::NONE
+        },
         source: "unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date; draws no tiles before the warp",
         unknown: &[
             Unknown { area: "token", what: "the Linux 6.03r7 sends G3D0511C; this row is the Windows build (the next row is the Linux one)" },
@@ -1972,7 +1995,27 @@ pub fn diff(a: &VersionProfile, b: &VersionProfile) -> Vec<Change> {
         manner_text,
     );
     value_change(&mut o, "drops", "drops", &a.drops, &b.drops, drops_text);
+    value_change(
+        &mut o,
+        "scripts",
+        "gs1",
+        &a.scripts.gs1,
+        &b.scripts.gs1,
+        runs_text,
+    );
+    value_change(
+        &mut o,
+        "scripts",
+        "gs2",
+        &a.scripts.gs2,
+        &b.scripts.gs2,
+        runs_text,
+    );
     o
+}
+
+fn runs_text(r: &Runs) -> String {
+    r.as_str().into()
 }
 
 fn drops_text(d: &ItemDrops) -> String {

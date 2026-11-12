@@ -884,6 +884,56 @@ pub struct VersionProfile {
     pub ui: Ui,
     pub mannerisms: Mannerisms,
     pub drops: ItemDrops,
+    /// Which script engines the build runs, as far as the evidence goes.
+    pub scripts: Scripts,
+}
+
+/// Whether a build runs a script engine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Runs {
+    Yes,
+    No,
+    /// Nothing read from this build settles it.
+    Unknown,
+}
+
+impl Runs {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Runs::Yes => "yes",
+            Runs::No => "no",
+            Runs::Unknown => "unknown",
+        }
+    }
+}
+
+/// The script engines of a build. Set per step in the version chain from
+/// evidence only (`documentation/version-chain.md`, "Script engines"):
+///
+/// - `gs1`: yes where the GS1 command table was read from the binary
+///   (1.21 to 2.05, the `gs1_commands` count) or the per-build vocabulary
+///   notes cover it (2.17, 2.22, 2.31). Unknown elsewhere.
+/// - `gs2`: yes where the binary handles `PLO_NPCBYTECODE` (131), the packet
+///   that carries a compiled GS2 script (3.153 and every binary build after
+///   it); no where the binary's server-id set has no 131 (every classic
+///   binary and 3.04). Unknown for builds with no binary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Scripts {
+    pub gs1: Runs,
+    pub gs2: Runs,
+}
+
+impl Scripts {
+    /// GS1 only, both read.
+    pub const GS1: Scripts = Scripts {
+        gs1: Runs::Yes,
+        gs2: Runs::No,
+    };
+    /// No binary: neither is known.
+    pub const UNKNOWN: Scripts = Scripts {
+        gs1: Runs::Unknown,
+        gs2: Runs::Unknown,
+    };
 }
 
 impl VersionProfile {
@@ -1015,6 +1065,31 @@ pub fn by_label(label: &str) -> Option<&'static VersionProfile> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The script-engine field says only what the evidence says: GS2 is
+    /// "yes" exactly where a binary handles PLO_NPCBYTECODE (131) and "no"
+    /// exactly where a binary does not; a build with no binary is unknown.
+    #[test]
+    fn script_engines_follow_the_evidence() {
+        for p in PROFILES.iter() {
+            let gs2 = match (p.basis, p.protocol.plo.contains(131)) {
+                (Basis::Inferred, _) => Runs::Unknown,
+                (Basis::Binary, true) => Runs::Yes,
+                (Basis::Binary, false) => Runs::No,
+            };
+            assert_eq!(p.scripts.gs2, gs2, "{} gs2", p.label);
+            if p.basis == Basis::Inferred {
+                assert_eq!(p.scripts.gs1, Runs::Unknown, "{} gs1", p.label);
+            }
+        }
+        use ClientVersion::*;
+        for v in [V121, V139, V205, V217, V222, V231] {
+            assert_eq!(v.profile().scripts, Scripts::GS1, "{v:?}");
+        }
+        assert_eq!(V3153.profile().scripts.gs2, Runs::Yes);
+        assert_eq!(V304.profile().scripts.gs2, Runs::No);
+        assert_eq!(V603R7Linux.profile().scripts.gs2, Runs::Yes);
+    }
 
     #[test]
     fn every_version_has_one_row() {
