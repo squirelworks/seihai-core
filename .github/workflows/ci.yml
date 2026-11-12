@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      # Linux builds without the `audio` feature, so the job needs no ALSA
+      # development files. Windows builds the default, with audio.
+      FEATURES: ${{ matrix.os == 'ubuntu-latest' && '--no-default-features --features dev' || '' }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Keep text fixtures (levels, ganis, scripts) byte-for-byte on Windows.
+      - name: No line-ending conversion
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo build --workspace $FEATURES
+      - run: cargo test --workspace --no-fail-fast $FEATURES
+      - run: cargo fmt --all -- --check
+        if: ${{ !cancelled() }}
+      - run: cargo clippy --workspace --all-targets $FEATURES -- -D warnings
+        if: ${{ !cancelled() }}
