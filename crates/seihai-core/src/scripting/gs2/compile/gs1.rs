@@ -54,6 +54,7 @@ pub(super) fn program(src: &str, era: Era) -> Result<Program, CompileErrors> {
                 Raw::Code(_) => None,
             })
             .collect(),
+        with_depth: 0,
     };
     let items = raw
         .into_iter()
@@ -86,6 +87,7 @@ pub(super) fn lower_embedded(command: &g::Stmt, era: Era) -> Result<Stmt, String
         line: 0,
         errors: Vec::new(),
         script_fns: Vec::new(),
+        with_depth: 0,
     };
     let body = lower.stmt(command);
     match lower.errors.into_iter().next() {
@@ -105,6 +107,7 @@ pub(super) fn message(text: &str, era: Era) -> Result<Vec<MsgPart>, String> {
         line: 0,
         errors: Vec::new(),
         script_fns: Vec::new(),
+        with_depth: 0,
     };
     let parts = lower.message(text)?;
     match lower.errors.into_iter().next() {
@@ -723,6 +726,8 @@ struct Lower {
     errors: Vec<CompileError>,
     /// The script's own function names, lower case.
     script_fns: Vec<String>,
+    /// How many GS1 `with` blocks the statement being lowered is in.
+    with_depth: u32,
 }
 
 fn bin_op(op: g::BinOp) -> BinOp {
@@ -760,6 +765,14 @@ fn assign_op(op: g::AssignOp) -> AssignOp {
 }
 
 /// GS1's `playerx` and `playery` are GS2's `player.x` and `player.y`.
+/// A plain script variable: no prefix, and not a built-in or an event.
+fn is_script_var(name: &str, era: Era) -> bool {
+    !name.contains('.')
+        && gs2_name(name) == name
+        && vocab::builtin_var(name, era).is_none()
+        && !is_event(name, era)
+}
+
 fn gs2_name(name: &str) -> String {
     match name {
         "playerx" => "player.x".into(),
@@ -908,8 +921,18 @@ impl Lower {
             }
         }
         Var {
-            name: gs2_name(&v.name),
+            name: self.name(&v.name),
             index: v.index.iter().map(|e| self.expr(e)).collect(),
+        }
+    }
+
+    /// A variable name as GS2 names it. Inside a GS1 `with`, a plain
+    /// script variable stays the NPC's own: GS2 reaches it as `thiso.`.
+    fn name(&self, name: &str) -> String {
+        if self.with_depth == 1 && is_script_var(name, self.era) {
+            format!("thiso.{name}")
+        } else {
+            gs2_name(name)
         }
     }
 
@@ -958,12 +981,13 @@ impl Lower {
     /// and properties are read and written, plain script variables (`i`,
     /// `j`) keep working, and script functions still run as the original
     /// NPC. GS2 resolves a plain name on the `with` object first and runs a
-    /// bare call against it, so a body whose meaning would change is
-    /// refused: a write to a plain name that is not a built-in property, the
-    /// `player`, `client.` and `level.` names (GS1 switches them with the
-    /// object, GS2 does not), a call to one of the script's own functions,
-    /// and a command lowered to an explicit `player`. Other commands act on
-    /// the `with` object in both.
+    /// bare call against it, so a plain script variable is lowered as
+    /// `thiso.name` (the object the `with` was entered from), and a body
+    /// whose meaning would still change is refused: a plain write inside
+    /// nested `with` blocks, the `player`, `client.` and `level.` names
+    /// (GS1 switches them with the object, GS2 does not), a call to one of
+    /// the script's own functions, and a command lowered to an explicit
+    /// `player`. Other commands act on the `with` object in both.
     fn with(&mut self, target: &g::Expr, body: &g::Stmt, line: u32) -> Stmt {
         if with_escape(body, false) {
             self.err(
@@ -973,6 +997,7 @@ impl Lower {
         }
         let mut problem = None;
         let era = self.era;
+        let nested = self.with_depth > 0;
         stmt_names(body, &mut |name, write| {
             if problem.is_some() {
                 return;
@@ -985,10 +1010,9 @@ impl Lower {
                 problem = Some(format!(
                     "`{name}` inside a GS1 `with` is not lowered (GS1 switches it with the object, GS2 does not)"
                 ));
-            } else if write && !name.contains('.') && vocab::builtin_var(name, era).is_none() {
+            } else if nested && write && is_script_var(name, era) {
                 problem = Some(format!(
-                    "writing the script variable `{name}` inside a GS1 `with` is not lowered \
-                     (GS2 would store it on the `with` object); use `this.{name}` outside the block"
+                    "writing the script variable `{name}` inside nested GS1 `with` blocks is not lowered"
                 ));
             }
         });
@@ -997,7 +1021,9 @@ impl Lower {
             return Stmt::empty();
         }
         let target = self.expr(target);
+        self.with_depth += 1;
         let body = self.boxed(body);
+        self.with_depth -= 1;
         let fns = std::mem::take(&mut self.script_fns);
         let (calls_own, player) = lowered_reaches(&body, &fns);
         self.script_fns = fns;
@@ -1043,7 +1069,7 @@ impl Lower {
                 };
                 return Stmt::Call {
                     name: name.into(),
-                    args: vec![Expr::var(gs2_name(var)), size],
+                    args: vec![Expr::var(self.name(var)), size],
                 };
             }
             "sleep" => {
@@ -1126,7 +1152,7 @@ impl Lower {
                 let v = raw_value(args.get(1));
                 if local(&var) {
                     Stmt::Assign {
-                        target: Var::plain(gs2_name(&var)),
+                        target: Var::plain(self.name(&var)),
                         op: AssignOp::Set,
                         value: self.expr(&v),
                     }
@@ -1157,11 +1183,11 @@ impl Lower {
                     ));
                     return Some(Stmt::empty());
                 }
-                let list = Expr::var(gs2_name(&var));
+                let list = Expr::var(self.name(&var));
                 if name == "addstring" && self.era < Era::V21 {
                     let value = self.expr(&raw_value(args.get(1)));
                     return Some(Stmt::Assign {
-                        target: Var::plain(gs2_name(&var)),
+                        target: Var::plain(self.name(&var)),
                         op: AssignOp::Set,
                         value: Expr::bin(BinOp::Cat, list, value),
                     });
@@ -1342,7 +1368,7 @@ impl Lower {
             }
             g::Expr::InArray { e, name } => Expr::InArray {
                 e: Box::new(self.expr(e)),
-                name: gs2_name(name),
+                name: self.name(name),
             },
             g::Expr::List(values) => {
                 if let Some(problem) = list_problem(values) {

@@ -258,3 +258,16 @@ fn legacy_mode_reads_later_gs1_as_gs1_2_1() {
         );
     }
 }
+
+#[test]
+fn a_gs1_with_keeps_plain_variables_on_the_npc() {
+    // Inside GS1 `with`, plain variables stay the NPC's own; GS2 reaches
+    // them through `thiso`.
+    let plain = "if (created) {\n  with (getplayer(#a)) {\n    n = 1;\n    m = n + x;\n    if (n in b) hide;\n  }\n}";
+    let thiso = "if (created) {\n  with (getplayer(#a)) {\n    thiso.n = 1;\n    thiso.m = thiso.n + x;\n    if (n in thiso.b) hide;\n  }\n}";
+    let got = compile_gs1(plain, Era::V21).unwrap_or_else(|e| panic!("{e}"));
+    let want = compile_gs1(thiso, Era::V21).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(got.write(), want.write());
+    let nested = "if (created) { with (a) { with (b) { n = 1; } } }";
+    assert!(compile_gs1(nested, Era::V21).is_err());
+}
