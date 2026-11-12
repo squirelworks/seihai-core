@@ -13,4 +13,4 @@ name = "seihai_draw"
 path = "src/lib.rs"
 
 [dependencies]
-seihai-core = { path = "../seihai-core", default-features = false }
+seihai-core.workspace = true
