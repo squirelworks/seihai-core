@@ -18,13 +18,13 @@ so `git log` and `git blame` go back to the first commit that touched it.
 Pin a tag:
 
 ```toml
-seihai-core = { git = "https://github.com/squirelworks/seihai-core", tag = "v0.0.11", default-features = false }
+seihai-core = { git = "https://github.com/squirelworks/seihai-core", tag = "v0.0.12", default-features = false }
 ```
 
 and, for drawing:
 
 ```toml
-seihai-draw = { git = "https://github.com/squirelworks/seihai-core", tag = "v0.0.11" }
+seihai-draw = { git = "https://github.com/squirelworks/seihai-core", tag = "v0.0.12" }
 ```
 
 Features: `dev` (developer mode) and `audio` (sound output through rodio,
