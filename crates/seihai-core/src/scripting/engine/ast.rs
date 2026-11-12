@@ -141,6 +141,12 @@ pub enum Gs2Expr {
         name: Expr,
         args: Vec<Expr>,
     },
+    /// `(name)(args)`: a call of the function named by a value.
+    DynCall { name: Expr, args: Vec<Expr> },
+    /// A GS1 message code (`#a`, `#v(x)`) used as a GS2 value.
+    Gs1Text(String),
+    /// `x in list` where the list is any value (`x in f(…)`).
+    InValue { e: Expr, list: Expr },
     /// `function (…) { … }` as a value; the name of the function made for it.
     Lambda(String),
     /// `x++` / `x--` used as a value: the old value, then the step.
@@ -177,7 +183,9 @@ impl Gs2Expr {
             Gs2Expr::Text(e) => vec![e],
             Gs2Expr::DynMember { obj, name } => vec![obj, name],
             Gs2Expr::DynMethod { obj, name, args } => [obj, name].into_iter().chain(args).collect(),
-            Gs2Expr::Lambda(_) => Vec::new(),
+            Gs2Expr::Lambda(_) | Gs2Expr::Gs1Text(_) => Vec::new(),
+            Gs2Expr::InValue { e, list } => vec![e, list],
+            Gs2Expr::DynCall { name, args } => std::iter::once(name).chain(args).collect(),
             Gs2Expr::PostStep { target, .. } | Gs2Expr::PreStep { target, .. } => vec![target],
             Gs2Expr::AssignValue { target, value, .. } => vec![target, value],
         }
@@ -187,7 +195,10 @@ impl Gs2Expr {
     pub fn calls(&self) -> bool {
         matches!(
             self,
-            Gs2Expr::Method { .. } | Gs2Expr::DynMethod { .. } | Gs2Expr::New { .. }
+            Gs2Expr::Method { .. }
+                | Gs2Expr::DynMethod { .. }
+                | Gs2Expr::DynCall { .. }
+                | Gs2Expr::New { .. }
         )
     }
 }
