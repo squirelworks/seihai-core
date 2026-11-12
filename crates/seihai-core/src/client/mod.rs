@@ -41,6 +41,7 @@ use crate::offline::OfflineSession;
 use crate::protocol::layouts::BoardModify2;
 use crate::protocol::lobby::LobbyBurst;
 use crate::protocol::login::LoginBurst;
+use crate::protocol::npcprops::NpcProps;
 use crate::protocol::walkcadence::WalkCadence;
 use crate::protocol::{ClientVersion, SessionState};
 use level::{Arrival, LevelStore};
@@ -158,7 +159,23 @@ pub struct Live {
     /// blocks), keyed by the level's lower-case name, for the view to put
     /// on the levels it holds (`gmap::apply_board_mods_to`).
     pub board_mods: SharedBoardMods,
+    /// The server's NPC updates (`PLO_NPCPROPS`, 3) for the player's level,
+    /// in arrival order, for the view to put on the NPCs it draws.
+    pub npc_changes: SharedNpcChanges,
 }
+
+/// One `PLO_NPCPROPS` record for an NPC of the player's level: the level's
+/// lower-case name as the network thread had it, the NPC id and the props
+/// the record carried (only those).
+#[derive(Debug, Clone, PartialEq)]
+pub struct NpcChange {
+    pub level: String,
+    pub id: u32,
+    pub props: NpcProps,
+}
+
+/// NPC updates from the network thread to the view, in arrival order.
+pub type SharedNpcChanges = Arc<Mutex<Vec<NpcChange>>>;
 
 /// Board changes by lower-case level name, from the network thread to the
 /// view.
@@ -261,6 +278,25 @@ fn others_of(st: &SessionState) -> Vec<Other> {
             y: o.y,
             dir: o.dir,
             nick: o.nick.clone(),
+        })
+        .collect()
+}
+
+/// The NPC updates `st` has gathered since the last call, each with the
+/// level it is for. A record with no level known is dropped: there is no
+/// level for the view to put it on.
+fn npc_changes_of(st: &mut SessionState) -> Vec<NpcChange> {
+    let changes = std::mem::take(&mut st.npc_changes);
+    let Some(level) = st.current_level_name() else {
+        return Vec::new();
+    };
+    let level = level.to_ascii_lowercase();
+    changes
+        .into_iter()
+        .map(|(id, props)| NpcChange {
+            level: level.clone(),
+            id,
+            props,
         })
         .collect()
 }
@@ -376,6 +412,7 @@ pub fn run_with(
     let world = live.as_ref().map(|l| l.world.clone());
     let crossings = live.as_ref().map(|l| l.crossings.clone());
     let board_mods = live.as_ref().map(|l| l.board_mods.clone());
+    let npc_changes = live.as_ref().map(|l| l.npc_changes.clone());
     // Crossings sent, over every connection: the view counts the same.
     let mut crossings_sent: u64 = 0;
     let gmap_rules = GmapRules::for_version(version);
@@ -511,6 +548,13 @@ pub fn run_with(
                         if let Some(b) = board_mods.as_ref() {
                             b.lock().unwrap_or_else(|e| e.into_inner()).extend(mods);
                         }
+                    }
+                    // NPC updates for the player's level: on to the view,
+                    // which has the level's NPCs. Taken either way, so they
+                    // do not pile up in the state.
+                    let changes = npc_changes_of(&mut st);
+                    if let (Some(n), false) = (npc_changes.as_ref(), changes.is_empty()) {
+                        n.lock().unwrap_or_else(|e| e.into_inner()).extend(changes);
                     }
                     // The gmap: the grid, the cell, the neighbours, and a
                     // request for what the server still has to send.
@@ -846,6 +890,23 @@ mod others_tests {
         let o = others_of(&st);
         let got: Vec<_> = o.iter().map(|o| (o.id, o.x, o.y)).collect();
         assert_eq!(got, vec![(2, 10.0, 12.0), (3, 20.0, 5.0)]);
+    }
+
+    /// An NPC update after the level is handed on with the level it is
+    /// for, and only once.
+    #[test]
+    fn npc_updates_go_to_the_view_with_their_level() {
+        use crate::protocol::npcprops::{npc_props_message, PropValue, NPCPROP_X};
+        let mut st = SessionState::for_version(ClientVersion::V3153);
+        st.apply_body(&npc_props_message(5, &[(NPCPROP_X, PropValue::Byte(60))]));
+        assert!(npc_changes_of(&mut st).is_empty(), "no level yet");
+        st.level_name = Some("Start.nw".into());
+        st.apply_body(&npc_props_message(5, &[(NPCPROP_X, PropValue::Byte(60))]));
+        let got = npc_changes_of(&mut st);
+        assert_eq!(got.len(), 1);
+        assert_eq!((got[0].level.as_str(), got[0].id), ("start.nw", 5));
+        assert_eq!(got[0].props.x, Some(30.0));
+        assert!(npc_changes_of(&mut st).is_empty());
     }
 
     /// GServer's full OTHERPLPROPS carries GMAPLEVELX/Y (43/44) = 0 on a
