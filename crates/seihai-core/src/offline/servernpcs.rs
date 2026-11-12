@@ -227,6 +227,20 @@ impl OfflineSession {
     }
 }
 
+impl OfflineSession {
+    /// Take the server's delete of NPC `id` (`PLO_NPCDEL2`, 150) on the
+    /// current level: the NPC with that server id leaves the level. True if
+    /// one did.
+    pub fn drop_server_npc(&mut self, id: u32) -> bool {
+        let Some(level) = self.current_level.as_mut() else {
+            return false;
+        };
+        let before = level.npcs.len();
+        level.npcs.retain(|n| n.server_id != Some(id));
+        level.npcs.len() != before
+    }
+}
+
 /// The level-file NPC with no server id yet, this image (any case) and this
 /// position (to the half tile the server sends).
 fn file_twin(level: &Level, image: &str, x: f32, y: f32) -> Option<usize> {
@@ -515,6 +529,25 @@ mod tests {
         let mut s = OfflineSession::new();
         s.current_level = Some(Level::parse(level).unwrap());
         s
+    }
+
+    #[test]
+    fn a_deleted_server_npc_leaves_the_level() {
+        let mut s = session("GLEVNW01\n");
+        s.take_server_npc(1001, &record("labblock.gif", 30.0, 25.0));
+        s.take_server_npc(1002, &record("sign.png", 3.0, 4.0));
+        assert!(s.drop_server_npc(1001));
+        assert!(!s.drop_server_npc(1001), "already gone");
+        let left: Vec<_> = s
+            .current_level
+            .as_ref()
+            .unwrap()
+            .npcs
+            .iter()
+            .map(|n| n.server_id)
+            .collect();
+        assert_eq!(left, [Some(1002)]);
+        assert!(!OfflineSession::new().drop_server_npc(1002), "no level");
     }
 
     fn record(image: &str, x: f32, y: f32) -> NpcProps {

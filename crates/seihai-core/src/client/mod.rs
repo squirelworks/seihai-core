@@ -164,14 +164,15 @@ pub struct Live {
     pub npc_changes: SharedNpcChanges,
 }
 
-/// One `PLO_NPCPROPS` record for an NPC of the player's level: the level's
-/// lower-case name as the network thread had it, the NPC id and the props
-/// the record carried (only those).
+/// One server record for an NPC: the level's lower-case name, the NPC id,
+/// and what came. `props` is a `PLO_NPCPROPS` (3) record for the player's
+/// level, with only the props it carried; `None` is a `PLO_NPCDEL2` (150)
+/// delete, for the level it names.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NpcChange {
     pub level: String,
     pub id: u32,
-    pub props: NpcProps,
+    pub props: Option<NpcProps>,
 }
 
 /// NPC updates from the network thread to the view, in arrival order.
@@ -282,23 +283,37 @@ fn others_of(st: &SessionState) -> Vec<Other> {
         .collect()
 }
 
-/// The NPC updates `st` has gathered since the last call, each with the
-/// level it is for. A record with no level known is dropped: there is no
-/// level for the view to put it on.
+/// The NPC updates and deletes `st` has gathered since the last call, in
+/// the order they came, each with the level it is for. An update with no
+/// level known is dropped: there is no level for the view to put it on.
 fn npc_changes_of(st: &mut SessionState) -> Vec<NpcChange> {
     let changes = std::mem::take(&mut st.npc_changes);
-    let Some(level) = st.current_level_name() else {
-        return Vec::new();
-    };
-    let level = level.to_ascii_lowercase();
-    changes
-        .into_iter()
-        .map(|(id, props)| NpcChange {
-            level: level.clone(),
-            id,
-            props,
-        })
-        .collect()
+    let deletes = std::mem::take(&mut st.npc_deletes);
+    let level = st.current_level_name().map(|l| l.to_ascii_lowercase());
+    let mut out = Vec::with_capacity(changes.len() + deletes.len());
+    let mut deletes = deletes.into_iter().peekable();
+    for (i, (id, props)) in changes.into_iter().enumerate() {
+        while let Some(d) = deletes.next_if(|d| d.after <= i) {
+            out.push(NpcChange {
+                level: d.level.to_ascii_lowercase(),
+                id: d.id,
+                props: None,
+            });
+        }
+        if let Some(level) = &level {
+            out.push(NpcChange {
+                level: level.clone(),
+                id,
+                props: Some(props),
+            });
+        }
+    }
+    out.extend(deletes.map(|d| NpcChange {
+        level: d.level.to_ascii_lowercase(),
+        id: d.id,
+        props: None,
+    }));
+    out
 }
 
 /// After a link request the player stands where the link said: the
@@ -905,8 +920,50 @@ mod others_tests {
         let got = npc_changes_of(&mut st);
         assert_eq!(got.len(), 1);
         assert_eq!((got[0].level.as_str(), got[0].id), ("start.nw", 5));
-        assert_eq!(got[0].props.x, Some(30.0));
+        assert_eq!(got[0].props.as_ref().and_then(|p| p.x), Some(30.0));
         assert!(npc_changes_of(&mut st).is_empty());
+    }
+
+    /// `PLO_NPCDEL2`: GCHAR length, the level, GINT3 id.
+    fn npc_del2(level: &str, id: u32) -> Vec<u8> {
+        let mut m = vec![150 + 0x20, level.len() as u8 + 0x20];
+        m.extend(level.as_bytes());
+        m.extend([
+            ((id >> 14) & 0x7f) as u8 + 0x20,
+            ((id >> 7) & 0x7f) as u8 + 0x20,
+            (id & 0x7f) as u8 + 0x20,
+        ]);
+        m.push(b'\n');
+        m
+    }
+
+    /// A delete goes to the view in its place among the updates, for the
+    /// level it names, and the server's record of the NPC is forgotten.
+    #[test]
+    fn npc_deletes_go_to_the_view_in_order() {
+        use crate::protocol::npcprops::{npc_props_message, PropValue, NPCPROP_X};
+        let mut st = SessionState::for_version(ClientVersion::V3153);
+        st.level_name = Some("start.nw".into());
+        let x = |id| npc_props_message(id, &[(NPCPROP_X, PropValue::Byte(60))]);
+        st.apply_body(&[x(5), npc_del2("Start.nw", 5), x(5), npc_del2("other.nw", 9)].concat());
+        let got: Vec<_> = npc_changes_of(&mut st)
+            .into_iter()
+            .map(|c| (c.level, c.id, c.props.is_some()))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                ("start.nw".to_string(), 5, true),
+                ("start.nw".to_string(), 5, false),
+                ("start.nw".to_string(), 5, true),
+                ("other.nw".to_string(), 9, false),
+            ]
+        );
+        // Re-added after the delete: the record is the new one.
+        assert!(st.server_npcs.contains_key(&5));
+        st.apply_body(&npc_del2("start.nw", 5));
+        assert!(!st.server_npcs.contains_key(&5));
+        assert_eq!(st.npc_dels, 3);
     }
 
     /// GServer's full OTHERPLPROPS carries GMAPLEVELX/Y (43/44) = 0 on a
