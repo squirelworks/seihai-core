@@ -572,6 +572,30 @@ impl ScriptWorld {
             .retain(|p| !matches!(p.target, Target::Npc(_)));
     }
 
+    /// Drop the level NPC tagged `tag` (the server deleted it) and close the
+    /// gap as the level's NPC list does: the NPCs tagged after it take one
+    /// less. Events queued for it are dropped. False if no NPC had the tag.
+    pub fn remove_npc(&mut self, tag: usize) -> bool {
+        let mut gone = None;
+        for o in self.objects.iter_mut() {
+            let Some(obj) = o.as_mut().filter(|o| o.kind == ObjKind::Npc) else {
+                continue;
+            };
+            if obj.tag == tag && gone.is_none() {
+                gone = Some(obj.id);
+                *o = None;
+            } else if obj.tag > tag {
+                obj.tag -= 1;
+            }
+        }
+        if let Some(id) = gone {
+            self.core
+                .pending
+                .retain(|p| !matches!(p.target, Target::Id(i) if i == id));
+        }
+        gone.is_some()
+    }
+
     /// Remove the weapon with this name, if present.
     pub fn remove_weapon(&mut self, name: &str) {
         for o in self.objects.iter_mut() {
