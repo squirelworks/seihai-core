@@ -1,4 +1,4 @@
-//! GS2 bytecode (Stage B of the GS2 plan) and the temporary compiler.
+//! GS2 bytecode (Stage B of the GS2 plan) and its compiler.
 //!
 //! Reads the files the open-source gs2-parser compiler writes into segments,
 //! a string table and a list of instructions (`exec` runs them). The layout,
@@ -7,8 +7,8 @@
 //! An opcode value the table does not name is kept as `Op::Unknown`, so a
 //! later executor can log it and skip it.
 //!
-//! [`compile`] is the temporary GS1 front end and the small GS2 compiler it
-//! lowers into (issue 371). It is expected to be phased out.
+//! [`compile`] compiles GS1 and GS2 source to this bytecode, strictly by
+//! default or with the legacy quirks old scripts rely on.
 
 use std::fmt::{self, Write as _};
 

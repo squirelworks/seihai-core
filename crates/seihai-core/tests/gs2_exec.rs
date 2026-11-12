@@ -334,7 +334,7 @@ fn leaving_a_with_block_by_break_continue_or_return_closes_it() {
 
 #[test]
 fn v6_shapes_run_as_written() {
-    use seihai_core::scripting::gs2::compile::compile_gs2;
+    use seihai_core::scripting::gs2::compile::{compile_gs2_legacy, Quirk};
     let src = "/* outer /* inner */ still a comment */\n\
                if (1 == 1) {\n\
                  function g(a, b) return a &= b;\n\
@@ -347,7 +347,20 @@ fn v6_shapes_run_as_written() {
                  this.s = strequals(\"/Sit\", /sit);\n\
                  seteffectmode 2;\n\
                }\n";
-    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let compiled = compile_gs2_legacy(src).unwrap();
+    let quirks: Vec<Quirk> = compiled.warnings.into_iter().map(|w| w.quirk).collect();
+    assert_eq!(
+        quirks,
+        [
+            Quirk::NestedComment,
+            Quirk::NestedFunction,
+            Quirk::BracelessFunctionBody,
+            Quirk::CommaStatements,
+            Quirk::SlashWord("/sit".into()),
+            Quirk::Gs1Command("seteffectmode".into()),
+        ]
+    );
+    let mut m = Machine::new(compiled.script);
     let mut h = EffectHost::new(Era::V205, 7);
     assert_eq!(m.run_top_level(&mut h), Outcome::Done);
     assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
@@ -370,11 +383,11 @@ fn v6_shapes_run_as_written() {
 
 #[test]
 fn a_function_returns_the_value_of_its_own_variable() {
-    use seihai_core::scripting::gs2::compile::compile_gs2;
+    use seihai_core::scripting::gs2::compile::compile_gs2_legacy;
     let src = "function g(a) { temp.t = a + 1; return temp.t; }\n\
                function h(a) return a += 2;\n\
                function onCreated() { this.b = g(6); this.c = h(6); }";
-    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let mut m = Machine::new(compile_gs2_legacy(src).unwrap().script);
     let mut h = host();
     assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
     assert_eq!(m.var(Root::This, "b"), Some(&Val::Num(7.0)));
