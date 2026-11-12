@@ -7,6 +7,7 @@
 //! the part that GS1 shares. `gs2::compile` compiles GS1 and GS2 to it.
 
 mod bytecode;
+pub mod delivery;
 pub mod engine;
 mod gs1;
 pub mod gs2;
