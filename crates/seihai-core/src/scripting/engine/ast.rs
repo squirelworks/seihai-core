@@ -129,8 +129,29 @@ pub enum Gs2Expr {
     New { ty: String, args: Vec<Expr> },
     /// `new[n]`, `new[n][m]`.
     NewArray(Vec<Expr>),
-    /// `a << b`, `a >> b`.
-    Shift { left: bool, a: Expr, b: Expr },
+    /// `a << b`, `a >> b`, `a & b`, `a | b`.
+    Bits { kind: BitKind, a: Expr, b: Expr },
+    /// `@x`: the value as a string.
+    Text(Expr),
+    /// `obj.(expr)`: the member whose name is the value of `expr`.
+    DynMember { obj: Expr, name: Expr },
+    /// `x++` / `x--` used as a value: the old value, then the step.
+    PostStep { target: Expr, delta: f64 },
+    /// `(x = v)`, `(x += v)` used as a value: the place after the store.
+    AssignValue {
+        target: Expr,
+        op: AssignOp,
+        value: Expr,
+    },
+}
+
+/// The bit operators of [`Gs2Expr::Bits`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BitKind {
+    Shl,
+    Shr,
+    And,
+    Or,
 }
 
 impl Gs2Expr {
@@ -142,7 +163,11 @@ impl Gs2Expr {
             Gs2Expr::Index { obj, index } => std::iter::once(obj).chain(index).collect(),
             Gs2Expr::New { args, .. } => args.iter().collect(),
             Gs2Expr::NewArray(dims) => dims.iter().collect(),
-            Gs2Expr::Shift { a, b, .. } => vec![a, b],
+            Gs2Expr::Bits { a, b, .. } => vec![a, b],
+            Gs2Expr::Text(e) => vec![e],
+            Gs2Expr::DynMember { obj, name } => vec![obj, name],
+            Gs2Expr::PostStep { target, .. } => vec![target],
+            Gs2Expr::AssignValue { target, value, .. } => vec![target, value],
         }
     }
 
@@ -222,6 +247,7 @@ pub enum AssignOp {
     Sub,
     Mul,
     Div,
+    Mod,
 }
 
 impl AssignOp {
@@ -232,6 +258,7 @@ impl AssignOp {
             AssignOp::Sub => "-=",
             AssignOp::Mul => "*=",
             AssignOp::Div => "/=",
+            AssignOp::Mod => "%=",
         }
     }
 }
