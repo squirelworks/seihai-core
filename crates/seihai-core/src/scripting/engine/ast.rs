@@ -159,6 +159,8 @@ impl Gs2Stmt {
             Gs2Stmt::Switch { arms, .. } => arms.iter().flat_map(|a| a.body.iter()).collect(),
             Gs2Stmt::ForEach { body, .. } => vec![body],
             Gs2Stmt::Eval(_) | Gs2Stmt::SetPart { .. } => Vec::new(),
+            Gs2Stmt::NewBlock { body, .. } => body.iter().collect(),
+            Gs2Stmt::Chain { .. } => Vec::new(),
         }
     }
 
@@ -171,6 +173,12 @@ impl Gs2Stmt {
             Gs2Stmt::ForEach { list, .. } => vec![list],
             Gs2Stmt::Eval(e) => vec![e],
             Gs2Stmt::SetPart { target, value } => vec![target, value],
+            Gs2Stmt::NewBlock { name, .. } => vec![name],
+            Gs2Stmt::Chain { targets, value } => targets
+                .iter()
+                .flat_map(|t| t.index.iter())
+                .chain(std::iter::once(value))
+                .collect(),
         }
     }
 }
@@ -196,6 +204,15 @@ pub enum Gs2Stmt {
     /// `target = value` where the target is a member or element of a value
     /// that is not a plain dotted name (`findplayer(n).chat = …`).
     SetPart { target: Expr, value: Expr },
+    /// `new Type(name) { body }`: make the object, run the body with it as
+    /// the current object, then add it as a control of the object outside.
+    NewBlock {
+        ty: String,
+        name: Expr,
+        body: Vec<Stmt>,
+    },
+    /// `a = b = … = value`: every target set to the value.
+    Chain { targets: Vec<VarRef>, value: Expr },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1089,8 +1089,14 @@ impl Builder {
             start,
         });
         self.op(Op::TypeArray);
+        // A `temp.x` parameter is the place `temp.x` (TEMP, x, member
+        // access in the Preagonal baselines).
         for p in item.params.iter().rev() {
-            self.emit_var(p);
+            if p.contains('.') {
+                self.place(p);
+            } else {
+                self.emit_var(p);
+            }
         }
         self.op(Op::FuncParamsEnd);
         self.op(Op::Jmp);
@@ -1367,6 +1373,26 @@ impl Builder {
                 _ => self.err("that assignment target is not lowered"),
             },
             Gs2Stmt::Switch { value, arms } => self.switch_stmt(value, arms),
+            Gs2Stmt::NewBlock { ty, name, body } => self.new_block(ty, name, body),
+            // `a = b = c = v` as in the Preagonal baselines: `a`, then each
+            // later target and `OP_COPY_LAST_OP`, the value, and one
+            // `OP_ASSIGN` per target (innermost first).
+            Gs2Stmt::Chain { targets, value } => {
+                if targets.iter().any(|t| !t.index.is_empty()) {
+                    self.err("`a[i] = b = …` is not lowered");
+                    return;
+                }
+                for (i, t) in targets.iter().enumerate() {
+                    self.place(&t.name);
+                    if i > 0 {
+                        self.op(Op::CopyLastOp);
+                    }
+                }
+                self.value(value);
+                for _ in targets {
+                    self.op(Op::Assign);
+                }
+            }
         }
     }
 
@@ -1534,11 +1560,22 @@ impl Builder {
         for a in args.iter().rev() {
             self.value(a);
         }
-        self.value(obj);
+        self.object(obj);
         self.emit_var(name);
         self.op(Op::MemberAccess);
         self.op(Op::Call);
         true
+    }
+
+    /// A value used as the object of a member or method: converted with
+    /// `OP_CONV_TO_OBJECT` unless it is a root (`this`, `player`, …),
+    /// as the Preagonal baselines do for dotted names, calls and members.
+    fn object(&mut self, obj: &Expr) {
+        self.value(obj);
+        let root = matches!(obj, Expr::Var(v) if v.index.is_empty() && root_op(&v.name).is_some());
+        if !root {
+            self.op(Op::ConvToObject);
+        }
     }
 
     fn gs2_value(&mut self, g: &Gs2Expr) -> Kind {
@@ -1551,14 +1588,20 @@ impl Builder {
                 Kind::Other
             }
             Gs2Expr::Member { obj, name } => {
-                self.value(obj);
+                self.object(obj);
                 self.emit_var(name);
                 self.op(Op::MemberAccess);
                 Kind::Other
             }
             Gs2Expr::Index { obj, index } => {
+                // `a[i][j]`: no conversion between the two reads in the
+                // Preagonal baselines.
                 self.value(obj);
-                self.op(Op::ConvToObject);
+                if !matches!(obj, Expr::Var(v) if !v.index.is_empty())
+                    && !matches!(obj, Expr::Gs2(g) if matches!(g.as_ref(), Gs2Expr::Index { .. }))
+                {
+                    self.op(Op::ConvToObject);
+                }
                 for i in index {
                     self.value(i);
                 }
@@ -1783,6 +1826,48 @@ impl Builder {
             self.numeric(i);
         }
         Some(v.index.len())
+    }
+
+    /// `new T(name) { body }` as the Preagonal compiler's baselines encode
+    /// it (behaviour only): the name, `OP_INLINE_NEW`, three
+    /// `OP_COPY_LAST_OP`, the type, `OP_CONV_TO_STRING`, `OP_NEW_OBJECT`,
+    /// `OP_ASSIGN` (the name now holds the object), `OP_CONV_TO_OBJECT`,
+    /// `OP_WITH` past the block, the body, `OP_WITHEND`, then
+    /// `addcontrol(object)` on the object outside and `OP_INDEX_DEC`.
+    fn new_block(&mut self, ty: &str, name: &Expr, body: &[Stmt]) {
+        if let Some(problem) = body.iter().find_map(|s| with_escape(s, false)) {
+            self.err(problem);
+            return;
+        }
+        self.value(name);
+        self.op(Op::InlineNew);
+        for _ in 0..3 {
+            self.op(Op::CopyLastOp);
+        }
+        let t = self.intern(ty);
+        self.code.push(Instr {
+            op: Op::TypeString,
+            operand: Operand::Str(t),
+            offset: 0,
+        });
+        self.op(Op::ConvToString);
+        self.op(Op::NewObject);
+        self.op(Op::Assign);
+        self.op(Op::ConvToObject);
+        let hole = self.hole(Op::With);
+        let outer = std::mem::take(&mut self.loops);
+        for s in body {
+            self.stmt(s);
+        }
+        self.loops = outer;
+        self.op(Op::WithEnd);
+        let after = self.here();
+        self.patch(hole, after);
+        self.op(Op::TypeArray);
+        self.op(Op::SwapLastOps);
+        self.emit_var("addcontrol");
+        self.op(Op::Call);
+        self.op(Op::IndexDec);
     }
 
     /// `with (target) body` in the fixture's encoding (`rest.gs2bc`,
@@ -2254,12 +2339,22 @@ impl Builder {
             self.place("player.y");
             return;
         }
-        if let Some((root, member)) = name.split_once('.') {
-            self.root(root);
+        // A dotted name is its first part, then each member with
+        // `OP_MEMBER_ACCESS`. As in gs2-parser's output, the value is
+        // converted to an object before each member, except straight after
+        // `this`/`temp`/`player`/… (`this.a.b` is THIS a MA CTO b MA;
+        // `client.a` is VAR client CTO a MA).
+        let mut parts = name.split('.');
+        let first = parts.next().unwrap_or_default();
+        self.root(first);
+        let mut after_root = root_op(first).is_some();
+        for member in parts {
+            if !after_root {
+                self.op(Op::ConvToObject);
+            }
+            after_root = false;
             self.emit_var(member);
             self.op(Op::MemberAccess);
-        } else {
-            self.root(name);
         }
     }
 
@@ -2655,7 +2750,20 @@ fn with_escape(s: &Stmt, in_loop: bool) -> Option<&'static str> {
         }
         Stmt::IncDec { target, .. } => target.index.iter().any(expr_waits).then_some(blocked),
         Stmt::Function { .. } | Stmt::Unknown { .. } => None,
-        Stmt::Gs2(_) => Some(blocked),
+        Stmt::Gs2(g) => {
+            if g.exprs().into_iter().any(expr_waits) {
+                return Some(blocked);
+            }
+            match g.as_ref() {
+                // `break` leaves the `switch`, not the block; a `continue`
+                // is refused when it is emitted (no loop inside the block).
+                Gs2Stmt::Switch { .. } | Gs2Stmt::ForEach { .. } => {
+                    g.bodies().into_iter().find_map(|s| with_escape(s, true))
+                }
+                Gs2Stmt::NewBlock { body, .. } => body.iter().find_map(|s| with_escape(s, false)),
+                Gs2Stmt::Eval(_) | Gs2Stmt::SetPart { .. } | Gs2Stmt::Chain { .. } => None,
+            }
+        }
     }
 }
 
@@ -2942,6 +3050,9 @@ struct Gs2<'a> {
     line: u32,
     peek: Option<GTok>,
     bad: Option<String>,
+    /// The body of a `new T(name) { … }` the expression parser just read,
+    /// for the statement parser to pick up.
+    new_body: Option<Vec<Stmt>>,
 }
 
 #[derive(Clone)]
@@ -2961,6 +3072,7 @@ impl<'a> Gs2<'a> {
             line: 1,
             peek: None,
             bad: None,
+            new_body: None,
         }
     }
 
@@ -2968,13 +3080,25 @@ impl<'a> Gs2<'a> {
         matches!(self.peek_tok(), GTok::Eof)
     }
 
+    /// A name with dots in it: `Obj.onAction` as a function name (an event
+    /// of a GUI control, kept whole as the function's name as the Preagonal
+    /// baselines do) or `temp.x` as a parameter.
+    fn dotted_ident(&mut self) -> Result<String, CompileErrors> {
+        let mut name = self.ident()?;
+        while self.eat(".") {
+            name.push('.');
+            name.push_str(&self.ident()?);
+        }
+        Ok(name)
+    }
+
     fn function(&mut self) -> Result<Item, CompileErrors> {
-        let name = self.ident()?;
+        let name = self.dotted_ident()?;
         self.expect("(")?;
         let mut params = Vec::new();
         if !self.eat(")") {
             loop {
-                params.push(self.ident()?);
+                params.push(self.dotted_ident()?);
                 if !self.eat(",") {
                     break;
                 }
@@ -3072,6 +3196,28 @@ impl<'a> Gs2<'a> {
             return Ok(Stmt::IncDec { target, delta });
         }
         let e = self.expr()?;
+        if let Some(body) = self.new_body.take() {
+            return match e {
+                Expr::Gs2(g) => match *g {
+                    Gs2Expr::New { ty, mut args } if args.len() == 1 => {
+                        self.eat(";");
+                        Ok(Stmt::Gs2(Box::new(Gs2Stmt::NewBlock {
+                            ty,
+                            name: args.remove(0),
+                            body,
+                        })))
+                    }
+                    _ => Err(CompileErrors::one(
+                        self.line,
+                        "`new T(name) { … }` needs one name and must stand alone",
+                    )),
+                },
+                _ => Err(CompileErrors::one(
+                    self.line,
+                    "`new T(name) { … }` used as a value is not lowered",
+                )),
+            };
+        }
         if let Expr::Var(v) = &e {
             if self.eat("++") {
                 self.expect(";")?;
@@ -3088,7 +3234,19 @@ impl<'a> Gs2<'a> {
                 });
             }
             if let Some(op) = self.assign_op() {
-                let value = self.expr()?;
+                let mut value = self.expr()?;
+                if op == AssignOp::Set && matches!(value, Expr::Var(_)) && self.sees("=") {
+                    let mut targets = vec![v.clone()];
+                    while let Expr::Var(t) = &value {
+                        if !self.eat("=") {
+                            break;
+                        }
+                        targets.push(t.clone());
+                        value = self.expr()?;
+                    }
+                    self.expect(";")?;
+                    return Ok(Stmt::Gs2(Box::new(Gs2Stmt::Chain { targets, value })));
+                }
                 self.expect(";")?;
                 return Ok(Stmt::Assign {
                     target: v.clone(),
@@ -3134,6 +3292,9 @@ impl<'a> Gs2<'a> {
         let then = Box::new(self.stmt()?);
         let els = if self.eat_id("else") {
             Some(Box::new(self.stmt()?))
+        } else if self.eat_id("elseif") {
+            // `elseif (c) s` is `else if (c) s`.
+            Some(Box::new(self.if_stmt()?))
         } else {
             None
         };
@@ -3478,11 +3639,9 @@ impl<'a> Gs2<'a> {
                 } else {
                     Vec::new()
                 };
-                if self.sees("{") {
-                    return Err(CompileErrors::one(
-                        self.line,
-                        "`new T(name) { … }` blocks are not in this temporary GS2 compiler",
-                    ));
+                if self.eat("{") {
+                    let body = self.block_body()?;
+                    self.new_body = Some(body);
                 }
                 Ok(Expr::Gs2(Box::new(Gs2Expr::New { ty, args })))
             }
