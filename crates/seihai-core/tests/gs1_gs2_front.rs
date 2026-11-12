@@ -654,13 +654,12 @@ fn element_forms_without_a_fixture_stay_errors() {
             "{source}: {error}"
         );
     }
+    // A field or a second index after an index is a GS2 postfix form: the
+    // element, then `OP_MEMBER_ACCESS` or another `OP_ARRAY` (no fixture).
     for stmt in ["this.x = npcs[0].x;", "this.x = this.a[0][1];"] {
         let source = format!("function onCreated() {{ {stmt} }}");
-        let error = compile::compile_gs2(&source).unwrap_err().to_string();
-        assert!(
-            error.contains("only `a[i]` and `a[i, j]`"),
-            "{source}: {error}"
-        );
+        let got = compile::compile_gs2(&source).unwrap();
+        assert!(got.disassemble().contains("OP_ARRAY"), "{source}");
     }
 }
 
@@ -947,4 +946,74 @@ fn gs1_join_lowers_to_the_gs2_join_call() {
     assert_eq!(ops(&got), ops(&want));
     assert_eq!(got.strings, want.strings);
     assert_eq!(got.write(), want.write());
+}
+
+fn fixture_source(name: &str) -> String {
+    std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/gs2")
+            .join(format!("{name}.gs2")),
+    )
+    .unwrap()
+}
+
+#[test]
+fn gs2_front_end_matches_six_fixtures() {
+    for name in ["shared", "timers", "strings", "lists", "rest", "objects"] {
+        let got =
+            compile::compile_gs2(&fixture_source(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let bytes = fixture(&format!("{name}.gs2bc"));
+        let want = Script::parse(&bytes).unwrap();
+        assert_eq!(got.disassemble(), want.disassemble(), "{name}");
+        assert_eq!(got.strings, want.strings, "{name}");
+        // `timers.gs2bc` lists its functions in another order; the bytes
+        // match everywhere else.
+        if name != "timers" {
+            assert_eq!(got.write(), bytes, "{name}");
+        }
+    }
+}
+
+/// The two fixtures Seihai does not copy exactly: each differs by one
+/// instruction, on purpose (see `switch_stmt` and the if-body call).
+#[test]
+fn gs2_front_end_differs_from_two_fixtures_by_one_deliberate_instruction() {
+    for (name, extra) in [("control", Op::SetIndex), ("calls", Op::IndexDec)] {
+        let got = compile::compile_gs2(&fixture_source(name)).unwrap();
+        let want = Script::parse(&fixture(&format!("{name}.gs2bc"))).unwrap();
+        let (g, w) = (ops(&got), ops(&want));
+        assert_eq!(g.len(), w.len() + 1, "{name}");
+        let at = g.iter().zip(&w).position(|(a, b)| a != b).unwrap();
+        assert_eq!(g[at], extra.to_string(), "{name}");
+        assert_eq!(g[..at], w[..at], "{name}");
+        assert_eq!(g[at + 1..], w[at..], "{name}");
+        assert_eq!(got.strings, want.strings, "{name}");
+    }
+}
+
+#[test]
+fn gs2_switch_default_without_break_leaves_the_switch() {
+    let src = "function onCreated() {\n  switch (this.n) {\n    case 1: this.a = 1; break;\n    default: this.a = 2;\n  }\n  this.done = 1;\n}\n";
+    let mut m = Machine::new(compile::compile_gs2(src).unwrap());
+    let mut h = EffectHost::new(Era::V21, 1);
+    assert_eq!(m.run_top_level(&mut h), Outcome::Done);
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    assert_eq!(m.var(Root::This, "a"), Some(&Val::Num(2.0)));
+    assert_eq!(m.var(Root::This, "done"), Some(&Val::Num(1.0)));
+}
+
+#[test]
+fn gs2_corpus_shapes_compile() {
+    for src in [
+        "public function f(a) { return a; }\nfunction onCreated() this.x = f(1);\n",
+        "function onCreated() { temp.s = \"a\" SPC \"b\" NL \"c\" TAB \"d\"; temp.s @= \"e\"; }",
+        "function onCreated() { temp.p = findplayer(\"x\").account; findplayer(\"x\").say2(\"hi\"); }",
+        "function onCreated() { temp.l = {1, 2}; temp.y = temp.l[1].y; }",
+        "function onCreated() { for (temp.v : {1, 2}) echo(temp.v); ++this.n; --this.n; }",
+        "function onCreated() { temp.w = new GuiWindowCtrl(\"W\"); temp.k = temp.n in {1, 2}; }",
+        "function onCreated() { temp.q = this.n > 0 ? \"y\" : \"n\"; temp.e = \"say \\\"hi\\\"\"; }",
+        "this.loaded = 1;\nif (created) setTimer(1);\nfunction onTimeout() { this.k = 1 << 3; }\n",
+    ] {
+        compile::compile_gs2(src).unwrap_or_else(|e| panic!("{src}\n{e}"));
+    }
 }

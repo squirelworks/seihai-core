@@ -107,6 +107,91 @@ pub enum Expr {
     /// `{a,b,c}`, the right side of an assignment (2.1 and later): fills
     /// the variable as an array.
     List(Vec<Expr>),
+    /// A GS2-only form. The GS1 grammar never builds one.
+    Gs2(Box<Gs2Expr>),
+}
+
+/// Expression forms only the GS2 front end builds
+/// (`scripting::gs2::compile`).
+#[derive(Debug, Clone, PartialEq)]
+pub enum Gs2Expr {
+    /// `obj.name(args)`: a built-in method or a call on an object.
+    Method {
+        obj: Expr,
+        name: String,
+        args: Vec<Expr>,
+    },
+    /// `obj.name` where `obj` is not a plain dotted name (a call, an index).
+    Member { obj: Expr, name: String },
+    /// `obj[i]` or `obj[i, j]` where `obj` is not a plain dotted name.
+    Index { obj: Expr, index: Vec<Expr> },
+    /// `new Type(args)`.
+    New { ty: String, args: Vec<Expr> },
+    /// `new[n]`, `new[n][m]`.
+    NewArray(Vec<Expr>),
+    /// `a << b`, `a >> b`.
+    Shift { left: bool, a: Expr, b: Expr },
+}
+
+impl Gs2Expr {
+    /// The expressions directly inside this one, in source order.
+    pub fn parts(&self) -> Vec<&Expr> {
+        match self {
+            Gs2Expr::Method { obj, args, .. } => std::iter::once(obj).chain(args).collect(),
+            Gs2Expr::Member { obj, .. } => vec![obj],
+            Gs2Expr::Index { obj, index } => std::iter::once(obj).chain(index).collect(),
+            Gs2Expr::New { args, .. } => args.iter().collect(),
+            Gs2Expr::NewArray(dims) => dims.iter().collect(),
+            Gs2Expr::Shift { a, b, .. } => vec![a, b],
+        }
+    }
+
+    /// The form may run script or host code (a method or `new`).
+    pub fn calls(&self) -> bool {
+        matches!(self, Gs2Expr::Method { .. } | Gs2Expr::New { .. })
+    }
+}
+
+impl Gs2Stmt {
+    /// The statements directly inside this one.
+    pub fn bodies(&self) -> Vec<&Stmt> {
+        match self {
+            Gs2Stmt::Switch { arms, .. } => arms.iter().flat_map(|a| a.body.iter()).collect(),
+            Gs2Stmt::ForEach { body, .. } => vec![body],
+            Gs2Stmt::Eval(_) => Vec::new(),
+        }
+    }
+
+    /// The expressions directly inside this one (not in its bodies).
+    pub fn exprs(&self) -> Vec<&Expr> {
+        match self {
+            Gs2Stmt::Switch { value, arms } => std::iter::once(value)
+                .chain(arms.iter().flat_map(|a| a.values.iter()))
+                .collect(),
+            Gs2Stmt::ForEach { list, .. } => vec![list],
+            Gs2Stmt::Eval(e) => vec![e],
+        }
+    }
+}
+
+/// One arm of a GS2 `switch`: `case` values (empty for `default`) and the
+/// statements up to the next arm.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SwitchArm {
+    pub values: Vec<Expr>,
+    pub default: bool,
+    pub body: Vec<Stmt>,
+}
+
+/// Statement forms only the GS2 front end builds.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Gs2Stmt {
+    /// `switch (value) { case …: … default: … }`.
+    Switch { value: Expr, arms: Vec<SwitchArm> },
+    /// `for (var : list) body`.
+    ForEach { var: VarRef, list: Expr, body: Stmt },
+    /// An expression used as a statement (`obj.method(…);`).
+    Eval(Expr),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -199,6 +284,8 @@ pub enum Stmt {
         reason: &'static str,
         line: u32,
     },
+    /// A GS2-only statement. The GS1 grammar never builds one.
+    Gs2(Box<Gs2Stmt>),
 }
 
 /// A problem found while parsing. The script still runs.
@@ -277,6 +364,7 @@ impl fmt::Display for Expr {
                 }
                 write!(f, ")")
             }
+            Expr::Gs2(g) => write!(f, "(gs2 {g:?})"),
         }
     }
 }
@@ -349,6 +437,7 @@ impl fmt::Display for Stmt {
             Stmt::Unknown {
                 name, raw, reason, ..
             } => write!(f, "(unknown {name} {raw:?} {reason})"),
+            Stmt::Gs2(g) => write!(f, "(gs2 {g:?})"),
         }
     }
 }

@@ -34,6 +34,16 @@
 //! gs2-parser's own encoding). A field after an index (`npcs[i].x`), three or
 //! more indexes and the `board`/`tiles` arrays have no fixture and stay
 //! compile errors.
+//!
+//! The GS2 front end takes code outside functions (emitted where it stands,
+//! so it runs from op 0 with the function bodies jumped over), `public
+//! function`, a one-statement function body, method calls and members on any
+//! value, `SPC`/`NL`/`TAB`, `?:`, `<<`/`>>`, `in |a, b|` and `in {a, b}`,
+//! `switch`, `for (x : list)`, `new T(…)`, `new[n][m]`, `++x`, `@=` and
+//! string escapes. Six of the eight fixtures compile to the same bytecode;
+//! `control` and `calls` differ by one instruction each on purpose (a jump
+//! out after the last `switch` arm, and popping a call's value when it is an
+//! `if` body without braces).
 
 use super::{Function, Instr, Op, Operand, Script};
 use crate::scripting::engine::ast::*;
@@ -452,6 +462,7 @@ fn contains_event(e: &Expr, era: Era) -> bool {
             contains_event(e, era) || list.iter().any(|a| contains_event(a, era))
         }
         Expr::List(list) => list.iter().any(|a| contains_event(a, era)),
+        Expr::Gs2(g) => g.parts().into_iter().any(|a| contains_event(a, era)),
         Expr::Cond { cond, then, els } => {
             contains_event(cond, era) || contains_event(then, era) || contains_event(els, era)
         }
@@ -514,10 +525,34 @@ fn event_var(e: &Expr, era: Era) -> Option<String> {
     }
 }
 
+/// One piece of a script in source order: a function, or (`top`) code
+/// outside any function, which is emitted where it stands so it runs from
+/// op 0 with the function bodies jumped over.
 struct Item {
     name: String,
     params: Vec<String>,
     body: Vec<Stmt>,
+    top: bool,
+}
+
+impl Item {
+    fn func(name: String, params: Vec<String>, body: Vec<Stmt>) -> Item {
+        Item {
+            name,
+            params,
+            body,
+            top: false,
+        }
+    }
+
+    fn top(body: Vec<Stmt>) -> Item {
+        Item {
+            name: String::new(),
+            params: Vec::new(),
+            body,
+            top: true,
+        }
+    }
 }
 
 /// Compile GS1 with the engine grammar and lower it to GS2 bytecode.
@@ -571,7 +606,7 @@ fn lift_gs1(body: Vec<Stmt>, era: Era) -> Result<Vec<Item>, CompileErrors> {
     let mut errors = Vec::new();
     for stmt in body {
         match stmt {
-            Stmt::Function { name, params, body } => items.push(Item { name, params, body }),
+            Stmt::Function { name, params, body } => items.push(Item::func(name, params, body)),
             Stmt::If { cond, then, els } => match event_arms(&cond, era) {
                 Arms::NotEvent => errors.push(CompileError {
                     line: 0,
@@ -613,7 +648,7 @@ fn lift_gs1(body: Vec<Stmt>, era: Era) -> Result<Vec<Item>, CompileErrors> {
                             items[at].body.extend(body);
                         } else {
                             event_items.insert(name.clone(), items.len());
-                            items.push(Item { name, params: Vec::new(), body });
+                            items.push(Item::func(name, Vec::new(), body));
                         }
                     }
                 }
@@ -676,7 +711,7 @@ struct Builder {
 fn emit_items(items: &[Item], gs1: bool, era: Era) -> Result<Built, CompileErrors> {
     let mut seen = HashMap::<String, ()>::new();
     let mut errors = Vec::new();
-    for item in items {
+    for item in items.iter().filter(|i| !i.top) {
         if seen.insert(item.name.clone(), ()).is_some() {
             errors.push(CompileError {
                 line: 0,
@@ -700,7 +735,20 @@ fn emit_items(items: &[Item], gs1: bool, era: Era) -> Result<Built, CompileError
         line: 0,
     };
     for item in items {
-        b.function(item);
+        if item.top {
+            // The skips over earlier functions land here, so code after a
+            // function still runs in source order. With no code after the
+            // last function they stay aimed at the end, as in the fixtures.
+            let here = b.here();
+            for skip in std::mem::take(&mut b.skips) {
+                b.patch(skip, here);
+            }
+            for s in &item.body {
+                b.stmt(s);
+            }
+        } else {
+            b.function(item);
+        }
     }
     b.op(Op::Ret);
     let end = b.here();
@@ -875,6 +923,10 @@ impl Builder {
             }
             Stmt::IncDec { target, .. } => self.index_has_call(target),
             Stmt::Break | Stmt::Continue | Stmt::Unknown { .. } => false,
+            Stmt::Gs2(g) => {
+                g.exprs().into_iter().any(|e| self.expr_has_call(e))
+                    || g.bodies().into_iter().any(|s| self.stmt_has_call(s))
+            }
         }
     }
 
@@ -937,12 +989,18 @@ impl Builder {
                 self.expr_has_call(cond) || self.expr_has_call(then) || self.expr_has_call(els)
             }
             Expr::List(v) => v.iter().any(|a| self.expr_has_call(a)),
+            Expr::Gs2(g) => g.calls() || g.parts().into_iter().any(|a| self.expr_has_call(a)),
             Expr::Var(v) => self.index_has_call(v),
             Expr::Num(_) | Expr::Str(_) => false,
         }
     }
 
     fn name_is_call(&self, name: &str) -> bool {
+        // `objects.gs2bc`: a body whose only call is `format` still gets
+        // `OP_CMD_CALL`.
+        if name == "format" {
+            return true;
+        }
         if opcode_builtin(name).is_some() {
             return false;
         }
@@ -1035,6 +1093,265 @@ impl Builder {
             } => {
                 self.line = *line;
                 self.err(format!("`{name}` cannot be lowered ({reason})"));
+            }
+            Stmt::Gs2(g) => self.gs2_stmt(g),
+        }
+    }
+
+    fn gs2_stmt(&mut self, g: &Gs2Stmt) {
+        match g {
+            Gs2Stmt::Eval(e) => {
+                if let Expr::Gs2(m) = e {
+                    if let Gs2Expr::Method { obj, name, args } = m.as_ref() {
+                        if self.method(obj, name, args) {
+                            self.op(Op::IndexDec);
+                        }
+                        return;
+                    }
+                }
+                self.value(e);
+                self.op(Op::IndexDec);
+            }
+            Gs2Stmt::ForEach { var, list, body } => self.foreach_stmt(var, list, body),
+            Gs2Stmt::Switch { value, arms } => self.switch_stmt(value, arms),
+        }
+    }
+
+    /// `for (v : list)` as in `lists.gs2bc`: the variable, the list as an
+    /// object and a counter 0 stay on the stack; `OP_FOREACH` writes the next
+    /// element or jumps out, `OP_INC` steps the counter, and one
+    /// `OP_INDEX_DEC` follows the loop. A `continue` goes to the `OP_INC`.
+    fn foreach_stmt(&mut self, var: &VarRef, list: &Expr, body: &Stmt) {
+        if !var.index.is_empty() {
+            self.err("a for-each variable must be a plain name");
+            return;
+        }
+        self.place(&var.name);
+        self.value(list);
+        self.op(Op::ConvToObject);
+        self.emit_int(0);
+        let top = self.hole(Op::ForEach);
+        self.op(Op::CmdCall);
+        self.loops.push(Loop {
+            continues: Vec::new(),
+            breaks: Vec::new(),
+        });
+        self.stmt(body);
+        let frame = self.loops.pop().unwrap();
+        let step = self.here();
+        for c in frame.continues {
+            self.patch(c, step);
+        }
+        self.op(Op::Inc);
+        self.jump(Op::SetIndex, top);
+        let end = self.here();
+        self.patch(top, end);
+        for b in frame.breaks {
+            self.patch(b, end);
+        }
+        self.op(Op::IndexDec);
+    }
+
+    /// `switch` as in `control.gs2bc`: a jump to the tests, the arm bodies in
+    /// source order (falling through), then the value, one
+    /// `OP_COPY_LAST_OP`, case value, `OP_EQ`, `OP_SET_INDEX_TRUE` per case,
+    /// a jump to `default` (or out), and one `OP_INDEX_DEC` that drops the
+    /// value. `break` goes to that `OP_INDEX_DEC`.
+    ///
+    /// Seihai adds one jump out after the last body. Without it a last arm
+    /// that does not `break` would run on into the tests again; the fixture's
+    /// `default` arm does that.
+    fn switch_stmt(&mut self, value: &Expr, arms: &[SwitchArm]) {
+        let to_tests = self.hole(Op::SetIndex);
+        self.loops.push(Loop {
+            continues: Vec::new(),
+            breaks: Vec::new(),
+        });
+        let mut starts = Vec::new();
+        for arm in arms {
+            starts.push(self.here());
+            for s in &arm.body {
+                self.stmt(s);
+            }
+        }
+        let falls_off = arms
+            .last()
+            .is_some_and(|a| !matches!(a.body.last(), Some(Stmt::Break | Stmt::Return(_))));
+        let out = falls_off.then(|| self.hole(Op::SetIndex));
+        let frame = self.loops.pop().unwrap();
+        self.patch(to_tests, self.here());
+        self.value(value);
+        for (arm, &start) in arms.iter().zip(&starts) {
+            for v in &arm.values {
+                self.op(Op::CopyLastOp);
+                self.value(v);
+                self.op(Op::Eq);
+                self.jump(Op::SetIndexTrue, start);
+            }
+        }
+        let default = arms
+            .iter()
+            .zip(&starts)
+            .find(|(a, _)| a.default)
+            .map(|(_, &s)| s);
+        let to_default = self.hole(Op::SetIndex);
+        let end = self.here();
+        self.patch(to_default, default.unwrap_or(end));
+        self.op(Op::IndexDec);
+        for b in frame.breaks.into_iter().chain(out) {
+            self.patch(b, end);
+        }
+        if !frame.continues.is_empty() {
+            match self.loops.last_mut() {
+                Some(outer) => outer.continues.extend(frame.continues),
+                None => self.err("`continue` outside a loop"),
+            }
+        }
+    }
+
+    /// A method call `obj.name(args)`. The built-in methods use the opcodes
+    /// and operand orders in `strings.gs2bc`, `lists.gs2bc` and
+    /// `rest.gs2bc`; any other name is a call on the object
+    /// (`objects.gs2bc`: the arguments reversed, the object, the name,
+    /// `OP_MEMBER_ACCESS`, `OP_CALL`). Returns whether a value was pushed.
+    fn method(&mut self, obj: &Expr, name: &str, args: &[Expr]) -> bool {
+        let lower = name.to_ascii_lowercase();
+        let n = args.len();
+        let string_op = match (lower.as_str(), n) {
+            ("trim", 0) => Some(Op::ObjTrim),
+            ("length", 0) => Some(Op::ObjLength),
+            ("pos", 1) => Some(Op::ObjPos),
+            ("charat", 1) => Some(Op::ObjCharAt),
+            ("substring", 1 | 2) => Some(Op::ObjSubstr),
+            ("starts", 1) => Some(Op::ObjStarts),
+            ("ends", 1) => Some(Op::ObjEnds),
+            ("positions", 1) => Some(Op::ObjPositions),
+            ("tokenize", 0 | 1) => Some(Op::ObjTokenize),
+            _ => None,
+        };
+        if let Some(op) = string_op {
+            // `lists.gs2bc` converts even a string literal.
+            self.value(obj);
+            self.op(Op::ConvToString);
+            for a in args {
+                self.value(a);
+            }
+            if op == Op::ObjTokenize && n == 0 {
+                self.emit_str(" ,");
+            }
+            self.op(op);
+            return true;
+        }
+        // List methods: the object as an object, then the operands. The
+        // two-operand ones push the value before the index.
+        let list_op = match (lower.as_str(), n) {
+            ("size", 0) => Some((Op::ObjSize, true)),
+            ("type", 0) => Some((Op::ObjType, true)),
+            ("clear", 0) => Some((Op::ObjClear, false)),
+            ("index", 1) => Some((Op::ObjIndex, true)),
+            ("add", 1) => Some((Op::ObjAddString, false)),
+            ("delete", 1) => Some((Op::ObjDeleteString, false)),
+            ("remove", 1) => Some((Op::ObjRemoveString, false)),
+            ("insert", 2) => Some((Op::ObjInsertString, false)),
+            ("replace", 2) => Some((Op::ObjReplaceString, false)),
+            ("subarray", 1 | 2) => Some((Op::ObjSubarray, true)),
+            _ => None,
+        };
+        if let Some((op, pushes)) = list_op {
+            self.value(obj);
+            self.op(Op::ConvToObject);
+            if matches!(op, Op::ObjInsertString | Op::ObjReplaceString) {
+                self.value(&args[1]);
+                self.value(&args[0]);
+            } else {
+                for a in args {
+                    self.value(a);
+                }
+            }
+            self.op(op);
+            return pushes;
+        }
+        if lower == "indices" && n == 1 {
+            self.value(&args[0]);
+            self.value(obj);
+            self.op(Op::ObjIndices);
+            return true;
+        }
+        self.op(Op::TypeArray);
+        for a in args.iter().rev() {
+            self.value(a);
+        }
+        self.value(obj);
+        self.emit_var(name);
+        self.op(Op::MemberAccess);
+        self.op(Op::Call);
+        true
+    }
+
+    fn gs2_value(&mut self, g: &Gs2Expr) -> Kind {
+        match g {
+            Gs2Expr::Method { obj, name, args } => {
+                if !self.method(obj, name, args) {
+                    // A list method that leaves nothing, used as a value.
+                    self.op(Op::TypeNull);
+                }
+                Kind::Other
+            }
+            Gs2Expr::Member { obj, name } => {
+                self.value(obj);
+                self.emit_var(name);
+                self.op(Op::MemberAccess);
+                Kind::Other
+            }
+            Gs2Expr::Index { obj, index } => {
+                self.value(obj);
+                self.op(Op::ConvToObject);
+                for i in index {
+                    self.value(i);
+                }
+                self.op(if index.len() == 1 {
+                    Op::Array
+                } else {
+                    Op::ArrayMultidim
+                });
+                Kind::Other
+            }
+            // `objects.gs2bc`: `new TStaticVar()` pushes the name
+            // "unknown_object", the type, then `OP_NEW_OBJECT`. The type is
+            // interned first. With an argument, Seihai pushes it in place of
+            // the default name (no fixture).
+            Gs2Expr::New { ty, args } => {
+                let t = self.intern(ty);
+                match args.first() {
+                    Some(a) => {
+                        self.value(a);
+                    }
+                    None => self.emit_var("unknown_object"),
+                }
+                self.code.push(Instr {
+                    op: Op::TypeString,
+                    operand: Operand::Str(t),
+                    offset: 0,
+                });
+                self.op(Op::NewObject);
+                Kind::Other
+            }
+            Gs2Expr::NewArray(dims) => {
+                for (i, d) in dims.iter().enumerate() {
+                    self.value(d);
+                    self.op(if i == 0 {
+                        Op::ArrayNew
+                    } else {
+                        Op::ArrayNewMultidim
+                    });
+                }
+                Kind::Other
+            }
+            Gs2Expr::Shift { left, a, b } => {
+                self.numeric(a);
+                self.numeric(b);
+                self.op(if *left { Op::ShiftLeft } else { Op::ShiftRight });
+                Kind::Number
             }
         }
     }
@@ -1405,8 +1722,23 @@ impl Builder {
                 self.op(Op::Int);
                 true
             }
+            // `rest.gs2bc`: `getangle(1, -1)` and `getdir(-3, 1)` push their
+            // operands in source order; the others are reversed.
+            "getangle" | "getdir" => {
+                for a in args {
+                    self.numeric(a);
+                }
+                self.op(opcode_builtin(name).unwrap());
+                true
+            }
+            // `strings.gs2bc`: `_("text")` is the text, then `OP_TRANSLATE`.
+            "_" if !self.gs1 && args.len() == 1 => {
+                self.value(&args[0]);
+                self.op(Op::Translate);
+                true
+            }
             "sin" | "cos" | "arctan" | "abs" | "random" | "exp" | "log" | "min" | "max" | "pow"
-            | "char" | "getangle" | "getdir" | "vecx" | "vecy" | "waitfor" | "makevar" => {
+            | "char" | "vecx" | "vecy" | "waitfor" | "makevar" => {
                 for a in args.iter().rev() {
                     self.numeric(a);
                 }
@@ -1587,10 +1919,18 @@ impl Builder {
                     Kind::Other
                 }
             }
-            Expr::InList { .. } if !self.gs1 => {
-                self.err("`in {list}` is not lowered by this temporary front end");
-                self.emit_int(0);
-                Kind::Number
+            // GS2 `x in {a, b}`: like `x in arr` in `lists.gs2bc`, with the
+            // literal as the array. Seihai's encoding, no fixture.
+            Expr::InList { e, list } if !self.gs1 => {
+                self.value(e);
+                self.op(Op::TypeArray);
+                for v in list.iter().rev() {
+                    self.value(v);
+                }
+                self.op(Op::ArrayEnd);
+                self.op(Op::ConvToObject);
+                self.op(Op::InObj);
+                Kind::Other
             }
             Expr::InList { e, list } => {
                 // GS1 `x in {a, b, c}` reads x, then each item left to right
@@ -1621,6 +1961,7 @@ impl Builder {
                 self.op(Op::InObj);
                 Kind::Other
             }
+            Expr::Gs2(g) => self.gs2_value(g),
             Expr::List(values) => {
                 if self.gs1 {
                     if let Some(problem) = self.gs1_list_problem(values) {
@@ -1864,6 +2205,7 @@ fn with_escape(s: &Stmt, in_loop: bool) -> Option<&'static str> {
         }
         Stmt::IncDec { target, .. } => target.index.iter().any(expr_waits).then_some(blocked),
         Stmt::Function { .. } | Stmt::Unknown { .. } => None,
+        Stmt::Gs2(_) => Some(blocked),
     }
 }
 
@@ -1953,6 +2295,10 @@ fn stmt_names(s: &Stmt, f: &mut dyn FnMut(&str, bool)) {
             }
         }),
         Stmt::Function { .. } | Stmt::Break | Stmt::Continue | Stmt::Unknown { .. } => {}
+        Stmt::Gs2(g) => {
+            g.exprs().into_iter().for_each(|e| expr_names(e, f));
+            g.bodies().into_iter().for_each(|s| stmt_names(s, f));
+        }
     }
 }
 
@@ -1987,6 +2333,7 @@ fn expr_names(e: &Expr, f: &mut dyn FnMut(&str, bool)) {
             expr_names(then, f);
             expr_names(els, f);
         }
+        Expr::Gs2(g) => g.parts().into_iter().for_each(|e| expr_names(e, f)),
     }
 }
 
@@ -2030,6 +2377,7 @@ fn has_nested_list(e: &Expr) -> bool {
         Expr::Cond { cond, then, els } => {
             has_nested_list(cond) || has_nested_list(then) || has_nested_list(els)
         }
+        Expr::Gs2(g) => g.parts().into_iter().any(has_nested_list),
     }
 }
 
@@ -2046,6 +2394,7 @@ fn mentions_call(e: &Expr, name: &str) -> bool {
         Expr::InList { e, list } => m(e) || list.iter().any(m),
         Expr::Cond { cond, then, els } => m(cond) || m(then) || m(els),
         Expr::List(v) => v.iter().any(m),
+        Expr::Gs2(g) => g.parts().into_iter().any(m),
     }
 }
 
@@ -2110,13 +2459,29 @@ fn parse_gs2(src: &str) -> Result<Vec<Item>, CompileErrors> {
         if p.eof() {
             break;
         }
-        if !p.eat_id("function") {
+        let public = p.eat_id("public");
+        if p.eat_id("function") {
+            let mut item = p.function()?;
+            if public {
+                item.name = format!("public.{}", item.name);
+            }
+            items.push(item);
+            continue;
+        }
+        if public {
             return Err(CompileErrors::one(
                 p.line,
-                "only functions are accepted by this temporary GS2 compiler",
+                "expected `function` after `public`",
             ));
         }
-        items.push(p.function()?);
+        let s = p.stmt()?;
+        if let Some(message) = p.bad.take() {
+            return Err(CompileErrors::one(p.line, message));
+        }
+        match items.last_mut() {
+            Some(last) if last.top => last.body.push(s),
+            _ => items.push(Item::top(vec![s])),
+        }
     }
     Ok(items)
 }
@@ -2166,12 +2531,16 @@ impl<'a> Gs2<'a> {
             }
             self.expect(")")?;
         }
-        self.expect("{")?;
-        let body = self.block_body()?;
+        // A body without braces is one statement (`function f() g();`).
+        let body = if self.eat("{") {
+            self.block_body()?
+        } else {
+            vec![self.stmt()?]
+        };
         if let Some(message) = self.bad.take() {
             return Err(CompileErrors::one(self.line, message));
         }
-        Ok(Item { name, params, body })
+        Ok(Item::func(name, params, body))
     }
 
     fn block_body(&mut self) -> Result<Vec<Stmt>, CompileErrors> {
@@ -2230,11 +2599,27 @@ impl<'a> Gs2<'a> {
             let body = Box::new(self.stmt()?);
             return Ok(Stmt::With { target, body, line });
         }
-        if self.eat_id("switch") || self.eat_id("new") || self.eat_id("public") {
+        if self.eat_id("switch") {
+            return self.switch_stmt();
+        }
+        if self.eat_id("public") || self.eat_id("enum") || self.eat_id("const") {
             return Err(CompileErrors::one(
                 self.line,
                 "that statement is not in this temporary GS2 compiler",
             ));
+        }
+        if self.sees("++") || self.sees("--") {
+            let delta = if self.eat("++") {
+                1.0
+            } else {
+                self.bump();
+                -1.0
+            };
+            let Expr::Var(target) = self.unary()? else {
+                return Err(CompileErrors::one(self.line, "`++`/`--` needs a variable"));
+            };
+            self.expect(";")?;
+            return Ok(Stmt::IncDec { target, delta });
         }
         let e = self.expr()?;
         if let Expr::Var(v) = &e {
@@ -2261,10 +2646,23 @@ impl<'a> Gs2<'a> {
                     value,
                 });
             }
+            // `a @= b` is `a = a @ b` here (Seihai's reading, no fixture).
+            if self.eat("@=") {
+                let value = self.expr()?;
+                self.expect(";")?;
+                return Ok(Stmt::Assign {
+                    target: v.clone(),
+                    op: AssignOp::Set,
+                    value: Expr::Bin(BinOp::Cat, Box::new(e.clone()), Box::new(value)),
+                });
+            }
         }
         self.expect(";")?;
         match e {
             Expr::Call { name, args } => Ok(Stmt::Call { name, args }),
+            Expr::Gs2(g) if matches!(g.as_ref(), Gs2Expr::Method { .. } | Gs2Expr::New { .. }) => {
+                Ok(Stmt::Gs2(Box::new(Gs2Stmt::Eval(Expr::Gs2(g)))))
+            }
             _ => Err(CompileErrors::one(
                 self.line,
                 "expression statement is not a call",
@@ -2295,16 +2693,23 @@ impl<'a> Gs2<'a> {
 
     fn for_stmt(&mut self) -> Result<Stmt, CompileErrors> {
         self.expect("(")?;
-        if self.sees(":") {
-            return Err(CompileErrors::one(
-                self.line,
-                "for-each is not in this temporary GS2 compiler",
-            ));
-        }
         let init = if self.eat(";") {
             None
         } else {
-            Some(Box::new(self.simple()?))
+            let first = self.expr()?;
+            if self.eat(":") {
+                let Expr::Var(var) = first else {
+                    return Err(CompileErrors::one(
+                        self.line,
+                        "a for-each variable must be a name",
+                    ));
+                };
+                let list = self.expr()?;
+                self.expect(")")?;
+                let body = self.stmt()?;
+                return Ok(Stmt::Gs2(Box::new(Gs2Stmt::ForEach { var, list, body })));
+            }
+            Some(Box::new(self.simple_from(first)?))
         };
         if init.is_some() {
             self.expect(";")?;
@@ -2336,6 +2741,10 @@ impl<'a> Gs2<'a> {
 
     fn simple(&mut self) -> Result<Stmt, CompileErrors> {
         let e = self.expr()?;
+        self.simple_from(e)
+    }
+
+    fn simple_from(&mut self, e: Expr) -> Result<Stmt, CompileErrors> {
         let Expr::Var(v) = e else {
             return Err(CompileErrors::one(
                 self.line,
@@ -2365,8 +2774,63 @@ impl<'a> Gs2<'a> {
         })
     }
 
+    fn switch_stmt(&mut self) -> Result<Stmt, CompileErrors> {
+        self.expect("(")?;
+        let value = self.expr()?;
+        self.expect(")")?;
+        self.expect("{")?;
+        let mut arms: Vec<SwitchArm> = Vec::new();
+        loop {
+            self.skip();
+            if self.eat("}") {
+                break;
+            }
+            if self.eat_id("case") {
+                let v = self.expr()?;
+                self.expect(":")?;
+                arms.push(SwitchArm {
+                    values: vec![v],
+                    default: false,
+                    body: Vec::new(),
+                });
+                continue;
+            }
+            if self.eat_id("default") {
+                self.expect(":")?;
+                arms.push(SwitchArm {
+                    values: Vec::new(),
+                    default: true,
+                    body: Vec::new(),
+                });
+                continue;
+            }
+            let s = self.stmt()?;
+            match arms.last_mut() {
+                Some(arm) => arm.body.push(s),
+                None => {
+                    return Err(CompileErrors::one(
+                        self.line,
+                        "a statement before the first `case`",
+                    ))
+                }
+            }
+        }
+        Ok(Stmt::Gs2(Box::new(Gs2Stmt::Switch { value, arms })))
+    }
+
     fn expr(&mut self) -> Result<Expr, CompileErrors> {
-        self.binary(1)
+        let cond = self.binary(1)?;
+        if self.eat("?") {
+            let then = self.expr()?;
+            self.expect(":")?;
+            let els = self.expr()?;
+            return Ok(Expr::Cond {
+                cond: Box::new(cond),
+                then: Box::new(then),
+                els: Box::new(els),
+            });
+        }
+        Ok(cond)
     }
 
     fn binary(&mut self, min: u8) -> Result<Expr, CompileErrors> {
@@ -2374,6 +2838,35 @@ impl<'a> Gs2<'a> {
         loop {
             // `x in arr`, at the equality level. Only a variable on the right.
             if min <= 6 && self.eat_id("in") {
+                if self.eat("|") {
+                    let lo = self.binary(4)?;
+                    self.expect(",")?;
+                    let hi = self.binary(4)?;
+                    self.expect("|")?;
+                    lhs = Expr::InRange {
+                        e: Box::new(lhs),
+                        lo: Box::new(lo),
+                        hi: Box::new(hi),
+                    };
+                    continue;
+                }
+                if self.eat("{") {
+                    let mut list = Vec::new();
+                    if !self.eat("}") {
+                        loop {
+                            list.push(self.expr()?);
+                            if !self.eat(",") {
+                                break;
+                            }
+                        }
+                        self.expect("}")?;
+                    }
+                    lhs = Expr::InList {
+                        e: Box::new(lhs),
+                        list,
+                    };
+                    continue;
+                }
                 let mut name = self.ident()?;
                 while self.eat(".") {
                     name.push('.');
@@ -2390,10 +2883,21 @@ impl<'a> Gs2<'a> {
             };
             self.bump();
             let rhs = self.binary(prec + 1)?;
+            if text == "<<" || text == ">>" {
+                lhs = Expr::Gs2(Box::new(Gs2Expr::Shift {
+                    left: text == "<<",
+                    a: lhs,
+                    b: rhs,
+                }));
+                continue;
+            }
             let op = match text {
                 "||" => BinOp::Or,
                 "&&" => BinOp::And,
                 "@" => BinOp::Cat,
+                "SPC" => BinOp::CatSpc,
+                "NL" => BinOp::CatNl,
+                "TAB" => BinOp::CatTab,
                 "==" => BinOp::Eq,
                 "!=" => BinOp::Ne,
                 "<" => BinOp::Lt,
@@ -2415,17 +2919,27 @@ impl<'a> Gs2<'a> {
 
     fn bin_op(&mut self, min: u8) -> Option<(BinOp, u8, &'static str)> {
         let tok = self.peek_tok();
-        let GTok::Op(text) = tok else { return None };
+        let text: &'static str = match tok {
+            GTok::Op(text) => text,
+            GTok::Id(id) if id == "SPC" => "SPC",
+            GTok::Id(id) if id == "NL" => "NL",
+            GTok::Id(id) if id == "TAB" => "TAB",
+            _ => return None,
+        };
         let (prec, op) = match text {
             "||" => (1, BinOp::Or),
             "&&" => (2, BinOp::And),
             "@" => (3, BinOp::Cat),
+            "SPC" => (3, BinOp::CatSpc),
+            "NL" => (3, BinOp::CatNl),
+            "TAB" => (3, BinOp::CatTab),
             "<" | "<=" => (4, if text == "<" { BinOp::Lt } else { BinOp::Le }),
             ">" | ">=" => (5, if text == ">" { BinOp::Gt } else { BinOp::Ge }),
             "==" | "!=" => (6, if text == "==" { BinOp::Eq } else { BinOp::Ne }),
-            "+" | "-" => (7, if text == "+" { BinOp::Add } else { BinOp::Sub }),
+            "<<" | ">>" => (7, BinOp::Mul),
+            "+" | "-" => (8, if text == "+" { BinOp::Add } else { BinOp::Sub }),
             "*" | "/" | "%" | "^" => (
-                8,
+                9,
                 match text {
                     "*" => BinOp::Mul,
                     "/" => BinOp::Div,
@@ -2455,17 +2969,90 @@ impl<'a> Gs2<'a> {
     }
 
     fn primary(&mut self) -> Result<Expr, CompileErrors> {
+        let e = self.atom()?;
+        self.postfix(e)
+    }
+
+    /// `.name`, `.name(args)` and `[i]` after a value that is not a plain
+    /// dotted name.
+    fn postfix(&mut self, mut e: Expr) -> Result<Expr, CompileErrors> {
+        loop {
+            if self.eat(".") {
+                let name = self.ident()?;
+                if self.eat("(") {
+                    let args = self.arg_list()?;
+                    e = Expr::Gs2(Box::new(Gs2Expr::Method { obj: e, name, args }));
+                } else {
+                    e = Expr::Gs2(Box::new(Gs2Expr::Member { obj: e, name }));
+                }
+            } else if self.sees("[") && !matches!(e, Expr::Num(_)) {
+                self.bump();
+                let mut index = Vec::new();
+                loop {
+                    index.push(self.expr()?);
+                    if !self.eat(",") {
+                        break;
+                    }
+                }
+                self.expect("]")?;
+                e = Expr::Gs2(Box::new(Gs2Expr::Index { obj: e, index }));
+            } else {
+                return Ok(e);
+            }
+        }
+    }
+
+    fn atom(&mut self) -> Result<Expr, CompileErrors> {
         match self.bump() {
             GTok::Num(n) => Ok(Expr::Num(n)),
             GTok::Str(s) => Ok(Expr::Str(s)),
+            GTok::Id(id) if id == "new" => {
+                if self.sees("[") {
+                    let mut dims = Vec::new();
+                    while self.eat("[") {
+                        dims.push(self.expr()?);
+                        self.expect("]")?;
+                    }
+                    return Ok(Expr::Gs2(Box::new(Gs2Expr::NewArray(dims))));
+                }
+                let ty = self.ident()?;
+                let args = if self.eat("(") {
+                    self.arg_list()?
+                } else {
+                    Vec::new()
+                };
+                if self.sees("{") {
+                    return Err(CompileErrors::one(
+                        self.line,
+                        "`new T(name) { … }` blocks are not in this temporary GS2 compiler",
+                    ));
+                }
+                Ok(Expr::Gs2(Box::new(Gs2Expr::New { ty, args })))
+            }
             GTok::Id(mut name) => {
                 if self.eat("(") {
                     let args = self.arg_list()?;
                     return Ok(Expr::Call { name, args });
                 }
-                while self.eat(".") {
+                while self.sees(".") {
+                    self.bump();
+                    let part = self.ident()?;
+                    if self.eat("(") {
+                        // `a.b.f(x)`: a method on the dotted name before it.
+                        let args = self.arg_list()?;
+                        let obj = Expr::Var(VarRef {
+                            name,
+                            index: Vec::new(),
+                            field_after_index: false,
+                        });
+                        return Ok(Expr::Gs2(Box::new(Gs2Expr::Method {
+                            obj,
+                            name: part,
+                            args,
+                        })));
+                    }
                     name.push('.');
-                    name.push_str(&self.ident()?);
+                    name.push_str(&part);
                 }
                 let mut index = Vec::new();
                 if self.eat("[") {
@@ -2477,17 +3064,10 @@ impl<'a> Gs2<'a> {
                     }
                     self.expect("]")?;
                 }
-                let field_after_index = !index.is_empty() && self.sees(".");
-                if field_after_index || self.sees("[") {
-                    return Err(CompileErrors::one(
-                        self.line,
-                        "only `a[i]` and `a[i, j]` are in this temporary GS2 compiler",
-                    ));
-                }
                 Ok(Expr::Var(VarRef {
                     name,
                     index,
-                    field_after_index,
+                    field_after_index: false,
                 }))
             }
             GTok::Op("(") => {
@@ -2630,23 +3210,32 @@ impl<'a> Gs2<'a> {
         let Some(&c) = self.b.get(self.i) else {
             return GTok::Eof;
         };
-        if c == b'"' {
-            let start = self.i + 1;
-            self.i = start;
-            while self.i < self.b.len() && self.b[self.i] != b'"' {
-                if self.b[self.i] == b'\\' {
-                    self.bad = Some("string escapes are not in this temporary compiler".into());
+        if c == b'"' || c == b'\'' {
+            // `\n`, `\t`, `\"`, `\'` and `\\` are unescaped here; any other
+            // escaped byte stands for itself. Seihai's reading, no fixture.
+            self.i += 1;
+            let mut text = Vec::new();
+            while self.i < self.b.len() && self.b[self.i] != c {
+                let mut ch = self.b[self.i];
+                if ch == b'\\' && self.i + 1 < self.b.len() {
+                    self.i += 1;
+                    ch = match self.b[self.i] {
+                        b'n' => b'\n',
+                        b't' => b'\t',
+                        b'r' => b'\r',
+                        other => other,
+                    };
                 }
-                if self.b[self.i] == b'\n' {
+                if ch == b'\n' {
                     self.line += 1;
                 }
+                text.push(ch);
                 self.i += 1;
             }
-            let text = String::from_utf8_lossy(&self.b[start..self.i]).into_owned();
             if self.i < self.b.len() {
                 self.i += 1;
             }
-            return GTok::Str(text);
+            return GTok::Str(String::from_utf8_lossy(&text).into_owned());
         }
         if c == b'0' && matches!(self.b.get(self.i + 1), Some(b'x' | b'X')) {
             self.i += 2;
@@ -2691,9 +3280,9 @@ impl<'a> Gs2<'a> {
             return GTok::Id(text);
         }
         const OPS: &[&str] = &[
-            "||", "&&", "==", "!=", "<=", ">=", "+=", "-=", "*=", "/=", ":=", "++", "--", "+", "-",
-            "*", "/", "%", "^", "=", "<", ">", "!", "(", ")", "{", "}", "[", "]", ",", ";", ".",
-            "@", "|", ":", "?",
+            "<<", ">>", "||", "&&", "==", "!=", "<=", ">=", "+=", "-=", "*=", "/=", "%=", "@=",
+            ":=", "++", "--", "+", "-", "*", "/", "%", "^", "=", "<", ">", "!", "(", ")", "{", "}",
+            "[", "]", ",", ";", ".", "@", "|", ":", "?",
         ];
         let rest = &self.b[self.i..];
         for op in OPS {
@@ -2703,7 +3292,7 @@ impl<'a> Gs2<'a> {
             }
         }
         self.i += 1;
-        GTok::Op("?")
+        GTok::Op("unknown character")
     }
 }
 
