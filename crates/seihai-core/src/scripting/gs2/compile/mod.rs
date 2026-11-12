@@ -32,7 +32,7 @@ mod lexer;
 mod parser;
 mod tables;
 
-pub use tables::{gs1_commands_without_gs2, gs2_event_function};
+pub use tables::{gs1_command_lowering, gs1_commands_without_gs2, gs2_event_function, Gs1Lowering};
 
 use super::Script;
 use crate::scripting::engine::{vocab, Era};

@@ -49,11 +49,11 @@ pub use list::{parse_list_reply, parse_svrlist, ListReply, ServerEntry};
 pub use profile::{
     by_label, profile, Basis, Blink, ChatFace, ChatText, CombatRules, DeathRules, Files, Health,
     HidePose, HudArt, IdSet, ItemDrops, Levels, ListKind, Listserver, LoginShape, Mannerisms,
-    PortStatus, PowerStore, Props, Protocol, PullRelease, ServerList, ShapeBasis, SwimStill, Ui,
-    VersionProfile, WindowPx, COMBAT_139, COMBAT_200, COMBAT_201, COMBAT_205, DEAD_LIST_PORT,
-    DEATH_139, DEATH_205, DEATH_21, DROPS_133, DROPS_138, DROPS_142, LEGACY_LIST_PORT,
-    LISTSERVER_HOST, MANNER_139, MANNER_141, MANNER_205, MANNER_222, PROFILES, SILENT_LIST_WAIT,
-    SUPPORTED_LIST_PORT,
+    PortStatus, PowerStore, Props, Protocol, PullRelease, Runs, Scripts, ServerList, ShapeBasis,
+    SwimStill, Ui, VersionProfile, WindowPx, COMBAT_139, COMBAT_200, COMBAT_201, COMBAT_205,
+    DEAD_LIST_PORT, DEATH_139, DEATH_205, DEATH_21, DROPS_133, DROPS_138, DROPS_142,
+    LEGACY_LIST_PORT, LISTSERVER_HOST, MANNER_139, MANNER_141, MANNER_205, MANNER_222, PROFILES,
+    SILENT_LIST_WAIT, SUPPORTED_LIST_PORT,
 };
 pub use props::{
     decode_pos_precise, encode_pos_classic, encode_pos_precise, parse_player_props,

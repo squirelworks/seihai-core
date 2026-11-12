@@ -42,8 +42,11 @@ pub(super) fn program(src: &str, era: Era) -> Result<Program, CompileErrors> {
                 .collect(),
         });
     }
+    let mut flags = Vec::new();
+    parsed.body.iter().for_each(|s| player_flags(s, &mut flags));
     let raw = lift(parsed.body, era)?;
     let mut lower = Lower {
+        flags,
         era,
         line: 0,
         errors: Vec::new(),
@@ -55,6 +58,7 @@ pub(super) fn program(src: &str, era: Era) -> Result<Program, CompileErrors> {
             })
             .collect(),
         with_depth: 0,
+        temps: 0,
     };
     let items = raw
         .into_iter()
@@ -88,6 +92,8 @@ pub(super) fn lower_embedded(command: &g::Stmt, era: Era) -> Result<Stmt, String
         errors: Vec::new(),
         script_fns: Vec::new(),
         with_depth: 0,
+        temps: 0,
+        flags: Vec::new(),
     };
     let body = lower.stmt(command);
     match lower.errors.into_iter().next() {
@@ -108,6 +114,8 @@ pub(super) fn message(text: &str, era: Era) -> Result<Vec<MsgPart>, String> {
         errors: Vec::new(),
         script_fns: Vec::new(),
         with_depth: 0,
+        temps: 0,
+        flags: Vec::new(),
     };
     let parts = lower.message(text)?;
     match lower.errors.into_iter().next() {
@@ -410,7 +418,7 @@ fn stmt_calls(s: &g::Stmt, gs1: bool) -> bool {
         g::Stmt::Assign { target, value, .. } => index(target) || e(value),
         g::Stmt::Call { name, args } => name_is_call(name, gs1) || args.iter().any(e),
         g::Stmt::Command { name, args, .. } => {
-            name_is_call(name, gs1)
+            command_is_call(name, args, gs1)
                 || args
                     .iter()
                     .any(|a| matches!(a, g::Arg::Num(x) if expr_calls(x, gs1)))
@@ -421,8 +429,26 @@ fn stmt_calls(s: &g::Stmt, gs1: bool) -> bool {
     }
 }
 
+/// Whether a GS1 command counts as a call for `OP_CMD_CALL`, judged by
+/// what it is lowered to: `setstring this.a,1;` and `setcharprop` become
+/// assignments, which do not; a flag `setstring` is a `set` call, and the
+/// list and `tokenize` forms are method calls, which do.
+fn command_is_call(name: &str, args: &[g::Arg], gs1: bool) -> bool {
+    match name {
+        "setstring" => !matches!(
+            args.first(),
+            Some(g::Arg::Text(t)) if {
+                let t = t.trim().to_ascii_lowercase();
+                t.starts_with("this.") || t.starts_with("client.")
+            }
+        ),
+        "setcharprop" => false,
+        _ => name_is_call(name, gs1),
+    }
+}
+
 /// Whether a GS1 expression counts as a call. Text with message codes does
-/// not.
+/// not; a count (`tokenscount`) does, as it is lowered to `.size()`.
 fn expr_calls(e: &g::Expr, gs1: bool) -> bool {
     let c = |x: &g::Expr| expr_calls(x, gs1);
     match e {
@@ -433,7 +459,9 @@ fn expr_calls(e: &g::Expr, gs1: bool) -> bool {
         g::Expr::InList { e, list } => c(e) || list.iter().any(c),
         g::Expr::Cond { cond, then, els } => c(cond) || c(then) || c(els),
         g::Expr::List(v) => v.iter().any(c),
-        g::Expr::Var(v) => v.index.iter().any(c),
+        g::Expr::Var(v) => {
+            (v.index.is_empty() && counted_list(&v.name).is_some()) || v.index.iter().any(c)
+        }
         g::Expr::Num(_) | g::Expr::Str(_) => false,
     }
 }
@@ -728,6 +756,11 @@ struct Lower {
     script_fns: Vec<String>,
     /// How many GS1 `with` blocks the statement being lowered is in.
     with_depth: u32,
+    /// `temp.` variables made so far (see [`Lower::ordered_list`]).
+    temps: u32,
+    /// Plain names the script sets as player flags, lower case (see
+    /// [`player_flags`]).
+    flags: Vec<String>,
 }
 
 fn bin_op(op: g::BinOp) -> BinOp {
@@ -764,7 +797,6 @@ fn assign_op(op: g::AssignOp) -> AssignOp {
     }
 }
 
-/// GS1's `playerx` and `playery` are GS2's `player.x` and `player.y`.
 /// A plain script variable: no prefix, and not a built-in or an event.
 fn is_script_var(name: &str, era: Era) -> bool {
     !name.contains('.')
@@ -773,11 +805,86 @@ fn is_script_var(name: &str, era: Era) -> bool {
         && !is_event(name, era)
 }
 
+/// The GS2 name of a GS1 built-in variable.
+///
+/// - `timeout` is `this.timeout`, the spelling `timers.gs2` reads and
+///   writes (fixture-checked). A bare `timeout` would be looked up on the
+///   function's locals first.
+/// - `playerx` and `playery` are `player.x` and `player.y`.
+/// - The other `player…` numbers are the same word on the `player` object
+///   (`playerdir` is `player.dir`). These names are Seihai's reading of the
+///   GS2 player object, not fixture-checked.
 fn gs2_name(name: &str) -> String {
     match name {
-        "playerx" => "player.x".into(),
-        "playery" => "player.y".into(),
+        "timeout" => "this.timeout".into(),
+        "playerx" | "playery" | "playerdir" | "playerhearts" | "playerrupees" | "playerbombs"
+        | "playerdarts" | "playerswordpower" | "playershieldpower" | "playerfullhearts" => {
+            format!("player.{}", &name["player".len()..])
+        }
         other => other.into(),
+    }
+}
+
+/// GS1 built-in variables with no GS2 name Seihai is sure of. Passing them
+/// through as a plain name would compile to a variable nothing sets, so
+/// they are refused.
+fn builtin_without_gs2(name: &str) -> bool {
+    matches!(
+        name,
+        "playerhp" | "playermaxhp" | "weaponscount" | "selectedweapon"
+    )
+}
+
+/// The list a GS1 count variable counts: `tokenscount` is
+/// `tokens.size()`, as `#t(i)` reads `tokens[i]`; `paramscount` is
+/// `params.size()`. `size()` is the method `lists.gs2` uses.
+fn counted_list(name: &str) -> Option<&'static str> {
+    match name {
+        "tokenscount" => Some("tokens"),
+        "paramscount" => Some("params"),
+        _ => None,
+    }
+}
+
+/// Plain names a statement sets or clears as player flags: `set name`,
+/// `unset name`, `setstring name,value` where the name has no `this.` or
+/// `client.` prefix. In GS1 a plain name reads the object's variable and
+/// then the flag, so after `set gotkey;` the test `if (gotkey)` reads the
+/// flag. GS2 looks a plain name up on the locals, the object, the level and
+/// the global object, never the player's flags.
+fn player_flags(s: &g::Stmt, out: &mut Vec<String>) {
+    match s {
+        g::Stmt::Command { name, args, .. }
+            if matches!(name.as_str(), "set" | "unset" | "setstring") =>
+        {
+            if let Some(g::Arg::Text(t)) = args.first() {
+                let t = t.trim().to_ascii_lowercase();
+                let n = t.split('=').next().unwrap_or("").trim();
+                if !n.is_empty() && !n.contains('.') && !n.contains('#') {
+                    out.push(n.to_string());
+                }
+            }
+        }
+        g::Stmt::Block(v) => v.iter().for_each(|s| player_flags(s, out)),
+        g::Stmt::Function { body, .. } => body.iter().for_each(|s| player_flags(s, out)),
+        g::Stmt::If { then, els, .. } => {
+            player_flags(then, out);
+            if let Some(e) = els {
+                player_flags(e, out);
+            }
+        }
+        g::Stmt::While { body, .. } | g::Stmt::With { body, .. } => player_flags(body, out),
+        g::Stmt::For { body, .. } => player_flags(body, out),
+        _ => {}
+    }
+}
+
+/// A GS1 value whose reading cannot depend on when it is read.
+fn is_constant(e: &g::Expr) -> bool {
+    match e {
+        g::Expr::Num(_) => true,
+        g::Expr::Str(s) => !s.contains('#'),
+        _ => false,
     }
 }
 
@@ -868,6 +975,16 @@ impl Lower {
             g::Stmt::Return(v) => Stmt::Return(v.as_ref().map(|e| self.expr(e))),
             g::Stmt::Break => Stmt::Break,
             g::Stmt::Continue => Stmt::Continue,
+            g::Stmt::Assign {
+                target,
+                op: g::AssignOp::Set,
+                value: g::Expr::List(values),
+            } if target.index.is_empty()
+                && !values.iter().any(has_nested_list)
+                && list_problem(values).is_some() =>
+            {
+                self.ordered_list(target, values)
+            }
             g::Stmt::Assign { target, op, value } => self.assign(target, assign_op(*op), value),
             g::Stmt::IncDec { target, delta } => {
                 if target.index.is_empty() {
@@ -910,6 +1027,24 @@ impl Lower {
     /// A variable as GS2 names it. An element must have no field after its
     /// index (`npcs[i].x`), and GS1's level board is not lowered.
     fn var(&mut self, v: &g::VarRef) -> Var {
+        if v.index.is_empty()
+            && is_script_var(&v.name, self.era)
+            && self.flags.contains(&v.name.to_ascii_lowercase())
+        {
+            self.err(format!(
+                "`{}` is a player flag the script sets; reading or writing a GS1 flag by its plain name \
+                 has no fixture-checked GS2 form (GS2 looks plain names up on the object)",
+                v.name
+            ));
+        }
+        if v.index.is_empty() && builtin_without_gs2(&v.name) {
+            self.err(format!(
+                "GS1 variable `{}` has no GS2 name Seihai has checked; it is not lowered",
+                v.name
+            ));
+        } else if v.index.is_empty() && counted_list(&v.name).is_some() {
+            self.err(format!("`{}` cannot be written", v.name));
+        }
         if !v.index.is_empty() {
             if v.field_after_index {
                 self.err(format!("a field after an index (`{v}`) is not lowered"));
@@ -974,6 +1109,37 @@ impl Lower {
             op,
             value: self.expr(value),
         }
+    }
+
+    /// `name = {a, f(), b}` where the order the elements are read in could
+    /// matter. GS2 pushes a literal's elements right to left, and the GS1
+    /// interpreter reads them left to right, so each element that is not a
+    /// constant is first stored in a `temp.` variable, in source order,
+    /// and the literal is built from those. The target has no index, so
+    /// nothing else in the statement runs between the elements.
+    fn ordered_list(&mut self, target: &g::VarRef, values: &[g::Expr]) -> Stmt {
+        let mut body = Vec::new();
+        let mut items = Vec::with_capacity(values.len());
+        for v in values {
+            if is_constant(v) {
+                items.push(self.expr(v));
+                continue;
+            }
+            let temp = format!("temp.__gs1list{}", self.temps);
+            self.temps += 1;
+            body.push(Stmt::Assign {
+                target: Var::plain(temp.clone()),
+                op: AssignOp::Set,
+                value: self.expr(v),
+            });
+            items.push(Expr::var(temp));
+        }
+        body.push(Stmt::Assign {
+            target: self.var(target),
+            op: AssignOp::Set,
+            value: Expr::List(items),
+        });
+        Stmt::Block(body)
     }
 
     /// `with (target) body`. The NPC server's notes (`npcserverdoc.txt`, NW
@@ -1087,6 +1253,7 @@ impl Lower {
         if let Some(s) = self.string_command(name, args) {
             return s;
         }
+        let name = renamed_command(name).unwrap_or(name);
         if !gs2_has_command(name) {
             self.err(format!(
                 "GS1 command `{name}` has no GS2 equivalent{}",
@@ -1348,6 +1515,13 @@ impl Lower {
                         gs2_event_function(&v.name)
                     ));
                     return Expr::Num(0.0);
+                }
+                if let Some(list) = counted_list(&v.name).filter(|_| v.index.is_empty()) {
+                    return Expr::Method {
+                        obj: Box::new(Expr::var(list)),
+                        name: "size".into(),
+                        args: Vec::new(),
+                    };
                 }
                 Expr::Var(self.var(v))
             }

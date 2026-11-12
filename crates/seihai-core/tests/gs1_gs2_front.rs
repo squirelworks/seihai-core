@@ -491,13 +491,17 @@ fn malformed_and_unsupported_array_forms_fail_clearly() {
         let source = format!("function onCreated() {{ this.a = {literal}; }}");
         assert!(compile_gs2(&source).is_err(), "{source}");
     }
+    // Stored straight into a variable, these lower in order through
+    // `temp.` variables; anywhere else they stay errors.
     for (literal, want) in [
         ("{next(), next()}", "one element calls"),
         ("{next(), this.v}", "one element calls"),
         ("{random(0, 1), random(0, 1)}", "one element calls"),
         ("{{1}, 2}", "that are lists"),
     ] {
-        let source = format!("if (created) {{ this.a = {literal}; }}");
+        let source = format!(
+            "function next() {{ return 1; }}\nfunction keep(v) {{ this.k = v; }}\nif (created) {{ keep({literal}); }}"
+        );
         let error = compile::compile_gs1(&source, Era::V21)
             .unwrap_err()
             .to_string();
@@ -841,9 +845,30 @@ fn array_literals_whose_order_cannot_matter_lower_with_calls() {
         machine.list(Root::This, "b"),
         Some([Value::from(Val::Num(4.0)), Value::from(Val::Num(7.0))].as_slice())
     );
-    // A call next to a variable read is refused: the call could change it.
+    // A call next to a variable read, stored straight into a variable, is
+    // read left to right through `temp.` variables.
+    let script = compile::compile_gs1(
+        "function next() { this.v = 9; return 4; }\nif (created) { this.v = 1; this.a = {this.v, next(), this.v, 5}; }",
+        Era::V21,
+    )
+    .unwrap();
+    assert!(
+        script.strings.iter().any(|s| s == "__gs1list0"),
+        "{:?}",
+        script.strings
+    );
+    let machine = run_created(script);
+    assert_eq!(
+        machine.list(Root::This, "a"),
+        Some(
+            [1.0, 4.0, 9.0, 5.0]
+                .map(|n| Value::from(Val::Num(n)))
+                .as_slice()
+        )
+    );
+    // In a call's argument the order is still refused.
     assert!(compile::compile_gs1(
-        "function next() { return 4; }\nif (created) { this.a = {next(), int(this.v)}; }",
+        "function next() { return 4; }\nfunction keep(v) { this.k = v; }\nif (created) { keep({next(), int(this.v)}); }",
         Era::V21,
     )
     .is_err());

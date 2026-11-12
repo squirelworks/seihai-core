@@ -23,6 +23,66 @@ pub fn gs1_commands_without_gs2() -> Vec<&'static str> {
         .collect()
 }
 
+/// How a GS1 command reaches GS2.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Gs1Lowering {
+    /// A GS2 command or opcode of the same name, called with the same
+    /// arguments.
+    Same,
+    /// The GS2 command of another name that does the same thing. The GS1
+    /// engine runs the two names as one command (`setgif` is `setimg`).
+    Renamed(&'static str),
+    /// No GS2 command of its own: it becomes one or more GS2 statements.
+    /// The text says which.
+    Statements(&'static str),
+    /// No GS2 counterpart. Compiling it is an error. `inert` is true when
+    /// the 2.05 client compiles the command and does nothing with it, so
+    /// leaving it out would be a possible lowering once a later client is
+    /// checked.
+    Missing { inert: bool },
+}
+
+/// How the GS1 command `name` is lowered, or `None` for a name that is not
+/// a GS1 command.
+pub fn gs1_command_lowering(name: &str) -> Option<Gs1Lowering> {
+    let cmd = vocab::command(name)?;
+    Some(if let Some(to) = renamed_command(name) {
+        Gs1Lowering::Renamed(to)
+    } else if let Some(how) = statement_lowering(name) {
+        Gs1Lowering::Statements(how)
+    } else if gs2_has_command(name) {
+        Gs1Lowering::Same
+    } else {
+        Gs1Lowering::Missing {
+            inert: matches!(cmd.exec, vocab::Exec::NoExec),
+        }
+    })
+}
+
+/// GS1 command names that are another GS2 command's old name. The GS1
+/// engine runs each pair as one command.
+pub(super) fn renamed_command(name: &str) -> Option<&'static str> {
+    match name {
+        "setgif" => Some("setimg"),
+        "setgifpart" => Some("setimgpart"),
+        _ => None,
+    }
+}
+
+/// The GS1 commands the front end turns into GS2 statements (see
+/// `gs1.rs`, `string_command`).
+fn statement_lowering(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "setstring" => "`this.`/`client.` names: an assignment; any other name is a player flag: `set(\"name=value\")` or `unset(\"name\")`",
+        "addstring" | "insertstring" | "replacestring" | "removestring" | "deletestring" => {
+            "the GS2 list method on a `this.`/`client.` list (`add`, `insert`, `replace`, `remove`, `delete`); before 2.1 `addstring` appends text"
+        }
+        "tokenize" | "tokenize2" => "`tokens = text.tokenize(seps)`",
+        "setcharprop" => "an assignment to the NPC's own property (`this.nick`, `this.colors[i]`, ...)",
+        _ => return None,
+    })
+}
+
 pub(super) fn gs2_has_command(name: &str) -> bool {
     GS2_CLIENT_COMMANDS.binary_search(&name).is_ok()
         || matches!(
@@ -261,8 +321,6 @@ pub(super) fn command_hint(name: &str) -> &'static str {
         "setstring" | "addstring" | "insertstring" | "replacestring" | "removestring"
         | "deletestring" => " (GS2 uses list methods such as add and delete)",
         "tokenize" | "tokenize2" => " (GS2 uses the tokenize method)",
-        "setgif" => " (GS2 has setimg)",
-        "setgifpart" => " (GS2 has setimgpart)",
         _ => "",
     }
 }
