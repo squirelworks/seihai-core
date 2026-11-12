@@ -474,12 +474,17 @@ fn malformed_and_unsupported_array_forms_fail_clearly() {
         let source = format!("function onCreated() {{ this.a = {literal}; }}");
         assert!(compile::compile_gs2(&source).is_err(), "{source}");
     }
-    for literal in ["{next(), 1}", "{1 + next(), 2}", "{{1}, 2}"] {
+    for (literal, want) in [
+        ("{next(), next()}", "one element calls"),
+        ("{next(), this.v}", "one element calls"),
+        ("{random(0, 1), random(0, 1)}", "one element calls"),
+        ("{{1}, 2}", "that are lists"),
+    ] {
         let source = format!("if (created) {{ this.a = {literal}; }}");
         let error = compile::compile_gs1(&source, Era::V21)
             .unwrap_err()
             .to_string();
-        assert!(error.contains("calls or nested lists"), "{source}: {error}");
+        assert!(error.contains(want), "{source}: {error}");
     }
     assert!(compile::compile_gs1("if (created) { this.a = {1, 2}; }", Era::V205).is_err());
     assert!(compile::compile_gs2("function onCreated() { this.a[0] = {1}; }").is_ok());
@@ -754,6 +759,51 @@ fn in_a_literal_list_lowers_to_equality_tests() {
     assert_eq!(machine.var(Root::This, "miss"), None);
     assert!(compile::compile_gs1(
         "function pick() { return 0; }\nif (created) { this.r = pick() in {1, 2}; }",
+        Era::V21,
+    )
+    .is_err());
+}
+
+/// A GS1 array literal whose element evaluation order cannot matter is
+/// lowered even with calls: one calling element among constants, or calls
+/// only to opcode built-ins that change nothing (`int`, `abs`, ...). The
+/// bytes are the GS2 front end's for the same literal.
+#[test]
+fn array_literals_whose_order_cannot_matter_lower_with_calls() {
+    for literal in [
+        "{next(), 1}",
+        "{1 + next(), 2, \"x\"}",
+        "{int(this.v), abs(this.w), 3}",
+        "{random(0, 1), 2}",
+    ] {
+        let gs1 = compile::compile_gs1(
+            &format!("function next() {{ return 4; }}\nif (created) {{ this.a = {literal}; }}"),
+            Era::V21,
+        )
+        .unwrap();
+        let gs2 = compile::compile_gs2(&format!(
+            "function next() {{ return 4; }}\nfunction onCreated() {{ this.a = {literal}; }}"
+        ))
+        .unwrap();
+        assert_eq!(gs1.write(), gs2.write(), "{literal}");
+    }
+    let script = compile::compile_gs1(
+        "function next() { return 4; }\nif (created) { this.v = 2.5; this.a = {int(this.v), 9}; this.b = {next(), 7}; }",
+        Era::V21,
+    )
+    .unwrap();
+    let machine = run_created(script);
+    assert_eq!(
+        machine.list(Root::This, "a"),
+        Some([Value::from(Val::Num(2.0)), Value::from(Val::Num(9.0))].as_slice())
+    );
+    assert_eq!(
+        machine.list(Root::This, "b"),
+        Some([Value::from(Val::Num(4.0)), Value::from(Val::Num(7.0))].as_slice())
+    );
+    // A call next to a variable read is refused: the call could change it.
+    assert!(compile::compile_gs1(
+        "function next() { return 4; }\nif (created) { this.a = {next(), int(this.v)}; }",
         Era::V21,
     )
     .is_err());

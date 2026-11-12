@@ -15,9 +15,10 @@
 //! `format` needs a pattern and accepts additional values. This is Seihai's
 //! compile-time validation policy, not a claim about original-client errors.
 //! Script and host calls are not subject to those opcode-specific checks.
-//! Array literals use the documented reverse-push encoding. GS1 lowering is
-//! limited to scalar elements without calls: the GS1 interpreter evaluates
-//! elements left to right, so calls need a separate order-preserving lowering.
+//! Array literals use the documented reverse-push encoding. The GS1
+//! interpreter evaluates elements left to right, so GS1 lowering takes a
+//! literal only when that order cannot matter: no element calls script or
+//! host code or `random`, or exactly one does and the rest are constants.
 //!
 //! Indexed reads and writes (`a[i]`, `a[i, j]`, `a[i] = v`, `a[i, j] = v`)
 //! and `x in array` use the encodings in `tests/fixtures/gs2/lists.gs2bc`:
@@ -854,6 +855,37 @@ impl Builder {
         }
     }
 
+    /// Why a GS1 array literal cannot be pushed in GS2's right-to-left
+    /// order, or `None` when it can. The GS1 interpreter evaluates the
+    /// elements left to right, so the order only matters for an element
+    /// whose evaluation can change something (a script or host call, or
+    /// `random`). The literal is lowered when no element is like that, or
+    /// when exactly one is and every other element is a constant.
+    fn gs1_list_problem(&self, values: &[Expr]) -> Option<&'static str> {
+        if values.iter().any(has_nested_list) {
+            return Some("GS1 array elements that are lists are not lowered");
+        }
+        let effects = values.iter().filter(|v| self.has_effect(v)).count();
+        let constants = values
+            .iter()
+            .filter(|v| matches!(v, Expr::Num(_) | Expr::Str(_)))
+            .count();
+        if effects == 0 || (effects == 1 && constants == values.len() - 1) {
+            None
+        } else {
+            Some(
+                "GS1 array elements with calls are lowered only when one element calls \
+                 and the others are constants (GS1 reads them left to right, GS2 pushes \
+                 them right to left); put the values in variables first",
+            )
+        }
+    }
+
+    /// The expression calls script or host code, or draws a random number.
+    fn has_effect(&self, e: &Expr) -> bool {
+        self.expr_has_call(e) || mentions_call(e, "random")
+    }
+
     fn expr_has_call(&self, e: &Expr) -> bool {
         match e {
             Expr::Call { name, args } => {
@@ -1489,10 +1521,12 @@ impl Builder {
                 Kind::Other
             }
             Expr::List(values) => {
-                if self.gs1 && !values.iter().all(gs1_array_element) {
-                    self.err("GS1 array elements with calls or nested lists are not lowered yet");
-                    self.emit_int(0);
-                    return Kind::Number;
+                if self.gs1 {
+                    if let Some(problem) = self.gs1_list_problem(values) {
+                        self.err(problem);
+                        self.emit_int(0);
+                        return Kind::Number;
+                    }
                 }
                 self.op(Op::TypeArray);
                 for value in values.iter().rev() {
@@ -1708,20 +1742,38 @@ fn element_problem(v: &VarRef) -> Option<String> {
     None
 }
 
-/// Scalar expressions whose evaluation cannot call script or host code.
-fn gs1_array_element(expr: &Expr) -> bool {
-    match expr {
-        Expr::Num(_) | Expr::Str(_) => true,
-        Expr::Var(v) => v.index.iter().all(gs1_array_element),
-        Expr::Unary(_, value) => gs1_array_element(value),
-        Expr::Bin(_, left, right) => gs1_array_element(left) && gs1_array_element(right),
+/// The expression holds a list literal anywhere.
+fn has_nested_list(e: &Expr) -> bool {
+    match e {
+        Expr::List(_) => true,
+        Expr::Num(_) | Expr::Str(_) => false,
+        Expr::Var(v) => v.index.iter().any(has_nested_list),
+        Expr::Unary(_, a) | Expr::InArray { e: a, .. } => has_nested_list(a),
+        Expr::Bin(_, a, b) => has_nested_list(a) || has_nested_list(b),
+        Expr::Call { args, .. } => args.iter().any(has_nested_list),
         Expr::InRange { e, lo, hi } => {
-            gs1_array_element(e) && gs1_array_element(lo) && gs1_array_element(hi)
+            has_nested_list(e) || has_nested_list(lo) || has_nested_list(hi)
         }
+        Expr::InList { e, list } => has_nested_list(e) || list.iter().any(has_nested_list),
         Expr::Cond { cond, then, els } => {
-            gs1_array_element(cond) && gs1_array_element(then) && gs1_array_element(els)
+            has_nested_list(cond) || has_nested_list(then) || has_nested_list(els)
         }
-        Expr::Call { .. } | Expr::List(_) | Expr::InList { .. } | Expr::InArray { .. } => false,
+    }
+}
+
+/// The expression calls `name` anywhere.
+fn mentions_call(e: &Expr, name: &str) -> bool {
+    let m = |x: &Expr| mentions_call(x, name);
+    match e {
+        Expr::Call { name: n, args } => n.eq_ignore_ascii_case(name) || args.iter().any(m),
+        Expr::Num(_) | Expr::Str(_) => false,
+        Expr::Var(v) => v.index.iter().any(m),
+        Expr::Unary(_, a) | Expr::InArray { e: a, .. } => m(a),
+        Expr::Bin(_, a, b) => m(a) || m(b),
+        Expr::InRange { e, lo, hi } => m(e) || m(lo) || m(hi),
+        Expr::InList { e, list } => m(e) || list.iter().any(m),
+        Expr::Cond { cond, then, els } => m(cond) || m(then) || m(els),
+        Expr::List(v) => v.iter().any(m),
     }
 }
 
