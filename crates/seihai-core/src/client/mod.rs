@@ -33,11 +33,12 @@ pub mod level;
 
 use crate::assets::{AssetResolver, AssetRoot, Level};
 use crate::filecache::{DownloadStore, FileSession};
-use crate::gmap::{sync_world, Crossing, Gmap, GmapRules, WorldLoader};
+use crate::gmap::{apply_board_mods_to, sync_world, Crossing, Gmap, GmapRules, WorldLoader};
 use crate::net::{
     link_request_frame, login_gserver_with, random_key, walk_message_for, wantfile_message,
 };
 use crate::offline::OfflineSession;
+use crate::protocol::layouts::BoardModify2;
 use crate::protocol::lobby::LobbyBurst;
 use crate::protocol::login::LoginBurst;
 use crate::protocol::walkcadence::WalkCadence;
@@ -153,7 +154,15 @@ pub struct Live {
     /// Gmap edges the view's walk crossed, in order; the network thread
     /// takes them and sends each crossing.
     pub crossings: Arc<Mutex<Vec<Crossing>>>,
+    /// Board changes the server sent (`PLO_BOARDMODIFY`, 7, and the 186
+    /// blocks), keyed by the level's lower-case name, for the view to put
+    /// on the levels it holds (`gmap::apply_board_mods_to`).
+    pub board_mods: SharedBoardMods,
 }
+
+/// Board changes by lower-case level name, from the network thread to the
+/// view.
+pub type SharedBoardMods = Arc<Mutex<Vec<(String, BoardModify2)>>>;
 
 /// [`WorldView::key`]: the gmap, the cell, the neighbours' cells and the
 /// crossings sent.
@@ -366,6 +375,7 @@ pub fn run_with(
     let wanted_sounds = live.as_ref().map(|l| l.wanted_sounds.clone());
     let world = live.as_ref().map(|l| l.world.clone());
     let crossings = live.as_ref().map(|l| l.crossings.clone());
+    let board_mods = live.as_ref().map(|l| l.board_mods.clone());
     // Crossings sent, over every connection: the view counts the same.
     let mut crossings_sent: u64 = 0;
     let gmap_rules = GmapRules::for_version(version);
@@ -491,6 +501,16 @@ pub fn run_with(
                     let got = files.process(&mut st);
                     if !got.send.is_empty() {
                         let _ = s.conn.send_messages(&got.send);
+                    }
+                    // Board changes: onto this side's gmap levels, and on to
+                    // the view.
+                    let mods = st.take_board_mods();
+                    if !mods.is_empty() {
+                        let here = st.current_level_name();
+                        apply_board_mods_to(&mut ws, here.as_deref(), &mods);
+                        if let Some(b) = board_mods.as_ref() {
+                            b.lock().unwrap_or_else(|e| e.into_inner()).extend(mods);
+                        }
                     }
                     // The gmap: the grid, the cell, the neighbours, and a
                     // request for what the server still has to send.

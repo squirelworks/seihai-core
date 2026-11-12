@@ -814,19 +814,29 @@ pub struct WorldRequests {
 /// the walking side holds: the player's and the loaded neighbours.
 pub fn apply_board_mods(session: &mut OfflineSession, net: &mut SessionState) {
     let mods = net.take_board_mods();
-    if mods.is_empty() {
-        return;
-    }
-    let current = net.current_level_name().map(|n| n.to_ascii_lowercase());
+    let current = net.current_level_name();
+    apply_board_mods_to(session, current.as_deref(), &mods);
+}
+
+/// Apply board changes (`PLO_BOARDMODIFY` and 186 blocks, keyed by the
+/// level's lower-case name, as [`SessionState::take_board_mods`] gives
+/// them) to the levels `session` holds: the one named `current` (any case)
+/// and, on a gmap, the loaded neighbours. A change for a level the session
+/// does not hold is dropped.
+pub fn apply_board_mods_to(
+    session: &mut OfflineSession,
+    current: Option<&str>,
+    mods: &[(String, crate::protocol::layouts::BoardModify2)],
+) {
     for (level, m) in mods {
-        if current.as_deref() == Some(level.as_str()) {
+        if current.is_some_and(|c| c.eq_ignore_ascii_case(level)) {
             if let Some(l) = session.current_level.as_mut() {
-                l.apply_board_modify2(&m);
+                l.apply_board_modify2(m);
             }
         } else if let Some(w) = session.gmap.as_mut() {
-            if let Some(cell) = w.map.cell_of(&level) {
+            if let Some(cell) = w.map.cell_of(level) {
                 if let Some(l) = w.levels.get_mut(&cell) {
-                    l.apply_board_modify2(&m);
+                    l.apply_board_modify2(m);
                 }
             }
         }
