@@ -247,7 +247,7 @@ fn commands_and_functions_without_gs2_are_errors() {
     assert!(err.to_string().contains("playersays"), "{err}");
     let err =
         compile::compile_gs1("if (created) { with (player) { hide; } }\n", Era::V21).unwrap_err();
-    assert!(err.to_string().contains("with"), "{err}");
+    assert!(err.to_string().contains("`with` body"), "{err}");
     let err =
         compile::compile_gs1("if (created) hide;\nif (created) show;\n", Era::V205).unwrap_err();
     assert!(err.to_string().contains("duplicate"), "{err}");
@@ -807,4 +807,108 @@ fn array_literals_whose_order_cannot_matter_lower_with_calls() {
         Era::V21,
     )
     .is_err());
+}
+
+/// Ops `from..=to` with every `OP_WITH` jump made relative to `from`, so a
+/// block can be compared wherever it sits in a script.
+fn with_block(script: &Script, from: usize, to: usize) -> Vec<String> {
+    use seihai_core::scripting::gs2::Operand;
+    let mut out = listing(script, from, to);
+    for (k, i) in script.code[from..=to].iter().enumerate() {
+        if i.op == Op::With {
+            if let Operand::Int(n) = i.operand {
+                out[k] = format!("OP_WITH +{}", n as usize - from);
+            }
+        }
+    }
+    out
+}
+
+/// `with` is lowered in the encoding of `rest.gs2bc` (`with (player)` and
+/// `with (null)`, ops 141..=161), by both front ends.
+#[test]
+fn with_matches_the_rest_fixture_in_both_front_ends() {
+    let reference = Script::parse(&fixture("rest.gs2bc")).unwrap();
+    let want = with_block(&reference, 141, 161);
+    assert_eq!(want[0], "OP_PLAYER");
+    assert_eq!(want[20], "OP_WITHEND");
+    let gs2 = compile::compile_gs2(
+        "function onCreated() {\n  with (player) {\n    x = 12;\n    this.inw = 1;\n  }\n  with (null) {\n    this.never = 1;\n  }\n}\n",
+    )
+    .unwrap();
+    let gs1 = compile::compile_gs1(
+        "if (created) {\n  with (player) {\n    x = 12;\n    this.inw = 1;\n  }\n  with (null) {\n    this.never = 1;\n  }\n}\n",
+        Era::V21,
+    )
+    .unwrap();
+    for got in [&gs2, &gs1] {
+        let start = ops(got).iter().position(|n| n == "OP_PLAYER").unwrap();
+        assert_eq!(with_block(got, start, start + 20), want);
+    }
+    assert_eq!(gs1.write(), gs2.write());
+}
+
+/// The NPC server's notes describe `with (players[i])` in a loop over the
+/// players; the target is an element read and the loop variable is read
+/// inside the block.
+#[test]
+fn gs1_with_over_an_element_lowers_and_reads_outer_variables() {
+    let script = compile::compile_gs1(
+        "if (created) {\n  for (i = 0; i < 3; i++) with (this.list[i]) {\n    if (this.hp < i) x = i;\n    while (this.hp > 0) { if (this.hp == 1) break; this.hp--; }\n  }\n}\n",
+        Era::V21,
+    )
+    .unwrap();
+    let names = ops(&script);
+    let w = names.iter().position(|n| n == "OP_WITH").unwrap();
+    assert_eq!(names[w - 1], "OP_CONV_TO_OBJECT");
+    assert_eq!(names[w - 2], "OP_ARRAY");
+    let end = names.iter().position(|n| n == "OP_WITHEND").unwrap();
+    assert_eq!(
+        listing(&script, w, w)[0],
+        format!("OP_WITH {}", end + 1),
+        "the jump lands just past OP_WITHEND"
+    );
+}
+
+/// Bodies whose GS1 meaning GS2 would change are refused, as are ways out
+/// of the block the NPC server's notes warn about.
+#[test]
+fn gs1_with_bodies_that_change_meaning_stay_errors() {
+    for (body, needle) in [
+        ("hide;", "runs a command"),
+        ("setlevel2 a.nw,30,30;", "runs a command"),
+        ("this.a = next();", "calls a function"),
+        ("sleep 1;", "`sleep`"),
+        ("return;", "`return`"),
+        ("i = 1;", "script variable `i`"),
+        ("i++;", "script variable `i`"),
+        ("this.a = playerx;", "`playerx`"),
+        ("player.chat = 1;", "`player.chat`"),
+        ("client.a = 1;", "`client.a`"),
+        ("this.a = level.b;", "`level.b`"),
+    ] {
+        let src = format!(
+            "function next() {{ return 1; }}\nif (created) {{ with (this.o) {{ {body} }} }}\n"
+        );
+        let err = compile::compile_gs1(&src, Era::V21)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains(needle), "{body}: {err}");
+    }
+    let err = compile::compile_gs1(
+        "if (created) { while (1) { with (this.o) { break; } } }\n",
+        Era::V21,
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(err.contains("leaves a `with` block"), "{err}");
+    let err =
+        compile::compile_gs2("function onCreated() { while (1) { with (player) { break; } } }")
+            .unwrap_err()
+            .to_string();
+    assert!(err.contains("leaves a `with` block"), "{err}");
+    // Before 2.1 `with` is not GS1.
+    assert!(
+        compile::compile_gs1("if (created) { with (this.o) { x = 1; } }\n", Era::V205).is_err()
+    );
 }

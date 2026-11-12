@@ -995,10 +995,7 @@ impl Builder {
                 }
             }
             Stmt::Command { name, args, line } => self.command(name, args, *line),
-            Stmt::With { line, .. } => {
-                self.line = *line;
-                self.err("`with` is not lowered by this temporary front end");
-            }
+            Stmt::With { target, body, line } => self.with_stmt(target, body, *line),
             Stmt::Unknown {
                 name, reason, line, ..
             } => {
@@ -1182,6 +1179,76 @@ impl Builder {
             self.numeric(i);
         }
         Some(v.index.len())
+    }
+
+    /// `with (target) body` in the fixture's encoding (`rest.gs2bc`,
+    /// `objects.gs2bc`): the target, `OP_CONV_TO_OBJECT`, `OP_WITH` to just
+    /// past the block, the body, `OP_WITHEND`.
+    fn with_stmt(&mut self, target: &Expr, body: &Stmt, line: u32) {
+        self.line = line;
+        if let Some(problem) = with_escape(body, false) {
+            self.err(problem);
+            return;
+        }
+        if self.gs1 {
+            if let Some(problem) = self.gs1_with_problem(body) {
+                self.err(problem);
+                return;
+            }
+        }
+        self.value(target);
+        self.op(Op::ConvToObject);
+        let hole = self.hole(Op::With);
+        // A loop outside the block cannot be left from inside it (refused
+        // above), so the body starts with no enclosing loop.
+        let outer = std::mem::take(&mut self.loops);
+        self.stmt(body);
+        self.loops = outer;
+        self.op(Op::WithEnd);
+        let after = self.here();
+        self.patch(hole, after);
+    }
+
+    /// Why a GS1 `with` body cannot be lowered, if it cannot. The NPC
+    /// server's notes (`npcserverdoc.txt`, NW beta 1 and 2) say that inside
+    /// `with` the target's `this.` variables and properties are read and
+    /// written, plain script variables (`i`, `j`) keep working, and script
+    /// functions still run as the original NPC. GS2 resolves a plain name on
+    /// the `with` object first and runs a bare call against it, so a body
+    /// whose meaning would change is refused: calls and commands, a write to
+    /// a plain name that is not a built-in property, and the `player`,
+    /// `client.` and `level.` names (GS1 switches them with the object, GS2
+    /// does not).
+    fn gs1_with_problem(&self, body: &Stmt) -> Option<String> {
+        if self.stmt_has_call(body) || stmt_has_command(body) {
+            return Some(
+                "a GS1 `with` body that calls a function or runs a command is not lowered \
+                 (GS1 runs it as the original NPC, GS2 against the `with` object)"
+                    .into(),
+            );
+        }
+        let mut problem = None;
+        let era = self.era;
+        stmt_names(body, &mut |name, write| {
+            if problem.is_some() {
+                return;
+            }
+            let lower = name.to_ascii_lowercase();
+            if lower.starts_with("player")
+                || lower.starts_with("client.")
+                || lower.starts_with("level.")
+            {
+                problem = Some(format!(
+                    "`{name}` inside a GS1 `with` is not lowered (GS1 switches it with the object, GS2 does not)"
+                ));
+            } else if write && !name.contains('.') && vocab::builtin_var(name, era).is_none() {
+                problem = Some(format!(
+                    "writing the script variable `{name}` inside a GS1 `with` is not lowered \
+                     (GS2 would store it on the `with` object); use `this.{name}` outside the block"
+                ));
+            }
+        });
+        problem
     }
 
     fn command(&mut self, name: &str, args: &[Arg], line: u32) {
@@ -1718,6 +1785,177 @@ impl Builder {
     }
 }
 
+/// Why a statement cannot sit inside a `with` block, if it cannot: a
+/// `return`, a `sleep` or `waitfor`, or a `break`/`continue` that would
+/// leave the block. The NPC server's notes say the old object is not
+/// restored then, and no fixture shows GS2 leaving a block early.
+fn with_escape(s: &Stmt, in_loop: bool) -> Option<&'static str> {
+    let blocked = "`return`, `sleep`, `waitfor`, or a `break`/`continue` that leaves a `with` block, is not lowered";
+    match s {
+        Stmt::Block(v) => v.iter().find_map(|s| with_escape(s, in_loop)),
+        Stmt::If { cond, then, els } => (expr_waits(cond))
+            .then_some(blocked)
+            .or_else(|| with_escape(then, in_loop))
+            .or_else(|| els.as_deref().and_then(|e| with_escape(e, in_loop))),
+        Stmt::While { cond, body } => expr_waits(cond)
+            .then_some(blocked)
+            .or_else(|| with_escape(body, true)),
+        Stmt::For {
+            init,
+            cond,
+            step,
+            body,
+        } => {
+            if cond.as_ref().is_some_and(expr_waits) {
+                return Some(blocked);
+            }
+            init.as_deref()
+                .and_then(|s| with_escape(s, in_loop))
+                .or_else(|| step.as_deref().and_then(|s| with_escape(s, true)))
+                .or_else(|| with_escape(body, true))
+        }
+        Stmt::With { body, .. } => with_escape(body, false),
+        Stmt::Return(_) => Some(blocked),
+        Stmt::Break | Stmt::Continue => (!in_loop).then_some(blocked),
+        Stmt::Command { name, args, .. } => (is_wait(name)
+            || args
+                .iter()
+                .any(|a| matches!(a, Arg::Num(e) if expr_waits(e))))
+        .then_some(blocked),
+        Stmt::Call { name, args } => {
+            (is_wait(name) || args.iter().any(expr_waits)).then_some(blocked)
+        }
+        Stmt::Assign { target, value, .. } => {
+            (target.index.iter().any(expr_waits) || expr_waits(value)).then_some(blocked)
+        }
+        Stmt::IncDec { target, .. } => target.index.iter().any(expr_waits).then_some(blocked),
+        Stmt::Function { .. } | Stmt::Unknown { .. } => None,
+    }
+}
+
+fn is_wait(name: &str) -> bool {
+    name.eq_ignore_ascii_case("sleep") || name.eq_ignore_ascii_case("waitfor")
+}
+
+fn expr_waits(e: &Expr) -> bool {
+    mentions_call(e, "sleep") || mentions_call(e, "waitfor")
+}
+
+/// The statement runs a GS1 command (other than `sleep`, which
+/// `with_escape` reports).
+fn stmt_has_command(s: &Stmt) -> bool {
+    match s {
+        Stmt::Block(v) => v.iter().any(stmt_has_command),
+        Stmt::If { then, els, .. } => {
+            stmt_has_command(then) || els.as_deref().is_some_and(stmt_has_command)
+        }
+        Stmt::While { body, .. } | Stmt::With { body, .. } => stmt_has_command(body),
+        Stmt::For {
+            init, step, body, ..
+        } => {
+            init.as_deref().is_some_and(stmt_has_command)
+                || step.as_deref().is_some_and(stmt_has_command)
+                || stmt_has_command(body)
+        }
+        Stmt::Command { .. } | Stmt::Call { .. } | Stmt::Unknown { .. } => true,
+        _ => false,
+    }
+}
+
+/// Every variable name in a statement, with `true` for a written one.
+fn stmt_names(s: &Stmt, f: &mut dyn FnMut(&str, bool)) {
+    match s {
+        Stmt::Block(v) => v.iter().for_each(|s| stmt_names(s, f)),
+        Stmt::If { cond, then, els } => {
+            expr_names(cond, f);
+            stmt_names(then, f);
+            if let Some(e) = els {
+                stmt_names(e, f);
+            }
+        }
+        Stmt::While { cond, body } => {
+            expr_names(cond, f);
+            stmt_names(body, f);
+        }
+        Stmt::For {
+            init,
+            cond,
+            step,
+            body,
+        } => {
+            if let Some(s) = init {
+                stmt_names(s, f);
+            }
+            if let Some(c) = cond {
+                expr_names(c, f);
+            }
+            if let Some(s) = step {
+                stmt_names(s, f);
+            }
+            stmt_names(body, f);
+        }
+        Stmt::With { target, body, .. } => {
+            expr_names(target, f);
+            stmt_names(body, f);
+        }
+        Stmt::Return(v) => {
+            if let Some(e) = v {
+                expr_names(e, f);
+            }
+        }
+        Stmt::Assign { target, value, .. } => {
+            f(&target.name, true);
+            target.index.iter().for_each(|e| expr_names(e, f));
+            expr_names(value, f);
+        }
+        Stmt::IncDec { target, .. } => {
+            f(&target.name, true);
+            target.index.iter().for_each(|e| expr_names(e, f));
+        }
+        Stmt::Call { args, .. } => args.iter().for_each(|e| expr_names(e, f)),
+        Stmt::Command { args, .. } => args.iter().for_each(|a| {
+            if let Arg::Num(e) = a {
+                expr_names(e, f);
+            }
+        }),
+        Stmt::Function { .. } | Stmt::Break | Stmt::Continue | Stmt::Unknown { .. } => {}
+    }
+}
+
+fn expr_names(e: &Expr, f: &mut dyn FnMut(&str, bool)) {
+    match e {
+        Expr::Num(_) | Expr::Str(_) => {}
+        Expr::Var(v) => {
+            f(&v.name, false);
+            v.index.iter().for_each(|e| expr_names(e, f));
+        }
+        Expr::Unary(_, a) => expr_names(a, f),
+        Expr::InArray { e, name } => {
+            expr_names(e, f);
+            f(name, false);
+        }
+        Expr::Bin(_, a, b) => {
+            expr_names(a, f);
+            expr_names(b, f);
+        }
+        Expr::Call { args, .. } | Expr::List(args) => args.iter().for_each(|e| expr_names(e, f)),
+        Expr::InRange { e, lo, hi } => {
+            expr_names(e, f);
+            expr_names(lo, f);
+            expr_names(hi, f);
+        }
+        Expr::InList { e, list } => {
+            expr_names(e, f);
+            list.iter().for_each(|e| expr_names(e, f));
+        }
+        Expr::Cond { cond, then, els } => {
+            expr_names(cond, f);
+            expr_names(then, f);
+            expr_names(els, f);
+        }
+    }
+}
+
 /// Why an indexed variable is not lowered, if it is not.
 fn element_problem(v: &VarRef) -> Option<String> {
     if v.field_after_index {
@@ -1950,11 +2188,15 @@ impl<'a> Gs2<'a> {
         if self.eat("{") {
             return Ok(Stmt::Block(self.block_body()?));
         }
-        if self.eat_id("switch")
-            || self.eat_id("with")
-            || self.eat_id("new")
-            || self.eat_id("public")
-        {
+        if self.eat_id("with") {
+            let line = self.line;
+            self.expect("(")?;
+            let target = self.expr()?;
+            self.expect(")")?;
+            let body = Box::new(self.stmt()?);
+            return Ok(Stmt::With { target, body, line });
+        }
+        if self.eat_id("switch") || self.eat_id("new") || self.eat_id("public") {
             return Err(CompileErrors::one(
                 self.line,
                 "that statement is not in this temporary GS2 compiler",
