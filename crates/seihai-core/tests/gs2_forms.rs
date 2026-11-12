@@ -4,8 +4,13 @@
 //! no code is taken from it. Where Seihai departs from its output on purpose,
 //! the test says so.
 
-use seihai_core::scripting::gs2::compile::compile_gs2;
+use seihai_core::scripting::gs2::compile::{self, CompileErrors};
 use seihai_core::scripting::gs2::Script;
+
+/// Legacy mode: these are forms live scripts use.
+fn compile_gs2(src: &str) -> Result<Script, CompileErrors> {
+    compile::compile_gs2_legacy(src).map(|c| c.script)
+}
 
 /// The ops of the function body after its four-op header, without the
 /// trailing `return 0` and the closing `OP_RET`.
@@ -421,7 +426,10 @@ fn more_forms_from_the_corpus_shapes() {
 #[test]
 fn compile_script_picks_the_front_end() {
     use seihai_core::scripting::engine::Era;
-    use seihai_core::scripting::gs2::compile::{compile_script, Front};
+    use seihai_core::scripting::gs2::compile::{compile, Front, Language, Mode};
+    let compile_script = |src: &str, era: Era| {
+        compile(src, Language::Detect(era), Mode::Legacy).map(|c| (c.script, c.front))
+    };
     let v21 = Era::V21;
     let gs1 = "if (playerenters) { setimgpart door.png,0,0,32,32; message hi; }";
     assert_eq!(compile_script(gs1, v21).unwrap().1, Front::Gs1);

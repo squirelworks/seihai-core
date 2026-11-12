@@ -107,168 +107,6 @@ pub enum Expr {
     /// `{a,b,c}`, the right side of an assignment (2.1 and later): fills
     /// the variable as an array.
     List(Vec<Expr>),
-    /// A GS2-only form. The GS1 grammar never builds one.
-    Gs2(Box<Gs2Expr>),
-}
-
-/// Expression forms only the GS2 front end builds
-/// (`scripting::gs2::compile`).
-#[derive(Debug, Clone, PartialEq)]
-pub enum Gs2Expr {
-    /// `obj.name(args)`: a built-in method or a call on an object.
-    Method {
-        obj: Expr,
-        name: String,
-        args: Vec<Expr>,
-    },
-    /// `obj.name` where `obj` is not a plain dotted name (a call, an index).
-    Member { obj: Expr, name: String },
-    /// `obj[i]` or `obj[i, j]` where `obj` is not a plain dotted name.
-    Index { obj: Expr, index: Vec<Expr> },
-    /// `new Type(args)`.
-    New { ty: String, args: Vec<Expr> },
-    /// `new[n]`, `new[n][m]`.
-    NewArray(Vec<Expr>),
-    /// `a << b`, `a >> b`, `a & b`, `a | b`.
-    Bits { kind: BitKind, a: Expr, b: Expr },
-    /// `@x`: the value as a string.
-    Text(Expr),
-    /// `obj.(expr)`: the member whose name is the value of `expr`.
-    DynMember { obj: Expr, name: Expr },
-    /// `obj.(expr)(args)`: a call of that member.
-    DynMethod {
-        obj: Expr,
-        name: Expr,
-        args: Vec<Expr>,
-    },
-    /// `(name)(args)`: a call of the function named by a value.
-    DynCall { name: Expr, args: Vec<Expr> },
-    /// A GS1 message code (`#a`, `#v(x)`) used as a GS2 value.
-    Gs1Text(String),
-    /// `x in list` where the list is any value (`x in f(…)`).
-    InValue { e: Expr, list: Expr },
-    /// `function (…) { … }` as a value; the name of the function made for it.
-    Lambda(String),
-    /// `x++` / `x--` used as a value: the old value, then the step.
-    PostStep { target: Expr, delta: f64 },
-    /// `++x` / `--x` used as a value: the step, then the new value.
-    PreStep { target: Expr, delta: f64 },
-    /// `(x = v)`, `(x += v)` used as a value: the place after the store.
-    AssignValue {
-        target: Expr,
-        op: AssignOp,
-        value: Expr,
-    },
-}
-
-/// The bit operators of [`Gs2Expr::Bits`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BitKind {
-    Shl,
-    Shr,
-    And,
-    Or,
-}
-
-impl Gs2Expr {
-    /// The expressions directly inside this one, in source order.
-    pub fn parts(&self) -> Vec<&Expr> {
-        match self {
-            Gs2Expr::Method { obj, args, .. } => std::iter::once(obj).chain(args).collect(),
-            Gs2Expr::Member { obj, .. } => vec![obj],
-            Gs2Expr::Index { obj, index } => std::iter::once(obj).chain(index).collect(),
-            Gs2Expr::New { args, .. } => args.iter().collect(),
-            Gs2Expr::NewArray(dims) => dims.iter().collect(),
-            Gs2Expr::Bits { a, b, .. } => vec![a, b],
-            Gs2Expr::Text(e) => vec![e],
-            Gs2Expr::DynMember { obj, name } => vec![obj, name],
-            Gs2Expr::DynMethod { obj, name, args } => [obj, name].into_iter().chain(args).collect(),
-            Gs2Expr::Lambda(_) | Gs2Expr::Gs1Text(_) => Vec::new(),
-            Gs2Expr::InValue { e, list } => vec![e, list],
-            Gs2Expr::DynCall { name, args } => std::iter::once(name).chain(args).collect(),
-            Gs2Expr::PostStep { target, .. } | Gs2Expr::PreStep { target, .. } => vec![target],
-            Gs2Expr::AssignValue { target, value, .. } => vec![target, value],
-        }
-    }
-
-    /// The form may run script or host code (a method or `new`).
-    pub fn calls(&self) -> bool {
-        matches!(
-            self,
-            Gs2Expr::Method { .. }
-                | Gs2Expr::DynMethod { .. }
-                | Gs2Expr::DynCall { .. }
-                | Gs2Expr::New { .. }
-        )
-    }
-}
-
-impl Gs2Stmt {
-    /// The statements directly inside this one.
-    pub fn bodies(&self) -> Vec<&Stmt> {
-        match self {
-            Gs2Stmt::Switch { arms, .. } => arms.iter().flat_map(|a| a.body.iter()).collect(),
-            Gs2Stmt::ForEach { body, .. } => vec![body],
-            Gs2Stmt::Eval(_) | Gs2Stmt::SetPart { .. } => Vec::new(),
-            Gs2Stmt::NewBlock { body, .. } => body.iter().collect(),
-            Gs2Stmt::Chain { .. } => Vec::new(),
-            Gs2Stmt::Gs1(s) => vec![s],
-        }
-    }
-
-    /// The expressions directly inside this one (not in its bodies).
-    pub fn exprs(&self) -> Vec<&Expr> {
-        match self {
-            Gs2Stmt::Switch { value, arms } => std::iter::once(value)
-                .chain(arms.iter().flat_map(|a| a.values.iter()))
-                .collect(),
-            Gs2Stmt::ForEach { list, .. } => vec![list],
-            Gs2Stmt::Eval(e) => vec![e],
-            Gs2Stmt::SetPart { target, value } => vec![target, value],
-            Gs2Stmt::NewBlock { name, .. } => vec![name],
-            Gs2Stmt::Gs1(_) => Vec::new(),
-            Gs2Stmt::Chain { targets, value } => targets
-                .iter()
-                .flat_map(|t| t.index.iter())
-                .chain(std::iter::once(value))
-                .collect(),
-        }
-    }
-}
-
-/// One arm of a GS2 `switch`: `case` values (empty for `default`) and the
-/// statements up to the next arm.
-#[derive(Debug, Clone, PartialEq)]
-pub struct SwitchArm {
-    pub values: Vec<Expr>,
-    pub default: bool,
-    pub body: Vec<Stmt>,
-}
-
-/// Statement forms only the GS2 front end builds.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Gs2Stmt {
-    /// `switch (value) { case …: … default: … }`.
-    Switch { value: Expr, arms: Vec<SwitchArm> },
-    /// `for (var : list) body`.
-    ForEach { var: VarRef, list: Expr, body: Stmt },
-    /// An expression used as a statement (`obj.method(…);`).
-    Eval(Expr),
-    /// `target = value` where the target is a member or element of a value
-    /// that is not a plain dotted name (`findplayer(n).chat = …`).
-    SetPart { target: Expr, value: Expr },
-    /// `new Type(name) { body }`: make the object, run the body with it as
-    /// the current object, then add it as a control of the object outside.
-    NewBlock {
-        ty: String,
-        name: Expr,
-        body: Vec<Stmt>,
-    },
-    /// `a = b = … = value`: every target set to the value.
-    Chain { targets: Vec<VarRef>, value: Expr },
-    /// A GS1 command written GS1-style inside GS2 (`setimgpart a.png,0,0,8,8;`),
-    /// parsed and lowered as GS1.
-    Gs1(Stmt),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -279,10 +117,6 @@ pub enum AssignOp {
     Mul,
     Div,
     Mod,
-    /// GS2 `&=`.
-    BitAnd,
-    /// GS2 `|=`.
-    BitOr,
 }
 
 impl AssignOp {
@@ -294,8 +128,6 @@ impl AssignOp {
             AssignOp::Mul => "*=",
             AssignOp::Div => "/=",
             AssignOp::Mod => "%=",
-            AssignOp::BitAnd => "&=",
-            AssignOp::BitOr => "|=",
         }
     }
 }
@@ -369,8 +201,6 @@ pub enum Stmt {
         reason: &'static str,
         line: u32,
     },
-    /// A GS2-only statement. The GS1 grammar never builds one.
-    Gs2(Box<Gs2Stmt>),
 }
 
 /// A problem found while parsing. The script still runs.
@@ -449,7 +279,6 @@ impl fmt::Display for Expr {
                 }
                 write!(f, ")")
             }
-            Expr::Gs2(g) => write!(f, "(gs2 {g:?})"),
         }
     }
 }
@@ -522,7 +351,6 @@ impl fmt::Display for Stmt {
             Stmt::Unknown {
                 name, raw, reason, ..
             } => write!(f, "(unknown {name} {raw:?} {reason})"),
-            Stmt::Gs2(g) => write!(f, "(gs2 {g:?})"),
         }
     }
 }

@@ -5,11 +5,18 @@
 
 use seihai_core::scripting::engine::Era;
 use seihai_core::scripting::engine::Val;
-use seihai_core::scripting::gs2::compile::{self, gs1_commands_without_gs2, gs2_event_function};
+use seihai_core::scripting::gs2::compile::{
+    self, gs1_commands_without_gs2, gs2_event_function, CompileErrors,
+};
 use seihai_core::scripting::gs2::exec::{EffectHost, Machine, Outcome, Root};
 use seihai_core::scripting::gs2::lists::Value;
 use seihai_core::scripting::gs2::{Op, Script};
 use std::path::Path;
+
+/// Legacy mode: these are forms live scripts use.
+fn compile_gs2(src: &str) -> Result<Script, CompileErrors> {
+    compile::compile_gs2_legacy(src).map(|c| c.script)
+}
 
 fn fixture(name: &str) -> Vec<u8> {
     std::fs::read(
@@ -30,7 +37,7 @@ fn gs2_subset_matches_the_shared_fixture_byte_for_byte() {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/gs2/shared.gs2"),
     )
     .unwrap();
-    let got = compile::compile_gs2(&src).unwrap();
+    let got = compile_gs2(&src).unwrap();
     let bytes = fixture("shared.gs2bc");
     let want = Script::parse(&bytes).unwrap();
     assert_eq!(got.disassemble(), want.disassemble(), "opcodes diverged");
@@ -61,7 +68,7 @@ if (created) {
 #[test]
 fn add_function_matches_the_calls_fixture_prefix() {
     let src = "function add(a, b) {\n  return a + b;\n}\n";
-    let got = compile::compile_gs2(src).unwrap();
+    let got = compile_gs2(src).unwrap();
     let want = Script::parse(&fixture("calls.gs2bc")).unwrap();
     assert_eq!(got.strings, &want.strings[..2]);
     assert_eq!(got.functions[0].name, "add");
@@ -75,7 +82,7 @@ fn add_function_matches_the_calls_fixture_prefix() {
 #[test]
 fn while_true_uses_the_calls_fixture_shape() {
     let src = "function onCreated() {\n  while (true) {\n    this.k++;\n  }\n}\n";
-    let got = compile::compile_gs2(src).unwrap();
+    let got = compile_gs2(src).unwrap();
     let names = ops(&got);
     assert_eq!(
         names,
@@ -122,7 +129,7 @@ function onTimeout() {
   }
 }
 ";
-    let got = compile::compile_gs2(src).unwrap();
+    let got = compile_gs2(src).unwrap();
     let names = ops(&got);
     let inc = names.iter().position(|n| n == "OP_INC").unwrap();
     let step = inc - 3;
@@ -156,7 +163,7 @@ function onTimeout() {
   temp.ok = (temp.n > 0 && temp.n < 300) || temp.n == -1;
 }
 ";
-    let got = compile::compile_gs2(src).unwrap();
+    let got = compile_gs2(src).unwrap();
     let names = ops(&got);
     let start = names.iter().position(|n| n == "OP_TEMP").unwrap();
     assert_eq!(
@@ -306,7 +313,7 @@ fn opcode_builtins_reject_missing_and_extra_arguments() {
         for count in [0, arity - 1, arity + 1] {
             let args = vec!["1"; count].join(", ");
             let source = format!("function onCreated() {{ {name}({args}); }}");
-            let error = compile::compile_gs2(&source).unwrap_err().to_string();
+            let error = compile_gs2(&source).unwrap_err().to_string();
             assert!(
                 error.contains(name) && error.contains("expects"),
                 "{source}: {error}"
@@ -314,7 +321,7 @@ fn opcode_builtins_reject_missing_and_extra_arguments() {
         }
         let args = vec!["1"; arity].join(", ");
         let source = format!("function onCreated() {{ {name}({args}); }}");
-        compile::compile_gs2(&source).unwrap_or_else(|error| panic!("{source}: {error}"));
+        compile_gs2(&source).unwrap_or_else(|error| panic!("{source}: {error}"));
     }
 }
 
@@ -339,7 +346,7 @@ fn malformed_nested_builtins_and_gs1_calls_fail_compilation() {
         "function onCreated() { hostcall(cos(1, 2)); }",
         "function onCreated() { if (random(1)) hide(); }",
     ] {
-        assert!(compile::compile_gs2(source).is_err(), "{source}");
+        assert!(compile_gs2(source).is_err(), "{source}");
     }
     for source in [
         "if (created) { sleep; }",
@@ -359,13 +366,13 @@ fn malformed_nested_builtins_and_gs1_calls_fail_compilation() {
 
 #[test]
 fn format_requires_a_pattern_but_keeps_variadic_arguments() {
-    assert!(compile::compile_gs2("function onCreated() { format(); }").is_err());
+    assert!(compile_gs2("function onCreated() { format(); }").is_err());
     for args in ["\"plain\"", "\"%s %s\", 1, 2", "\"%s\", sin(1)"] {
         let source = format!("function onCreated() {{ this.text = format({args}); }}");
-        compile::compile_gs2(&source).unwrap();
+        compile_gs2(&source).unwrap();
     }
     // A name outside the opcode subset is still a script/host call.
-    compile::compile_gs2("function onCreated() { custom(); custom(1, 2, 3, 4); }").unwrap();
+    compile_gs2("function onCreated() { custom(); custom(1, 2, 3, 4); }").unwrap();
 }
 
 fn first_literal(script: &Script) -> Vec<(Op, seihai_core::scripting::gs2::Operand)> {
@@ -398,7 +405,7 @@ fn run_created(script: Script) -> Machine {
 
 #[test]
 fn array_literal_matches_the_existing_fixture_and_both_front_ends() {
-    let gs2 = compile::compile_gs2("function onCreated() { this.a = {10, \"two\", 30}; }").unwrap();
+    let gs2 = compile_gs2("function onCreated() { this.a = {10, \"two\", 30}; }").unwrap();
     let gs1 =
         compile::compile_gs1("if (created) { this.a = {10, \"two\", 30}; }", Era::V21).unwrap();
     assert_eq!(gs1.write(), gs2.write());
@@ -422,8 +429,7 @@ fn array_literal_matches_the_existing_fixture_and_both_front_ends() {
 #[test]
 fn empty_nested_and_trailing_comma_literals_keep_their_structure() {
     let script =
-        compile::compile_gs2("function onCreated() { this.a = {}; this.b = {1, {2, 3,}, {},}; }")
-            .unwrap();
+        compile_gs2("function onCreated() { this.a = {}; this.b = {1, {2, 3,}, {},}; }").unwrap();
     let machine = run_created(script);
     assert_eq!(machine.list(Root::This, "a"), Some([].as_slice()));
     assert_eq!(
@@ -441,7 +447,7 @@ fn empty_nested_and_trailing_comma_literals_keep_their_structure() {
 
 #[test]
 fn gs2_literal_calls_preserve_the_reverse_push_order_and_array_marker() {
-    let script = compile::compile_gs2(
+    let script = compile_gs2(
         "function next() { this.count += 1; return this.count; }
          function onCreated() { this.count = 0; this.a = {next(), next()}; }",
     )
@@ -462,8 +468,7 @@ fn gs1_sparse_entries_and_scalar_expressions_lower_without_losing_positions() {
     )
     .unwrap();
     let gs2 =
-        compile::compile_gs2("function onCreated() { this.a = {1 + 2, 0, -4,}; this.b = {}; }")
-            .unwrap();
+        compile_gs2("function onCreated() { this.a = {1 + 2, 0, -4,}; this.b = {}; }").unwrap();
     assert_eq!(gs1.write(), gs2.write());
     let machine = run_created(gs1);
     assert_eq!(
@@ -484,7 +489,7 @@ fn gs1_sparse_entries_and_scalar_expressions_lower_without_losing_positions() {
 fn malformed_and_unsupported_array_forms_fail_clearly() {
     for literal in ["{1", "{1,,2}", "{,1}", "{1 2}"] {
         let source = format!("function onCreated() {{ this.a = {literal}; }}");
-        assert!(compile::compile_gs2(&source).is_err(), "{source}");
+        assert!(compile_gs2(&source).is_err(), "{source}");
     }
     for (literal, want) in [
         ("{next(), next()}", "one element calls"),
@@ -499,7 +504,7 @@ fn malformed_and_unsupported_array_forms_fail_clearly() {
         assert!(error.contains(want), "{source}: {error}");
     }
     assert!(compile::compile_gs1("if (created) { this.a = {1, 2}; }", Era::V205).is_err());
-    assert!(compile::compile_gs2("function onCreated() { this.a[0] = {1}; }").is_ok());
+    assert!(compile_gs2("function onCreated() { this.a[0] = {1}; }").is_ok());
     assert!(compile::compile_gs1("if (created) { this.a[0] = {1}; }", Era::V21).is_err());
 }
 
@@ -536,10 +541,9 @@ fn element_read_and_write_match_the_lists_fixture() {
     let reference = Script::parse(&fixture("lists.gs2bc")).unwrap();
     // lists.gs2: `this.first = temp.a[0]; temp.a[1] = 20;` is ops 23..=39.
     let want = listing(&reference, 23, 39);
-    let gs2 = compile::compile_gs2(
-        "function onCreated() {\n  this.first = temp.a[0];\n  temp.a[1] = 20;\n}\n",
-    )
-    .unwrap();
+    let gs2 =
+        compile_gs2("function onCreated() {\n  this.first = temp.a[0];\n  temp.a[1] = 20;\n}\n")
+            .unwrap();
     assert_eq!(body(&gs2), want);
     // GS1 has no `temp.`; `this.` lowers the same way on both sides.
     let gs1 = compile::compile_gs1(
@@ -547,10 +551,9 @@ fn element_read_and_write_match_the_lists_fixture() {
         Era::V21,
     )
     .unwrap();
-    let gs2 = compile::compile_gs2(
-        "function onCreated() {\n  this.first = this.a[0];\n  this.a[1] = 20;\n}\n",
-    )
-    .unwrap();
+    let gs2 =
+        compile_gs2("function onCreated() {\n  this.first = this.a[0];\n  this.a[1] = 20;\n}\n")
+            .unwrap();
     assert_eq!(gs1.write(), gs2.write());
     assert!(ops(&gs1).contains(&"OP_ARRAY".to_string()));
     assert!(ops(&gs1).contains(&"OP_ARRAY_ASSIGN".to_string()));
@@ -561,20 +564,18 @@ fn two_index_read_and_write_match_the_lists_fixture() {
     let reference = Script::parse(&fixture("lists.gs2bc")).unwrap();
     // `temp.g[1, 2] = 9; this.g = temp.g[1, 2];` is ops 171..=189.
     let want = listing(&reference, 171, 189);
-    let gs2 = compile::compile_gs2(
-        "function onCreated() {\n  temp.g[1, 2] = 9;\n  this.g = temp.g[1, 2];\n}\n",
-    )
-    .unwrap();
+    let gs2 =
+        compile_gs2("function onCreated() {\n  temp.g[1, 2] = 9;\n  this.g = temp.g[1, 2];\n}\n")
+            .unwrap();
     assert_eq!(body(&gs2), want);
     let gs1 = compile::compile_gs1(
         "if (created) {\n  this.h[1, 2] = 9;\n  this.g = this.h[1, 2];\n}\n",
         Era::V21,
     )
     .unwrap();
-    let gs2 = compile::compile_gs2(
-        "function onCreated() {\n  this.h[1, 2] = 9;\n  this.g = this.h[1, 2];\n}\n",
-    )
-    .unwrap();
+    let gs2 =
+        compile_gs2("function onCreated() {\n  this.h[1, 2] = 9;\n  this.g = this.h[1, 2];\n}\n")
+            .unwrap();
     assert_eq!(gs1.write(), gs2.write());
 }
 
@@ -583,13 +584,11 @@ fn in_array_matches_the_lists_fixture() {
     let reference = Script::parse(&fixture("lists.gs2bc")).unwrap();
     // `this.has = 40 in temp.a;` is ops 89..=98.
     let want = listing(&reference, 89, 98);
-    let gs2 =
-        compile::compile_gs2("function onCreated() {\n  this.has = 40 in temp.a;\n}\n").unwrap();
+    let gs2 = compile_gs2("function onCreated() {\n  this.has = 40 in temp.a;\n}\n").unwrap();
     assert_eq!(body(&gs2), want);
     let gs1 =
         compile::compile_gs1("if (created) {\n  this.has = 40 in this.a;\n}\n", Era::V21).unwrap();
-    let gs2 =
-        compile::compile_gs2("function onCreated() {\n  this.has = 40 in this.a;\n}\n").unwrap();
+    let gs2 = compile_gs2("function onCreated() {\n  this.has = 40 in this.a;\n}\n").unwrap();
     assert_eq!(gs1.write(), gs2.write());
 }
 
@@ -633,9 +632,9 @@ fn lowered_elements_run_on_the_gs2_machine() {
 
 #[test]
 fn a_call_in_an_index_marks_the_function_as_calling() {
-    let script = compile::compile_gs2("function onCreated() { this.a[pick()] = 1; }").unwrap();
+    let script = compile_gs2("function onCreated() { this.a[pick()] = 1; }").unwrap();
     assert!(ops(&script).contains(&"OP_CMD_CALL".to_string()));
-    let script = compile::compile_gs2("function onCreated() { this.x = this.a[pick()]; }").unwrap();
+    let script = compile_gs2("function onCreated() { this.x = this.a[pick()]; }").unwrap();
     assert!(ops(&script).contains(&"OP_CMD_CALL".to_string()));
 }
 
@@ -656,7 +655,7 @@ fn element_forms_without_a_fixture_stay_errors() {
     }
     // The GS2 front compiles them: `a[i] += v` as `a[i] = a[i] + v`
     // (Seihai's form), `a[i]++` as the element read and `OP_INC`.
-    let s = compile::compile_gs2("function onCreated() { this.a[0] += 1; }").unwrap();
+    let s = compile_gs2("function onCreated() { this.a[0] += 1; }").unwrap();
     assert_eq!(
         &ops(&s)[4..],
         [
@@ -680,7 +679,7 @@ fn element_forms_without_a_fixture_stay_errors() {
             "OP_RET",
         ]
     );
-    let s = compile::compile_gs2("function onCreated() { a[i]++; }").unwrap();
+    let s = compile_gs2("function onCreated() { a[i]++; }").unwrap();
     assert_eq!(
         &ops(&s)[4..11],
         [
@@ -697,7 +696,7 @@ fn element_forms_without_a_fixture_stay_errors() {
     // element, then `OP_MEMBER_ACCESS` or another `OP_ARRAY` (no fixture).
     for stmt in ["this.x = npcs[0].x;", "this.x = this.a[0][1];"] {
         let source = format!("function onCreated() {{ {stmt} }}");
-        let got = compile::compile_gs2(&source).unwrap();
+        let got = compile_gs2(&source).unwrap();
         assert!(got.disassemble().contains("OP_ARRAY"), "{source}");
     }
 }
@@ -723,7 +722,7 @@ fn joins_conditionals_ranges_and_player_position_lower_and_run() {
     assert_eq!(machine.var(Root::This, "r"), Some(&Val::Num(1.0)));
     assert_eq!(machine.var(Root::This, "o"), Some(&Val::Num(0.0)));
     let gs1 = compile::compile_gs1("if (created) { this.x = playerx; }", Era::V205).unwrap();
-    let gs2 = compile::compile_gs2("function onCreated() { this.x = player.x; }").unwrap();
+    let gs2 = compile_gs2("function onCreated() { this.x = player.x; }").unwrap();
     assert_eq!(gs1.write(), gs2.write());
 }
 
@@ -822,7 +821,7 @@ fn array_literals_whose_order_cannot_matter_lower_with_calls() {
             Era::V21,
         )
         .unwrap();
-        let gs2 = compile::compile_gs2(&format!(
+        let gs2 = compile_gs2(&format!(
             "function next() {{ return 4; }}\nfunction onCreated() {{ this.a = {literal}; }}"
         ))
         .unwrap();
@@ -873,7 +872,7 @@ fn with_matches_the_rest_fixture_in_both_front_ends() {
     let want = with_block(&reference, 141, 161);
     assert_eq!(want[0], "OP_PLAYER");
     assert_eq!(want[20], "OP_WITHEND");
-    let gs2 = compile::compile_gs2(
+    let gs2 = compile_gs2(
         "function onCreated() {\n  with (player) {\n    x = 12;\n    this.inw = 1;\n  }\n  with (null) {\n    this.never = 1;\n  }\n}\n",
     )
     .unwrap();
@@ -922,8 +921,8 @@ fn gs1_with_bodies_that_change_meaning_stay_errors() {
         ("this.a = next();", "script's own functions"),
         ("sleep 1;", "`sleep`"),
         ("return;", "`return`"),
-        ("i = 1;", "script variable `i`"),
-        ("i++;", "script variable `i`"),
+        ("with (this.p) { i = 1; }", "script variable `i`"),
+        ("with (this.p) { i++; }", "script variable `i`"),
         ("this.a = playerx;", "`playerx`"),
         ("player.chat = 1;", "`player.chat`"),
         ("client.a = 1;", "`client.a`"),
@@ -945,10 +944,7 @@ fn gs1_with_bodies_that_change_meaning_stay_errors() {
     .to_string();
     assert!(err.contains("leaves a `with` block"), "{err}");
     // GS2 jumps straight out; the executor closes the block.
-    assert!(compile::compile_gs2(
-        "function onCreated() { while (1) { with (player) { break; } } }"
-    )
-    .is_ok());
+    assert!(compile_gs2("function onCreated() { while (1) { with (player) { break; } } }").is_ok());
     // Before 2.1 `with` is not GS1.
     assert!(
         compile::compile_gs1("if (created) { with (this.o) { x = 1; } }\n", Era::V205).is_err()
@@ -962,7 +958,7 @@ fn repeated_event_tests_merge_into_one_function_in_source_order() {
         Era::V205,
     )
     .unwrap();
-    let want = compile::compile_gs2(
+    let want = compile_gs2(
         "function onCreated() { hide(); set(\"a\"); }\nfunction onPlayerEnters() { show(); }\n",
     )
     .unwrap();
@@ -982,7 +978,7 @@ fn repeated_event_tests_merge_into_one_function_in_source_order() {
 fn gs1_join_lowers_to_the_gs2_join_call() {
     assert!(!gs1_commands_without_gs2().contains(&"join"));
     let got = compile::compile_gs1("if (created) { join baddyclass; }\n", Era::V21).unwrap();
-    let want = compile::compile_gs2("function onCreated() { join(\"baddyclass\"); }\n").unwrap();
+    let want = compile_gs2("function onCreated() { join(\"baddyclass\"); }\n").unwrap();
     assert_eq!(ops(&got), ops(&want));
     assert_eq!(got.strings, want.strings);
     assert_eq!(got.write(), want.write());
@@ -1000,8 +996,7 @@ fn fixture_source(name: &str) -> String {
 #[test]
 fn gs2_front_end_matches_six_fixtures() {
     for name in ["shared", "timers", "strings", "lists", "rest", "objects"] {
-        let got =
-            compile::compile_gs2(&fixture_source(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let got = compile_gs2(&fixture_source(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
         let bytes = fixture(&format!("{name}.gs2bc"));
         let want = Script::parse(&bytes).unwrap();
         assert_eq!(got.disassemble(), want.disassemble(), "{name}");
@@ -1019,7 +1014,7 @@ fn gs2_front_end_matches_six_fixtures() {
 #[test]
 fn gs2_front_end_differs_from_two_fixtures_by_one_deliberate_instruction() {
     for (name, extra) in [("control", Op::SetIndex), ("calls", Op::IndexDec)] {
-        let got = compile::compile_gs2(&fixture_source(name)).unwrap();
+        let got = compile_gs2(&fixture_source(name)).unwrap();
         let want = Script::parse(&fixture(&format!("{name}.gs2bc"))).unwrap();
         let (g, w) = (ops(&got), ops(&want));
         assert_eq!(g.len(), w.len() + 1, "{name}");
@@ -1034,7 +1029,7 @@ fn gs2_front_end_differs_from_two_fixtures_by_one_deliberate_instruction() {
 #[test]
 fn gs2_switch_default_without_break_leaves_the_switch() {
     let src = "function onCreated() {\n  switch (this.n) {\n    case 1: this.a = 1; break;\n    default: this.a = 2;\n  }\n  this.done = 1;\n}\n";
-    let mut m = Machine::new(compile::compile_gs2(src).unwrap());
+    let mut m = Machine::new(compile_gs2(src).unwrap());
     let mut h = EffectHost::new(Era::V21, 1);
     assert_eq!(m.run_top_level(&mut h), Outcome::Done);
     assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
@@ -1054,7 +1049,7 @@ fn gs2_corpus_shapes_compile() {
         "function onCreated() { temp.q = this.n > 0 ? \"y\" : \"n\"; temp.e = \"say \\\"hi\\\"\"; }",
         "this.loaded = 1;\nif (created) setTimer(1);\nfunction onTimeout() { this.k = 1 << 3; }\n",
     ] {
-        compile::compile_gs2(src).unwrap_or_else(|e| panic!("{src}\n{e}"));
+        compile_gs2(src).unwrap_or_else(|e| panic!("{src}\n{e}"));
     }
 }
 
@@ -1111,7 +1106,7 @@ fn gs1_message_codes_and_string_commands_lower_and_run() {
 #[test]
 fn gs2_assigns_to_members_and_elements_of_values() {
     let src = "function onCreated() { temp.l = {1, 2}; temp.l[0] = 5; findplayer(\"a\").chat = \"hi\"; temp.g = new[2][2]; temp.g[1, 1] = 3; }";
-    compile::compile_gs2(src).unwrap();
+    compile_gs2(src).unwrap();
     compile::compile_gs1(
         "if (created) { message #s(clientr.x) #s(serverr.y); }\n",
         Era::V21,
