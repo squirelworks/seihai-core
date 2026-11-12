@@ -131,6 +131,10 @@ pub enum Quirk {
     /// The script did not say which language it is in; it was read as this
     /// one.
     GuessedLanguage(Front),
+    /// A GS1 script for this version that uses later GS1 (`with`, `in`
+    /// with a variable or `<a, b>`, `{…}` lists, newer commands); it was
+    /// compiled as GS1 2.1.
+    LaterGs1(Era),
 }
 
 impl fmt::Display for Quirk {
@@ -177,6 +181,12 @@ impl fmt::Display for Quirk {
             Quirk::SlashWord(word) => write!(f, "unquoted argument `{word}`"),
             Quirk::GuessedLanguage(Front::Gs1) => write!(f, "language not given; read as GS1"),
             Quirk::GuessedLanguage(Front::Gs2) => write!(f, "language not given; read as GS2"),
+            Quirk::LaterGs1(era) => {
+                write!(
+                    f,
+                    "GS1 newer than the script's version ({era:?}); read as GS1 2.1"
+                )
+            }
         }
     }
 }
@@ -248,7 +258,7 @@ pub struct Compiled {
 /// Compile a script.
 pub fn compile(src: &str, language: Language, mode: Mode) -> Result<Compiled, CompileErrors> {
     match language {
-        Language::Gs1(era) => gs1_script(src, era),
+        Language::Gs1(era) => gs1_script(src, era, mode),
         Language::Gs2 => gs2_script(src, mode),
         Language::Detect(era) => detect(src, era, mode),
     }
@@ -269,15 +279,29 @@ pub fn compile_gs2_legacy(src: &str) -> Result<Compiled, CompileErrors> {
     compile(src, Language::Gs2, Mode::Legacy)
 }
 
-/// GS1 has no quirks of its own: the GS1 grammar is the GS1 engine's, and
-/// a script it reports a problem in is refused in both modes.
-fn gs1_script(src: &str, era: Era) -> Result<Compiled, CompileErrors> {
-    let program = gs1::program(src, era)?;
-    Ok(Compiled {
-        script: codegen::generate(&program, lexer::Spellings::default())?,
-        front: Front::Gs1,
-        warnings: Vec::new(),
-    })
+/// The GS1 grammar is the GS1 engine's, and a script it reports a problem
+/// in is refused in both modes. The one GS1 quirk is a script that uses
+/// GS1 newer than its version: legacy mode reads it as GS1 2.1.
+fn gs1_script(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors> {
+    let compiled = |era| -> Result<Compiled, CompileErrors> {
+        let program = gs1::program(src, era)?;
+        Ok(Compiled {
+            script: codegen::generate(&program, lexer::Spellings::default())?,
+            front: Front::Gs1,
+            warnings: Vec::new(),
+        })
+    };
+    match compiled(era) {
+        Err(e) if mode == Mode::Legacy && era < Era::V21 => {
+            let mut c = compiled(Era::V21).map_err(|_| e)?;
+            c.warnings.push(Warning {
+                line: 0,
+                quirk: Quirk::LaterGs1(era),
+            });
+            Ok(c)
+        }
+        r => r,
+    }
 }
 
 fn gs2_script(src: &str, mode: Mode) -> Result<Compiled, CompileErrors> {
@@ -335,13 +359,13 @@ fn detect(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors> {
         c
     };
     if looks_gs1(src) {
-        if let Ok(c) = gs1_script(src, era) {
+        if let Ok(c) = gs1_script(src, era, mode) {
             return Ok(guessed(c));
         }
     }
     match gs2_script(src, Mode::Legacy) {
         Ok(c) => Ok(guessed(c)),
-        Err(e) => gs1_script(src, era).map(guessed).map_err(|_| e),
+        Err(e) => gs1_script(src, era, mode).map(guessed).map_err(|_| e),
     }
 }
 

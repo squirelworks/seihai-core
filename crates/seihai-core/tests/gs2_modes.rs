@@ -234,3 +234,27 @@ fn a_new_block_must_stand_alone() {
     }
     compile_gs2("function f() { new T(\"a\") { y = 1; } }").unwrap();
 }
+
+#[test]
+fn legacy_mode_reads_later_gs1_as_gs1_2_1() {
+    // GS1 2.05 scripts that use features 2.05 gates: `with`, `in` with a
+    // variable, `in <a, b>`, `{…}` lists, and a later command.
+    for src in [
+        "if (created) {\n  with (getplayer(#a)) {\n    hide;\n  }\n}",
+        "if (actiongrab) {\n  if (strequals(#g,w1 w2) || player.a in b) {\n    c = 1;\n  }\n}",
+        "function a() {\n  if (playerx in <x+1,x+3> && playery > y) {\n    d = 1;\n  }\n}",
+        "if (created) {\n  this.a = {0,1,2,3};\n}",
+        "if (created) {\n  seteffectmode 2;\n}",
+    ] {
+        assert!(compile_gs1(src, Era::V205).is_err(), "{src}");
+        let got = compile(src, Language::Gs1(Era::V205), Mode::Legacy)
+            .unwrap_or_else(|e| panic!("{src}: {e}"));
+        let quirks: Vec<Quirk> = got.warnings.into_iter().map(|w| w.quirk).collect();
+        assert_eq!(quirks, [Quirk::LaterGs1(Era::V205)], "{src}");
+        assert_eq!(
+            got.script.write(),
+            compile_gs1(src, Era::V21).unwrap().write(),
+            "{src}"
+        );
+    }
+}
