@@ -490,8 +490,8 @@ pub struct SessionState {
     pub own_attrs: [Option<String>; 5],
     /// Read prop 10 as the pre-2.1 bow slot.
     pub bow_prop10: bool,
-    /// `PLO_OTHERPLPROPS` starts with a one-GCHAR player id (1.35), not a
-    /// GSHORT (1.36 on).
+    /// `PLO_OTHERPLPROPS` starts with a one-GCHAR player id (1.21 to 1.35),
+    /// not a GSHORT (1.36 on).
     pub other_id_gchar: bool,
     /// Server→client ids this client version handles. Others are counted
     /// in `ignored` and dropped, as that client would. `None` takes all.
@@ -681,9 +681,10 @@ impl SessionState {
         Self {
             file_has_modtime: p.files.modtime,
             bow_prop10: p.props.bow_prop10,
-            // Original 1.35 reads the other player's id as one GCHAR
-            // (exact-build static evidence, graal-client-repro#179).
-            other_id_gchar: version == ClientVersion::V135,
+            // 1.21 to 1.35 read the other player's id as one GCHAR: 1.35
+            // from exact-build static evidence (graal-client-repro#179),
+            // the earlier builds as seihai-gserver #74 sends to them.
+            other_id_gchar: one_byte_player_ids(version),
             known_plo: Some(p.protocol.plo),
             own_prop_ids: Some(p.props.own),
             other_prop_ids: Some(p.props.other),
@@ -1865,8 +1866,18 @@ struct OtherUpdate {
     left: bool,
 }
 
+/// The builds whose `PLO_OTHERPLPROPS` carries a one-GCHAR player id:
+/// 1.21 to 1.35. 1.36 and later read a GSHORT.
+pub fn one_byte_player_ids(version: ClientVersion) -> bool {
+    use ClientVersion::*;
+    matches!(
+        version,
+        V121 | V128B2 | V13T | V131 | V132 | V133 | V134 | V135
+    )
+}
+
 /// Parse one `PLO_OTHERPLPROPS` payload: the player id (one GCHAR when
-/// `id_gchar`, as 1.35 sends it, else a GSHORT) + prop stream.
+/// `id_gchar`, as 1.21 to 1.35 send it, else a GSHORT) + prop stream.
 fn parse_other_player(
     payload: &[u8],
     id_gchar: bool,
@@ -2673,18 +2684,33 @@ mod tests {
         [&[8 + 0x20][..], &gs(id), props, b"\n"].concat()
     }
 
-    /// 1.35 reads the other player's id as one GCHAR; 1.36 reads a GSHORT.
+    /// 1.21 to 1.35 read the other player's id as one GCHAR; 1.36 and later
+    /// read a GSHORT.
     #[test]
-    fn otherplprops_id_is_one_byte_for_1_35() {
+    fn otherplprops_id_is_one_byte_for_1_21_to_1_35() {
+        use ClientVersion::*;
         let props = [15 + 0x20, 40 + 0x20, 16 + 0x20, 50 + 0x20];
-        let mut st = SessionState::for_version(ClientVersion::V135);
-        st.apply_body(&[&[8 + 0x20, 7 + 0x20][..], &props, b"\n"].concat());
-        let got: Vec<_> = st.others.iter().map(|o| (o.id, o.x, o.y)).collect();
-        assert_eq!(got, vec![(7, 20.0, 25.0)]);
-        let mut st = SessionState::for_version(ClientVersion::V136);
-        st.apply_body(&other(7, &props));
-        let got: Vec<_> = st.others.iter().map(|o| (o.id, o.x, o.y)).collect();
-        assert_eq!(got, vec![(7, 20.0, 25.0)]);
+        let one_byte = [V121, V128B2, V13T, V131, V132, V133, V134, V135];
+        for v in ClientVersion::all_versions() {
+            assert_eq!(
+                one_byte_player_ids(*v),
+                one_byte.contains(v),
+                "{}",
+                v.label()
+            );
+        }
+        for v in one_byte {
+            let mut st = SessionState::for_version(v);
+            st.apply_body(&[&[8 + 0x20, 7 + 0x20][..], &props, b"\n"].concat());
+            let got: Vec<_> = st.others.iter().map(|o| (o.id, o.x, o.y)).collect();
+            assert_eq!(got, vec![(7, 20.0, 25.0)], "{}", v.label());
+        }
+        for v in [V136, V139, V231] {
+            let mut st = SessionState::for_version(v);
+            st.apply_body(&other(7, &props));
+            let got: Vec<_> = st.others.iter().map(|o| (o.id, o.x, o.y)).collect();
+            assert_eq!(got, vec![(7, 20.0, 25.0)], "{}", v.label());
+        }
     }
 
     #[test]
