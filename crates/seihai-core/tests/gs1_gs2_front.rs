@@ -248,8 +248,11 @@ fn commands_and_functions_without_gs2_are_errors() {
     let err =
         compile::compile_gs1("if (created) { with (player) { hide; } }\n", Era::V21).unwrap_err();
     assert!(err.to_string().contains("`with` body"), "{err}");
-    let err =
-        compile::compile_gs1("if (created) hide;\nif (created) show;\n", Era::V205).unwrap_err();
+    let err = compile::compile_gs1(
+        "function onCreated() { hide; }\nfunction onCreated() { show; }\n",
+        Era::V205,
+    )
+    .unwrap_err();
     assert!(err.to_string().contains("duplicate"), "{err}");
     let err = compile::compile_gs1("x = 1;\n", Era::V205).unwrap_err();
     assert!(err.to_string().contains("top-level"), "{err}");
@@ -911,4 +914,37 @@ fn gs1_with_bodies_that_change_meaning_stay_errors() {
     assert!(
         compile::compile_gs1("if (created) { with (this.o) { x = 1; } }\n", Era::V205).is_err()
     );
+}
+
+#[test]
+fn repeated_event_tests_merge_into_one_function_in_source_order() {
+    let merged = compile::compile_gs1(
+        "if (created) hide;\nif (playerenters) show;\nif (created) { set a; }\n",
+        Era::V205,
+    )
+    .unwrap();
+    let want = compile::compile_gs2(
+        "function onCreated() { hide(); set(\"a\"); }\nfunction onPlayerEnters() { show(); }\n",
+    )
+    .unwrap();
+    assert_eq!(merged.functions, want.functions);
+    assert_eq!(ops(&merged), ops(&want));
+    assert_eq!(merged.write(), want.write());
+
+    let err = compile::compile_gs1(
+        "if (created) { if (x) return; hide; }\nif (created) show;\n",
+        Era::V21,
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("not merged"), "{err}");
+}
+
+#[test]
+fn gs1_join_lowers_to_the_gs2_join_call() {
+    assert!(!gs1_commands_without_gs2().contains(&"join"));
+    let got = compile::compile_gs1("if (created) { join baddyclass; }\n", Era::V21).unwrap();
+    let want = compile::compile_gs2("function onCreated() { join(\"baddyclass\"); }\n").unwrap();
+    assert_eq!(ops(&got), ops(&want));
+    assert_eq!(got.strings, want.strings);
+    assert_eq!(got.write(), want.write());
 }

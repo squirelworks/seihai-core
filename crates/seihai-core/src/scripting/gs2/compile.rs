@@ -90,7 +90,9 @@ impl CompileErrors {
 /// A name is kept when it is in the 3.153 command tables
 /// (`documentation/gs2-shared-commands.md`), when `gs2-executor.md` names it
 /// as a call the host still accepts (`set`, `unset`, `setlevel`,
-/// `setlevel2`, `setplayerprop`), or when `gs2-opcodes.md` gives it an
+/// `setlevel2`, `setplayerprop`), when `gs2-grammar.md` says the compiler
+/// keeps it as a call by name (`join("class")`, so GS1 `join class;` lowers
+/// to that call with the class name as a string), or when `gs2-opcodes.md` gives it an
 /// opcode (`sleep`, `setarray`). The string-list commands are the case the
 /// notes call out: GS2 has list methods instead, and a call by the GS1 name
 /// is not a GS2 command.
@@ -106,7 +108,7 @@ fn gs2_has_command(name: &str) -> bool {
     GS2_CLIENT_COMMANDS.binary_search(&name).is_ok()
         || matches!(
             name,
-            "set" | "unset" | "setlevel" | "setlevel2" | "setplayerprop"
+            "set" | "unset" | "setlevel" | "setlevel2" | "setplayerprop" | "join"
         )
         || opcode_builtin(name).is_some()
 }
@@ -558,8 +560,14 @@ fn finish(built: Built) -> Result<Script, CompileErrors> {
     Script::parse(&script.write()).map_err(|message| CompileErrors::one(0, message))
 }
 
+/// Lifts top-level GS1 into GS2 functions. Several `if (created)` blocks
+/// (or any repeated event test) become one `onCreated`, their bodies in
+/// source order: GS1 runs every block whose test is true, top to bottom, and
+/// only one event is true per run. A block that can `return` is not merged,
+/// since the return would skip the blocks after it.
 fn lift_gs1(body: Vec<Stmt>, era: Era) -> Result<Vec<Item>, CompileErrors> {
-    let mut items = Vec::new();
+    let mut items: Vec<Item> = Vec::new();
+    let mut event_items = HashMap::<String, usize>::new();
     let mut errors = Vec::new();
     for stmt in body {
         match stmt {
@@ -591,7 +599,22 @@ fn lift_gs1(body: Vec<Stmt>, era: Era) -> Result<Vec<Item>, CompileErrors> {
                         } else {
                             base.clone()
                         };
-                        items.push(Item { name: gs2_event_function(&event), params: Vec::new(), body });
+                        let name = gs2_event_function(&event);
+                        if let Some(&at) = event_items.get(&name) {
+                            if items[at].body.iter().any(can_return) {
+                                errors.push(CompileError {
+                                    line: 0,
+                                    message: format!(
+                                        "`{name}` blocks are not merged because an earlier one can return"
+                                    ),
+                                });
+                                continue;
+                            }
+                            items[at].body.extend(body);
+                        } else {
+                            event_items.insert(name.clone(), items.len());
+                            items.push(Item { name, params: Vec::new(), body });
+                        }
                     }
                 }
             },
@@ -605,6 +628,17 @@ fn lift_gs1(body: Vec<Stmt>, era: Era) -> Result<Vec<Item>, CompileErrors> {
         return Err(CompileErrors { errors });
     }
     Ok(items)
+}
+
+fn can_return(s: &Stmt) -> bool {
+    match s {
+        Stmt::Return(_) => true,
+        Stmt::Block(v) => v.iter().any(can_return),
+        Stmt::If { then, els, .. } => can_return(then) || els.as_deref().is_some_and(can_return),
+        Stmt::While { body, .. } | Stmt::With { body, .. } => can_return(body),
+        Stmt::For { body, .. } => can_return(body),
+        _ => false,
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
