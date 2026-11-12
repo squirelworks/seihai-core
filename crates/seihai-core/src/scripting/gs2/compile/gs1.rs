@@ -1250,6 +1250,21 @@ impl Lower {
     /// A call. Built-ins keep their names (code generation knows them);
     /// GS1-only built-ins are lowered here.
     fn call(&mut self, name: &str, args: &[g::Expr]) -> Expr {
+        // `this.join("c")`, `obj.f(x)`: a method call on the object, as
+        // GS2 encodes it, not a call of a function named `this.join`.
+        if let Some((obj, method)) = name.rsplit_once('.') {
+            if !obj.is_empty() && !method.is_empty() {
+                let obj = Expr::Var(Var {
+                    name: self.name(obj),
+                    index: Vec::new(),
+                });
+                return Expr::Method {
+                    obj: Box::new(obj),
+                    name: method.into(),
+                    args: args.iter().map(|a| self.expr(a)).collect(),
+                };
+            }
+        }
         let gs1_arity = match name {
             "strlen" => Some(1),
             "startswith" | "indexof" => Some(2),

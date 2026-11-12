@@ -283,3 +283,16 @@ fn detect_tries_gs2_before_later_gs1() {
         .iter()
         .any(|w| w.quirk == Quirk::LaterGs1(Era::V205)));
 }
+
+#[test]
+fn a_gs1_method_call_is_a_member_call() {
+    // GS2-style calls in a GS1 script call a method on the object, not a
+    // function whose name has a dot in it.
+    let gs1 = "function onCreated() {\n  this.join(\"c\");\n  this.setshape(1, 32, 32);\n  x = player.level.name.length();\n}";
+    // GS1 folds names to lower case.
+    let gs2 = "function oncreated() {\n  this.join(\"c\");\n  this.setshape(1, 32, 32);\n  x = player.level.name.length();\n}";
+    assert_eq!(
+        compile_gs1(gs1, Era::V205).unwrap().write(),
+        compile_gs2(gs2).unwrap().write()
+    );
+}
