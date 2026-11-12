@@ -640,6 +640,8 @@ impl<'a> Run<'a> {
             }
             // A list outside an assignment has no value of its own.
             Expr::List(_) => Val::default(),
+            // The GS1 grammar never builds a GS2-only form.
+            Expr::Gs2(_) => Val::default(),
             Expr::InArray { e, name } => {
                 let x = self.eval(e);
                 let len = self

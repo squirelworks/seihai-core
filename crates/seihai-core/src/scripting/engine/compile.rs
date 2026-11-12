@@ -276,6 +276,8 @@ impl Compiler {
                     line: *line,
                 });
             }
+            // The GS1 grammar never builds a GS2-only statement.
+            Stmt::Gs2(_) => {}
         }
     }
 

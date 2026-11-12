@@ -287,3 +287,17 @@ fn shared_commands_match_in_any_case_and_under_this() {
         ]
     );
 }
+
+#[test]
+fn gs2_top_level_code_runs_from_op_zero_around_functions() {
+    use seihai_core::scripting::gs2::compile::compile_gs2;
+    let src = "this.a = 1;\nfunction onCreated() { this.b = this.a + 1; }\nthis.a += 10;\nfunction onTimeout() { this.c = 3; }\n";
+    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let mut h = host();
+    assert_eq!(m.run_top_level(&mut h), Outcome::Done);
+    assert_eq!(m.var(Root::This, "a"), Some(&Val::Num(11.0)));
+    assert_eq!(m.var(Root::This, "b"), None);
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    assert_eq!(m.var(Root::This, "b"), Some(&Val::Num(12.0)));
+    assert_eq!(m.var(Root::This, "c"), None);
+}
