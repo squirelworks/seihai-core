@@ -13,4 +13,6 @@ name = "seihai_draw"
 path = "src/lib.rs"
 
 [dependencies]
-seihai-core.workspace = true
+# The core of this same repo and tag, so a Level or Gani a tool parses is
+# the type this crate paints. No core features: drawing needs none.
+seihai-core = { path = "../seihai-core", default-features = false }
