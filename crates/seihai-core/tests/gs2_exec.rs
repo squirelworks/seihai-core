@@ -331,3 +331,52 @@ fn leaving_a_with_block_by_break_continue_or_return_closes_it() {
     }
     assert_eq!(m.var(Root::This, "r"), Some(&Val::Num(4.0)));
 }
+
+#[test]
+fn v6_shapes_run_as_written() {
+    use seihai_core::scripting::gs2::compile::compile_gs2;
+    let src = "/* outer /* inner */ still a comment */\n\
+               if (1 == 1) {\n\
+                 function g(a, b) return a &= b;\n\
+               }\n\
+               function onCreated() {\n\
+                 if (this.no) this.p = 1;\n\
+                 else this.p = 2, this.q = 3;\n\
+                 this.m = 6; this.m |= 9; this.m &= 12;\n\
+                 this.b = g(6, 3);\n\
+                 this.s = strequals(\"/Sit\", /sit);\n\
+                 seteffectmode 2;\n\
+               }\n";
+    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let mut h = EffectHost::new(Era::V205, 7);
+    assert_eq!(m.run_top_level(&mut h), Outcome::Done);
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    let n = |v: f64| Some(Val::Num(v));
+    let get = |k: &str| m.var(Root::This, k).cloned();
+    assert_eq!((get("p"), get("q")), (n(2.0), n(3.0)));
+    // 6 | 9 = 15, 15 & 12 = 12; 6 & 3 = 2.
+    assert_eq!((get("m"), get("b")), (n(12.0), n(2.0)));
+    assert_eq!(get("s"), n(1.0));
+    assert!(h.log.is_empty(), "{:?}", h.log);
+    assert_eq!(
+        h.effects,
+        [Effect::Command {
+            obj: 7,
+            name: "seteffectmode".into(),
+            args: vec![Val::Num(2.0)]
+        }]
+    );
+}
+
+#[test]
+fn a_function_returns_the_value_of_its_own_variable() {
+    use seihai_core::scripting::gs2::compile::compile_gs2;
+    let src = "function g(a) { temp.t = a + 1; return temp.t; }\n\
+               function h(a) return a += 2;\n\
+               function onCreated() { this.b = g(6); this.c = h(6); }";
+    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let mut h = host();
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    assert_eq!(m.var(Root::This, "b"), Some(&Val::Num(7.0)));
+    assert_eq!(m.var(Root::This, "c"), Some(&Val::Num(8.0)));
+}

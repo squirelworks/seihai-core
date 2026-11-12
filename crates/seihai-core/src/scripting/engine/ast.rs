@@ -279,6 +279,10 @@ pub enum AssignOp {
     Mul,
     Div,
     Mod,
+    /// GS2 `&=`.
+    BitAnd,
+    /// GS2 `|=`.
+    BitOr,
 }
 
 impl AssignOp {
@@ -290,6 +294,8 @@ impl AssignOp {
             AssignOp::Mul => "*=",
             AssignOp::Div => "/=",
             AssignOp::Mod => "%=",
+            AssignOp::BitAnd => "&=",
+            AssignOp::BitOr => "|=",
         }
     }
 }
