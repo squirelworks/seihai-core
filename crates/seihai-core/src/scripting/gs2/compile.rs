@@ -497,17 +497,34 @@ fn event_arms(e: &Expr, era: Era) -> Arms {
                 }
             }
         },
-        Expr::Bin(BinOp::And, a, b) => match (event_var(a, era), event_var(b, era)) {
-            (Some(ev), None) => Arms::Events(vec![(ev, Some((**b).clone()))]),
-            (None, Some(ev)) => Arms::Events(vec![(ev, Some((**a).clone()))]),
-            _ => {
-                if contains_event(e, era) {
-                    Arms::Complex
-                } else {
-                    Arms::NotEvent
+        // `a && event && b && …`: one event among the terms, the rest a
+        // guard in source order. A term before the event that calls a
+        // function would run in every event in GS1, so that stays complex.
+        Expr::Bin(BinOp::And, _, _) => {
+            let mut terms = Vec::new();
+            and_terms(e, &mut terms);
+            let events: Vec<usize> = (0..terms.len())
+                .filter(|&i| event_var(terms[i], era).is_some())
+                .collect();
+            let others_clean = terms
+                .iter()
+                .enumerate()
+                .all(|(i, t)| events.contains(&i) || !contains_event(t, era));
+            match events.as_slice() {
+                [at] if others_clean && !terms[..*at].iter().any(|t| mentions_any_call(t)) => {
+                    let ev = event_var(terms[*at], era).unwrap();
+                    let guard = terms
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| i != at)
+                        .map(|(_, t)| (*t).clone())
+                        .reduce(|a, b| Expr::Bin(BinOp::And, Box::new(a), Box::new(b)));
+                    Arms::Events(vec![(ev, guard)])
                 }
+                [] if others_clean => Arms::NotEvent,
+                _ => Arms::Complex,
             }
-        },
+        }
         _ => {
             if contains_event(e, era) {
                 Arms::Complex
@@ -515,6 +532,189 @@ fn event_arms(e: &Expr, era: Era) -> Arms {
                 Arms::NotEvent
             }
         }
+    }
+}
+
+fn plain_var(name: &str) -> VarRef {
+    VarRef {
+        name: name.to_string(),
+        index: Vec::new(),
+        field_after_index: false,
+    }
+}
+
+/// The GS2 property a GS1 `setcharprop` code sets on the NPC itself.
+fn char_prop(code: &str) -> Option<VarRef> {
+    let prop = match code {
+        "#c" => "this.chat",
+        "#n" => "this.nick",
+        "#1" => "this.swordimg",
+        "#2" => "this.shieldimg",
+        "#3" => "this.headimg",
+        "#8" => "this.bodyimg",
+        _ => {
+            let (base, n, lo, hi) = match code.strip_prefix("#C") {
+                Some(n) => ("this.colors", n, 0, 4),
+                None => ("this.attr", code.strip_prefix("#P")?, 1, 30),
+            };
+            let i: u32 = n.parse().ok()?;
+            if !(lo..=hi).contains(&i) {
+                return None;
+            }
+            return Some(VarRef {
+                name: base.into(),
+                index: vec![Expr::Num(f64::from(i))],
+                field_after_index: false,
+            });
+        }
+    };
+    Some(plain_var(prop))
+}
+
+fn no_lowering(code: char) -> String {
+    format!("message code `#{code}` has no GS2 lowering in this temporary front end")
+}
+
+enum TextPart {
+    Lit(String),
+    Expr(Expr),
+    Trim(String),
+    Sub(Expr, Expr, String),
+}
+
+/// Splits GS1 text at its message codes, with the bounds and era gates of
+/// Seihai's GS1 engine (`engine::interp`, `expand`).
+fn split_codes(s: &str, era: Era) -> Result<Vec<TextPart>, String> {
+    let b = s.as_bytes();
+    let mut parts = Vec::new();
+    let mut lit = String::new();
+    let mut i = 0;
+    let num = |x: &str| -> Expr {
+        let x = x.trim();
+        if x.contains('#') {
+            Expr::Str(x.to_string())
+        } else {
+            crate::scripting::engine::parser::parse_expr(x, era).unwrap_or(Expr::Num(0.0))
+        }
+    };
+    while i < b.len() {
+        if b[i] != b'#' || i + 1 >= b.len() {
+            let ch = s[i..].chars().next().unwrap();
+            lit.push(ch);
+            i += ch.len_utf8();
+            continue;
+        }
+        let code = b[i + 1] as char;
+        let digits = crate::scripting::engine::lexer::code_digits(&b[i + 1..]);
+        let open = i + 2 + digits;
+        let (inner, end) = if b.get(open) == Some(&b'(') {
+            let mut d = 0;
+            let mut close = None;
+            for (j, &c) in b.iter().enumerate().skip(open) {
+                match c {
+                    b'(' => d += 1,
+                    b')' => {
+                        d -= 1;
+                        if d == 0 {
+                            close = Some(j);
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            match close {
+                Some(c) => (Some(&s[open + 1..c]), c + 1),
+                None => (None, open),
+            }
+        } else {
+            (None, open)
+        };
+        let var = |n: &str, idx: Option<Expr>| {
+            Expr::Var(VarRef {
+                name: n.into(),
+                index: idx.into_iter().collect(),
+                field_after_index: false,
+            })
+        };
+        let part = match (code, inner) {
+            ('c', None) if digits == 0 => Some(TextPart::Expr(var("player.chat", None))),
+            ('n', None) => Some(TextPart::Expr(var("player.nick", None))),
+            ('a', None) => Some(TextPart::Expr(var("player.account", None))),
+            ('v', Some(x)) => Some(TextPart::Expr(num(x))),
+            ('s', Some(x)) => {
+                let n = x.trim().to_ascii_lowercase();
+                if (n.starts_with("this.") || n.starts_with("client.")) && is_plain_name(&n) {
+                    Some(TextPart::Expr(var(&n, None)))
+                } else {
+                    return Err(format!(
+                        "`#s({x})`: only `this.` and `client.` strings are lowered (a plain GS1 string is a player flag)"
+                    ));
+                }
+            }
+            ('t', Some(x)) if era >= Era::V202 => Some(TextPart::Expr(var("tokens", Some(num(x))))),
+            ('p', Some(x)) if era >= Era::V203 => Some(TextPart::Expr(var("params", Some(num(x))))),
+            ('T', Some(x)) if era >= Era::V202 => Some(TextPart::Trim(x.to_string())),
+            ('e', Some(x)) if era >= Era::V202 => {
+                let p: Vec<&str> = x.splitn(3, ',').collect();
+                if p.len() != 3 {
+                    return Err(format!("`#e({x})` needs start, length and text"));
+                }
+                Some(TextPart::Sub(num(p[0]), num(p[1]), p[2].to_string()))
+            }
+            ('w' | 'L' | 'F', None) => return Err(no_lowering(code)),
+            ('w' | 'W', Some(_)) if era >= Era::V204 => return Err(no_lowering(code)),
+            ('I', Some(_)) if era >= Era::V21 => return Err(no_lowering(code)),
+            ('P', _) if digits > 0 && era >= Era::V21 => return Err(no_lowering(code)),
+            _ => None,
+        };
+        match part {
+            Some(p) => {
+                if !lit.is_empty() {
+                    parts.push(TextPart::Lit(std::mem::take(&mut lit)));
+                }
+                parts.push(p);
+                i = end;
+            }
+            None => {
+                lit.push('#');
+                i += 1;
+            }
+        }
+    }
+    if !lit.is_empty() || parts.is_empty() {
+        parts.push(TextPart::Lit(lit));
+    }
+    Ok(parts)
+}
+
+fn and_terms<'a>(e: &'a Expr, out: &mut Vec<&'a Expr>) {
+    match e {
+        Expr::Bin(BinOp::And, a, b) => {
+            and_terms(a, out);
+            and_terms(b, out);
+        }
+        _ => out.push(e),
+    }
+}
+
+/// The expression calls any function (script, host or built-in).
+fn mentions_any_call(e: &Expr) -> bool {
+    match e {
+        Expr::Call { .. } => true,
+        Expr::Num(_) | Expr::Str(_) => false,
+        Expr::Var(v) => v.index.iter().any(mentions_any_call),
+        Expr::Unary(_, a) | Expr::InArray { e: a, .. } => mentions_any_call(a),
+        Expr::Bin(_, a, b) => mentions_any_call(a) || mentions_any_call(b),
+        Expr::InRange { e, lo, hi } => {
+            mentions_any_call(e) || mentions_any_call(lo) || mentions_any_call(hi)
+        }
+        Expr::InList { e, list } => mentions_any_call(e) || list.iter().any(mentions_any_call),
+        Expr::Cond { cond, then, els } => {
+            mentions_any_call(cond) || mentions_any_call(then) || mentions_any_call(els)
+        }
+        Expr::List(v) => v.iter().any(mentions_any_call),
+        Expr::Gs2(_) => true,
     }
 }
 
@@ -604,19 +804,21 @@ fn lift_gs1(body: Vec<Stmt>, era: Era) -> Result<Vec<Item>, CompileErrors> {
     let mut items: Vec<Item> = Vec::new();
     let mut event_items = HashMap::<String, usize>::new();
     let mut errors = Vec::new();
+    let mut seen_event = false;
     for stmt in body {
         match stmt {
             Stmt::Function { name, params, body } => items.push(Item::func(name, params, body)),
             Stmt::If { cond, then, els } => match event_arms(&cond, era) {
-                Arms::NotEvent => errors.push(CompileError {
-                    line: 0,
-                    message: "top-level statement is not an event test or a function".into(),
-                }),
+                Arms::NotEvent => {
+                    let stmt = Stmt::If { cond, then, els };
+                    top_level(&mut items, &mut errors, stmt, seen_event);
+                }
                 Arms::Complex => errors.push(CompileError {
                     line: 0,
                     message: "event test is too complex for this temporary front end; split it into one if per event".into(),
                 }),
                 Arms::Events(arms) => {
+                    seen_event = true;
                     if els.is_some() {
                         errors.push(CompileError {
                             line: 0,
@@ -653,16 +855,37 @@ fn lift_gs1(body: Vec<Stmt>, era: Era) -> Result<Vec<Item>, CompileErrors> {
                     }
                 }
             },
-            _ => errors.push(CompileError {
-                line: 0,
-                message: "top-level statement is not an event test or a function".into(),
-            }),
+            other => top_level(&mut items, &mut errors, other, seen_event),
         }
     }
     if !errors.is_empty() {
         return Err(CompileErrors { errors });
     }
     Ok(items)
+}
+
+/// A GS1 statement outside every event test. GS1 runs it in every event,
+/// in source order. It becomes GS2 code outside functions, which the Linux
+/// 4.04r2 experiment saw run before each event's handler (Graal_analysis
+/// `client-internals/linux-404r2-events.md`). Before the first event test
+/// the order is the same. After one, only commands and calls are taken
+/// (`join`, `dontblock`, `setshape` and the like, which set state); an
+/// assignment, `if` or loop there could see a different order, so it stays
+/// an error.
+fn top_level(items: &mut Vec<Item>, errors: &mut Vec<CompileError>, stmt: Stmt, seen_event: bool) {
+    if seen_event && !matches!(stmt, Stmt::Command { .. } | Stmt::Call { .. }) {
+        errors.push(CompileError {
+            line: 0,
+            message: "a top-level statement after an event test is not lowered \
+                      (GS2 runs code outside functions before the handler); move it above the first event test"
+                .into(),
+        });
+        return;
+    }
+    match items.last_mut() {
+        Some(last) if last.top => last.body.push(stmt),
+        _ => items.push(Item::top(vec![stmt])),
+    }
 }
 
 fn can_return(s: &Stmt) -> bool {
@@ -1620,6 +1843,9 @@ impl Builder {
             self.op(Op::Sleep);
             return;
         }
+        if self.gs1 && self.gs1_string_command(name, args) {
+            return;
+        }
         if self.gs1 && !gs2_has_command(name) {
             self.err(format!(
                 "GS1 command `{name}` has no GS2 equivalent{}",
@@ -1627,9 +1853,187 @@ impl Builder {
             ));
             return;
         }
+        // The first word of `setplayerprop` names the property (`#c`); it
+        // is not a message to expand.
+        if self.gs1 && name == "setplayerprop" {
+            self.op(Op::TypeArray);
+            for (i, a) in args.iter().enumerate().rev() {
+                match a {
+                    Arg::Text(t) if i == 0 => self.emit_str(t),
+                    a => {
+                        self.value(&arg_to_expr(a));
+                    }
+                }
+            }
+            self.emit_var(name);
+            self.op(Op::Call);
+            self.op(Op::IndexDec);
+            return;
+        }
         let exprs: Vec<Expr> = args.iter().map(arg_to_expr).collect();
         self.call_ops(name, &exprs);
         self.op(Op::IndexDec);
+    }
+
+    /// GS1 commands that become GS2 statements rather than a call by name.
+    /// Returns whether `name` was one of them (lowered or reported).
+    ///
+    /// - `setstring name,value`: `this.` and `client.` names become an
+    ///   assignment. Any other name is a player flag in GS1 (Seihai's GS1
+    ///   engine writes it as a flag), so it becomes `set("name=value")`, or
+    ///   `unset("name")` for a literal empty value.
+    /// - `addstring`, `insertstring`, `replacestring`, `removestring`,
+    ///   `deletestring` (2.1 lists) on `this.`/`client.` names: the GS2 list
+    ///   methods. Before 2.1 `addstring` appends text.
+    /// - `tokenize text` / `tokenize2 text,seps`: `tokens = text.tokenize()`,
+    ///   which `#t(i)` then reads as `tokens[i]`.
+    /// - `setcharprop code,value`: the NPC's own property (`#c` chat, `#n`
+    ///   nick, `#1` sword, `#2` shield, `#3` head, `#8` body, `#C0`–`#C4`
+    ///   colors, `#P1`–`#P30` attributes) as `this.<prop> = value`. The
+    ///   GS2 property names are Seihai's reading, not fixture-checked.
+    fn gs1_string_command(&mut self, name: &str, args: &[Arg]) -> bool {
+        let text_name = |a: Option<&Arg>| match a {
+            Some(Arg::Text(t)) => {
+                let t = t.trim().to_ascii_lowercase();
+                (is_plain_name(&t) && !t.is_empty()).then_some(t)
+            }
+            _ => None,
+        };
+        let value = |a: Option<&Arg>| a.map(arg_to_expr).unwrap_or(Expr::Str(String::new()));
+        let local = |n: &str| n.starts_with("this.") || n.starts_with("client.");
+        match name {
+            "setstring" => {
+                let Some(var) = text_name(args.first()) else {
+                    self.err("`setstring` needs a plain string name");
+                    return true;
+                };
+                let v = value(args.get(1));
+                if local(&var) {
+                    self.assign(&plain_var(&var), AssignOp::Set, &v);
+                } else if matches!(&v, Expr::Str(s) if s.is_empty()) {
+                    self.call_ops("unset", &[Expr::Str(var)]);
+                    self.op(Op::IndexDec);
+                } else {
+                    let text = match &v {
+                        Expr::Str(s) if !s.contains('#') => Expr::Str(format!("{var}={s}")),
+                        _ => Expr::Bin(
+                            BinOp::Cat,
+                            Box::new(Expr::Str(format!("{var}="))),
+                            Box::new(v),
+                        ),
+                    };
+                    self.call_ops("set", &[text]);
+                    self.op(Op::IndexDec);
+                }
+                true
+            }
+            "addstring" | "insertstring" | "replacestring" | "removestring" | "deletestring" => {
+                let Some(var) = text_name(args.first()) else {
+                    self.err(format!("`{name}` needs a plain string name"));
+                    return true;
+                };
+                if !local(&var) {
+                    self.err(format!(
+                        "`{name}` on `{var}`: only `this.` and `client.` lists are lowered (a plain GS1 string is a player flag)"
+                    ));
+                    return true;
+                }
+                if name == "addstring" && self.era < Era::V21 {
+                    let v = Expr::Bin(
+                        BinOp::Cat,
+                        Box::new(Expr::Var(plain_var(&var))),
+                        Box::new(value(args.get(1))),
+                    );
+                    self.assign(&plain_var(&var), AssignOp::Set, &v);
+                    return true;
+                }
+                let method = match name {
+                    "addstring" => "add",
+                    "insertstring" => "insert",
+                    "replacestring" => "replace",
+                    "removestring" => "remove",
+                    _ => "delete",
+                };
+                let margs: Vec<Expr> = args.iter().skip(1).map(arg_to_expr).collect();
+                if self.method(&Expr::Var(plain_var(&var)), method, &margs) {
+                    self.op(Op::IndexDec);
+                }
+                true
+            }
+            "tokenize" | "tokenize2" => {
+                let text = value(args.first());
+                let margs = if name == "tokenize2" {
+                    vec![Expr::Bin(
+                        BinOp::Cat,
+                        Box::new(Expr::Str(" ,".into())),
+                        Box::new(value(args.get(1))),
+                    )]
+                } else {
+                    Vec::new()
+                };
+                let call = Expr::Gs2(Box::new(Gs2Expr::Method {
+                    obj: text,
+                    name: "tokenize".into(),
+                    args: margs,
+                }));
+                self.assign(&plain_var("tokens"), AssignOp::Set, &call);
+                true
+            }
+            "setcharprop" => {
+                let code = match args.first() {
+                    Some(Arg::Text(t)) => t.trim().to_string(),
+                    _ => String::new(),
+                };
+                let Some(target) = char_prop(&code) else {
+                    self.err(format!("`setcharprop {code}` has no GS2 property here"));
+                    return true;
+                };
+                self.assign(&target, AssignOp::Set, &value(args.get(1)));
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// GS1 text with message codes, as GS2 joins (`@`). Codes Seihai's GS1
+    /// engine expands (`scripting::engine::interp`) are lowered where GS2
+    /// has the same value; the others are errors. A `#` that starts no code
+    /// stays text, as in GS1.
+    fn gs1_text(&mut self, s: &str) -> Kind {
+        let parts = match split_codes(s, self.era) {
+            Ok(p) => p,
+            Err(e) => {
+                self.err(e);
+                self.emit_str(s);
+                return Kind::String;
+            }
+        };
+        if let [TextPart::Lit(t)] = parts.as_slice() {
+            self.emit_str(t);
+            return Kind::String;
+        }
+        for (i, part) in parts.iter().enumerate() {
+            match part {
+                TextPart::Lit(t) => self.emit_str(t),
+                TextPart::Expr(e) => self.stringish(e),
+                TextPart::Trim(t) => {
+                    self.gs1_text(t);
+                    self.op(Op::ConvToString);
+                    self.op(Op::ObjTrim);
+                }
+                TextPart::Sub(start, len, t) => {
+                    self.gs1_text(t);
+                    self.op(Op::ConvToString);
+                    self.numeric(start);
+                    self.numeric(len);
+                    self.op(Op::ObjSubstr);
+                }
+            }
+            if i > 0 {
+                self.op(Op::Join);
+            }
+        }
+        Kind::String
     }
 
     fn setarray_command(&mut self, args: &[Arg]) {
@@ -1657,6 +2061,21 @@ impl Builder {
             return call_pushes(name);
         }
         if self.gs1 && self.method_builtin(name, args) {
+            return true;
+        }
+        // `strtofloat(s)` is the number in s; `strcontains(a, b)` is
+        // `a.pos(b) >= 0`.
+        if self.gs1 && name == "strtofloat" && args.len() == 1 {
+            self.numeric(&args[0]);
+            return true;
+        }
+        if self.gs1 && name == "strcontains" && args.len() == 2 {
+            self.stringish(&args[0]);
+            self.value(&args[1]);
+            self.op(Op::ObjPos);
+            self.op(Op::ConvToFloat);
+            self.emit_int(0);
+            self.op(Op::Gte);
             return true;
         }
         if self.gs1 && gs1_fn_without_gs2(name) {
@@ -1834,6 +2253,7 @@ impl Builder {
                 self.emit_number(*n);
                 Kind::Number
             }
+            Expr::Str(s) if self.gs1 && s.contains('#') => self.gs1_text(s),
             Expr::Str(s) => {
                 self.emit_str(s);
                 Kind::String

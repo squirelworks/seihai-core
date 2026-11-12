@@ -237,9 +237,15 @@ fn commands_and_functions_without_gs2_are_errors() {
     ] {
         assert!(!lacking.contains(&name), "{name} is a GS2 command");
     }
-    let err = compile::compile_gs1("if (created) { setstring a,b; }\n", Era::V205).unwrap_err();
-    assert!(err.to_string().contains("setstring"), "{err}");
-    assert!(err.to_string().contains("no GS2 equivalent"), "{err}");
+    // `setstring` on a plain name is a player flag: `set("a=b")`.
+    let got = compile::compile_gs1("if (created) { setstring a,b; }\n", Era::V205).unwrap();
+    assert!(
+        got.strings.contains(&"a=b".to_string()),
+        "{:?}",
+        got.strings
+    );
+    let err = compile::compile_gs1("if (created) { addstring a,b; }\n", Era::V21).unwrap_err();
+    assert!(err.to_string().contains("addstring"), "{err}");
     let err = compile::compile_gs1("if (created) { putnpc x,1,2; }\n", Era::V205).unwrap_err();
     assert!(err.to_string().contains("putnpc"), "{err}");
     let err = compile::compile_gs1("if (created) { if (playersays(hello)) hide; }\n", Era::V205)
@@ -254,7 +260,11 @@ fn commands_and_functions_without_gs2_are_errors() {
     )
     .unwrap_err();
     assert!(err.to_string().contains("duplicate"), "{err}");
-    let err = compile::compile_gs1("x = 1;\n", Era::V205).unwrap_err();
+    // Code outside every event test becomes GS2 code outside functions; after
+    // an event test only a command or call is taken.
+    compile::compile_gs1("x = 1;\nif (created) { hide; }\n", Era::V205).unwrap();
+    compile::compile_gs1("if (created) { hide; }\ndontblock;\n", Era::V205).unwrap();
+    let err = compile::compile_gs1("if (created) { hide; }\nx = 1;\n", Era::V205).unwrap_err();
     assert!(err.to_string().contains("top-level"), "{err}");
 }
 
@@ -1016,4 +1026,54 @@ fn gs2_corpus_shapes_compile() {
     ] {
         compile::compile_gs2(src).unwrap_or_else(|e| panic!("{src}\n{e}"));
     }
+}
+
+#[test]
+fn gs1_top_level_join_and_guard_chains_lower() {
+    let got = compile::compile_gs1(
+        "join mover;\nif (playertouchsme && this.on == 1 && !isweapon) { hide; }\n",
+        Era::V21,
+    )
+    .unwrap();
+    let dis = got.disassemble();
+    assert!(dis.starts_with("    0  OP_TYPE_ARRAY"), "{dis}");
+    assert!(dis.contains("\"join\""), "{dis}");
+    assert_eq!(got.functions[0].name, "onPlayerTouchsMe");
+    // A call before the event would run in every GS1 event: not taken.
+    let err = compile::compile_gs1("if (f() && playertouchsme) { hide; }\n", Era::V21).unwrap_err();
+    assert!(err.to_string().contains("too complex"), "{err}");
+}
+
+#[test]
+fn gs1_message_codes_and_string_commands_lower_and_run() {
+    let src = "if (created) {
+  this.n = 4;
+  setstring this.s,n=#v(this.n+1);
+  setstring client.who,#a;
+  tokenize a b,c;
+  setstring this.t,#t(1)/#e(1,2,hello)/#T(  x  );
+  setcharprop #c,hi #s(this.s);
+  this.f = strtofloat(#v(2.5));
+  this.k = strcontains(#s(this.s),=5);
+}
+";
+    let script = compile::compile_gs1(src, Era::V21).unwrap();
+    let mut m = Machine::new(script);
+    let mut h = EffectHost::new(Era::V21, 3);
+    assert_eq!(m.run_top_level(&mut h), Outcome::Done);
+    m.call_event("onCreated", &[], &mut h);
+    let s = |m: &Machine, n: &str| match m.var(Root::This, n) {
+        Some(Val::Str(s)) => s.clone(),
+        other => format!("{other:?}"),
+    };
+    assert_eq!(s(&m, "s"), "n=5");
+    assert_eq!(s(&m, "t"), "b/el/x");
+    assert_eq!(s(&m, "chat"), "hi n=5");
+    assert_eq!(m.var(Root::This, "f"), Some(&Val::Num(2.5)));
+    assert_eq!(m.var(Root::This, "k"), Some(&Val::Num(1.0)));
+    // Codes Seihai cannot lower are errors, not literal text.
+    let err = compile::compile_gs1("if (created) { message #w; }\n", Era::V21).unwrap_err();
+    assert!(err.to_string().contains("#w"), "{err}");
+    // A `#` that starts no code stays text.
+    compile::compile_gs1("if (created) { message #1 and # ok; }\n", Era::V21).unwrap();
 }
