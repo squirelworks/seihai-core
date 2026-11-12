@@ -60,6 +60,23 @@ fn playerleaves_runs_from_the_21_era() {
     assert!(messages(&mut w).is_empty());
 }
 
+/// `playerlogin` / `playerlogout` are Seihai's server-side events for a
+/// level-less Control-NPC. Same era gate as `playerleaves`.
+#[test]
+fn playerlogin_and_playerlogout_run_from_the_21_era() {
+    let src = "if (playerlogin) { message in; }\nif (playerlogout) { message out; }";
+    let (mut w, id) = npc(src);
+    w.fire(id, "playerlogin", &[]);
+    assert_eq!(messages(&mut w), vec!["in"]);
+    w.fire(id, "playerlogout", &[]);
+    assert_eq!(messages(&mut w), vec!["out"]);
+
+    let (mut w, id) = npc_in(src, Era::V205);
+    w.fire(id, "playerlogin", &[]);
+    w.fire(id, "playerlogout", &[]);
+    assert!(messages(&mut w).is_empty());
+}
+
 #[test]
 fn start_all_runs_created_once() {
     let (mut w, _) = npc("if (created) { this.n++; message hi; }");

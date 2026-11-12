@@ -440,6 +440,15 @@ pub static EVENTS: &[(&str, Era)] = &[
     // 2.22 clients that were searched, so no client fires it; a client
     // script that tests it reads false, as an unknown flag does there.
     ("playerleaves", V21),
+    // SEIHAI EXTENSION, not original Graal GS1 behaviour. For
+    // seihai-npcserver's level-less Control-NPC: a
+    // player finished logging in to, or left, the game server. No GS1
+    // source names these. The only sample is a later GS2 Control-NPC
+    // (`onPlayerLogin(player)` / `onPlayerLogout(player)`, Graal_analysis
+    // `npc-library/reference/npcControl-NPC.txt`), and the 2001 NPC-server
+    // notes do not list them. Server-side only; no client fires them.
+    ("playerlogin", V21),
+    ("playerlogout", V21),
 ];
 
 /// First era an event name exists in, or `None` if it is not an event.
@@ -738,6 +747,9 @@ mod tests {
         assert_eq!(event_since("playerdies"), Some(Era::V201));
         assert_eq!(event_since("actionpushed"), Some(Era::V203));
         assert_eq!(event_since("playerleaves"), Some(Era::V21));
+        assert_eq!(event_since("playerlogin"), Some(Era::V21));
+        assert_eq!(event_since("playerlogout"), Some(Era::V21));
+        assert_eq!(event_since("playerlogin"), event_since("playerleaves"));
         assert_eq!(event_since("action"), None);
         assert!(builtin_var("vecx", Era::V202).is_none());
         assert!(builtin_var("vecx", Era::V203).is_some());
