@@ -26,9 +26,13 @@
 //! `OP_ARRAY_MULTIDIM_ASSIGN` / `OP_IN_OBJ`. The fixture only has constant
 //! indexes; a computed index gets `OP_CONV_TO_FLOAT` like every other numeric
 //! operand here, which is Seihai's choice, not a fixture-checked encoding.
-//! Compound assignment and `++`/`--` on an element, a field after an index
-//! (`npcs[i].x`), three or more indexes and the `board`/`tiles` arrays have no
-//! fixture and stay compile errors.
+//! In GS1, compound assignment and `++`/`--` on an element are rewritten to
+//! `a[i] = a[i] op v`, and `x in {a, b}` to `x == a || x == b`, which is what
+//! the GS1 interpreter does; both are refused when the repeated expression
+//! calls a function. The GS2 front keeps them errors (no fixture for
+//! gs2-parser's own encoding). A field after an index (`npcs[i].x`), three or
+//! more indexes and the `board`/`tiles` arrays have no fixture and stay
+//! compile errors.
 
 use super::{Function, Instr, Op, Operand, Script};
 use crate::scripting::engine::ast::*;
@@ -929,6 +933,17 @@ impl Builder {
             }
             Stmt::Assign { target, op, value } => self.assign(target, *op, value),
             Stmt::IncDec { target, delta } => {
+                if !target.index.is_empty() && self.gs1 {
+                    // GS1 `a[i]++` is `a[i] = a[i] + 1` (the same reads and
+                    // writes, the element read once and written once).
+                    let op = if *delta < 0.0 {
+                        AssignOp::Sub
+                    } else {
+                        AssignOp::Add
+                    };
+                    self.element_assign(target, op, &Expr::Num(1.0));
+                    return;
+                }
                 if !target.index.is_empty() {
                     self.err(format!(
                         "`{}` on an array element has no fixture-checked GS2 form; write `a[i] = a[i] {} 1`",
@@ -1070,6 +1085,35 @@ impl Builder {
 
     /// `a[i] = v` and `a[i, j] = v`: object, indexes, value, assign op.
     fn element_assign(&mut self, target: &VarRef, op: AssignOp, value: &Expr) {
+        if op != AssignOp::Set && self.gs1 {
+            // GS1 `a[i] += v` is `a[i] = a[i] + v`: the GS1 interpreter
+            // reads the element, works the number out and stores it, and
+            // the lowered form does the same with the fixture-checked
+            // element read and write. The index is pushed twice, so it
+            // must not call anything.
+            if self.index_has_call(target) {
+                self.err(format!(
+                    "`{}` on an array element whose index calls a function is not lowered; \
+                     put the index in a variable first",
+                    op.symbol()
+                ));
+                return;
+            }
+            let bin = match op {
+                AssignOp::Add => BinOp::Add,
+                AssignOp::Sub => BinOp::Sub,
+                AssignOp::Mul => BinOp::Mul,
+                AssignOp::Div => BinOp::Div,
+                AssignOp::Set => unreachable!(),
+            };
+            let sum = Expr::Bin(
+                bin,
+                Box::new(Expr::Var(target.clone())),
+                Box::new(value.clone()),
+            );
+            self.element_assign(target, AssignOp::Set, &sum);
+            return;
+        }
         if op != AssignOp::Set {
             self.err(format!(
                 "`{}` on an array element has no fixture-checked GS2 form; write `a[i] = a[i] {} v`",
@@ -1410,10 +1454,32 @@ impl Builder {
                     Kind::Other
                 }
             }
-            Expr::InList { .. } => {
+            Expr::InList { .. } if !self.gs1 => {
                 self.err("`in {list}` is not lowered by this temporary front end");
                 self.emit_int(0);
                 Kind::Number
+            }
+            Expr::InList { e, list } => {
+                // GS1 `x in {a, b, c}` reads x, then each item left to right
+                // until one equals it (the interpreter's `==`). With no
+                // calls in x that is `x == a || x == b || x == c`.
+                if self.expr_has_call(e) {
+                    self.err(
+                        "`x in {list}` where x calls a function is not lowered; \
+                         put x in a variable first",
+                    );
+                    self.emit_int(0);
+                    return Kind::Number;
+                }
+                let Some(chain) = list
+                    .iter()
+                    .map(|item| Expr::Bin(BinOp::Eq, e.clone(), Box::new(item.clone())))
+                    .reduce(|acc, eq| Expr::Bin(BinOp::Or, Box::new(acc), Box::new(eq)))
+                else {
+                    self.emit_int(0);
+                    return Kind::Number;
+                };
+                self.value(&chain)
             }
             Expr::InArray { e, name } => {
                 self.value(e);

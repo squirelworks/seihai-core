@@ -625,8 +625,6 @@ fn a_call_in_an_index_marks_the_function_as_calling() {
 #[test]
 fn element_forms_without_a_fixture_stay_errors() {
     let cases = [
-        ("this.a[0] += 1;", "no fixture-checked GS2 form"),
-        ("this.a[0]++;", "no fixture-checked GS2 form"),
         ("this.a[0, 1, 2] = 1;", "GS2 array opcodes take one or two"),
         ("this.x = npcs[0].x;", "a field after an index"),
         ("this.x = board[5];", "`board[..]`"),
@@ -639,9 +637,14 @@ fn element_forms_without_a_fixture_stay_errors() {
             .to_string();
         assert!(error.contains(want), "{source}: {error}");
     }
+    // The GS2 front keeps them errors: its own encoding has no fixture.
     for stmt in ["this.a[0] += 1;", "this.a[0]++;"] {
         let source = format!("function onCreated() {{ {stmt} }}");
-        assert!(compile::compile_gs2(&source).is_err(), "{source}");
+        let error = compile::compile_gs2(&source).unwrap_err().to_string();
+        assert!(
+            error.contains("no fixture-checked GS2 form"),
+            "{source}: {error}"
+        );
     }
     for stmt in ["this.x = npcs[0].x;", "this.x = this.a[0][1];"] {
         let source = format!("function onCreated() {{ {stmt} }}");
@@ -676,4 +679,82 @@ fn joins_conditionals_ranges_and_player_position_lower_and_run() {
     let gs1 = compile::compile_gs1("if (created) { this.x = playerx; }", Era::V205).unwrap();
     let gs2 = compile::compile_gs2("function onCreated() { this.x = player.x; }").unwrap();
     assert_eq!(gs1.write(), gs2.write());
+}
+
+/// GS1 `a[i] op= v`, `a[i]++` and `a[i]--` lower to the element write of
+/// `a[i] = a[i] op v`, op for op (the element read and write are the
+/// `lists` fixture's), and run on the GS2 machine.
+#[test]
+fn compound_element_assignment_lowers_to_read_and_write() {
+    let pairs = [
+        ("this.a[0] += 5;", "this.a[0] = this.a[0] + 5;"),
+        ("this.a[1] -= 2;", "this.a[1] = this.a[1] - 2;"),
+        ("this.a[0] *= 3;", "this.a[0] = this.a[0] * 3;"),
+        ("this.a[1] /= 4;", "this.a[1] = this.a[1] / 4;"),
+        ("this.a[this.i]++;", "this.a[this.i] = this.a[this.i] + 1;"),
+        ("this.a[1]--;", "this.a[1] = this.a[1] - 1;"),
+        ("this.m[1, 2] += 1;", "this.m[1, 2] = this.m[1, 2] + 1;"),
+    ];
+    for (short, long) in pairs {
+        let a = compile::compile_gs1(&format!("if (created) {{ {short} }}"), Era::V21).unwrap();
+        let b = compile::compile_gs1(&format!("if (created) {{ {long} }}"), Era::V21).unwrap();
+        assert_eq!(a.write(), b.write(), "{short}");
+    }
+    let script = compile::compile_gs1(
+        "if (created) {
+  this.a = {10, 20};
+  this.a[0] += 5;
+  this.a[1]--;
+  this.a[1] *= 2;
+  this.p = this.a[0];
+  this.q = this.a[1];
+}
+",
+        Era::V21,
+    )
+    .unwrap();
+    let machine = run_created(script);
+    assert_eq!(machine.var(Root::This, "p"), Some(&Val::Num(15.0)));
+    assert_eq!(machine.var(Root::This, "q"), Some(&Val::Num(38.0)));
+    // The index is pushed twice: one that calls is refused.
+    let error = compile::compile_gs1(
+        "function pick() { return 0; }\nif (created) { this.a[pick()] += 1; }",
+        Era::V21,
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(error.contains("index calls a function"), "{error}");
+}
+
+/// GS1 `x in {a, b, c}` lowers to `x == a || x == b || x == c` (the GS1
+/// interpreter's equality, item by item, stopping at the first match) and
+/// runs on the GS2 machine; an empty list is 0.
+#[test]
+fn in_a_literal_list_lowers_to_equality_tests() {
+    let a =
+        compile::compile_gs1("if (created) { this.r = this.n in {1, 2, 3}; }", Era::V21).unwrap();
+    let b = compile::compile_gs1(
+        "if (created) { this.r = this.n == 1 || this.n == 2 || this.n == 3; }",
+        Era::V21,
+    )
+    .unwrap();
+    assert_eq!(a.write(), b.write());
+    let script = compile::compile_gs1(
+        "if (created) {
+  this.n = 2;
+  if (this.n in {1, 2, 3}) this.hit = 1;
+  if (this.n in {4, 5}) this.miss = 1;
+}
+",
+        Era::V21,
+    )
+    .unwrap();
+    let machine = run_created(script);
+    assert_eq!(machine.var(Root::This, "hit"), Some(&Val::Num(1.0)));
+    assert_eq!(machine.var(Root::This, "miss"), None);
+    assert!(compile::compile_gs1(
+        "function pick() { return 0; }\nif (created) { this.r = pick() in {1, 2}; }",
+        Era::V21,
+    )
+    .is_err());
 }
