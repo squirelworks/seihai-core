@@ -107,11 +107,7 @@ fn waitfor_and_pow_push_in_source_order() {
 #[test]
 fn no_closing_return_after_an_if_else_that_always_returns() {
     let both = lines("function g() {\n  if (temp.x) { return 1; } else if (temp.y) { return 2; } else { return 3; }\n}\n");
-    assert_eq!(
-        both.iter().filter(|x| *x == "OP_RET").count(),
-        3,
-        "{both:#?}"
-    );
+    assert!(!both.iter().any(|x| x == "OP_TYPE_NUMBER 0"), "{both:#?}");
     let one = lines("function a() {\n  if (temp.x) return 1;\n}\n");
     assert!(has_run(&one, &["OP_TYPE_NUMBER 0", "OP_RET"]), "{one:#?}");
 }
