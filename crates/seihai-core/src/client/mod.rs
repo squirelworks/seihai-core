@@ -115,14 +115,22 @@ pub struct Pose {
 /// 50 ms tick and sends the walk props.
 pub type SharedPose = Arc<Mutex<Option<Pose>>>;
 
-/// Another player in the level, as the server last placed them.
-#[derive(Debug, Clone, PartialEq)]
+/// Another player in the level, as the server last placed them, with
+/// what the view needs to draw them from their GANI.
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Other {
     pub id: u16,
     pub x: f32,
     pub y: f32,
     pub dir: u8,
     pub nick: Option<String>,
+    /// SPRITE (17) as received (`dir + 4 * S`), once the server has said:
+    /// the pose a pre-2.1 player is in.
+    pub sprite: Option<u8>,
+    /// STATUS (18), once the server has said (the dead and hidden bits).
+    pub status: Option<u8>,
+    /// The pictures, colours and GANI the server sent for the player.
+    pub looks: crate::protocol::OtherLooks,
 }
 
 /// The network thread writes the other players here after each frame; the
@@ -296,6 +304,9 @@ fn others_of(st: &SessionState) -> Vec<Other> {
             y: o.y,
             dir: o.dir,
             nick: o.nick.clone(),
+            sprite: o.sprite,
+            status: o.status,
+            looks: o.looks.clone(),
         })
         .collect()
 }
@@ -943,6 +954,24 @@ mod others_tests {
         let o = others_of(&st);
         let got: Vec<_> = o.iter().map(|o| (o.id, o.x, o.y)).collect();
         assert_eq!(got, vec![(2, 10.0, 12.0), (3, 20.0, 5.0)]);
+    }
+
+    /// The view gets what it draws a player with: the pictures, the
+    /// colours, the GANI and the sprite.
+    #[test]
+    fn the_looks_and_pose_go_with_the_player() {
+        let mut st = SessionState::for_version(ClientVersion::V3153);
+        st.apply_body(&other(2, 20, 24));
+        st.others[0].looks.head = Some("head7.png".into());
+        st.others[0].looks.colors = Some([1, 2, 3, 4, 5]);
+        st.others[0].looks.gani = Some("walk".into());
+        st.others[0].sprite = Some(2 + 4);
+        st.others[0].status = Some(0);
+        let o = &others_of(&st)[0];
+        assert_eq!(o.looks.head.as_deref(), Some("head7.png"));
+        assert_eq!(o.looks.colors, Some([1, 2, 3, 4, 5]));
+        assert_eq!(o.looks.gani.as_deref(), Some("walk"));
+        assert_eq!((o.sprite, o.status), (Some(6), Some(0)));
     }
 
     /// An NPC update after the level is handed on with the level it is
