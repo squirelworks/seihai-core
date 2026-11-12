@@ -65,6 +65,12 @@ pub fn wanted_name(file: &str) -> String {
     file.strip_prefix('+').unwrap_or(file).trim().to_string()
 }
 
+/// Whether `name` is a sound effect the engine plays: a `.wav`, in any
+/// case, with or without a path.
+pub fn is_sound_name(name: &str) -> bool {
+    name.trim().to_ascii_lowercase().ends_with(".wav")
+}
+
 /// Pan for a sound at `sound_x` heard from `listener_x`.
 pub fn pan_for(sound_x: f32, listener_x: f32, reverse_stereo: bool) -> i32 {
     let pan = ((sound_x - listener_x) * PAN_PER_TILE)
@@ -217,6 +223,28 @@ impl SoundEngine {
         Outcome::Played
     }
 
+    /// A sound file that came from the server, kept in memory: decode it
+    /// and keep it under its name, so the next cue for it plays. Downloads
+    /// are not written to the engine's folders, so this is how a sound
+    /// asked for with `WANTFILE` reaches it.
+    pub fn add(&mut self, file: &str, bytes: &[u8]) -> Result<(), String> {
+        let (name, _) = Self::normalize(file);
+        if name.is_empty() {
+            return Err("no name".into());
+        }
+        match decode_wav(bytes) {
+            Ok(pcm) => {
+                self.cache.insert(name, Some(Arc::new(pcm)));
+                Ok(())
+            }
+            Err(e) => {
+                self.warn_once(format!("cannot read sound {name}: {e}"));
+                self.cache.insert(name, None);
+                Err(e)
+            }
+        }
+    }
+
     /// `stopsound`: stop a sound by file name (the path is ignored).
     pub fn stop(&mut self, file: &str) {
         let (name, _) = Self::normalize(file);
@@ -348,6 +376,20 @@ mod tests {
                 looped: false
             }]
         );
+    }
+
+    #[test]
+    fn a_sound_that_arrives_in_memory_plays_on_the_next_cue() {
+        // Lab #441: WANTFILE went out, the file came, and it never played,
+        // because downloads stay in memory and the engine read only folders.
+        let (mut e, rec, _) = engine("arrive", &[]);
+        assert_eq!(e.play(&ev("steps2.wav"), L, 0), Outcome::Missing);
+        assert!(e.add("Steps2.WAV", &test_wav(8000, 800)).is_ok());
+        assert_eq!(e.play(&ev("steps2.wav"), L, 10), Outcome::Played);
+        assert_eq!(rec.log().len(), 1);
+        assert!(e.add("bad.wav", b"not a wav").is_err());
+        assert_eq!(e.play(&ev("bad.wav"), L, 20), Outcome::Undecodable);
+        assert!(is_sound_name("sounds/X.Wav") && !is_sound_name("a.png"));
     }
 
     #[test]

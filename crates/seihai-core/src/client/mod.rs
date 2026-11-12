@@ -40,7 +40,7 @@ use crate::net::{
 use crate::offline::OfflineSession;
 use crate::protocol::layouts::BoardModify2;
 use crate::protocol::lobby::LobbyBurst;
-use crate::protocol::login::LoginBurst;
+use crate::protocol::login::{nick_props_message, sends_nick_props, LoginBurst};
 use crate::protocol::npcprops::NpcProps;
 use crate::protocol::walkcadence::WalkCadence;
 use crate::protocol::{ClientVersion, SessionState};
@@ -147,8 +147,12 @@ pub struct Live {
     pub link: Arc<Mutex<Option<LinkAsk>>>,
     /// Sounds the view could not find on disk; the network thread asks
     /// the server for each (WANTFILE), as 2.05 does, and the sound plays
-    /// on a later cue once it is saved.
+    /// on a later cue once it has arrived.
     pub wanted_sounds: Arc<Mutex<Vec<String>>>,
+    /// Sound files the server sent, by name, with their bytes: downloads
+    /// are kept in memory, so the view's sound engine takes them from here
+    /// (`SoundEngine::add`) rather than from its folders.
+    pub arrived_sounds: SharedSounds,
     /// The gmap the server has the player on, as the network thread last
     /// saw it changed; the view takes it.
     pub world: Arc<Mutex<Option<WorldView>>>,
@@ -174,6 +178,9 @@ pub struct NpcChange {
     pub id: u32,
     pub props: Option<NpcProps>,
 }
+
+/// Sound files from the network thread to the view: name and bytes.
+pub type SharedSounds = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
 
 /// NPC updates from the network thread to the view, in arrival order.
 pub type SharedNpcChanges = Arc<Mutex<Vec<NpcChange>>>;
@@ -260,6 +267,16 @@ fn sound_requests(
             (n, m)
         })
         .filter(|(_, m)| !m.is_empty())
+        .collect()
+}
+
+/// The sound files among `written` (names [`FileSession::process`] saved
+/// or kept), with their bytes from `store`, for the view's sound engine.
+fn arrived_sounds_of(written: &[String], store: &DownloadStore) -> Vec<(String, Vec<u8>)> {
+    written
+        .iter()
+        .filter(|n| crate::sound::is_sound_name(n))
+        .filter_map(|n| Some((n.clone(), store.read(n)?)))
         .collect()
 }
 
@@ -424,6 +441,7 @@ pub fn run_with(
     let others = live.as_ref().map(|l| l.others.clone());
     let link = live.as_ref().map(|l| l.link.clone());
     let wanted_sounds = live.as_ref().map(|l| l.wanted_sounds.clone());
+    let arrived_sounds = live.as_ref().map(|l| l.arrived_sounds.clone());
     let world = live.as_ref().map(|l| l.world.clone());
     let crossings = live.as_ref().map(|l| l.crossings.clone());
     let board_mods = live.as_ref().map(|l| l.board_mods.clone());
@@ -468,6 +486,9 @@ pub fn run_with(
         files.new_connection();
         let mut login_burst = LoginBurst::for_version(version);
         let mut lobby_burst = LobbyBurst::for_version(version);
+        // 6.x: the nickname, once the first level is in (no recorded frame
+        // carries it).
+        let mut nick_owed = sends_nick_props(version);
         let title = version.profile().window_title(server_name.as_deref());
         let mut st = SessionState::for_version(version);
         let mut walker = WalkSender::new(version);
@@ -553,6 +574,23 @@ pub fn run_with(
                     let got = files.process(&mut st);
                     if !got.send.is_empty() {
                         let _ = s.conn.send_messages(&got.send);
+                    }
+                    if let Some(a) = arrived_sounds.as_ref() {
+                        let sounds = arrived_sounds_of(&got.written, &files.store);
+                        if !sounds.is_empty() {
+                            a.lock().unwrap_or_else(|e| e.into_inner()).extend(sounds);
+                        }
+                    }
+                    if nick_owed && st.current_level_name().is_some() {
+                        nick_owed = false;
+                        let nick = if login.nick.is_empty() {
+                            &login.account
+                        } else {
+                            &login.nick
+                        };
+                        if s.conn.send_messages(&[nick_props_message(nick)]).is_ok() {
+                            let _ = writeln!(out, "sent the nickname {nick:?}");
+                        }
                     }
                     // Board changes: onto this side's gmap levels, and on to
                     // the view.
@@ -1027,5 +1065,20 @@ mod sound_request_tests {
         );
         assert!(w.lock().unwrap().is_empty());
         assert!(sound_requests(&w, |_| vec![vec![1]]).is_empty());
+    }
+
+    /// A sound the server sent is handed on with its bytes, from the
+    /// in-memory store; other files are not (lab #441).
+    #[test]
+    fn arrived_sounds_come_from_the_memory_store() {
+        let mut store =
+            DownloadStore::new(AssetResolver::empty(ClientVersion::V603R7.profile()), false);
+        store.store("steps2.wav", b"RIFF..", None).unwrap();
+        store.store("pics1.png", b"png", None).unwrap();
+        let written = vec!["steps2.wav".to_string(), "pics1.png".to_string()];
+        assert_eq!(
+            arrived_sounds_of(&written, &store),
+            vec![("steps2.wav".to_string(), b"RIFF..".to_vec())]
+        );
     }
 }
