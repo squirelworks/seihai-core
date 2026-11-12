@@ -9,6 +9,7 @@ pub mod assets;
 pub mod baddies;
 pub mod bombs;
 pub mod chatlists;
+pub mod client;
 pub mod combat;
 pub mod config;
 pub mod dev;
