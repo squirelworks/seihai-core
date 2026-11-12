@@ -729,11 +729,14 @@ fn event_var(e: &Expr, era: Era) -> Option<String> {
 /// One piece of a script in source order: a function, or (`top`) code
 /// outside any function, which is emitted where it stands so it runs from
 /// op 0 with the function bodies jumped over.
+#[derive(Clone)]
 struct Item {
     name: String,
     params: Vec<String>,
     body: Vec<Stmt>,
     top: bool,
+    /// A `function() { … }` value, emitted where it is used.
+    lambda: bool,
 }
 
 impl Item {
@@ -743,6 +746,7 @@ impl Item {
             params,
             body,
             top: false,
+            lambda: false,
         }
     }
 
@@ -752,6 +756,7 @@ impl Item {
             params: Vec::new(),
             body,
             top: true,
+            lambda: false,
         }
     }
 }
@@ -933,6 +938,8 @@ struct Builder {
     spellings: Spellings,
     /// The script's own function names, lower case.
     script_fns: Vec<String>,
+    /// `function() { … }` values by function name, emitted where used.
+    lambdas: HashMap<String, Item>,
 }
 
 fn emit_items(
@@ -943,7 +950,23 @@ fn emit_items(
 ) -> Result<Built, CompileErrors> {
     let mut seen = HashMap::<String, ()>::new();
     let mut errors = Vec::new();
-    for item in items.iter().filter(|i| !i.top) {
+    // GS2: a later function of the same name replaces the earlier one, as a
+    // live server kept running such scripts (Seihai's reading). GS1 keeps
+    // the error.
+    let mut replaced = vec![false; items.len()];
+    if !gs1 {
+        let mut last = HashMap::<&str, usize>::new();
+        for (i, item) in items.iter().enumerate().filter(|(_, i)| !i.top) {
+            if let Some(prev) = last.insert(item.name.as_str(), i) {
+                replaced[prev] = true;
+            }
+        }
+    }
+    for (_, item) in items
+        .iter()
+        .enumerate()
+        .filter(|(i, it)| !it.top && !replaced[*i])
+    {
         if seen.insert(item.name.clone(), ()).is_some() {
             errors.push(CompileError {
                 line: 0,
@@ -967,8 +990,15 @@ fn emit_items(
         line: 0,
         spellings,
         script_fns: seen.keys().map(|k| k.to_ascii_lowercase()).collect(),
+        lambdas: HashMap::new(),
     };
-    for item in items {
+    for item in items.iter().filter(|i| i.lambda) {
+        b.lambdas.insert(item.name.clone(), item.clone());
+    }
+    for (i, item) in items.iter().enumerate() {
+        if replaced[i] || item.lambda {
+            continue;
+        }
         if item.top {
             // The skips over earlier functions land here, so code after a
             // function still runs in source order. With no code after the
@@ -1043,9 +1073,8 @@ impl Builder {
         if let Some(&i) = self.index.get(s) {
             return i;
         }
-        if s.chars().any(|c| (c as u32) > 255) {
-            self.err("a string is outside latin1");
-        }
+        // Text beyond latin1 is written as its UTF-8 bytes, which is what a
+        // byte-oriented compiler gives for a UTF-8 source file.
         let i = self.strings.len() as u32;
         self.index.insert(s.to_string(), i);
         self.strings.push(s.to_string());
@@ -1402,6 +1431,14 @@ impl Builder {
             },
             Gs2Stmt::Switch { value, arms } => self.switch_stmt(value, arms),
             Gs2Stmt::NewBlock { ty, name, body } => self.new_block(ty, name, body),
+            // A GS1-style command inside GS2 lowers as it would in a GS1
+            // script (message codes, string commands, `setcharprop`).
+            Gs2Stmt::Gs1(s) => {
+                let gs2 = !self.gs1;
+                self.gs1 = true;
+                self.stmt(s);
+                self.gs1 = !gs2;
+            }
             // `a = b = c = v` as in the Preagonal baselines: `a`, then each
             // later target and `OP_COPY_LAST_OP`, the value, and one
             // `OP_ASSIGN` per target (innermost first).
@@ -1713,6 +1750,47 @@ impl Builder {
                 self.op(Op::IndexDec);
                 Kind::Number
             }
+            Gs2Expr::Lambda(name) => {
+                let Some(item) = self.lambdas.remove(&format!("public.{name}")) else {
+                    self.err("a `function() { … }` value is used twice");
+                    return Kind::Other;
+                };
+                let loops = std::mem::take(&mut self.loops);
+                self.function(&item);
+                self.loops = loops;
+                if let Some(skip) = self.skips.pop() {
+                    let here = self.here();
+                    self.patch(skip, here);
+                }
+                self.op(Op::This);
+                self.emit_var(name);
+                self.op(Op::MemberAccess);
+                self.op(Op::ConvToObject);
+                Kind::Other
+            }
+            // `obj.(n)(args)`: a method named by a value (Seihai's form, as
+            // a method call with the name pushed as a string).
+            Gs2Expr::DynMethod { obj, name, args } => {
+                self.op(Op::TypeArray);
+                for a in args.iter().rev() {
+                    self.value(a);
+                }
+                self.object(obj);
+                self.value(name);
+                self.op(Op::ConvToString);
+                self.op(Op::MemberAccess);
+                self.op(Op::Call);
+                Kind::Other
+            }
+            // `++x` used as a value: the place and `OP_INC`, which leaves
+            // the changed variable (Seihai's form, no probe).
+            Gs2Expr::PreStep { target, delta } => {
+                if !self.step_place(target) {
+                    return Kind::Other;
+                }
+                self.op(if *delta < 0.0 { Op::Dec } else { Op::Inc });
+                Kind::Other
+            }
             // `y = (x = 2)` (Preagonal probe): x, `OP_COPY_LAST_OP`, the
             // value, `OP_ASSIGN`, leaving x. For `+=` and the others Seihai
             // copies the place once more, so x is still there after the
@@ -1769,7 +1847,7 @@ impl Builder {
             Expr::Gs2(g)
                 if matches!(
                     g.as_ref(),
-                    Gs2Expr::Member { .. } | Gs2Expr::DynMember { .. }
+                    Gs2Expr::Member { .. } | Gs2Expr::DynMember { .. } | Gs2Expr::Index { .. }
                 ) =>
             {
                 self.value(target);
@@ -2977,6 +3055,7 @@ fn with_escape(s: &Stmt, in_loop: bool, gs2: bool) -> Option<&'static str> {
                     body.iter().find_map(|s| with_escape(s, false, gs2))
                 }
                 Gs2Stmt::Eval(_) | Gs2Stmt::SetPart { .. } | Gs2Stmt::Chain { .. } => None,
+                Gs2Stmt::Gs1(s) => with_escape(s, in_loop, gs2),
             }
         }
     }
@@ -3253,6 +3332,7 @@ fn parse_gs2(src: &str) -> Result<(Vec<Item>, Spellings), CompileErrors> {
             _ => items.push(Item::top(vec![s])),
         }
     }
+    items.append(&mut p.lambdas);
     Ok((items, p.spellings))
 }
 
@@ -3269,6 +3349,12 @@ struct Gs2<'a> {
     spellings: Spellings,
     /// `const` and `enum` names (lowercase), folded where they are read.
     consts: HashMap<String, Expr>,
+    /// The line the peeked token starts on, and the line of the last token
+    /// taken.
+    peek_line: u32,
+    last_line: u32,
+    /// `function() { … }` values met so far.
+    lambdas: Vec<Item>,
 }
 
 /// The source text of decimal literals, keyed by the bits of their absolute
@@ -3334,11 +3420,79 @@ impl<'a> Gs2<'a> {
             new_body: None,
             spellings: Spellings::default(),
             consts: HashMap::new(),
+            peek_line: 1,
+            last_line: 1,
+            lambdas: Vec::new(),
         }
     }
 
     fn eof(&mut self) -> bool {
         matches!(self.peek_tok(), GTok::Eof)
+    }
+
+    /// A GS1 command written GS1-style in a GS2 script: a GS1 command name
+    /// followed by its arguments without brackets, or by `;` alone
+    /// (`setimgpart a.png,0,0,8,8;`, `hide;`). The live servers ran such
+    /// scripts, so the text up to `;` goes through the GS1 parser.
+    fn gs1_command(&mut self) -> Result<Option<Stmt>, CompileErrors> {
+        let GTok::Id(name) = self.peek_tok() else {
+            return Ok(None);
+        };
+        if vocab::command(&name.to_ascii_lowercase()).is_none() {
+            return Ok(None);
+        }
+        // The name was just lexed, so it ends at `self.i`.
+        let start = self.i - name.len();
+        let mut j = self.i;
+        while matches!(self.b.get(j), Some(b' ' | b'\t')) {
+            j += 1;
+        }
+        match self.b.get(j) {
+            Some(b';') => {}
+            Some(c)
+                if c.is_ascii_alphanumeric() || matches!(c, b'#' | b'"' | b'-' | b'_' | b'.') =>
+            {
+                // `name = …`, `name.x`, `name(…)`, `name++` are GS2.
+                if *c == b'.' || *c == b'-' && self.b.get(j + 1) == Some(&b'-') {
+                    return Ok(None);
+                }
+            }
+            _ => return Ok(None),
+        }
+        let mut end = j;
+        let mut quote = None;
+        let mut lines = 0;
+        while let Some(&c) = self.b.get(end) {
+            match (quote, c) {
+                (Some(q), c) if c == q => quote = None,
+                (None, b'"') => quote = Some(c),
+                (None, b';') => break,
+                (None, b'{' | b'}') => return Ok(None),
+                (_, b'\n') => lines += 1,
+                _ => {}
+            }
+            end += 1;
+        }
+        if self.b.get(end) != Some(&b';') {
+            return Ok(None);
+        }
+        let text = String::from_utf8_lossy(&self.b[start..=end]).into_owned();
+        let parsed = parse(&text, Era::V21);
+        if !parsed.diagnostics.is_empty() {
+            return Ok(None);
+        }
+        let mut body = parsed.body;
+        if body.len() != 1 || !matches!(body[0], Stmt::Command { .. }) {
+            return Ok(None);
+        }
+        let mut s = body.remove(0);
+        if let Stmt::Command { line, .. } = &mut s {
+            *line = self.line;
+        }
+        self.peek = None;
+        self.i = end + 1;
+        self.line += lines;
+        Ok(Some(Stmt::Gs2(Box::new(Gs2Stmt::Gs1(s)))))
     }
 
     /// A name with dots in it: `Obj.onAction` as a function name (an event
@@ -3369,6 +3523,14 @@ impl<'a> Gs2<'a> {
         // A body without braces is one statement (`function f() g();`).
         let body = if self.eat("{") {
             self.block_body()?
+        } else if self.eat(";") {
+            Vec::new()
+        } else if matches!(self.peek_tok(), GTok::Id(ref w) if w == "function" || w == "public")
+            || matches!(self.peek_tok(), GTok::Eof)
+        {
+            // `function f()` with no body at all (the Preagonal notes say
+            // a function may omit it).
+            Vec::new()
         } else {
             vec![self.stmt()?]
         };
@@ -3397,6 +3559,9 @@ impl<'a> Gs2<'a> {
     }
 
     fn stmt(&mut self) -> Result<Stmt, CompileErrors> {
+        if let Some(s) = self.gs1_command()? {
+            return Ok(s);
+        }
         if self.eat_id("if") {
             return self.if_stmt();
         }
@@ -3412,15 +3577,15 @@ impl<'a> Gs2<'a> {
             } else {
                 Some(self.expr()?)
             };
-            self.expect(";")?;
+            self.end_stmt()?;
             return Ok(Stmt::Return(v));
         }
         if self.eat_id("break") {
-            self.expect(";")?;
+            self.end_stmt()?;
             return Ok(Stmt::Break);
         }
         if self.eat_id("continue") {
-            self.expect(";")?;
+            self.end_stmt()?;
             return Ok(Stmt::Continue);
         }
         if self.eat("{") {
@@ -3449,7 +3614,7 @@ impl<'a> Gs2<'a> {
                     break;
                 }
             }
-            self.expect(";")?;
+            self.end_stmt()?;
             return Ok(Stmt::Block(Vec::new()));
         }
         if self.eat_id("enum") {
@@ -3506,7 +3671,7 @@ impl<'a> Gs2<'a> {
             let Expr::Var(target) = self.unary()? else {
                 return Err(CompileErrors::one(self.line, "`++`/`--` needs a variable"));
             };
-            self.expect(";")?;
+            self.end_stmt()?;
             return Ok(Stmt::IncDec { target, delta });
         }
         let e = self.expr()?;
@@ -3514,13 +3679,29 @@ impl<'a> Gs2<'a> {
             if let Gs2Expr::PostStep {
                 target: Expr::Var(v),
                 delta,
+            }
+            | Gs2Expr::PreStep {
+                target: Expr::Var(v),
+                delta,
             } = g.as_ref()
             {
-                self.expect(";")?;
+                self.end_stmt()?;
                 return Ok(Stmt::IncDec {
                     target: v.clone(),
                     delta: *delta,
                 });
+            }
+        }
+        // `a[i][j]++;` as a statement: the place, `OP_INC`, `OP_INDEX_DEC`
+        // (the `a[i]++` probe's form).
+        if let Expr::Gs2(g) = &e {
+            if let Gs2Expr::PostStep { target, delta } = g.as_ref() {
+                let e = Expr::Gs2(Box::new(Gs2Expr::PreStep {
+                    target: target.clone(),
+                    delta: *delta,
+                }));
+                self.end_stmt()?;
+                return Ok(Stmt::Gs2(Box::new(Gs2Stmt::Eval(e))));
             }
         }
         if let Some(body) = self.new_body.take() {
@@ -3547,14 +3728,14 @@ impl<'a> Gs2<'a> {
         }
         if let Expr::Var(v) = &e {
             if self.eat("++") {
-                self.expect(";")?;
+                self.end_stmt()?;
                 return Ok(Stmt::IncDec {
                     target: v.clone(),
                     delta: 1.0,
                 });
             }
             if self.eat("--") {
-                self.expect(";")?;
+                self.end_stmt()?;
                 return Ok(Stmt::IncDec {
                     target: v.clone(),
                     delta: -1.0,
@@ -3571,10 +3752,19 @@ impl<'a> Gs2<'a> {
                         targets.push(t.clone());
                         value = self.expr()?;
                     }
-                    self.expect(";")?;
+                    self.end_stmt()?;
                     return Ok(Stmt::Gs2(Box::new(Gs2Stmt::Chain { targets, value })));
                 }
-                self.expect(";")?;
+                // `a = makevar(…) += v`: the inner store is a value.
+                if let Some(inner) = self.assign_op() {
+                    let v2 = self.expr()?;
+                    value = Expr::Gs2(Box::new(Gs2Expr::AssignValue {
+                        target: value,
+                        op: inner,
+                        value: v2,
+                    }));
+                }
+                self.end_stmt()?;
                 return Ok(Stmt::Assign {
                     target: v.clone(),
                     op,
@@ -3584,7 +3774,7 @@ impl<'a> Gs2<'a> {
             // `a @= b` is `a = a @ b` here (Seihai's reading, no fixture).
             if self.eat("@=") {
                 let value = self.expr()?;
-                self.expect(";")?;
+                self.end_stmt()?;
                 return Ok(Stmt::Assign {
                     target: v.clone(),
                     op: AssignOp::Set,
@@ -3600,20 +3790,37 @@ impl<'a> Gs2<'a> {
             Expr::Call { name, .. } => name == "makevar",
             _ => false,
         };
-        if settable && self.eat("=") {
-            let value = self.expr()?;
-            self.expect(";")?;
-            return Ok(Stmt::Gs2(Box::new(Gs2Stmt::SetPart { target: e, value })));
+        if settable {
+            if let Some(op) = self.assign_op() {
+                let mut value = self.expr()?;
+                // `obj.x += v` / `a[i][j] -= v` is `… = … + v` (Seihai's
+                // form; the place is read once and written once).
+                let bin = match op {
+                    AssignOp::Set => None,
+                    AssignOp::Add => Some(BinOp::Add),
+                    AssignOp::Sub => Some(BinOp::Sub),
+                    AssignOp::Mul => Some(BinOp::Mul),
+                    AssignOp::Div => Some(BinOp::Div),
+                    AssignOp::Mod => Some(BinOp::Mod),
+                };
+                if let Some(bin) = bin {
+                    value = Expr::Bin(bin, Box::new(e.clone()), Box::new(value));
+                }
+                self.end_stmt()?;
+                return Ok(Stmt::Gs2(Box::new(Gs2Stmt::SetPart { target: e, value })));
+            }
         }
-        self.expect(";")?;
+        self.end_stmt()?;
         match e {
             Expr::Call { name, args } => Ok(Stmt::Call { name, args }),
             Expr::Gs2(g)
                 if matches!(
                     g.as_ref(),
                     Gs2Expr::Method { .. }
+                        | Gs2Expr::DynMethod { .. }
                         | Gs2Expr::New { .. }
                         | Gs2Expr::PostStep { .. }
+                        | Gs2Expr::PreStep { .. }
                         | Gs2Expr::AssignValue { .. }
                 ) =>
             {
@@ -3626,9 +3833,20 @@ impl<'a> Gs2<'a> {
         }
     }
 
+    /// An `if`/`while` condition. A single `=` there compares, as in GS1
+    /// (`if (key = "m")`), which live GS2 scripts still use.
+    fn cond(&mut self) -> Result<Expr, CompileErrors> {
+        let e = self.expr()?;
+        if self.eat("=") {
+            let rhs = self.expr()?;
+            return Ok(Expr::Bin(BinOp::Eq, Box::new(e), Box::new(rhs)));
+        }
+        Ok(e)
+    }
+
     fn if_stmt(&mut self) -> Result<Stmt, CompileErrors> {
         self.expect("(")?;
-        let cond = self.expr()?;
+        let cond = self.cond()?;
         self.expect(")")?;
         let then = Box::new(self.stmt()?);
         let els = if self.eat_id("else") {
@@ -3644,7 +3862,7 @@ impl<'a> Gs2<'a> {
 
     fn while_stmt(&mut self) -> Result<Stmt, CompileErrors> {
         self.expect("(")?;
-        let cond = self.expr()?;
+        let cond = self.cond()?;
         self.expect(")")?;
         let body = Box::new(self.stmt()?);
         Ok(Stmt::While { cond, body })
@@ -3706,6 +3924,10 @@ impl<'a> Gs2<'a> {
     fn simple_from(&mut self, e: Expr) -> Result<Stmt, CompileErrors> {
         if let Expr::Gs2(g) = &e {
             if let Gs2Expr::PostStep {
+                target: Expr::Var(v),
+                delta,
+            }
+            | Gs2Expr::PreStep {
                 target: Expr::Var(v),
                 delta,
             } = g.as_ref()
@@ -3936,6 +4158,16 @@ impl<'a> Gs2<'a> {
     }
 
     fn unary(&mut self) -> Result<Expr, CompileErrors> {
+        if self.sees("++") || self.sees("--") {
+            let delta = if self.eat("++") {
+                1.0
+            } else {
+                self.bump();
+                -1.0
+            };
+            let target = self.unary()?;
+            return Ok(Expr::Gs2(Box::new(Gs2Expr::PreStep { target, delta })));
+        }
         if self.eat("!") {
             return Ok(Expr::Unary(UnOp::Not, Box::new(self.unary()?)));
         }
@@ -3961,7 +4193,16 @@ impl<'a> Gs2<'a> {
                 if self.eat("(") {
                     let n = self.expr()?;
                     self.expect(")")?;
-                    e = Expr::Gs2(Box::new(Gs2Expr::DynMember { obj: e, name: n }));
+                    if self.eat("(") {
+                        let args = self.arg_list()?;
+                        e = Expr::Gs2(Box::new(Gs2Expr::DynMethod {
+                            obj: e,
+                            name: n,
+                            args,
+                        }));
+                    } else {
+                        e = Expr::Gs2(Box::new(Gs2Expr::DynMember { obj: e, name: n }));
+                    }
                     continue;
                 }
                 let name = self.ident()?;
@@ -4021,6 +4262,29 @@ impl<'a> Gs2<'a> {
                 }
                 Ok(Expr::Gs2(Box::new(Gs2Expr::New { ty, args })))
             }
+            GTok::Id(name) if name == "function" && self.sees("(") => {
+                // `function (params) { … }` as a value (Preagonal probe: a
+                // public function named `function_<n>_<m>`, emitted where it
+                // stands and jumped over, then `this.<name>` as an object).
+                self.bump();
+                let mut params = Vec::new();
+                if !self.eat(")") {
+                    loop {
+                        params.push(self.dotted_ident()?);
+                        if !self.eat(",") {
+                            break;
+                        }
+                    }
+                    self.expect(")")?;
+                }
+                self.expect("{")?;
+                let body = self.block_body()?;
+                let name = format!("function_{}_{}", self.line, self.lambdas.len() + 1);
+                let mut item = Item::func(format!("public.{name}"), params, body);
+                item.lambda = true;
+                self.lambdas.push(item);
+                Ok(Expr::Gs2(Box::new(Gs2Expr::Lambda(name))))
+            }
             GTok::Id(mut name) => {
                 if self.eat("(") {
                     let args = self.arg_list()?;
@@ -4042,6 +4306,14 @@ impl<'a> Gs2<'a> {
                             index: Vec::new(),
                             field_after_index: false,
                         });
+                        if self.eat("(") {
+                            let args = self.arg_list()?;
+                            return Ok(Expr::Gs2(Box::new(Gs2Expr::DynMethod {
+                                obj,
+                                name: n,
+                                args,
+                            })));
+                        }
                         return Ok(Expr::Gs2(Box::new(Gs2Expr::DynMember { obj, name: n })));
                     }
                     let part = self.ident()?;
@@ -4202,6 +4474,8 @@ impl<'a> Gs2<'a> {
 
     fn peek_tok(&mut self) -> GTok {
         if self.peek.is_none() {
+            self.skip();
+            self.peek_line = self.line;
             self.peek = Some(self.lex());
         }
         self.peek.clone().unwrap()
@@ -4209,7 +4483,22 @@ impl<'a> Gs2<'a> {
 
     fn bump(&mut self) -> GTok {
         self.peek_tok();
+        self.last_line = self.peek_line;
         self.peek.take().unwrap()
+    }
+
+    /// The `;` that ends a statement. The live servers ran scripts that
+    /// leave it out at the end of a line or before `}`, so a statement also
+    /// ends there.
+    fn end_stmt(&mut self) -> Result<(), CompileErrors> {
+        if self.eat(";") {
+            return Ok(());
+        }
+        let next = self.peek_tok();
+        if self.peek_line > self.last_line || matches!(next, GTok::Op("}") | GTok::Eof) {
+            return Ok(());
+        }
+        Err(CompileErrors::one(self.line, "expected `;`"))
     }
 
     fn skip(&mut self) {

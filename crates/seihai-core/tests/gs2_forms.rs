@@ -284,3 +284,104 @@ fn elseif_and_with_exits() {
         names(&["PLAYER", "CONV_TO_OBJECT", "WITH", "SET_INDEX", "WITHEND"])
     );
 }
+
+#[test]
+fn gs1_style_commands_inside_gs2() {
+    let got = f("setimgpart door.png,0,0,32,32;\n  hide;\n  x = 1;");
+    assert_eq!(
+        got[..9],
+        names(&[
+            "TYPE_ARRAY",
+            "TYPE_NUMBER",
+            "TYPE_NUMBER",
+            "TYPE_NUMBER",
+            "TYPE_NUMBER",
+            "TYPE_STRING",
+            "TYPE_VAR",
+            "CALL",
+            "INDEX_DEC",
+        ])
+    );
+    let s = compile_gs2("function onCreated() { setimgpart door.png,0,0,32,32; }").unwrap();
+    assert!(s.strings.iter().any(|t| t == "door.png"));
+    // GS1 message codes in the arguments are lowered as in GS1.
+    let s = compile_gs2("function onCreated() { setcharprop #c,hi #a; }").unwrap();
+    assert!(ops(&s).contains(&"OP_PLAYER".to_string()));
+    // A GS1 name used GS2-style stays GS2.
+    assert_eq!(
+        f("hide();"),
+        names(&["TYPE_ARRAY", "TYPE_VAR", "CALL", "INDEX_DEC"])
+    );
+}
+
+#[test]
+fn leniency_the_live_servers_had() {
+    // A missing `;` at the end of a line or before `}`.
+    assert_eq!(f("x = 1\n  y = 2\n"), f("x = 1; y = 2;"));
+    assert_eq!(
+        f("echo(1) }\nfunction g() {"),
+        f("echo(1); }\nfunction g() {")
+    );
+    assert!(compile_gs2("function f() { x = 1 y = 2; }").is_err());
+    // `=` compares inside an `if` condition.
+    assert_eq!(f("if (a = \"m\") x = 1;"), f("if (a == \"m\") x = 1;"));
+    // A later function of the same name replaces the earlier one.
+    let s = compile_gs2("function f() { x = 1; }\nfunction f() { y = 2; }").unwrap();
+    assert_eq!(s.functions.len(), 1);
+    assert!(s.strings.iter().any(|t| t == "y") && !s.strings.iter().any(|t| t == "x"));
+    // Declarations and functions without a body.
+    assert!(compile_gs2("function a();\nfunction b()\nfunction c() { return 2; }").is_ok());
+    // Text beyond latin1.
+    assert!(compile_gs2("function f() { x = \"\u{263A}\"; }").is_ok());
+}
+
+#[test]
+fn lambdas_steps_and_dynamic_calls() {
+    let s = compile_gs2("function onCreated() { temp.f = function() { return 1; }; }").unwrap();
+    assert_eq!(
+        ops(&s)[4..18],
+        names(&[
+            "TEMP",
+            "TYPE_VAR",
+            "MEMBER_ACCESS",
+            "SET_INDEX",
+            "TYPE_ARRAY",
+            "FUNC_PARAMS_END",
+            "JMP",
+            "TYPE_NUMBER",
+            "RET",
+            "THIS",
+            "TYPE_VAR",
+            "MEMBER_ACCESS",
+            "CONV_TO_OBJECT",
+            "ASSIGN",
+        ])
+    );
+    assert!(s
+        .functions
+        .iter()
+        .any(|f| f.name.starts_with("public.function_")));
+    assert_eq!(
+        f("a[1][2]--;"),
+        names(&[
+            "TYPE_VAR",
+            "CONV_TO_OBJECT",
+            "TYPE_NUMBER",
+            "ARRAY",
+            "TYPE_NUMBER",
+            "ARRAY",
+            "DEC",
+            "INDEX_DEC",
+        ])
+    );
+    assert!(compile_gs2("function f() { for (i = 0; i < 4; ++i) showpoly(++this.n, x); }").is_ok());
+    assert!(compile_gs2("function f() { obj.(@\"add\" @ n)(1, 2); a.b.(n)(); }").is_ok());
+    assert!(
+        compile_gs2("function f() { this.n = makevar(\"a\" @ i) += 2; a[i][j] -= 1; }").is_ok()
+    );
+    // Integers past 32 bits stay exact.
+    assert!(compile_gs2("function f() { x = 98765432109876; }")
+        .unwrap()
+        .disassemble()
+        .contains("98765432109876"));
+}
