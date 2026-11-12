@@ -772,13 +772,13 @@ pub fn compile_gs1(src: &str, era: Era) -> Result<Script, CompileErrors> {
         });
     }
     let items = lift_gs1(parsed.body, era)?;
-    finish(emit_items(&items, true, era)?)
+    finish(emit_items(&items, true, era, Spellings::default())?)
 }
 
 /// Compile the GS2 subset this temporary compiler accepts.
 pub fn compile_gs2(src: &str) -> Result<Script, CompileErrors> {
-    let items = parse_gs2(src)?;
-    finish(emit_items(&items, false, Era::V21)?)
+    let (items, spellings) = parse_gs2(src)?;
+    finish(emit_items(&items, false, Era::V21, spellings)?)
 }
 
 fn finish(built: Built) -> Result<Script, CompileErrors> {
@@ -930,9 +930,15 @@ struct Builder {
     gs1: bool,
     era: Era,
     line: u32,
+    spellings: Spellings,
 }
 
-fn emit_items(items: &[Item], gs1: bool, era: Era) -> Result<Built, CompileErrors> {
+fn emit_items(
+    items: &[Item],
+    gs1: bool,
+    era: Era,
+    spellings: Spellings,
+) -> Result<Built, CompileErrors> {
     let mut seen = HashMap::<String, ()>::new();
     let mut errors = Vec::new();
     for item in items.iter().filter(|i| !i.top) {
@@ -957,6 +963,7 @@ fn emit_items(items: &[Item], gs1: bool, era: Era) -> Result<Built, CompileError
         gs1,
         era,
         line: 0,
+        spellings,
     };
     for item in items {
         if item.top {
@@ -1069,6 +1076,14 @@ impl Builder {
     }
 
     fn emit_number(&mut self, n: f64) {
+        if let Some(text) = self.spellings.get(n) {
+            self.code.push(Instr {
+                op: Op::TypeNumber,
+                operand: Operand::Decimal(text),
+                offset: 0,
+            });
+            return;
+        }
         if n.is_finite() && n.fract() == 0.0 && (i32::MIN as f64..=i32::MAX as f64).contains(&n) {
             self.emit_int(n as i32);
         } else {
@@ -2242,9 +2257,11 @@ impl Builder {
                 self.op(Op::Format);
                 true
             }
+            // The reference compiler hands `OP_OBJ_SIZE` an object.
             "arraylen" | "sarraylen" => {
                 if let Some(a) = args.first() {
-                    self.numeric(a);
+                    self.value(a);
+                    self.op(Op::ConvToObject);
                 }
                 self.op(Op::ObjSize);
                 true
@@ -2271,8 +2288,39 @@ impl Builder {
                 self.op(Op::Translate);
                 true
             }
-            "sin" | "cos" | "arctan" | "abs" | "random" | "exp" | "log" | "min" | "max" | "pow"
-            | "char" | "vecx" | "vecy" | "waitfor" | "makevar" => {
+            // `makevar` takes its name as a string, converted even when it
+            // already is one, as the reference compiler does.
+            "makevar" => {
+                if let Some(a) = args.first() {
+                    self.value(a);
+                    self.op(Op::ConvToString);
+                }
+                self.op(Op::MakeVar);
+                true
+            }
+            // `waitfor(object, event, timeout)` pushes in source order: the
+            // object and event as strings, the timeout as a number.
+            "waitfor" => {
+                for (i, a) in args.iter().enumerate() {
+                    if i < 2 {
+                        self.stringish(a);
+                    } else {
+                        self.numeric(a);
+                    }
+                }
+                self.op(Op::WaitFor);
+                true
+            }
+            // `pow(base, exponent)` pushes in source order, like `getangle`.
+            "pow" => {
+                for a in args {
+                    self.numeric(a);
+                }
+                self.op(Op::Pow);
+                true
+            }
+            "sin" | "cos" | "arctan" | "abs" | "random" | "exp" | "log" | "min" | "max"
+            | "char" | "vecx" | "vecy" => {
                 for a in args.iter().rev() {
                     self.numeric(a);
                 }
@@ -2445,7 +2493,9 @@ impl Builder {
                 self.value(lo);
                 self.value(hi);
                 self.op(Op::InRange);
-                Kind::Other
+                // The reference compiler uses the result as a number with no
+                // `OP_CONV_TO_FLOAT`; the same for `OP_IN_OBJ` below.
+                Kind::Number
             }
             Expr::Cond { cond, then, els } => {
                 let mut fails = Vec::new();
@@ -2475,7 +2525,7 @@ impl Builder {
                 self.op(Op::ArrayEnd);
                 self.op(Op::ConvToObject);
                 self.op(Op::InObj);
-                Kind::Other
+                Kind::Number
             }
             Expr::InList { e, list } => {
                 // GS1 `x in {a, b, c}` reads x, then each item left to right
@@ -2504,7 +2554,7 @@ impl Builder {
                 self.place(name);
                 self.op(Op::ConvToObject);
                 self.op(Op::InObj);
-                Kind::Other
+                Kind::Number
             }
             Expr::Gs2(g) => self.gs2_value(g),
             Expr::List(values) => {
@@ -2988,10 +3038,22 @@ fn is_logic(e: &Expr) -> bool {
     }
 }
 
+/// The body always leaves through `return`, so the function needs no
+/// closing `return 0`. An `if` counts when it has an `else` and every branch
+/// returns, which is where the reference compiler also leaves it out.
 fn ends_with_return(body: &[Stmt]) -> bool {
-    match body.last() {
-        Some(Stmt::Return(_)) => true,
-        Some(Stmt::Block(v)) => ends_with_return(v),
+    body.last().is_some_and(always_returns)
+}
+
+fn always_returns(s: &Stmt) -> bool {
+    match s {
+        Stmt::Return(_) => true,
+        Stmt::Block(v) => ends_with_return(v),
+        Stmt::If {
+            then,
+            els: Some(els),
+            ..
+        } => always_returns(then) && always_returns(els),
         _ => false,
     }
 }
@@ -3009,7 +3071,7 @@ fn is_plain_name(s: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
 }
 
-fn parse_gs2(src: &str) -> Result<Vec<Item>, CompileErrors> {
+fn parse_gs2(src: &str) -> Result<(Vec<Item>, Spellings), CompileErrors> {
     let mut p = Gs2::new(src);
     let mut items = Vec::new();
     loop {
@@ -3041,7 +3103,7 @@ fn parse_gs2(src: &str) -> Result<Vec<Item>, CompileErrors> {
             _ => items.push(Item::top(vec![s])),
         }
     }
-    Ok(items)
+    Ok((items, p.spellings))
 }
 
 struct Gs2<'a> {
@@ -3053,6 +3115,51 @@ struct Gs2<'a> {
     /// The body of a `new T(name) { … }` the expression parser just read,
     /// for the statement parser to pick up.
     new_body: Option<Vec<Stmt>>,
+    /// How each decimal literal was written, by value (see [`Spellings`]).
+    spellings: Spellings,
+}
+
+/// The source text of decimal literals, keyed by the bits of their absolute
+/// value. The reference compiler writes a decimal literal's text as it
+/// stands (`3.0`, `.5`, `1.50`), not a normalised number. A value written two
+/// different ways in one script falls back to the normalised text.
+#[derive(Default)]
+struct Spellings {
+    text: HashMap<u64, String>,
+    mixed: std::collections::HashSet<u64>,
+}
+
+impl Spellings {
+    fn record(&mut self, value: f64, text: &str) {
+        let key = value.to_bits();
+        if self.mixed.contains(&key) {
+            return;
+        }
+        match self.text.get(&key) {
+            Some(seen) if seen != text => {
+                self.text.remove(&key);
+                self.mixed.insert(key);
+            }
+            Some(_) => {}
+            None => {
+                self.text.insert(key, text.to_string());
+            }
+        }
+    }
+
+    /// The written text for a literal whose spelling differs from the
+    /// normalised form, or `None` to use the normalised form.
+    fn get(&self, value: f64) -> Option<String> {
+        let t = self.text.get(&value.abs().to_bits())?;
+        if *t == num_to_string(value.abs()) {
+            return None;
+        }
+        Some(if value < 0.0 {
+            format!("-{t}")
+        } else {
+            t.clone()
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -3073,6 +3180,7 @@ impl<'a> Gs2<'a> {
             peek: None,
             bad: None,
             new_body: None,
+            spellings: Spellings::default(),
         }
     }
 
@@ -3880,7 +3988,15 @@ impl<'a> Gs2<'a> {
                 }
             }
             let text = std::str::from_utf8(&self.b[start..self.i]).unwrap_or("0");
-            return GTok::Num(text.parse().unwrap_or(0.0));
+            let value = text.parse().unwrap_or(0.0);
+            if text.contains('.') {
+                self.spellings.record(value, text);
+            } else {
+                // Integer literals are written normalised (`007` is `7`);
+                // they only mark the value as also written that way.
+                self.spellings.record(value, &num_to_string(value));
+            }
+            return GTok::Num(value);
         }
         if c.is_ascii_alphabetic() || c == b'_' || c == b'$' {
             let start = self.i;
