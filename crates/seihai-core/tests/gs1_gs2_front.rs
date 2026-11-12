@@ -482,5 +482,198 @@ fn malformed_and_unsupported_array_forms_fail_clearly() {
         assert!(error.contains("calls or nested lists"), "{source}: {error}");
     }
     assert!(compile::compile_gs1("if (created) { this.a = {1, 2}; }", Era::V205).is_err());
-    assert!(compile::compile_gs2("function onCreated() { this.a[0] = 1; }").is_err());
+    assert!(compile::compile_gs2("function onCreated() { this.a[0] = {1}; }").is_ok());
+    assert!(compile::compile_gs1("if (created) { this.a[0] = {1}; }", Era::V21).is_err());
+}
+
+/// Instructions `from..=to` with string operands written out, so two scripts
+/// with different string tables can be compared op for op.
+fn listing(script: &Script, from: usize, to: usize) -> Vec<String> {
+    use seihai_core::scripting::gs2::Operand;
+    script.code[from..=to]
+        .iter()
+        .map(|i| match &i.operand {
+            Operand::None => i.op.to_string(),
+            Operand::Str(n) => format!("{} {:?}", i.op, script.strings[*n as usize]),
+            Operand::Int(n) => format!("{} {n}", i.op),
+            Operand::Decimal(t) => format!("{} {t}", i.op),
+        })
+        .collect()
+}
+
+/// The body of the only function, without its header (params, jump, the
+/// call marker) and without the closing `return 0`.
+fn body(script: &Script) -> Vec<String> {
+    let names = ops(script);
+    let start = names.iter().position(|n| n == "OP_JMP").unwrap() + 1;
+    let start = if names[start] == "OP_CMD_CALL" {
+        start + 1
+    } else {
+        start
+    };
+    listing(script, start, script.code.len() - 4)
+}
+
+#[test]
+fn element_read_and_write_match_the_lists_fixture() {
+    let reference = Script::parse(&fixture("lists.gs2bc")).unwrap();
+    // lists.gs2: `this.first = temp.a[0]; temp.a[1] = 20;` is ops 23..=39.
+    let want = listing(&reference, 23, 39);
+    let gs2 = compile::compile_gs2(
+        "function onCreated() {\n  this.first = temp.a[0];\n  temp.a[1] = 20;\n}\n",
+    )
+    .unwrap();
+    assert_eq!(body(&gs2), want);
+    // GS1 has no `temp.`; `this.` lowers the same way on both sides.
+    let gs1 = compile::compile_gs1(
+        "if (created) {\n  this.first = this.a[0];\n  this.a[1] = 20;\n}\n",
+        Era::V21,
+    )
+    .unwrap();
+    let gs2 = compile::compile_gs2(
+        "function onCreated() {\n  this.first = this.a[0];\n  this.a[1] = 20;\n}\n",
+    )
+    .unwrap();
+    assert_eq!(gs1.write(), gs2.write());
+    assert!(ops(&gs1).contains(&"OP_ARRAY".to_string()));
+    assert!(ops(&gs1).contains(&"OP_ARRAY_ASSIGN".to_string()));
+}
+
+#[test]
+fn two_index_read_and_write_match_the_lists_fixture() {
+    let reference = Script::parse(&fixture("lists.gs2bc")).unwrap();
+    // `temp.g[1, 2] = 9; this.g = temp.g[1, 2];` is ops 171..=189.
+    let want = listing(&reference, 171, 189);
+    let gs2 = compile::compile_gs2(
+        "function onCreated() {\n  temp.g[1, 2] = 9;\n  this.g = temp.g[1, 2];\n}\n",
+    )
+    .unwrap();
+    assert_eq!(body(&gs2), want);
+    let gs1 = compile::compile_gs1(
+        "if (created) {\n  this.h[1, 2] = 9;\n  this.g = this.h[1, 2];\n}\n",
+        Era::V21,
+    )
+    .unwrap();
+    let gs2 = compile::compile_gs2(
+        "function onCreated() {\n  this.h[1, 2] = 9;\n  this.g = this.h[1, 2];\n}\n",
+    )
+    .unwrap();
+    assert_eq!(gs1.write(), gs2.write());
+}
+
+#[test]
+fn in_array_matches_the_lists_fixture() {
+    let reference = Script::parse(&fixture("lists.gs2bc")).unwrap();
+    // `this.has = 40 in temp.a;` is ops 89..=98.
+    let want = listing(&reference, 89, 98);
+    let gs2 =
+        compile::compile_gs2("function onCreated() {\n  this.has = 40 in temp.a;\n}\n").unwrap();
+    assert_eq!(body(&gs2), want);
+    let gs1 =
+        compile::compile_gs1("if (created) {\n  this.has = 40 in this.a;\n}\n", Era::V21).unwrap();
+    let gs2 =
+        compile::compile_gs2("function onCreated() {\n  this.has = 40 in this.a;\n}\n").unwrap();
+    assert_eq!(gs1.write(), gs2.write());
+}
+
+#[test]
+fn lowered_elements_run_on_the_gs2_machine() {
+    let script = compile::compile_gs1(
+        "if (created) {
+  this.a = {10, 20, 30};
+  this.i = 1;
+  this.a[this.i + 1] = 7;
+  this.first = this.a[0];
+  this.last = this.a[2];
+  this.has = 7 in this.a;
+  this.not = 8 in this.a;
+}
+",
+        Era::V21,
+    )
+    .unwrap();
+    // A computed index is converted like any numeric operand.
+    let names = ops(&script);
+    let assign = names.iter().position(|n| n == "OP_ARRAY_ASSIGN").unwrap();
+    assert_eq!(names[assign - 2], "OP_ADD", "{names:?}");
+    let machine = run_created(script);
+    assert_eq!(
+        machine.list(Root::This, "a"),
+        Some(
+            [
+                Value::from(Val::Num(10.0)),
+                Value::from(Val::Num(20.0)),
+                Value::from(Val::Num(7.0)),
+            ]
+            .as_slice()
+        )
+    );
+    assert_eq!(machine.var(Root::This, "first"), Some(&Val::Num(10.0)));
+    assert_eq!(machine.var(Root::This, "last"), Some(&Val::Num(7.0)));
+    assert_eq!(machine.var(Root::This, "has"), Some(&Val::Num(1.0)));
+    assert_eq!(machine.var(Root::This, "not"), Some(&Val::Num(0.0)));
+}
+
+#[test]
+fn a_call_in_an_index_marks_the_function_as_calling() {
+    let script = compile::compile_gs2("function onCreated() { this.a[pick()] = 1; }").unwrap();
+    assert!(ops(&script).contains(&"OP_CMD_CALL".to_string()));
+    let script = compile::compile_gs2("function onCreated() { this.x = this.a[pick()]; }").unwrap();
+    assert!(ops(&script).contains(&"OP_CMD_CALL".to_string()));
+}
+
+#[test]
+fn element_forms_without_a_fixture_stay_errors() {
+    let cases = [
+        ("this.a[0] += 1;", "no fixture-checked GS2 form"),
+        ("this.a[0]++;", "no fixture-checked GS2 form"),
+        ("this.a[0, 1, 2] = 1;", "GS2 array opcodes take one or two"),
+        ("this.x = npcs[0].x;", "a field after an index"),
+        ("this.x = board[5];", "`board[..]`"),
+        ("this.x = tiles[1, 2];", "`tiles[..]`"),
+    ];
+    for (stmt, want) in cases {
+        let source = format!("if (created) {{ {stmt} }}");
+        let error = compile::compile_gs1(&source, Era::V21)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(want), "{source}: {error}");
+    }
+    for stmt in ["this.a[0] += 1;", "this.a[0]++;"] {
+        let source = format!("function onCreated() {{ {stmt} }}");
+        assert!(compile::compile_gs2(&source).is_err(), "{source}");
+    }
+    for stmt in ["this.x = npcs[0].x;", "this.x = this.a[0][1];"] {
+        let source = format!("function onCreated() {{ {stmt} }}");
+        let error = compile::compile_gs2(&source).unwrap_err().to_string();
+        assert!(
+            error.contains("only `a[i]` and `a[i, j]`"),
+            "{source}: {error}"
+        );
+    }
+}
+
+#[test]
+fn joins_conditionals_ranges_and_player_position_lower_and_run() {
+    let script = compile::compile_gs1(
+        "if (created) {
+  this.s = \"a\" @ \"b\";
+  this.t = \"a\" SPC \"b\";
+  this.c = 1 > 0 ? 5 : 6;
+  this.r = 3 in |1, 5|;
+  this.o = 9 in |1, 5|;
+}
+",
+        Era::V21,
+    )
+    .unwrap();
+    let machine = run_created(script);
+    assert_eq!(machine.var(Root::This, "s"), Some(&Val::from("ab")));
+    assert_eq!(machine.var(Root::This, "t"), Some(&Val::from("a b")));
+    assert_eq!(machine.var(Root::This, "c"), Some(&Val::Num(5.0)));
+    assert_eq!(machine.var(Root::This, "r"), Some(&Val::Num(1.0)));
+    assert_eq!(machine.var(Root::This, "o"), Some(&Val::Num(0.0)));
+    let gs1 = compile::compile_gs1("if (created) { this.x = playerx; }", Era::V205).unwrap();
+    let gs2 = compile::compile_gs2("function onCreated() { this.x = player.x; }").unwrap();
+    assert_eq!(gs1.write(), gs2.write());
 }

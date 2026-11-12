@@ -9,6 +9,9 @@ use std::fmt;
 pub struct VarRef {
     pub name: String,
     pub index: Vec<Expr>,
+    /// `true` when a `.field` follows the index (`npcs[i].x`): the field is
+    /// folded into `name`, so the index applies to the part before it.
+    pub field_after_index: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

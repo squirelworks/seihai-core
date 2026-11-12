@@ -18,6 +18,17 @@
 //! Array literals use the documented reverse-push encoding. GS1 lowering is
 //! limited to scalar elements without calls: the GS1 interpreter evaluates
 //! elements left to right, so calls need a separate order-preserving lowering.
+//!
+//! Indexed reads and writes (`a[i]`, `a[i, j]`, `a[i] = v`, `a[i, j] = v`)
+//! and `x in array` use the encodings in `tests/fixtures/gs2/lists.gs2bc`:
+//! the variable, `OP_CONV_TO_OBJECT`, the indexes, then the value for a write,
+//! and `OP_ARRAY` / `OP_ARRAY_MULTIDIM` / `OP_ARRAY_ASSIGN` /
+//! `OP_ARRAY_MULTIDIM_ASSIGN` / `OP_IN_OBJ`. The fixture only has constant
+//! indexes; a computed index gets `OP_CONV_TO_FLOAT` like every other numeric
+//! operand here, which is Seihai's choice, not a fixture-checked encoding.
+//! Compound assignment and `++`/`--` on an element, a field after an index
+//! (`npcs[i].x`), three or more indexes and the `board`/`tiles` arrays have no
+//! fixture and stay compile errors.
 
 use super::{Function, Instr, Op, Operand, Script};
 use crate::scripting::engine::ast::*;
@@ -811,7 +822,9 @@ impl Builder {
             }
             Stmt::Function { body, .. } => self.body_has_call(body),
             Stmt::Return(v) => v.as_ref().is_some_and(|e| self.expr_has_call(e)),
-            Stmt::Assign { value, .. } => self.expr_has_call(value),
+            Stmt::Assign { target, value, .. } => {
+                self.index_has_call(target) || self.expr_has_call(value)
+            }
             Stmt::Call { name, args } => {
                 self.name_is_call(name) || args.iter().any(|a| self.expr_has_call(a))
             }
@@ -821,8 +834,13 @@ impl Builder {
             Stmt::With { target, body, .. } => {
                 self.expr_has_call(target) || self.stmt_has_call(body)
             }
-            Stmt::Break | Stmt::Continue | Stmt::IncDec { .. } | Stmt::Unknown { .. } => false,
+            Stmt::IncDec { target, .. } => self.index_has_call(target),
+            Stmt::Break | Stmt::Continue | Stmt::Unknown { .. } => false,
         }
+    }
+
+    fn index_has_call(&self, v: &VarRef) -> bool {
+        v.index.iter().any(|e| self.expr_has_call(e))
     }
 
     fn arg_has_call(&self, a: &Arg) -> bool {
@@ -849,7 +867,8 @@ impl Builder {
                 self.expr_has_call(cond) || self.expr_has_call(then) || self.expr_has_call(els)
             }
             Expr::List(v) => v.iter().any(|a| self.expr_has_call(a)),
-            Expr::Num(_) | Expr::Str(_) | Expr::Var(_) => false,
+            Expr::Var(v) => self.index_has_call(v),
+            Expr::Num(_) | Expr::Str(_) => false,
         }
     }
 
@@ -911,7 +930,11 @@ impl Builder {
             Stmt::Assign { target, op, value } => self.assign(target, *op, value),
             Stmt::IncDec { target, delta } => {
                 if !target.index.is_empty() {
-                    self.err("indexes are not lowered by this temporary front end");
+                    self.err(format!(
+                        "`{}` on an array element has no fixture-checked GS2 form; write `a[i] = a[i] {} 1`",
+                        if *delta < 0.0 { "--" } else { "++" },
+                        if *delta < 0.0 { "-" } else { "+" },
+                    ));
                     return;
                 }
                 self.place(&target.name);
@@ -1023,7 +1046,7 @@ impl Builder {
 
     fn assign(&mut self, target: &VarRef, op: AssignOp, value: &Expr) {
         if !target.index.is_empty() {
-            self.err("indexes are not lowered by this temporary front end");
+            self.element_assign(target, op, value);
             return;
         }
         self.place(&target.name);
@@ -1043,6 +1066,46 @@ impl Builder {
             AssignOp::Set => unreachable!(),
         });
         self.op(Op::Assign);
+    }
+
+    /// `a[i] = v` and `a[i, j] = v`: object, indexes, value, assign op.
+    fn element_assign(&mut self, target: &VarRef, op: AssignOp, value: &Expr) {
+        if op != AssignOp::Set {
+            self.err(format!(
+                "`{}` on an array element has no fixture-checked GS2 form; write `a[i] = a[i] {} v`",
+                op.symbol(),
+                op.symbol().trim_end_matches('='),
+            ));
+            return;
+        }
+        if self.gs1 && matches!(value, Expr::List(_)) {
+            self.err("a list stored into an array element is not lowered");
+            return;
+        }
+        let Some(dims) = self.element(target) else {
+            return;
+        };
+        self.value(value);
+        self.op(if dims == 1 {
+            Op::ArrayAssign
+        } else {
+            Op::ArrayMultidimAssign
+        });
+    }
+
+    /// Pushes an indexed variable as an object followed by its indexes and
+    /// returns how many indexes there are, or `None` after an error.
+    fn element(&mut self, v: &VarRef) -> Option<usize> {
+        if let Some(problem) = element_problem(v) {
+            self.err(problem);
+            return None;
+        }
+        self.place(&v.name);
+        self.op(Op::ConvToObject);
+        for i in &v.index {
+            self.numeric(i);
+        }
+        Some(v.index.len())
     }
 
     fn command(&mut self, name: &str, args: &[Arg], line: u32) {
@@ -1268,9 +1331,16 @@ impl Builder {
             }
             Expr::Var(v) => {
                 if !v.index.is_empty() {
-                    self.err("indexes are not lowered by this temporary front end");
-                    self.emit_int(0);
-                    return Kind::Number;
+                    let Some(dims) = self.element(v) else {
+                        self.emit_int(0);
+                        return Kind::Number;
+                    };
+                    self.op(if dims == 1 {
+                        Op::Array
+                    } else {
+                        Op::ArrayMultidim
+                    });
+                    return Kind::Other;
                 }
                 if self.gs1 && !v.name.contains('.') && is_event(&v.name, self.era) {
                     self.err(format!(
@@ -1345,10 +1415,12 @@ impl Builder {
                 self.emit_int(0);
                 Kind::Number
             }
-            Expr::InArray { .. } => {
-                self.err("`in array` is not lowered by this temporary front end");
-                self.emit_int(0);
-                Kind::Number
+            Expr::InArray { e, name } => {
+                self.value(e);
+                self.place(name);
+                self.op(Op::ConvToObject);
+                self.op(Op::InObj);
+                Kind::Other
             }
             Expr::List(values) => {
                 if self.gs1 && !values.iter().all(gs1_array_element) {
@@ -1546,10 +1618,35 @@ impl Builder {
     }
 }
 
+/// Why an indexed variable is not lowered, if it is not.
+fn element_problem(v: &VarRef) -> Option<String> {
+    if v.field_after_index {
+        return Some(format!(
+            "a field after an index (`{}`) is not lowered by this temporary front end",
+            v
+        ));
+    }
+    if v.index.len() > 2 {
+        return Some(format!(
+            "`{}` has {} indexes; GS2 array opcodes take one or two",
+            v.name,
+            v.index.len()
+        ));
+    }
+    if matches!(v.name.as_str(), "board" | "tiles") {
+        return Some(format!(
+            "`{}[..]` has no fixture-checked GS2 encoding; it is not lowered",
+            v.name
+        ));
+    }
+    None
+}
+
 /// Scalar expressions whose evaluation cannot call script or host code.
 fn gs1_array_element(expr: &Expr) -> bool {
     match expr {
-        Expr::Num(_) | Expr::Str(_) | Expr::Var(_) => true,
+        Expr::Num(_) | Expr::Str(_) => true,
+        Expr::Var(v) => v.index.iter().all(gs1_array_element),
         Expr::Unary(_, value) => gs1_array_element(value),
         Expr::Bin(_, left, right) => gs1_array_element(left) && gs1_array_element(right),
         Expr::InRange { e, lo, hi } => {
@@ -1880,7 +1977,23 @@ impl<'a> Gs2<'a> {
 
     fn binary(&mut self, min: u8) -> Result<Expr, CompileErrors> {
         let mut lhs = self.unary()?;
-        while let Some((fallback, prec, text)) = self.bin_op(min) {
+        loop {
+            // `x in arr`, at the equality level. Only a variable on the right.
+            if min <= 6 && self.eat_id("in") {
+                let mut name = self.ident()?;
+                while self.eat(".") {
+                    name.push('.');
+                    name.push_str(&self.ident()?);
+                }
+                lhs = Expr::InArray {
+                    e: Box::new(lhs),
+                    name,
+                };
+                continue;
+            }
+            let Some((fallback, prec, text)) = self.bin_op(min) else {
+                break;
+            };
             self.bump();
             let rhs = self.binary(prec + 1)?;
             let op = match text {
@@ -1960,9 +2073,27 @@ impl<'a> Gs2<'a> {
                     name.push('.');
                     name.push_str(&self.ident()?);
                 }
+                let mut index = Vec::new();
+                if self.eat("[") {
+                    loop {
+                        index.push(self.expr()?);
+                        if !self.eat(",") {
+                            break;
+                        }
+                    }
+                    self.expect("]")?;
+                }
+                let field_after_index = !index.is_empty() && self.sees(".");
+                if field_after_index || self.sees("[") {
+                    return Err(CompileErrors::one(
+                        self.line,
+                        "only `a[i]` and `a[i, j]` are in this temporary GS2 compiler",
+                    ));
+                }
                 Ok(Expr::Var(VarRef {
                     name,
-                    index: Vec::new(),
+                    index,
+                    field_after_index,
                 }))
             }
             GTok::Op("(") => {

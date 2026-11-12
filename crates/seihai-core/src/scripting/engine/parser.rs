@@ -581,6 +581,7 @@ impl<'a> Parser<'a> {
     /// and any chained `.field` or `.field[index]`.
     fn var_tail(&mut self, mut name: String) -> VarRef {
         let mut index = Vec::new();
+        let mut field_after_index = false;
         loop {
             if self.eat_op("[") {
                 loop {
@@ -596,12 +597,17 @@ impl<'a> Parser<'a> {
                 if let Tok::Ident(f) = self.peek().tok.clone() {
                     self.next();
                     name = format!("{name}.{f}");
+                    field_after_index |= !index.is_empty();
                     continue;
                 }
             }
             break;
         }
-        VarRef { name, index }
+        VarRef {
+            name,
+            index,
+            field_after_index,
+        }
     }
 
     fn assign_tail(&mut self, target: VarRef) -> Stmt {
@@ -950,6 +956,7 @@ fn text_arg(raw: &str, quoted: bool, era: Era) -> Expr {
         return Expr::Var(VarRef {
             name: lower,
             index: Vec::new(),
+            field_after_index: false,
         });
     }
     // `this.a[3]` indexed form.
