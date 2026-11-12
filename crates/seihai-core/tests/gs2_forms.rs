@@ -385,3 +385,59 @@ fn lambdas_steps_and_dynamic_calls() {
         .disassemble()
         .contains("98765432109876"));
 }
+
+#[test]
+fn more_forms_from_the_corpus_shapes() {
+    for stmt in [
+        "f(1).x = f(2).x = 3;",
+        "f(1).x -= 2;",
+        "a[i] = b = 3;",
+        "temp.a[i][2] += 1;",
+        "if (\"a\" in f(\"b\")) x = 1;",
+        "a.x = 1, b.x = 2;",
+        "this.x == \"a\";",
+    ] {
+        let src = format!("function g() {{ {stmt} }}");
+        assert!(
+            compile_gs2(&src).is_ok(),
+            "{src}: {:?}",
+            compile_gs2(&src).err()
+        );
+    }
+    // `x in f(…)`: the value, `OP_CONV_TO_OBJECT`, `OP_IN_OBJ`.
+    let got = f("y = \"a\" in f(\"b\");");
+    assert_eq!(
+        got[got.len() - 3..],
+        names(&["CONV_TO_OBJECT", "IN_OBJ", "ASSIGN"])
+    );
+    // Enum members may be text; `global enum` too.
+    let s = compile_gs2("global enum E { A = \"x\", B };\nfunction g() { y = E::A @ B; }").unwrap();
+    assert!(s.strings.iter().any(|t| t == "x"));
+    // A declaration followed by its body, and a block left open at the end.
+    assert!(compile_gs2("function g();\n{ x = 1; }").is_ok());
+    assert!(compile_gs2("function g() {\n x = 1;\n").is_ok());
+}
+
+#[test]
+fn compile_script_picks_the_front_end() {
+    use seihai_core::scripting::gs2::compile::{compile_script, Front};
+    let gs1 = "if (playerenters) { setimgpart door.png,0,0,32,32; message hi; }";
+    assert_eq!(compile_script(gs1).unwrap().1, Front::Gs1);
+    let gs2 = "function onCreated() { setimgpart door.png,0,0,32,32; }";
+    assert_eq!(compile_script(gs2).unwrap().1, Front::Gs2);
+    // Only the GS1 front end takes this one.
+    assert_eq!(
+        compile_script("if (created) { tokenize #c; }").unwrap().1,
+        Front::Gs1
+    );
+}
+
+#[test]
+fn gs1_codes_and_ranges_inside_gs2() {
+    // `#a` as a call argument reads the player's account, as GS1 does.
+    let got = f("showtext(1, #a);");
+    assert!(got.contains(&"OP_PLAYER".to_string()), "{got:?}");
+    assert!(compile_gs2("function g() { x = #v(this.y) @ #c; }").is_ok());
+    // GS1's `in <a, b>` is the same range as `in |a, b|`.
+    assert_eq!(f("if (x in <1, 3>) y = 1;"), f("if (x in |1, 3|) y = 1;"));
+}

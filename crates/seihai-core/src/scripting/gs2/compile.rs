@@ -780,6 +780,58 @@ pub fn compile_gs1(src: &str, era: Era) -> Result<Script, CompileErrors> {
     finish(emit_items(&items, true, era, Spellings::default())?)
 }
 
+/// Which front end [`compile_script`] used.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Front {
+    Gs2,
+    Gs1,
+}
+
+/// Compile a script whose language is not marked, as a server holding both
+/// GS1 and GS2 scripts would. A script with no `function` that tests a GS1
+/// event (`if (playerenters)`) is GS1; any other is GS2, and falls back to
+/// GS1 when only the GS1 front end takes it. Seihai's reading: how the live
+/// servers chose is not recorded.
+pub fn compile_script(src: &str) -> Result<(Script, Front), CompileErrors> {
+    if looks_gs1(src) {
+        if let Ok(s) = compile_gs1(src, Era::V21) {
+            return Ok((s, Front::Gs1));
+        }
+    }
+    match compile_gs2(src) {
+        Ok(s) => Ok((s, Front::Gs2)),
+        Err(e) => match compile_gs1(src, Era::V21) {
+            Ok(s) => Ok((s, Front::Gs1)),
+            Err(_) => Err(e),
+        },
+    }
+}
+
+/// No `function` keyword, and an `if (` whose condition starts with a GS1
+/// event name.
+fn looks_gs1(src: &str) -> bool {
+    let lower = src.to_ascii_lowercase();
+    let words = |t: &str| {
+        t.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+            .any(|w| w == "function")
+    };
+    if words(&lower) {
+        return false;
+    }
+    lower.match_indices("if").any(|(i, _)| {
+        let rest = lower[i + 2..].trim_start();
+        let Some(rest) = rest.strip_prefix('(') else {
+            return false;
+        };
+        let word: String = rest
+            .trim_start()
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric())
+            .collect();
+        vocab::EVENTS.iter().any(|(e, _)| *e == word)
+    })
+}
+
 /// Compile the GS2 subset this temporary compiler accepts.
 pub fn compile_gs2(src: &str) -> Result<Script, CompileErrors> {
     let (items, spellings) = parse_gs2(src)?;
@@ -1444,7 +1496,17 @@ impl Builder {
             // `OP_ASSIGN` per target (innermost first).
             Gs2Stmt::Chain { targets, value } => {
                 if targets.iter().any(|t| !t.index.is_empty()) {
-                    self.err("`a[i] = b = …` is not lowered");
+                    // `a[i] = b = v`: the later stores as values, then the
+                    // first (Seihai's form; no probe).
+                    let mut v = value.clone();
+                    for t in targets[1..].iter().rev() {
+                        v = Expr::Gs2(Box::new(Gs2Expr::AssignValue {
+                            target: Expr::Var(t.clone()),
+                            op: AssignOp::Set,
+                            value: v,
+                        }));
+                    }
+                    self.assign(&targets[0], AssignOp::Set, &v);
                     return;
                 }
                 for (i, t) in targets.iter().enumerate() {
@@ -1781,6 +1843,21 @@ impl Builder {
                 self.op(Op::MemberAccess);
                 self.op(Op::Call);
                 Kind::Other
+            }
+            // A GS1 message code in GS2: expanded as GS1 does.
+            Gs2Expr::Gs1Text(code) => {
+                let gs1 = self.gs1;
+                self.gs1 = true;
+                let k = self.gs1_text(code);
+                self.gs1 = gs1;
+                k
+            }
+            Gs2Expr::InValue { e, list } => {
+                self.value(e);
+                self.value(list);
+                self.op(Op::ConvToObject);
+                self.op(Op::InObj);
+                Kind::Number
             }
             // `++x` used as a value: the place and `OP_INC`, which leaves
             // the changed variable (Seihai's form, no probe).
@@ -3405,6 +3482,8 @@ enum GTok {
     Id(String),
     Num(f64),
     Str(String),
+    /// A GS1 message code (`#a`, `#v(x)`) where a GS2 value is expected.
+    Code(String),
     Op(&'static str),
     Eof,
 }
@@ -3524,7 +3603,12 @@ impl<'a> Gs2<'a> {
         let body = if self.eat("{") {
             self.block_body()?
         } else if self.eat(";") {
-            Vec::new()
+            // `function f();` is a declaration, unless a body follows.
+            if self.eat("{") {
+                self.block_body()?
+            } else {
+                Vec::new()
+            }
         } else if matches!(self.peek_tok(), GTok::Id(ref w) if w == "function" || w == "public")
             || matches!(self.peek_tok(), GTok::Eof)
         {
@@ -3548,7 +3632,9 @@ impl<'a> Gs2<'a> {
                 break;
             }
             if self.eof() {
-                return Err(CompileErrors::one(self.line, "unclosed `{`"));
+                // A block left open at the end of the file closes there
+                // (live scripts end that way).
+                break;
             }
             if self.eat(";") {
                 continue;
@@ -3617,6 +3703,12 @@ impl<'a> Gs2<'a> {
             self.end_stmt()?;
             return Ok(Stmt::Block(Vec::new()));
         }
+        if self.eat_id("global") && !self.sees_enum() {
+            return Err(CompileErrors::one(
+                self.line,
+                "expected `enum` after `global`",
+            ));
+        }
         if self.eat_id("enum") {
             // `enum Name { A, B = 5, C }`: numbers from 0, or from a given
             // value. Seihai folds them like `const`; the Preagonal output
@@ -3630,23 +3722,24 @@ impl<'a> Gs2<'a> {
             let mut next = 0.0;
             while !self.eat("}") {
                 let name = self.ident()?;
+                // `A = "x"` makes the member that text; numbering carries on
+                // from the last number.
+                let mut value = None;
                 if self.eat("=") {
                     match self.const_value()? {
                         Expr::Num(n) => next = n,
-                        _ => {
-                            return Err(CompileErrors::one(
-                                self.line,
-                                "an `enum` value must be a number",
-                            ))
-                        }
+                        v => value = Some(v),
                     }
                 }
+                let value = value.unwrap_or_else(|| {
+                    next += 1.0;
+                    Expr::Num(next - 1.0)
+                });
                 let lower = name.to_ascii_lowercase();
                 if let Some(p) = &prefix {
-                    self.consts.insert(format!("{p}::{lower}"), Expr::Num(next));
+                    self.consts.insert(format!("{p}::{lower}"), value.clone());
                 }
-                self.consts.insert(lower, Expr::Num(next));
-                next += 1.0;
+                self.consts.insert(lower, value);
                 if !self.eat(",") {
                     self.expect("}")?;
                     break;
@@ -3792,7 +3885,7 @@ impl<'a> Gs2<'a> {
         };
         if settable {
             if let Some(op) = self.assign_op() {
-                let mut value = self.expr()?;
+                let mut value = self.assigned_value()?;
                 // `obj.x += v` / `a[i][j] -= v` is `… = … + v` (Seihai's
                 // form; the place is read once and written once).
                 let bin = match op {
@@ -3826,10 +3919,9 @@ impl<'a> Gs2<'a> {
             {
                 Ok(Stmt::Gs2(Box::new(Gs2Stmt::Eval(Expr::Gs2(g)))))
             }
-            _ => Err(CompileErrors::one(
-                self.line,
-                "expression statement is not a call",
-            )),
+            // Any other expression as a statement (a bare name, a stray
+            // comparison): the value, dropped. Live scripts have these.
+            other => Ok(Stmt::Gs2(Box::new(Gs2Stmt::Eval(other)))),
         }
     }
 
@@ -4031,11 +4123,13 @@ impl<'a> Gs2<'a> {
         loop {
             // `x in arr`, at the equality level. Only a variable on the right.
             if min <= 6 && self.eat_id("in") {
-                if self.eat("|") {
-                    let lo = self.binary(4)?;
+                // `in |a, b|`, and GS1's `in <a, b>`.
+                let angle = self.sees("<");
+                if self.eat("|") || self.eat("<") {
+                    let lo = self.binary(if angle { 7 } else { 4 })?;
                     self.expect(",")?;
-                    let hi = self.binary(4)?;
-                    self.expect("|")?;
+                    let hi = self.binary(if angle { 7 } else { 4 })?;
+                    self.expect(if angle { ">" } else { "|" })?;
                     lhs = Expr::InRange {
                         e: Box::new(lhs),
                         lo: Box::new(lo),
@@ -4060,14 +4154,17 @@ impl<'a> Gs2<'a> {
                     };
                     continue;
                 }
-                let mut name = self.ident()?;
-                while self.eat(".") {
-                    name.push('.');
-                    name.push_str(&self.ident()?);
-                }
-                lhs = Expr::InArray {
-                    e: Box::new(lhs),
-                    name,
+                let list = self.unary()?;
+                lhs = match list {
+                    Expr::Var(v) if v.index.is_empty() => Expr::InArray {
+                        e: Box::new(lhs),
+                        name: v.name,
+                    },
+                    // `x in f(…)`, `x in a[i]`: the value as the list.
+                    other => Expr::Gs2(Box::new(Gs2Expr::InValue {
+                        e: lhs,
+                        list: other,
+                    })),
                 };
                 continue;
             }
@@ -4364,6 +4461,7 @@ impl<'a> Gs2<'a> {
                 self.expect(")")?;
                 Ok(e)
             }
+            GTok::Code(code) => Ok(Expr::Gs2(Box::new(Gs2Expr::Gs1Text(code)))),
             GTok::Op("@") => {
                 let e = self.unary()?;
                 Ok(Expr::Gs2(Box::new(Gs2Expr::Text(e))))
@@ -4490,8 +4588,40 @@ impl<'a> Gs2<'a> {
     /// The `;` that ends a statement. The live servers ran scripts that
     /// leave it out at the end of a line or before `}`, so a statement also
     /// ends there.
+    /// The right side of an assignment, where it may itself be an
+    /// assignment (`a.x = b.x = v`, `a = f(1).y += v`): those inner stores
+    /// are values, innermost first.
+    fn assigned_value(&mut self) -> Result<Expr, CompileErrors> {
+        let value = self.expr()?;
+        let settable = match &value {
+            Expr::Var(_) => true,
+            Expr::Gs2(g) => matches!(
+                g.as_ref(),
+                Gs2Expr::Member { .. } | Gs2Expr::Index { .. } | Gs2Expr::DynMember { .. }
+            ),
+            Expr::Call { name, .. } => name == "makevar",
+            _ => false,
+        };
+        if settable {
+            if let Some(op) = self.assign_op() {
+                let inner = self.assigned_value()?;
+                return Ok(Expr::Gs2(Box::new(Gs2Expr::AssignValue {
+                    target: value,
+                    op,
+                    value: inner,
+                })));
+            }
+        }
+        Ok(value)
+    }
+
+    fn sees_enum(&mut self) -> bool {
+        matches!(self.peek_tok(), GTok::Id(ref w) if w == "enum")
+    }
+
     fn end_stmt(&mut self) -> Result<(), CompileErrors> {
-        if self.eat(";") {
+        // `a.x = 1, b.x = 2;`: a comma also ends a statement.
+        if self.eat(";") || self.eat(",") {
             return Ok(());
         }
         let next = self.peek_tok();
@@ -4562,6 +4692,37 @@ impl<'a> Gs2<'a> {
                 self.i += 1;
             }
             return GTok::Str(String::from_utf8_lossy(&text).into_owned());
+        }
+        // `#a`, `#c`, `#v(this.x)`, `#P1`: a GS1 message code used as a
+        // value in GS2 code (live scripts pass them to calls).
+        if c == b'#'
+            && self
+                .b
+                .get(self.i + 1)
+                .is_some_and(|d| d.is_ascii_alphabetic())
+        {
+            let start = self.i;
+            self.i += 2;
+            while self.b.get(self.i).is_some_and(|d| d.is_ascii_digit()) {
+                self.i += 1;
+            }
+            if self.b.get(self.i) == Some(&b'(') {
+                let mut depth = 0;
+                while let Some(&d) = self.b.get(self.i) {
+                    self.i += 1;
+                    match d {
+                        b'(' => depth += 1,
+                        b')' => {
+                            depth -= 1;
+                            if depth == 0 {
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            return GTok::Code(String::from_utf8_lossy(&self.b[start..self.i]).into_owned());
         }
         if c == b'0' && matches!(self.b.get(self.i + 1), Some(b'x' | b'X')) {
             self.i += 2;
