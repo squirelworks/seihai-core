@@ -208,6 +208,10 @@ mod tests {
         assert_eq!(out.pixel(2, 2), Some([0, 0, 0, 0]), "the inside");
         assert_eq!(out.pixel(4, 4), Some([0, 0, 0, 0]));
         out.stroke_rect(0, 0, 0, 3, [7, 7, 7, 255]);
-        assert_eq!(out.pixel(0, 0), Some([0, 0, 0, 0]), "no width draws nothing");
+        assert_eq!(
+            out.pixel(0, 0),
+            Some([0, 0, 0, 0]),
+            "no width draws nothing"
+        );
     }
 }
