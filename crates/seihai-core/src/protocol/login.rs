@@ -410,6 +410,29 @@ fn classic_head(version: super::ClientVersion, raw: &[u8]) -> Vec<u8> {
     }
 }
 
+/// The nickname props a 6.x build sends when it has no recorded post-login
+/// frame: `PLI_PLAYERPROPS` (2) with `NICKNAME` (0) alone. No 6.x capture
+/// of the real frame exists yet (#441); without this the server keeps its
+/// default nick ("default") and every other client shows that.
+pub fn nick_props_message(nick: &str) -> Vec<u8> {
+    let mut m = vec![PLI_PLAYERPROPS + 0x20, 0x20];
+    gstring(&mut m, nick);
+    m.push(b'\n');
+    m
+}
+
+/// Whether `version` sends [`nick_props_message`] once its first level has
+/// loaded: the 6.x builds, which have neither a [`LoginBurst`] nor a 4.x
+/// lobby frame to carry the nickname.
+pub fn sends_nick_props(version: super::ClientVersion) -> bool {
+    let all = super::ClientVersion::all_versions();
+    let at = |v| all.iter().position(|&x| x == v);
+    at(version) >= at(super::ClientVersion::V600R2)
+        && version.profile().protocol.pli.contains(PLI_PLAYERPROPS)
+        && LoginBurst::for_version(version).is_none()
+        && super::lobby::LobbyBurst::for_version(version).is_none()
+}
+
 /// Whether `version` sends [`classic_login_props_message`] once its first
 /// level has loaded: the gen-2 builds that can send `PLI_PLAYERPROPS`.
 pub fn sends_classic_login_props(version: super::ClientVersion) -> bool {
@@ -1372,5 +1395,19 @@ mod tests {
         assert!(LoginBurst::for_version(V217).unwrap().info().idle_gani);
         assert!(LoginBurst::for_version(V222).unwrap().info().idle_gani);
         assert!(!LoginBurst::for_version(V231).unwrap().info().idle_gani);
+    }
+
+    #[test]
+    fn six_x_sends_the_nick_alone() {
+        use super::super::ClientVersion::*;
+        for v in [V600R2, V6015, V6034, V603R7, V603R7Linux] {
+            assert!(sends_nick_props(v), "{v:?}");
+        }
+        for v in [V222, V231, V304, V404R2, V531R4] {
+            assert!(!sends_nick_props(v), "{v:?}");
+        }
+        let mut want = vec![PLI_PLAYERPROPS + 0x20, 0x20, 4 + 0x20];
+        want.extend(b"Lily\n");
+        assert_eq!(nick_props_message("Lily"), want);
     }
 }

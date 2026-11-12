@@ -20,7 +20,7 @@ mod wav;
 pub use rodio_out::RodioSound;
 
 pub use engine::{
-    pan_for, wanted_name, Outcome, SoundEngine, SoundEvent, MAX_VOICES, PAN_PER_TILE,
+    is_sound_name, pan_for, wanted_name, Outcome, SoundEngine, SoundEvent, MAX_VOICES, PAN_PER_TILE,
 };
 pub use wav::{decode_wav, Pcm};
 
