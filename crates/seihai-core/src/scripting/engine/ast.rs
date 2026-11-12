@@ -158,7 +158,7 @@ impl Gs2Stmt {
         match self {
             Gs2Stmt::Switch { arms, .. } => arms.iter().flat_map(|a| a.body.iter()).collect(),
             Gs2Stmt::ForEach { body, .. } => vec![body],
-            Gs2Stmt::Eval(_) => Vec::new(),
+            Gs2Stmt::Eval(_) | Gs2Stmt::SetPart { .. } => Vec::new(),
         }
     }
 
@@ -170,6 +170,7 @@ impl Gs2Stmt {
                 .collect(),
             Gs2Stmt::ForEach { list, .. } => vec![list],
             Gs2Stmt::Eval(e) => vec![e],
+            Gs2Stmt::SetPart { target, value } => vec![target, value],
         }
     }
 }
@@ -192,6 +193,9 @@ pub enum Gs2Stmt {
     ForEach { var: VarRef, list: Expr, body: Stmt },
     /// An expression used as a statement (`obj.method(…);`).
     Eval(Expr),
+    /// `target = value` where the target is a member or element of a value
+    /// that is not a plain dotted name (`findplayer(n).chat = …`).
+    SetPart { target: Expr, value: Expr },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

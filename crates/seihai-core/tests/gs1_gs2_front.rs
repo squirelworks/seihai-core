@@ -1077,3 +1077,14 @@ fn gs1_message_codes_and_string_commands_lower_and_run() {
     // A `#` that starts no code stays text.
     compile::compile_gs1("if (created) { message #1 and # ok; }\n", Era::V21).unwrap();
 }
+
+#[test]
+fn gs2_assigns_to_members_and_elements_of_values() {
+    let src = "function onCreated() { temp.l = {1, 2}; temp.l[0] = 5; findplayer(\"a\").chat = \"hi\"; temp.g = new[2][2]; temp.g[1, 1] = 3; }";
+    compile::compile_gs2(src).unwrap();
+    compile::compile_gs1(
+        "if (created) { message #s(clientr.x) #s(serverr.y); }\n",
+        Era::V21,
+    )
+    .unwrap();
+}

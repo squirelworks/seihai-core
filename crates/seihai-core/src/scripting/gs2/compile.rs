@@ -644,11 +644,12 @@ fn split_codes(s: &str, era: Era) -> Result<Vec<TextPart>, String> {
             ('v', Some(x)) => Some(TextPart::Expr(num(x))),
             ('s', Some(x)) => {
                 let n = x.trim().to_ascii_lowercase();
-                if (n.starts_with("this.") || n.starts_with("client.")) && is_plain_name(&n) {
+                let readable = ["this.", "client.", "clientr.", "serverr."];
+                if readable.iter().any(|p| n.starts_with(p)) && is_plain_name(&n) {
                     Some(TextPart::Expr(var(&n, None)))
                 } else {
                     return Err(format!(
-                        "`#s({x})`: only `this.` and `client.` strings are lowered (a plain GS1 string is a player flag)"
+                        "`#s({x})`: only `this.`, `client.`, `clientr.` and `serverr.` strings are lowered (a plain GS1 string is a player flag)"
                     ));
                 }
             }
@@ -1336,6 +1337,35 @@ impl Builder {
                 self.op(Op::IndexDec);
             }
             Gs2Stmt::ForEach { var, list, body } => self.foreach_stmt(var, list, body),
+            // The member or element as a place, the value, `OP_ASSIGN` /
+            // `OP_ARRAY_ASSIGN`, as for a dotted name or `a[i]`. Seihai's
+            // encoding, no fixture.
+            Gs2Stmt::SetPart { target, value } => match target {
+                Expr::Gs2(g) => match g.as_ref() {
+                    Gs2Expr::Member { obj, name } => {
+                        self.value(obj);
+                        self.emit_var(name);
+                        self.op(Op::MemberAccess);
+                        self.value(value);
+                        self.op(Op::Assign);
+                    }
+                    Gs2Expr::Index { obj, index } if index.len() <= 2 => {
+                        self.value(obj);
+                        self.op(Op::ConvToObject);
+                        for i in index {
+                            self.value(i);
+                        }
+                        self.value(value);
+                        self.op(if index.len() == 1 {
+                            Op::ArrayAssign
+                        } else {
+                            Op::ArrayMultidimAssign
+                        });
+                    }
+                    _ => self.err("that assignment target is not lowered"),
+                },
+                _ => self.err("that assignment target is not lowered"),
+            },
             Gs2Stmt::Switch { value, arms } => self.switch_stmt(value, arms),
         }
     }
@@ -3076,6 +3106,13 @@ impl<'a> Gs2<'a> {
                     value: Expr::Bin(BinOp::Cat, Box::new(e.clone()), Box::new(value)),
                 });
             }
+        }
+        if matches!(&e, Expr::Gs2(g) if matches!(g.as_ref(), Gs2Expr::Member { .. } | Gs2Expr::Index { .. }))
+            && self.eat("=")
+        {
+            let value = self.expr()?;
+            self.expect(";")?;
+            return Ok(Stmt::Gs2(Box::new(Gs2Stmt::SetPart { target: e, value })));
         }
         self.expect(";")?;
         match e {
