@@ -420,16 +420,24 @@ fn more_forms_from_the_corpus_shapes() {
 
 #[test]
 fn compile_script_picks_the_front_end() {
+    use seihai_core::scripting::engine::Era;
     use seihai_core::scripting::gs2::compile::{compile_script, Front};
+    let v21 = Era::V21;
     let gs1 = "if (playerenters) { setimgpart door.png,0,0,32,32; message hi; }";
-    assert_eq!(compile_script(gs1).unwrap().1, Front::Gs1);
+    assert_eq!(compile_script(gs1, v21).unwrap().1, Front::Gs1);
     let gs2 = "function onCreated() { setimgpart door.png,0,0,32,32; }";
-    assert_eq!(compile_script(gs2).unwrap().1, Front::Gs2);
+    assert_eq!(compile_script(gs2, v21).unwrap().1, Front::Gs2);
     // Only the GS1 front end takes this one.
     assert_eq!(
-        compile_script("if (created) { tokenize #c; }").unwrap().1,
+        compile_script("if (created) { tokenize #c; }", v21)
+            .unwrap()
+            .1,
         Front::Gs1
     );
+    // The GS1 front end reads the era it is given: `#I(…)` lowers before 2.1.
+    let old = "if (playerenters) { message #I(x); }";
+    assert!(compile_script(old, v21).is_err());
+    assert_eq!(compile_script(old, Era::V205).unwrap().1, Front::Gs1);
 }
 
 #[test]
@@ -475,6 +483,41 @@ fn v5_corpus_shapes() {
             "TYPE_NUMBER",
             "ADD",
             "ASSIGN"
+        ])
+    );
+}
+
+#[test]
+fn v6_shapes_compile() {
+    for src in [
+        // An empty statement after a block inside a `case`.
+        "function f() { switch (x) { case 1: { y = 1; } ; break; } }",
+        // Calling what a call returned.
+        "function f() { with (a) g(\"x\" @ b.c())(); }",
+        // A run-time name as the target, and a member named at run time.
+        "function f() { (@\"a\" @ temp.b) = new TStaticVar(); this.(@\"a\" @ temp.b) = 1; }",
+        // A function inside a GS1-style event test.
+        "if (created) {\n function f() { x = 1; }\n}",
+        // `/word` as a call argument, next to a GS1 code.
+        "function f() { if (g(#c(1), /word) || h()) x = 1; }",
+    ] {
+        if let Err(e) = compile_gs2(src) {
+            panic!("{src}: {e:?}");
+        }
+    }
+    // An unclosed nested comment ends at its first `*/`.
+    assert!(compile_gs2("/* a /* b */\nfunction f() { x = 1; }").is_ok());
+    // `&=` is the place, its value, the operand, `OP_BWA`, assign.
+    assert_eq!(
+        f("this.a &= 1;")[..7],
+        names(&[
+            "THIS",
+            "TYPE_VAR",
+            "MEMBER_ACCESS",
+            "COPY_LAST_OP",
+            "CONV_TO_FLOAT",
+            "TYPE_NUMBER",
+            "BWA"
         ])
     );
 }

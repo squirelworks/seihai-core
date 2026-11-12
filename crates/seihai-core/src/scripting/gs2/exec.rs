@@ -634,15 +634,18 @@ impl Machine {
                 }
                 Op::FuncParamsEnd => self.bind_params(host),
                 Op::Ret => {
-                    let Some(frame) = self.frames.pop() else {
+                    if self.frames.is_empty() {
                         self.running = false;
                         self.stack.clear();
                         return Outcome::Done;
-                    };
+                    }
+                    // The value is read while the function's own variables
+                    // are still there (`return a;`, `return temp.x;`).
                     let v = match self.pop() {
                         Some(s) => self.value_full(s, host),
                         None => Value::default(),
                     };
+                    let frame = self.frames.pop().expect("checked above");
                     self.stack.truncate(frame.base);
                     self.with.truncate(frame.with_depth);
                     self.with_span.truncate(frame.with_depth);
@@ -1523,6 +1526,20 @@ impl Host for EffectHost {
             "setplayerprop" => self.effects.push(Effect::SetPlayerProp {
                 code: text(args, 0),
                 value: text(args, 1),
+            }),
+            // GS1's `strequals(a, b)`, which GS1 scripts in GS2 files call:
+            // the two texts equal, letter case aside (the GS1 engine's rule).
+            "strequals" => {
+                let same = text(args, 0).to_lowercase() == text(args, 1).to_lowercase();
+                return Some(Val::Num(if same { 1.0 } else { 0.0 }));
+            }
+            // How `seteffect` mixes. The GS1 vocabulary dates it to 2.1;
+            // a GS2 host takes it whatever era it was made for, and sends it
+            // as GS1 does.
+            "seteffectmode" => self.effects.push(Effect::Command {
+                obj,
+                name: name.to_string(),
+                args: args.to_vec(),
             }),
             _ => {
                 let cmd = vocab::command_in(name, self.era)?;

@@ -791,16 +791,17 @@ pub enum Front {
 /// GS1 and GS2 scripts would. A script with no `function` that tests a GS1
 /// event (`if (playerenters)`) is GS1; any other is GS2, and falls back to
 /// GS1 when only the GS1 front end takes it. Seihai's reading: how the live
-/// servers chose is not recorded.
-pub fn compile_script(src: &str) -> Result<(Script, Front), CompileErrors> {
+/// servers chose is not recorded. `era` is the GS1 dialect the GS1 front end
+/// reads, as for [`compile_gs1`].
+pub fn compile_script(src: &str, era: Era) -> Result<(Script, Front), CompileErrors> {
     if looks_gs1(src) {
-        if let Ok(s) = compile_gs1(src, Era::V21) {
+        if let Ok(s) = compile_gs1(src, era) {
             return Ok((s, Front::Gs1));
         }
     }
     match compile_gs2(src) {
         Ok(s) => Ok((s, Front::Gs2)),
-        Err(e) => match compile_gs1(src, Era::V21) {
+        Err(e) => match compile_gs1(src, era) {
             Ok(s) => Ok((s, Front::Gs1)),
             Err(_) => Err(e),
         },
@@ -836,6 +837,74 @@ fn looks_gs1(src: &str) -> bool {
 pub fn compile_gs2(src: &str) -> Result<Script, CompileErrors> {
     let (items, spellings) = parse_gs2(src)?;
     finish(emit_items(&items, false, Era::V21, spellings)?)
+}
+
+/// The end of the `/* … */` comment at `start`. Comments nest
+/// (`/* a /* b */ c */`, as live scripts write them); one whose nesting never
+/// closes ends at its first `*/` instead.
+fn block_comment_end(b: &[u8], start: usize) -> usize {
+    let first = |from: usize| {
+        b[from..]
+            .windows(2)
+            .position(|w| w == b"*/")
+            .map_or(b.len(), |p| from + p + 2)
+    };
+    let (mut i, mut depth) = (start + 2, 1);
+    while i + 1 < b.len() {
+        match &b[i..i + 2] {
+            b"/*" => {
+                depth += 1;
+                i += 2;
+            }
+            b"*/" => {
+                depth -= 1;
+                i += 2;
+                if depth == 0 {
+                    return i;
+                }
+            }
+            _ => i += 1,
+        }
+    }
+    first(start + 2)
+}
+
+fn is_call(e: &Expr) -> bool {
+    match e {
+        Expr::Call { .. } => true,
+        Expr::Gs2(g) => matches!(
+            g.as_ref(),
+            Gs2Expr::Method { .. } | Gs2Expr::DynMethod { .. } | Gs2Expr::DynCall { .. }
+        ),
+        _ => false,
+    }
+}
+
+/// `a op= v` written out as `a op v`.
+fn op_value(op: AssignOp, a: Expr, v: Expr) -> Expr {
+    let bin = match op {
+        AssignOp::Add => BinOp::Add,
+        AssignOp::Sub => BinOp::Sub,
+        AssignOp::Mul => BinOp::Mul,
+        AssignOp::Div => BinOp::Div,
+        AssignOp::Mod => BinOp::Mod,
+        AssignOp::BitAnd => {
+            return Expr::Gs2(Box::new(Gs2Expr::Bits {
+                kind: BitKind::And,
+                a,
+                b: v,
+            }))
+        }
+        AssignOp::BitOr => {
+            return Expr::Gs2(Box::new(Gs2Expr::Bits {
+                kind: BitKind::Or,
+                a,
+                b: v,
+            }))
+        }
+        AssignOp::Set => unreachable!(),
+    };
+    Expr::Bin(bin, Box::new(a), Box::new(v))
 }
 
 fn finish(built: Built) -> Result<Script, CompileErrors> {
@@ -1899,6 +1968,8 @@ impl Builder {
                         AssignOp::Mul => Op::Mul,
                         AssignOp::Div => Op::Div,
                         AssignOp::Mod => Op::Mod,
+                        AssignOp::BitAnd => Op::BitAnd,
+                        AssignOp::BitOr => Op::BitOr,
                         AssignOp::Set => unreachable!(),
                     });
                 }
@@ -2050,6 +2121,8 @@ impl Builder {
             AssignOp::Mul => Op::Mul,
             AssignOp::Div => Op::Div,
             AssignOp::Mod => Op::Mod,
+            AssignOp::BitAnd => Op::BitAnd,
+            AssignOp::BitOr => Op::BitOr,
             AssignOp::Set => unreachable!(),
         });
         self.op(Op::Assign);
@@ -2087,6 +2160,8 @@ impl Builder {
                     AssignOp::Mul => Op::Mul,
                     AssignOp::Div => Op::Div,
                     AssignOp::Mod => Op::Mod,
+                    AssignOp::BitAnd => Op::BitAnd,
+                    AssignOp::BitOr => Op::BitOr,
                     AssignOp::Set => unreachable!(),
                 });
                 self.op(Op::Assign);
@@ -2100,19 +2175,7 @@ impl Builder {
                 ));
                 return;
             }
-            let bin = match op {
-                AssignOp::Add => BinOp::Add,
-                AssignOp::Sub => BinOp::Sub,
-                AssignOp::Mul => BinOp::Mul,
-                AssignOp::Div => BinOp::Div,
-                AssignOp::Mod => BinOp::Mod,
-                AssignOp::Set => unreachable!(),
-            };
-            let sum = Expr::Bin(
-                bin,
-                Box::new(Expr::Var(target.clone())),
-                Box::new(value.clone()),
-            );
+            let sum = op_value(op, Expr::Var(target.clone()), value.clone());
             self.element_assign(target, AssignOp::Set, &sum);
             return;
         }
@@ -3469,6 +3532,8 @@ struct Gs2<'a> {
     /// The line the peeked token starts on, and the line of the last token
     /// taken.
     peek_line: u32,
+    /// The last statement ended at a `,`: the next one belongs with it.
+    comma: bool,
     last_line: u32,
     /// `function() { … }` values met so far.
     lambdas: Vec<Item>,
@@ -3540,6 +3605,7 @@ impl<'a> Gs2<'a> {
             spellings: Spellings::default(),
             consts: HashMap::new(),
             peek_line: 1,
+            comma: false,
             last_line: 1,
             lambdas: Vec::new(),
         }
@@ -3689,7 +3755,26 @@ impl<'a> Gs2<'a> {
         Ok(body)
     }
 
+    /// One statement. `a.x = 1, b.x = 2;` is one statement too, so a
+    /// brace-less body (`else a.x = 1, b.x = 2;`) keeps every part, and a
+    /// lone `;` is an empty one.
     fn stmt(&mut self) -> Result<Stmt, CompileErrors> {
+        if self.eat(";") {
+            return Ok(Stmt::Block(Vec::new()));
+        }
+        self.comma = false;
+        let first = self.one_stmt()?;
+        if !self.comma {
+            return Ok(first);
+        }
+        let mut all = vec![first];
+        while std::mem::take(&mut self.comma) {
+            all.push(self.one_stmt()?);
+        }
+        Ok(Stmt::Block(all))
+    }
+
+    fn one_stmt(&mut self) -> Result<Stmt, CompileErrors> {
         if let Some(s) = self.gs1_command()? {
             return Ok(s);
         }
@@ -3793,11 +3878,23 @@ impl<'a> Gs2<'a> {
             self.eat(";");
             return Ok(Stmt::Block(Vec::new()));
         }
-        if self.eat_id("public") {
-            return Err(CompileErrors::one(
-                self.line,
-                "that statement is not in this temporary GS2 compiler",
-            ));
+        // A function written inside a block (`if (1 == 1) { function f()
+        // { … } }`) is a function of the script, as at the top level.
+        let public = matches!(self.peek_tok(), GTok::Id(ref w) if w == "public");
+        if public || self.sees_function_header() {
+            let public = self.eat_id("public");
+            if !self.eat_id("function") {
+                return Err(CompileErrors::one(
+                    self.line,
+                    "expected `function` after `public`",
+                ));
+            }
+            let mut item = self.function()?;
+            if public {
+                item.name = format!("public.{}", item.name);
+            }
+            self.lambdas.push(item);
+            return Ok(Stmt::Block(Vec::new()));
         }
         if self.sees("++") || self.sees("--") {
             let delta = if self.eat("++") {
@@ -3812,7 +3909,7 @@ impl<'a> Gs2<'a> {
             self.end_stmt()?;
             return Ok(Stmt::IncDec { target, delta });
         }
-        let e = self.expr()?;
+        let mut e = self.expr()?;
         if let Expr::Gs2(g) = &e {
             if let Gs2Expr::PostStep {
                 target: Expr::Var(v),
@@ -3920,6 +4017,16 @@ impl<'a> Gs2<'a> {
                 });
             }
         }
+        // `(@"a" @ n) = v`: a variable named at run time, as
+        // `makevar(@"a" @ n) = v` (Seihai's reading).
+        let joined = matches!(&e, Expr::Bin(BinOp::Cat, ..))
+            || matches!(&e, Expr::Gs2(g) if matches!(g.as_ref(), Gs2Expr::Text(_)));
+        if joined && matches!(self.peek_tok(), GTok::Op("=")) {
+            e = Expr::Call {
+                name: "makevar".into(),
+                args: vec![e],
+            };
+        }
         let settable = match &e {
             Expr::Gs2(g) => matches!(
                 g.as_ref(),
@@ -3940,16 +4047,8 @@ impl<'a> Gs2<'a> {
                 let mut value = self.assigned_value()?;
                 // `obj.x += v` / `a[i][j] -= v` is `… = … + v` (Seihai's
                 // form; the place is read once and written once).
-                let bin = match op {
-                    AssignOp::Set => None,
-                    AssignOp::Add => Some(BinOp::Add),
-                    AssignOp::Sub => Some(BinOp::Sub),
-                    AssignOp::Mul => Some(BinOp::Mul),
-                    AssignOp::Div => Some(BinOp::Div),
-                    AssignOp::Mod => Some(BinOp::Mod),
-                };
-                if let Some(bin) = bin {
-                    value = Expr::Bin(bin, Box::new(e.clone()), Box::new(value));
+                if op != AssignOp::Set {
+                    value = op_value(op, e.clone(), value);
                 }
                 self.end_stmt()?;
                 return Ok(Stmt::Gs2(Box::new(Gs2Stmt::SetPart { target: e, value })));
@@ -4381,6 +4480,11 @@ impl<'a> Gs2<'a> {
                     -1.0
                 };
                 e = Expr::Gs2(Box::new(Gs2Expr::PostStep { target: e, delta }));
+            } else if self.sees("(") && is_call(&e) {
+                // `f("x")()`: call what the call returned, by name.
+                self.bump();
+                let args = self.arg_list()?;
+                e = Expr::Gs2(Box::new(Gs2Expr::DynCall { name: e, args }));
             } else {
                 return Ok(e);
             }
@@ -4565,13 +4669,37 @@ impl<'a> Gs2<'a> {
             return Ok(args);
         }
         loop {
-            args.push(self.expr()?);
+            match self.slash_word() {
+                Some(word) => args.push(Expr::Str(word)),
+                None => args.push(self.expr()?),
+            }
             if !self.eat(",") {
                 break;
             }
         }
         self.expect(")")?;
         Ok(args)
+    }
+
+    /// An argument written as unquoted `/word` (`strequals(#c, /sit)`, as
+    /// GS1 writes text arguments), read as the string `"/word"`.
+    fn slash_word(&mut self) -> Option<String> {
+        if !self.sees("/") {
+            return None;
+        }
+        let rest = &self.b[self.i..];
+        let n = rest
+            .iter()
+            .take_while(|c| c.is_ascii_alphanumeric() || **c == b'_')
+            .count();
+        let after = rest[n..].iter().find(|c| !c.is_ascii_whitespace());
+        if n == 0 || !rest[0].is_ascii_alphabetic() || !matches!(after, Some(b',' | b')')) {
+            return None;
+        }
+        let word = format!("/{}", String::from_utf8_lossy(&rest[..n]));
+        self.bump();
+        self.i += n;
+        Some(word)
     }
 
     fn assign_op(&mut self) -> Option<AssignOp> {
@@ -4582,6 +4710,8 @@ impl<'a> Gs2<'a> {
             GTok::Op("*=") => AssignOp::Mul,
             GTok::Op("/=") => AssignOp::Div,
             GTok::Op("%=") => AssignOp::Mod,
+            GTok::Op("&=") => AssignOp::BitAnd,
+            GTok::Op("|=") => AssignOp::BitOr,
             _ => return None,
         };
         self.bump();
@@ -4625,6 +4755,17 @@ impl<'a> Gs2<'a> {
         } else {
             false
         }
+    }
+
+    /// The next token is `function` and a name follows it (not a
+    /// `function() { … }` value).
+    fn sees_function_header(&mut self) -> bool {
+        if !matches!(self.peek_tok(), GTok::Id(ref w) if w == "function") {
+            return false;
+        }
+        let rest = &self.b[self.i..];
+        let start = rest.iter().position(|c| !c.is_ascii_whitespace());
+        start.is_some_and(|k| rest[k].is_ascii_alphabetic() || rest[k] == b'_')
     }
 
     fn peek_tok(&mut self) -> GTok {
@@ -4678,7 +4819,11 @@ impl<'a> Gs2<'a> {
 
     fn end_stmt(&mut self) -> Result<(), CompileErrors> {
         // `a.x = 1, b.x = 2;`: a comma also ends a statement.
-        if self.eat(";") || self.eat(",") {
+        if self.eat(",") {
+            self.comma = true;
+            return Ok(());
+        }
+        if self.eat(";") {
             return Ok(());
         }
         let next = self.peek_tok();
@@ -4702,16 +4847,9 @@ impl<'a> Gs2<'a> {
                     }
                 }
                 Some(b'/') if self.b.get(self.i + 1) == Some(&b'*') => {
-                    self.i += 2;
-                    while self.i + 1 < self.b.len()
-                        && !(self.b[self.i] == b'*' && self.b[self.i + 1] == b'/')
-                    {
-                        if self.b[self.i] == b'\n' {
-                            self.line += 1;
-                        }
-                        self.i += 1;
-                    }
-                    self.i = (self.i + 2).min(self.b.len());
+                    let end = block_comment_end(self.b, self.i);
+                    self.line += self.b[self.i..end].iter().filter(|&&c| c == b'\n').count() as u32;
+                    self.i = end;
                 }
                 _ => break,
             }
@@ -4842,8 +4980,8 @@ impl<'a> Gs2<'a> {
         }
         const OPS: &[&str] = &[
             "<<", ">>", "||", "&&", "==", "!=", "<>", "<=", ">=", "=<", "=>", "+=", "-=", "*=",
-            "/=", "%=", "@=", ":=", "++", "--", "+", "-", "*", "/", "%", "^", "=", "<", ">", "!",
-            "(", ")", "{", "}", "[", "]", ",", ";", ".", "@", "|", "&", ":", "?",
+            "/=", "%=", "&=", "|=", "@=", ":=", "++", "--", "+", "-", "*", "/", "%", "^", "=", "<",
+            ">", "!", "(", ")", "{", "}", "[", "]", ",", ";", ".", "@", "|", "&", ":", "?",
         ];
         let rest = &self.b[self.i..];
         for op in OPS {
