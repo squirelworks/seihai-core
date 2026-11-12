@@ -6,8 +6,9 @@ license.workspace = true
 
 # UI-less drawing shared with tools. Tiles and one gani frame go into an
 # RGBA buffer. No window, no sound, and no second level or gani parser:
-# those types come from seihai-core. The live client still draws in
-# seihai-mae; this crate does not replace that view.
+# those types come from seihai-core. The flat view Ato and Issho share
+# (seihai's `seihai-play`) draws through it; seihai-mae keeps its own
+# renderer for now.
 [lib]
 name = "seihai_draw"
 path = "src/lib.rs"

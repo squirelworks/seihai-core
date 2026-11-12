@@ -6,8 +6,9 @@
 //! a level or a gani of its own. [`Image`] is a view of bytes in the layout
 //! `seihai_core::assets::read_png_rgb` or `read_png_rgba` already returns.
 //!
-//! The live client's camera, chests and HUD stay in `seihai-mae`. This
-//! crate only composites tiles and sprites.
+//! The camera, chests and HUD stay with each client. This crate only
+//! composites tiles, sprites, gani frames and plain rectangles; the flat
+//! view Ato and Issho share (`seihai-play`) draws through it.
 
 mod sprite;
 mod tiles;
@@ -53,6 +54,31 @@ impl PixelBuffer {
             height,
             rgba,
         }
+    }
+
+    /// Fill the rectangle `(x, y, w, h)` with `color`, clipped.
+    pub fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: [u8; 4]) {
+        let (bw, bh) = (self.width as i64, self.height as i64);
+        let (x0, y0) = (i64::from(x).max(0), i64::from(y).max(0));
+        let x1 = (i64::from(x) + i64::from(w)).min(bw);
+        let y1 = (i64::from(y) + i64::from(h)).min(bh);
+        for py in y0..y1 {
+            for px in x0..x1 {
+                let i = ((py * bw + px) * 4) as usize;
+                self.rgba[i..i + 4].copy_from_slice(&color);
+            }
+        }
+    }
+
+    /// A one-pixel outline of the rectangle `(x, y, w, h)`, clipped.
+    pub fn stroke_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: [u8; 4]) {
+        if w <= 0 || h <= 0 {
+            return;
+        }
+        self.fill_rect(x, y, w, 1, color);
+        self.fill_rect(x, y + h - 1, w, 1, color);
+        self.fill_rect(x, y, 1, h, color);
+        self.fill_rect(x + w - 1, y, 1, h, color);
     }
 
     /// The pixel at `(x, y)`, or `None` outside the buffer.
@@ -164,5 +190,28 @@ mod tests {
         assert_eq!(buf.pixel(2, 0), None);
         assert_eq!(buf.pixel(0, 1), None);
         assert!(PixelBuffer::new(0, 0).rgba.is_empty());
+    }
+
+    #[test]
+    fn rectangles_are_clipped_and_an_outline_leaves_the_inside() {
+        let mut buf = PixelBuffer::new(4, 4);
+        buf.fill_rect(-2, 2, 4, 9, [1, 1, 1, 255]);
+        assert_eq!(buf.pixel(0, 2), Some([1, 1, 1, 255]));
+        assert_eq!(buf.pixel(1, 3), Some([1, 1, 1, 255]));
+        assert_eq!(buf.pixel(2, 2), Some([0, 0, 0, 0]));
+        assert_eq!(buf.pixel(0, 1), Some([0, 0, 0, 0]));
+        let mut out = PixelBuffer::new(5, 5);
+        out.stroke_rect(1, 1, 3, 3, [9, 9, 9, 255]);
+        assert_eq!(out.pixel(1, 1), Some([9, 9, 9, 255]));
+        assert_eq!(out.pixel(3, 3), Some([9, 9, 9, 255]));
+        assert_eq!(out.pixel(2, 1), Some([9, 9, 9, 255]));
+        assert_eq!(out.pixel(2, 2), Some([0, 0, 0, 0]), "the inside");
+        assert_eq!(out.pixel(4, 4), Some([0, 0, 0, 0]));
+        out.stroke_rect(0, 0, 0, 3, [7, 7, 7, 255]);
+        assert_eq!(
+            out.pixel(0, 0),
+            Some([0, 0, 0, 0]),
+            "no width draws nothing"
+        );
     }
 }
