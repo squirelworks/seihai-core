@@ -1251,6 +1251,44 @@ mod tests {
         assert_eq!(n(ClientVersion::V222), 80);
         assert_eq!(n(ClientVersion::V231), 81);
         assert!(!profile(ClientVersion::V205).protocol.plo.contains(26));
+        // Mac PowerPC switches, read statically 2026-11-13.
+        let ids = |v| profile(v).protocol.plo.iter().collect::<Vec<u8>>();
+        let mac404: Vec<u8> = (0..=25)
+            .chain(27..=40)
+            .chain([42, 43])
+            .chain(45..=49)
+            .chain([67, 68, 69, 74, 75, 82, 84, 100, 101, 102, 104, 105, 106])
+            .chain([131, 132, 133, 134, 150, 151, 153, 154, 155, 156, 165, 166])
+            .chain(168..=176)
+            .chain(178..=187)
+            .chain([189, 190, 191, 193, 194, 195])
+            .collect();
+        assert_eq!(mac404.len(), 97);
+        assert_eq!(ids(ClientVersion::V404R2Mac), mac404);
+        let mut mac420 = mac404.clone();
+        mac420.extend([107, 108]);
+        mac420.sort();
+        assert_eq!(ids(ClientVersion::V420R6), mac420);
+        let mut mac512 = mac420.clone();
+        mac512.extend([140, 197]);
+        mac512.sort();
+        assert_eq!(ids(ClientVersion::V512Mac), mac512);
+        assert_eq!(n(ClientVersion::V512Mac), 101);
+        assert_eq!(n(ClientVersion::V404R2), 98);
+        assert_eq!(n(ClientVersion::V512), 100);
+        for v in [
+            ClientVersion::V404R2,
+            ClientVersion::V404R2Mac,
+            ClientVersion::V420R6,
+            ClientVersion::V420R8,
+            ClientVersion::V512,
+            ClientVersion::V512Mac,
+        ] {
+            assert!(profile(v).protocol.gen5_round_down, "{v:?}");
+        }
+        for v in [ClientVersion::V500R7, ClientVersion::V524R4] {
+            assert!(!profile(v).protocol.gen5_round_down, "{v:?}");
+        }
         assert!(!profile(ClientVersion::V231).protocol.plo.contains(44));
         assert!(!profile(ClientVersion::V139).protocol.plo.contains(42));
     }

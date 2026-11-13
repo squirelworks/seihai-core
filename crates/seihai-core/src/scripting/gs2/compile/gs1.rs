@@ -19,6 +19,16 @@
 //!
 //! `x in {a, b, c}` is `x == a || x == b || x == c`, which is what the GS1
 //! interpreter does, and is refused when `x` calls a function.
+//!
+//! Two of these differ on purpose from gs2-parser, which reads every script
+//! as GS2 (issue 32). In an unmarked GS1 script, `if (playerenters) {…}`
+//! runs on entry, where gs2-parser tests a variable that is never set; and
+//! a bare command such as `noplayerkilling;` is called, where gs2-parser
+//! pushes the name and drops it. On real 5.12 and 5.24r4 clients this is
+//! visible: a level NPC that sets the arrow and bomb counts, or turns on
+//! no-player-killing (the red crossed icon by the HP/AP bar), does so with
+//! Seihai's bytecode and not with gs2-parser's. That is the GS1 meaning, so
+//! it stays. `tests/gs1_hud_semantics.rs` covers both.
 
 use super::ast::*;
 use super::tables::*;

@@ -1179,9 +1179,12 @@ pub const CHAIN: &[Step] = &[
             showimg: Some(Some(SHOWIMG_404)),
             server_list: Some(ServerList::Direct),
             chat_text: Some(ChatText { face: ChatFace::Arial, height: 24 }),
+            // The engine DLL steps zlib/bz2 bodies len >> 2 times, at most 4, in
+            // both directions (read 2026-11-13).
+            gen5_round_down: Some(true),
             ..Delta::NONE
         },
-        source: "binary (stock engine DLL unpacked from the Thinstall installer) and one live lab run (live-behaviour-404): 98 PLO ids, login id 5 with G3D17026 and win,<3 md5> in the plain zlib frame, then 37; Login mode while the server name starts with login, until 178",
+        source: "binary (stock engine DLL unpacked from the Thinstall installer) and one live lab run (live-behaviour-404): 98 PLO ids, login id 5 with G3D17026 and win,<3 md5> in the plain zlib frame, then 37; Login mode while the server name starts with login, until 178; frame cipher read 2026-11-13: raw bodies (len + 3) >> 2 steps, at most 12, zlib/bz2 bodies len >> 2, at most 4 (round down)",
         unknown: &[
             Unknown { area: "pli", what: "the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34, 38 and 46 seen in the lab; the 2026-10-31 live run saw 2, 4, 9, 23, 24, 34, 37, 38, 44, 46, 152, 154 and 157, all in the set)" },
             Unknown { area: "login", what: "Seihai sends the three machine fields as an empty quoted string, as for 5.00r7; the real client sends three MD5s" },
@@ -1205,14 +1208,16 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Binary,
         delta: Delta {
+            // Static read 2026-11-13: one 97-case switch, the Windows 4.04r2 set
+            // without 41.
+            plo: IdDelta::plus_minus(&[], &[41]),
             lobby: Some(Some(LOBBY_404_MAC)),
-            // Its frame cipher steps a zlib or bz2 body len >> 2 times, as 5.12.
-            gen5_round_down: Some(true),
+            // Its frame cipher steps a zlib or bz2 body len >> 2 times, as the
+            // Windows 4.04r2, so the flag carries over.
             ..Delta::NONE
         },
-        source: "binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32; the frame cipher steps raw bodies (len + 3) >> 2 times, at most 12, and zlib/bz2 bodies len >> 2, at most 4, as 5.12; short C->S bodies under 48 bytes go raw), login id 5 with G3D18026 and mac,<md5>,<md5>,\"\" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38",
+        source: "binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32; the frame cipher steps raw bodies (len + 3) >> 2 times, at most 12, and zlib/bz2 bodies len >> 2, at most 4, as 5.12; short C->S bodies under 48 bytes go raw), login id 5 with G3D18026 and mac,<md5>,<md5>,\"\" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38; PLO switch read statically (2026-11-13): 97 ids, the Windows 4.04r2 set without 41, 100 a case of the switch, no 107 or 108",
         unknown: &[
-            Unknown { area: "plo", what: "the PLO set is taken from the Windows 4.04r2; the Mac binary's switch was not read" },
             Unknown { area: "pli", what: "the Windows 4.04r2 set is kept; the lab saw 2, 18, 23, 24, 37, 38, 46 and 157" },
             Unknown { area: "login", what: "Seihai sends the three machine fields as empty quoted strings; the real client sent the MAC and /etc stat MD5s and an empty fourth field" },
             Unknown { area: "3d", what: "the Torque 3D mode is not modelled" },
@@ -1228,20 +1233,20 @@ pub const CHAIN: &[Step] = &[
             // Layered board change (107) and 108 in; 41 has no case in this build.
             // Re-read 2026-10-31: the switch has 97 cases (0-195 without 41) and
             // 100 and 108 are taken before it, as in 4.20r8, so 99 ids.
-            plo: IdDelta::plus_minus(&[107, 108], &[41]),
+            // 41 already left with the Mac 4.04r2 row.
+            plo: IdDelta::plus(&[107, 108]),
             pli: IdDelta::plus(&[162]),
             lobby: Some(Some(LOBBY_420_MAC)),
-            // Back to round-up after the Mac 4.04r2 row; 4.20r6's cipher was not read.
-            gen5_round_down: Some(false),
+            // Its frame cipher rounds down as the Mac 4.04r2 (static read
+            // 2026-11-13), so the flag carries over.
             ..Delta::NONE
         },
-        source: "binary (Mac OS X PPC) and one lab run on Mac OS X 10.4 in qemu (Graal_analysis version-profiles/lab-mac-tiger-2026-10-31.md): 4.20r8's PLO set without 41 and 196 (a 97-case switch plus 100 and 108 before it; 108 subtype 0 answers with 162), login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty> (captured as mac,\"\",<32 hex>,\"\"), first props with OSTYPE mac and code page 0 (in both lab runs), sends 2, 23, 24, 34, 37, 44, 46 and 157 seen",
+        source: "binary (Mac OS X PPC) and one lab run on Mac OS X 10.4 in qemu (Graal_analysis version-profiles/lab-mac-tiger-2026-10-31.md): 4.20r8's PLO set without 41 and 196 (a 97-case switch plus 100 and 108 before it; 108 subtype 0 answers with 162), login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty> (captured as mac,\"\",<32 hex>,\"\"), first props with OSTYPE mac and code page 0 (in both lab runs), sends 2, 23, 24, 34, 37, 44, 46 and 157 seen; frame cipher read 2026-11-13: raw bodies (len + 3) >> 2 steps, at most 12, zlib/bz2 bodies len >> 2, at most 4 (round down), bz2 above 4095 bytes, zlib above 47",
         unknown: &[
             Unknown { area: "pli", what: "162 (the answer to 108) is from the Mac binary and 2, 23, 24, 34, 37, 44, 46 and 157 were seen in the lab; the rest of 4.20r8's set is taken" },
             Unknown { area: "login", what: "the real client sent mac,\"\",<md5 hex of the /etc stat>,\"\" in the lab (the MAC field empty under qemu's NIC); Seihai sends all three machine fields as empty quoted strings" },
             Unknown { area: "flags", what: "the real client sent no 18 for the lab level's gr.x/gr.y clientside setstring; Seihai's flat path does" },
             Unknown { area: "3d", what: "Torque protocol 21 is not modelled here; seihai-ato::torque has its profile" },
-            Unknown { area: "framing", what: "the gen-5 step count was not read in this binary; round-up is kept, while the Mac 4.04r2 and 5.12 round down" },
         ],
     },
     Step {
@@ -1253,6 +1258,8 @@ pub const CHAIN: &[Step] = &[
         delta: Delta {
             plo: IdDelta::plus(&[41, 196]),
             lobby: Some(Some(LOBBY_404)),
+            // The engine DLL steps zlib/bz2 bodies len >> 2 times (read
+            // 2026-11-13), so the Mac rows' round-down carries over.
             ..Delta::NONE
         },
         source: "binary (a third-party packet-logger copy of the engine DLL, linked January 2007; its signature check is patched out): 101 PLO ids (41 and 196 in against the Mac 4.20r6), send ids from the connection code, login id 5 with G3D20126 and win,<3 md5>",
@@ -1286,6 +1293,8 @@ pub const CHAIN: &[Step] = &[
             showimg: Some(None),
             // The 4.x login line; the 4.x after-login messages are not carried over.
             lobby: Some(Some(LOBBY_500)),
+            // Not read in this binary; round-up is kept, as before.
+            gen5_round_down: Some(false),
             ..Delta::NONE
         },
         source: "binary (unpacked engine DLL) and lab (lab-v5-2026-10-30): PLO set of 100 ids, send ids from the send wrappers, login id 5 with G3D22067 and the win,<3 md5> list in the plain zlib frame, then 37 in its own gen-5 frame; Login mode until 178",
@@ -1296,6 +1305,7 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "props", what: "own and other prop sets are 3.153's; no 5.x parser was read" },
             Unknown { area: "ui", what: "chat is a bold sans serif in the lab; its cell height is not known, 24 is kept" },
             Unknown { area: "3d", what: "the Torque 3D mode (Graal3DEngine.dll, protocol 24) is not modelled" },
+            Unknown { area: "framing", what: "the gen-5 step count was not read in this binary; round-up is kept, while 4.20r8 before it and 5.12 after it round down" },
         ],
     },
     Step {
@@ -1323,14 +1333,16 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Binary,
         delta: Delta {
+            // Static read 2026-11-13: the Mac 4.20r6 set plus 140 and 197, so
+            // against the Windows 5.12 without 41 and with 100 and 108.
+            plo: IdDelta::plus_minus(&[100, 108], &[41]),
             lobby: Some(Some(LOBBY_512_MAC)),
             // Rounds down as the Windows 5.12, but sends short bodies raw.
             gen5_compress_all: Some(false),
             ..Delta::NONE
         },
-        source: "binary (Mac OS X PPC Mach-O, main exe sha256 a76dc557...2d206f10; the \"Unknown\" v5 Mac builds are byte-identical copies) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways with 5.12's round-down step, login id 5 with G3D15097 and mac,<md5>,<md5>,\"\",<quoted Darwin kernel string> in the plain zlib frame; auto-login as guest with a client-made password; first props as 4.04r2 Mac; asked arial.ttf, chest.png, state.png and steps.wav; sent no 18",
+        source: "binary (Mac OS X PPC Mach-O, main exe sha256 a76dc557...2d206f10; the \"Unknown\" v5 Mac builds are byte-identical copies) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways with 5.12's round-down step, login id 5 with G3D15097 and mac,<md5>,<md5>,\"\",<quoted Darwin kernel string> in the plain zlib frame; auto-login as guest with a client-made password; first props as 4.04r2 Mac; asked arial.ttf, chest.png, state.png and steps.wav; sent no 18; PLO switch read statically (2026-11-13): 101 ids, the Mac 4.20r6 set plus 140 and 197",
         unknown: &[
-            Unknown { area: "plo", what: "the PLO set is taken from the Windows 5.12; the Mac binary's switch was not read" },
             Unknown { area: "pli", what: "the Windows 5.12 set is kept; the lab saw 2, 23, 24, 37, 46 and 157" },
             Unknown { area: "login", what: "the kernel string is the one Mac OS X 10.4.0 gave in the lab; a real Mac sends its own" },
             Unknown { area: "render", what: "on a modern gserver world the level stayed black even with the lab's render shim; the cause was not found" },
@@ -1343,7 +1355,8 @@ pub const CHAIN: &[Step] = &[
         date: "2010-02-01",
         basis: Basis::Binary,
         delta: Delta {
-            plo: IdDelta::plus_minus(&[109, 198], &[75, 132, 133, 171, 193]),
+            // Against the Windows 5.12; 41, 100 and 108 undo the Mac 5.12 row.
+            plo: IdDelta::plus_minus(&[41, 109, 198], &[75, 100, 108, 132, 133, 171, 193]),
             gen5_round_down: Some(false),
             gen5_compress_all: Some(false),
             // The Windows 5.12 lobby again, after the Mac 5.12 row.
