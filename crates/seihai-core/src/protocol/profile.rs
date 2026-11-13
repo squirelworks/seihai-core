@@ -359,11 +359,16 @@ pub struct Protocol {
     /// [`super::lobby`]. `None` for every build before 5.00.
     pub lobby: Option<Lobby>,
     /// 5.12's gen-5 step count: on zlib and bz2 frames the iterator steps
-    /// once per whole 4-byte group (rounded down), and every frame the
-    /// client sends is compressed. Every other build rounds up. Read from
-    /// 5.12's frame decoder and needed by the lab proxy to talk to it
-    /// (Graal_analysis `protocol/v5v6-lab-play.md`, "5.12's cipher step count").
+    /// once per whole 4-byte group (rounded down). Every other build rounds
+    /// up, except the Mac PowerPC 4.04r2 and 5.12, read in their binaries
+    /// (Tiger lab 2026-11-13). Read from 5.12's frame decoder and needed by
+    /// the lab proxy to talk to it (Graal_analysis `protocol/v5v6-lab-play.md`,
+    /// "5.12's cipher step count").
     pub gen5_round_down: bool,
+    /// Every frame the client sends is compressed, even a short one: the
+    /// Windows 5.12. The Mac 4.04r2 and 5.12 round down but send bodies under
+    /// 48 bytes raw, as every other build.
+    pub gen5_compress_all: bool,
     /// 6.x frame lengths: a frame of 0xFFFF bytes or more has `FF FF` and
     /// then a `u32be` length ([`super::FrameLen::Long`]). Read from the
     /// Linux 6.01 and 6.03 builds (Graal_analysis `protocol/v6x-clients.md`).
@@ -1589,7 +1594,7 @@ mod tests {
             }
         }
         assert_eq!(seen, classic.len() + gen5.len());
-        assert_eq!(lobby, 14);
+        assert_eq!(lobby, 16);
         assert_eq!(seen + 12 + lobby, PROFILES.len());
     }
 

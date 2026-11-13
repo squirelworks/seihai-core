@@ -1048,6 +1048,8 @@ pub struct Connection {
     gen3: Option<Gen3>,
     /// Gen-5 XOR state for client→server frames, set by a 2.22 login.
     gen5: Option<Gen5>,
+    /// Every frame goes out compressed (the Windows 5.12).
+    gen5_compress_all: bool,
     /// Gen-5 XOR state for server→client frames. Each direction has its
     /// own iterator, both seeded at login.
     gen5_in: Option<Gen5>,
@@ -1115,6 +1117,7 @@ impl Connection {
             stream,
             gen3: None,
             gen5: None,
+            gen5_compress_all: false,
             gen5_in: None,
             frame_len: FrameLen::Short,
             pli: None,
@@ -1349,6 +1352,7 @@ impl Connection {
         match version.encryption() {
             EncryptionGen::Gen3 => self.gen3 = gen3,
             EncryptionGen::Gen5 => {
+                self.gen5_compress_all = version.profile().protocol.gen5_compress_all;
                 let g = if version.profile().protocol.gen5_round_down {
                     Gen5::new(key).round_down()
                 } else {
@@ -1634,9 +1638,9 @@ impl Connection {
             }
         }
         if let Some(g5) = self.gen5.as_mut() {
-            // 5.12 sends even short bodies compressed.
+            // The Windows 5.12 sends even short bodies compressed.
             let comp = match choose_comp(body.len()) {
-                Gen5Comp::None if g5.is_round_down() => Gen5Comp::Zlib,
+                Gen5Comp::None if self.gen5_compress_all => Gen5Comp::Zlib,
                 c => c,
             };
             let compressed = match comp {
@@ -3961,10 +3965,12 @@ mod tests {
                 "2.31",
                 "3.153",
                 "4.04r2",
+                "4.04r2 Mac",
                 "4.20r6",
                 "4.20r8",
                 "5.00r7",
                 "5.12",
+                "5.12 Mac",
                 "5.24r4",
                 "5.30r3",
                 "5.31r4",
