@@ -1042,6 +1042,38 @@ impl Lower {
         }
     }
 
+    /// A read of a GS1 name whose GS2 form differs from a plain variable,
+    /// as a real 5.24r4 client reads them (lab probe, 2026-11-13):
+    /// `playerhp` is `player.hearts`, `playermaxhp` `player.fullhearts`,
+    /// `weaponscount` `player.weapons.size()`, `selectedweapon` the bare
+    /// GS2 `selectedweapon`, and a player flag the script sets
+    /// (`set gotkey;` then `if (gotkey)`) is `player.gotkey`. Writes to
+    /// these are not lowered (see [`Lower::var`]).
+    fn read_name(&mut self, v: &g::VarRef) -> Option<Expr> {
+        if !v.index.is_empty() {
+            return None;
+        }
+        let lower = v.name.to_ascii_lowercase();
+        let e = match lower.as_str() {
+            "playerhp" => Expr::var("player.hearts"),
+            "playermaxhp" => Expr::var("player.fullhearts"),
+            "weaponscount" => Expr::Method {
+                obj: Box::new(Expr::var("player.weapons")),
+                name: "size".into(),
+                args: Vec::new(),
+            },
+            "selectedweapon" => Expr::var("selectedweapon"),
+            _ if self.with_depth == 0
+                && is_script_var(&v.name, self.era)
+                && self.flags.contains(&lower) =>
+            {
+                Expr::var(format!("player.{}", v.name))
+            }
+            _ => return None,
+        };
+        Some(e)
+    }
+
     /// A variable as GS2 names it. An element must have no field after its
     /// index (`npcs[i].x`), and GS1's level board is not lowered.
     fn var(&mut self, v: &g::VarRef) -> Var {
@@ -1050,14 +1082,14 @@ impl Lower {
             && self.flags.contains(&v.name.to_ascii_lowercase())
         {
             self.err(format!(
-                "`{}` is a player flag the script sets; reading or writing a GS1 flag by its plain name \
-                 has no fixture-checked GS2 form (GS2 looks plain names up on the object)",
+                "`{}` is a player flag the script sets; writing a GS1 flag by its plain name, or \
+                 reading it inside `with`, has no client-checked GS2 form",
                 v.name
             ));
         }
         if v.index.is_empty() && builtin_without_gs2(&v.name) {
             self.err(format!(
-                "GS1 variable `{}` has no GS2 name Seihai has checked; it is not lowered",
+                "writing the GS1 variable `{}` has no client-checked GS2 form; it is not lowered",
                 v.name
             ));
         } else if v.index.is_empty() && counted_list(&v.name).is_some() {
@@ -1532,6 +1564,9 @@ impl Lower {
                         name: "size".into(),
                         args: Vec::new(),
                     };
+                }
+                if let Some(e) = self.read_name(v) {
+                    return e;
                 }
                 Expr::Var(self.var(v))
             }
