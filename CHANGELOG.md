@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.1.x
 
+- **0.1.9**: The built-in player is a squirrel (head, body and bushy tail), with an acorn for the money icon and on the shield. Graal files in the user's asset folder still replace it file by file.
 - **0.1.8**: 5.x builds send the nickname once the first level is in, so 4.x players no longer see them as "default".
 - **0.1.7**: The client session hands the game the level's baddies, the leader flag and other players' carried objects; GS2 `play` and its kin make sound; `.mp3` music plays.
 - **0.1.6**: `KNOWN_TOKENS`, every login token in the Graal_analysis catalogue (78, with or without a profile), and its generated `documentation/version-tokens.tsv`.
