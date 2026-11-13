@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use super::{read_png_rgba, AssetResolver, AssetRoot, Gani, Level, TileTypes, TileTypesFile};
 use crate::gmap::Gmap;
 use crate::protocol::{ClientVersion, VersionProfile};
-use crate::sound::decode_wav;
+use crate::sound::decode_sound;
 
 /// What kind of file a [`Need`] is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -477,7 +477,7 @@ fn load(r: &AssetResolver, kind: NeedKind, p: &Path) -> Result<String, String> {
         }
         NeedKind::Sound => {
             let bytes = fs::read(p).map_err(|e| e.to_string())?;
-            let pcm = decode_wav(&bytes)?;
+            let pcm = decode_sound(&bytes)?;
             Ok(format!("wav, {} Hz", pcm.rate))
         }
         NeedKind::Music => {
@@ -838,7 +838,7 @@ mod tests {
                     wav += 1;
                     fs::read(f)
                         .map_err(|e| e.to_string())
-                        .and_then(|b| decode_wav(&b).map(|_| ()))
+                        .and_then(|b| decode_sound(&b).map(|_| ()))
                 }
                 "nw" => {
                     nw += 1;

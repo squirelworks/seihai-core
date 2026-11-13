@@ -25,6 +25,11 @@ hkdf = "0.12"
 sha2 = "0.10"
 rand_core = { version = "0.6", features = ["getrandom"] }
 base64 = "0.22"
+# Sound effects beyond WAV (`sound::decode_sound`): 6.x worlds ship Ogg
+# Vorbis effects, MP3 data inside WAV files (format tag 0x55), and MP3
+# files under a `.wav` name. Both pure Rust, MIT OR Apache-2.0.
+lewton = "0.10"
+nanomp3 = "0.2"
 # Sound device output (`sound::RodioSound`, feature `audio`). Needs the
 # ALSA development files on Linux.
 rodio = { version = "0.19", optional = true, default-features = false }
