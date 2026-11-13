@@ -131,6 +131,9 @@ pub struct Other {
     pub status: Option<u8>,
     /// The pictures, colours and GANI the server sent for the player.
     pub looks: crate::protocol::OtherLooks,
+    /// The chat bubble over the player (CURCHAT, 12), while it lasts: the
+    /// server's empty CURCHAT or the bubble's own timer ends it.
+    pub chat: Option<String>,
 }
 
 /// The network thread writes the other players here after each frame; the
@@ -178,6 +181,14 @@ pub struct Live {
     /// (closes the connection) within a walk tick, so the server drops the
     /// player instead of keeping them until the process ends.
     pub closed: Arc<std::sync::atomic::AtomicBool>,
+    /// The player's own counters (hearts, gralats, bombs, arrows, AP).
+    pub own: SharedOwn,
+    /// Lines the player typed, in order; the network thread takes each and
+    /// says it in the level (CURCHAT), where the server also runs chat
+    /// commands such as `setnick` from it.
+    pub say: Arc<Mutex<Vec<String>>>,
+    /// The chat lines that came in, for the view to take.
+    pub chat: SharedChat,
 }
 
 /// One server record for an NPC: the level's lower-case name, the NPC id,
@@ -190,6 +201,54 @@ pub struct NpcChange {
     pub id: u32,
     pub props: Option<NpcProps>,
 }
+
+/// The player's own counters as the server last set them with
+/// `PLO_PLAYERPROPS` (9), for the view's status display. `None` is a prop
+/// the server has not sent yet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct OwnStats {
+    /// MAXPOWER (1): heart containers, in hearts.
+    pub max_power: Option<u8>,
+    /// CURPOWER (2): power in half hearts.
+    pub cur_power: Option<u8>,
+    /// RUPEESCOUNT (3), the gralats.
+    pub rupees: Option<u32>,
+    /// ARROWSCOUNT (4).
+    pub arrows: Option<u8>,
+    /// BOMBSCOUNT (5).
+    pub bombs: Option<u8>,
+    /// GLOVEPOWER (6).
+    pub glove_power: Option<u8>,
+    /// STATUS (18).
+    pub status: Option<u8>,
+    /// ALIGNMENT (32), the AP.
+    pub alignment: Option<u8>,
+}
+
+impl OwnStats {
+    /// The counters `st` holds.
+    pub fn of(st: &SessionState) -> OwnStats {
+        OwnStats {
+            max_power: st.own_max_power,
+            cur_power: st.own_cur_power,
+            rupees: st.own_rupees,
+            arrows: st.own_darts,
+            bombs: st.own_bombs,
+            glove_power: st.own_glove_power,
+            status: st.own_status,
+            alignment: st.own_alignment,
+        }
+    }
+}
+
+/// The network thread writes the player's counters here when they change;
+/// the view's status display reads them.
+pub type SharedOwn = Arc<Mutex<OwnStats>>;
+
+/// Chat lines from the network thread to the view, oldest first: the
+/// bubbles said in the level, toalls, PMs and admin lines, as core's
+/// session state reads them. The view takes them.
+pub type SharedChat = Arc<Mutex<Vec<crate::protocol::ChatLine>>>;
 
 /// Sound files from the network thread to the view: name and bytes.
 pub type SharedSounds = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
@@ -311,7 +370,27 @@ fn others_of(st: &SessionState) -> Vec<Other> {
             sprite: o.sprite,
             status: o.status,
             looks: o.looks.clone(),
+            chat: o.chat.clone().filter(|c| !c.is_empty()),
         })
+        .collect()
+}
+
+/// Move the chat lines `st` has gathered into `to`, so the state does not
+/// keep them and the view sees each once.
+fn take_chat(st: &mut SessionState, to: &Mutex<Vec<crate::protocol::ChatLine>>) {
+    if st.chat_log.is_empty() {
+        return;
+    }
+    let lines = std::mem::take(&mut st.chat_log);
+    to.lock().unwrap_or_else(|e| e.into_inner()).extend(lines);
+}
+
+/// The lines the view asked to say, taken from `say`. Blank lines are
+/// dropped: an empty CURCHAT clears the bubble instead of saying anything.
+fn take_say(say: &Mutex<Vec<String>>) -> Vec<String> {
+    std::mem::take(&mut *say.lock().unwrap_or_else(|e| e.into_inner()))
+        .into_iter()
+        .filter(|t| !t.trim().is_empty())
         .collect()
 }
 
@@ -462,6 +541,11 @@ pub fn run_with(
     let board_mods = live.as_ref().map(|l| l.board_mods.clone());
     let npc_changes = live.as_ref().map(|l| l.npc_changes.clone());
     let closed = live.as_ref().map(|l| l.closed.clone());
+    let own = live.as_ref().map(|l| l.own.clone());
+    let say = live.as_ref().map(|l| l.say.clone());
+    let chat = live.as_ref().map(|l| l.chat.clone());
+    // The bubbles' timers run on the loop's own clock.
+    let mut bubble_clock = Instant::now();
     let view_closed = || {
         closed
             .as_ref()
@@ -555,6 +639,16 @@ pub fn run_with(
                         if *slot != now {
                             *slot = now;
                         }
+                    }
+                    if let Some(o) = own.as_ref() {
+                        let now = OwnStats::of(&st);
+                        let mut slot = o.lock().unwrap_or_else(|e| e.into_inner());
+                        if *slot != now {
+                            *slot = now;
+                        }
+                    }
+                    if let Some(c) = chat.as_ref() {
+                        take_chat(&mut st, c);
                     }
                     if let Some(w) = st.server_warp.take() {
                         if owed {
@@ -688,6 +782,22 @@ pub fn run_with(
                     }
                 }
                 Err(RecvTimeoutError::Disconnected) => return Ok(()),
+            }
+            // The other players' bubbles run out on their own timers.
+            let dt = bubble_clock.elapsed().as_millis().min(u128::from(u32::MAX)) as u32;
+            bubble_clock = Instant::now();
+            if st.tick_bubbles(dt) {
+                if let Some(o) = others.as_ref() {
+                    *o.lock().unwrap_or_else(|e| e.into_inner()) = others_of(&st);
+                }
+            }
+            // What the player typed: said in the level.
+            if let Some(q) = say.as_ref() {
+                for text in take_say(q) {
+                    if s.conn.send_chat(&text).is_ok() {
+                        let _ = writeln!(out, "said {text:?}");
+                    }
+                }
             }
             // The walk, once a tick, after the post-login frame has gone
             // (the real clients send nothing before it).
@@ -988,6 +1098,81 @@ mod others_tests {
         assert_eq!(o.looks.colors, Some([1, 2, 3, 4, 5]));
         assert_eq!(o.looks.gani.as_deref(), Some("walk"));
         assert_eq!((o.sprite, o.status), (Some(6), Some(0)));
+    }
+
+    /// A player's chat bubble goes to the view while it lasts. An empty
+    /// CURCHAT lets it end once its minimum time is up (core's 2.05 rule),
+    /// and the loop's bubble clock takes it down then.
+    #[test]
+    fn the_bubble_goes_with_the_player() {
+        let mut st = SessionState::for_version(ClientVersion::V3153);
+        st.apply_body(&other(2, 20, 24));
+        // OTHERPLPROPS (8) for player 2: CURCHAT (12) "hi".
+        let say = |text: &str| {
+            let mut m = vec![8 + 0x20, 0x20, 2 + 0x20, 12 + 0x20, text.len() as u8 + 0x20];
+            m.extend_from_slice(text.as_bytes());
+            m.push(b'\n');
+            m
+        };
+        st.apply_body(&say("hi"));
+        assert_eq!(others_of(&st)[0].chat.as_deref(), Some("hi"));
+        st.apply_body(&say(""));
+        assert!(st.tick_bubbles(60_000), "the bubble ends");
+        assert_eq!(others_of(&st)[0].chat, None);
+    }
+
+    /// The chat lines move to the view once each; the state keeps none.
+    #[test]
+    fn chat_lines_go_to_the_view_once() {
+        use crate::protocol::ChatKind;
+        let mut st = SessionState::for_version(ClientVersion::V3153);
+        let to = Mutex::new(Vec::new());
+        st.push_chat(ChatKind::Toall, "Ann".into(), "hello".into());
+        take_chat(&mut st, &to);
+        take_chat(&mut st, &to);
+        let got = to.lock().unwrap();
+        assert_eq!(got.len(), 1);
+        assert_eq!(
+            (got[0].from.as_str(), got[0].text.as_str()),
+            ("Ann", "hello")
+        );
+        assert!(st.chat_log.is_empty());
+    }
+
+    /// What the player typed is taken in order; blank lines are not said.
+    #[test]
+    fn typed_lines_are_taken_in_order_without_blanks() {
+        let q = Mutex::new(vec!["one".to_string(), "  ".into(), "two".into()]);
+        assert_eq!(take_say(&q), vec!["one".to_string(), "two".into()]);
+        assert!(take_say(&q).is_empty());
+    }
+
+    /// The counters the status display draws come from the player props.
+    #[test]
+    fn own_counters_from_the_player_props() {
+        let mut st = SessionState::for_version(ClientVersion::V3153);
+        // PLAYERPROPS (9): MAXPOWER 3, CURPOWER 5, ARROWSCOUNT 7,
+        // BOMBSCOUNT 15, ALIGNMENT 50.
+        st.apply_body(&[
+            9 + 0x20,
+            1 + 0x20,
+            3 + 0x20,
+            2 + 0x20,
+            5 + 0x20,
+            4 + 0x20,
+            7 + 0x20,
+            5 + 0x20,
+            15 + 0x20,
+            32 + 0x20,
+            50 + 0x20,
+            b'\n',
+        ]);
+        let o = OwnStats::of(&st);
+        assert_eq!(
+            (o.max_power, o.cur_power, o.arrows, o.bombs, o.alignment),
+            (Some(3), Some(5), Some(7), Some(15), Some(50))
+        );
+        assert_eq!(o.rupees, None);
     }
 
     /// An NPC update after the level is handed on with the level it is
