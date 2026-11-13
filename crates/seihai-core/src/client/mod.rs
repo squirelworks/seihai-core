@@ -102,13 +102,39 @@ pub fn run(
 }
 
 /// Where the player stands and faces, as the game view last set it.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Pose {
     pub x: f32,
     pub y: f32,
     /// 0 up, 1 left, 2 down, 3 right.
     pub dir: u8,
     pub walking: bool,
+    /// The SPRITE value (17) when it is more than the direction: `dir +
+    /// 4 * S` during a sword swing on a build that shows the swing in the
+    /// sprite (core's `OfflineSession::sprite_value`). `None` sends `dir`.
+    pub sprite: Option<u8>,
+    /// The animation the view names in the GANI prop (10) on a GANI build:
+    /// `sword` or `spin` during a swing (core's
+    /// `OfflineSession::bow_slot_anim`). `None` is `walk` or `idle` by
+    /// `walking`.
+    pub gani: Option<&'static str>,
+}
+
+impl Pose {
+    /// The SPRITE value to send.
+    pub fn sprite_value(&self) -> u8 {
+        self.sprite.unwrap_or(self.dir)
+    }
+}
+
+/// `PLI_PLAYERPROPS` (2) with GANI (10): the animation by name, as a GANI
+/// build shows a swing to the other players.
+pub fn gani_props_message(gani: &str) -> Vec<u8> {
+    let name = &gani.as_bytes()[..gani.len().min(223)];
+    let mut m = vec![2 + 0x20, 10 + 0x20, name.len() as u8 + 0x20];
+    m.extend_from_slice(name);
+    m.push(b'\n');
+    m
 }
 
 /// The game view writes the pose here; the network thread reads it each
@@ -189,6 +215,10 @@ pub struct Live {
     pub say: Arc<Mutex<Vec<String>>>,
     /// The chat lines that came in, for the view to take.
     pub chat: SharedChat,
+    /// Messages the view built for the server (core's `PLI_BOARDMODIFY`
+    /// for a cut, bomb and arrow adds), in order; the network thread sends
+    /// them after the walk of its next tick.
+    pub send: Arc<Mutex<Vec<Vec<u8>>>>,
 }
 
 /// One server record for an NPC: the level's lower-case name, the NPC id,
@@ -375,6 +405,12 @@ fn others_of(st: &SessionState) -> Vec<Other> {
         .collect()
 }
 
+/// A post-login frame is still owed: the real clients send nothing else
+/// before it.
+fn burst_owed_now(login: &Option<LoginBurst>, lobby: &Option<LobbyBurst>) -> bool {
+    login.as_ref().is_some_and(|b| b.pending()) || lobby.as_ref().is_some_and(|b| b.pending())
+}
+
 /// Move the chat lines `st` has gathered into `to`, so the state does not
 /// keep them and the view sees each once.
 fn take_chat(st: &mut SessionState, to: &Mutex<Vec<crate::protocol::ChatLine>>) {
@@ -495,24 +531,36 @@ impl WalkSender {
         frame
     }
 
-    fn walk(&mut self, pose: Pose) -> Option<Vec<u8>> {
+    fn walk(&mut self, pose: Pose) -> Vec<Vec<u8>> {
+        let moving = if pose.walking { "walk" } else { "idle" };
         if let Some(wc) = self.cadence.as_mut() {
-            let gani = self
-                .ganis
-                .then_some(if pose.walking { "walk" } else { "idle" });
-            let st = wc.state(pose.x, pose.y, pose.dir, gani);
-            return wc.tick(st);
+            let gani = self.ganis.then_some(pose.gani.unwrap_or(moving));
+            let st = wc.state(pose.x, pose.y, pose.sprite_value(), gani);
+            return wc.tick(st).into_iter().collect();
         }
-        let first = self.last.is_none();
-        let same = self
-            .last
-            .is_some_and(|l| (l.x, l.y, l.dir) == (pose.x, pose.y, pose.dir));
+        let last = self.last;
         self.last = Some(pose);
         // The first pose is where the server put the player: nothing to say.
-        if first || same {
-            return None;
+        let Some(last) = last else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        // A GANI build with no captured cadence names only the view's own
+        // animations (a swing) and the return from one; its walk stays the
+        // walk message, as before.
+        if self.ganis && pose.gani != last.gani {
+            out.push(gani_props_message(pose.gani.unwrap_or(moving)));
         }
-        Some(walk_message_for(self.version, pose.x, pose.y, pose.dir))
+        let place = |p: &Pose| (p.x, p.y, p.sprite_value());
+        if place(&pose) != place(&last) {
+            out.push(walk_message_for(
+                self.version,
+                pose.x,
+                pose.y,
+                pose.sprite_value(),
+            ));
+        }
+        out
     }
 }
 
@@ -544,6 +592,7 @@ pub fn run_with(
     let own = live.as_ref().map(|l| l.own.clone());
     let say = live.as_ref().map(|l| l.say.clone());
     let chat = live.as_ref().map(|l| l.chat.clone());
+    let outbox = live.as_ref().map(|l| l.send.clone());
     // The bubbles' timers run on the loop's own clock.
     let mut bubble_clock = Instant::now();
     let view_closed = || {
@@ -791,6 +840,17 @@ pub fn run_with(
                     *o.lock().unwrap_or_else(|e| e.into_inner()) = others_of(&st);
                 }
             }
+            // What the view built for the server, once the post-login frame
+            // has gone.
+            if let Some(q) = outbox
+                .as_ref()
+                .filter(|_| !burst_owed_now(&login_burst, &lobby_burst))
+            {
+                let msgs = std::mem::take(&mut *q.lock().unwrap_or_else(|e| e.into_inner()));
+                if !msgs.is_empty() {
+                    let _ = s.conn.send_messages(&msgs);
+                }
+            }
             // What the player typed: said in the level.
             if let Some(q) = say.as_ref() {
                 for text in take_say(q) {
@@ -962,6 +1022,7 @@ mod tests {
             y: 30.0,
             dir,
             walking,
+            ..Default::default()
         }
     }
 
@@ -979,6 +1040,41 @@ mod tests {
             vec![walk_message_for(ClientVersion::V3153, 30.5, 30.0, 3)]
         );
         assert!(w.tick(pose(30.5, 3, true)).is_empty());
+    }
+
+    /// A 6.x swing: the GANI prop names `sword` when the view starts it and
+    /// `idle` when it ends; standing still, no walk message goes with it.
+    #[test]
+    fn a_gani_build_names_the_swing_and_its_end() {
+        let v = ClientVersion::V603R7;
+        let mut w = WalkSender::new(v);
+        assert!(w.cadence.is_none() && w.ganis);
+        assert!(w.tick(pose(30.0, 2, false)).is_empty());
+        let mut swing = pose(30.0, 2, false);
+        swing.gani = Some("sword");
+        assert_eq!(w.tick(swing), vec![gani_props_message("sword")]);
+        assert!(w.tick(swing).is_empty(), "once");
+        assert_eq!(
+            w.tick(pose(30.0, 2, false)),
+            vec![gani_props_message("idle")]
+        );
+        assert_eq!(gani_props_message("sword"), b"\"*%sword\n");
+    }
+
+    /// A sprite build shows the swing in SPRITE: the walk message carries
+    /// `dir + 4 * S`.
+    #[test]
+    fn a_sprite_build_sends_the_swing_sprite() {
+        let v = ClientVersion::V3153;
+        let mut w = WalkSender::new(v);
+        assert!(w.tick(pose(30.0, 2, false)).is_empty());
+        let mut swing = pose(30.0, 2, false);
+        swing.sprite = Some(2 + 4 * 6);
+        let got = w.tick(swing);
+        assert!(
+            got.contains(&walk_message_for(v, 30.0, 30.0, 26)),
+            "{got:?}"
+        );
     }
 
     /// 3.04 and 4.04r2 walk on core's cadence: nothing on the first tick,
