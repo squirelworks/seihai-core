@@ -958,16 +958,19 @@ impl SessionState {
                 // layout. A file that reads only in the other layout means
                 // that is the server's layout for this connection, so the
                 // next file is read that way first.
-                let parsed = match parse_file_packet(&msg.payload, self.file_has_modtime) {
-                    Some(p) => Some(p),
-                    None => {
-                        let other = parse_file_packet(&msg.payload, !self.file_has_modtime);
-                        if other.is_some() {
-                            self.file_has_modtime = !self.file_has_modtime;
+                // A name with no extension (the Graal3D Sky's textures,
+                // `sky_fr`) is taken only when neither layout reads a name
+                // with one, in this connection's layout first.
+                let mut parsed = None;
+                'layouts: for dotted in [true, false] {
+                    for modtime in [self.file_has_modtime, !self.file_has_modtime] {
+                        if let Some(p) = parse_file_packet(&msg.payload, modtime, dotted) {
+                            self.file_has_modtime = modtime;
+                            parsed = Some(p);
+                            break 'layouts;
                         }
-                        other
                     }
-                };
+                }
                 if let Some((name, data, mod_time)) = parsed {
                     self.file_requests.push(format!("FILE:{name}"));
                     if let Some(t) = mod_time.filter(|&t| t != 0) {
@@ -2080,7 +2083,14 @@ pub(super) fn read_gint5(b: &[u8]) -> Option<u64> {
 ///
 /// - 2.1+: `GINT5 modtime` + `GCHAR name_len` + name + data + `\n`
 /// - before 2.1 (2.05): `GCHAR name_len` + name + data, with no `\n`
-fn parse_file_packet(payload: &[u8], has_modtime: bool) -> Option<(String, Vec<u8>, Option<u32>)> {
+///
+/// With `dotted`, a name with no `.` is refused: that is how the wrong
+/// layout usually shows. Without it, any plain name is taken.
+fn parse_file_packet(
+    payload: &[u8],
+    has_modtime: bool,
+    dotted: bool,
+) -> Option<(String, Vec<u8>, Option<u32>)> {
     let mod_time = if has_modtime {
         read_gint5(payload).map(|t| t.min(u64::from(u32::MAX)) as u32)
     } else {
@@ -2101,7 +2111,7 @@ fn parse_file_packet(payload: &[u8], has_modtime: bool) -> Option<(String, Vec<u
     // layout.
     let name_bytes = &rest[..name_len];
     let plain = |b: &u8| b.is_ascii_graphic() || *b == b' ';
-    if name_len == 0 || !name_bytes.iter().all(plain) || !name_bytes.contains(&b'.') {
+    if name_len == 0 || !name_bytes.iter().all(plain) || (dotted && !name_bytes.contains(&b'.')) {
         return None;
     }
     let name = String::from_utf8_lossy(name_bytes).into_owned();
@@ -2395,6 +2405,28 @@ mod tests {
         assert!(st.file_has_modtime);
     }
 
+    /// The Graal3D Sky asks for its textures with no extension, and the
+    /// lab gserver answers with that name (`sky_fr` and PNG data, lab
+    /// #458, 2026-11-13). The file is taken, in the connection's layout.
+    #[test]
+    fn a_file_named_with_no_extension_is_taken() {
+        let mut st = SessionState {
+            file_has_modtime: true,
+            ..Default::default()
+        };
+        let mut p = b"\x26\x77\x75\x42\x61\x26sky_fr".to_vec();
+        p.extend_from_slice(b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR");
+        p.push(b'\n');
+        st.apply_body(&raw_file(&p));
+        assert_eq!(st.incoming_files.len(), 1);
+        assert_eq!(st.incoming_files[0].0, "sky_fr");
+        assert!(st.incoming_files[0].1.starts_with(b"\x89PNG"));
+        assert!(st.file_has_modtime);
+        // A dotted name still wins: the 2.05 layout of `state.png` is not
+        // read as a name with no extension in the 5.24 layout.
+        assert_eq!(parse_file_packet(&STATE_PNG_524[5..], true, true), None);
+    }
+
     #[test]
     fn stock_gs2lib_layout_is_not_read_as_a_png_name() {
         // A stock gs2lib has no `G3D15010`, so GServer sends 5.24 the 2.05
@@ -2405,7 +2437,7 @@ mod tests {
         // …png‰PNG… for writing" in the lab.
         let len = (old[5] - 0x20) as usize;
         assert!(old[6..6 + len].starts_with(b".png\x89PNG"));
-        assert_eq!(parse_file_packet(old, true), None);
+        assert_eq!(parse_file_packet(old, true, true), None);
 
         let mut st = SessionState {
             file_has_modtime: true,
