@@ -781,26 +781,36 @@ fn partial_ticks_accumulate() {
     assert_eq!(w.now_ms(), 50);
 }
 
-/// Lab 2026-11-13, real 4.20r6: `timeout = 0.01` and `0.025` never fire,
-/// `0.05` fires every 50 ms step. Engines that were not measured keep the
-/// round-up to one tick.
+/// Lab 2026-11-13, real 4.04r2, 4.20r6 and 3.04: the C++ engine counts a
+/// timeout in whole 50 ms steps, rounded down, and one under a step never
+/// fires. Engines that were not measured keep the round-up to one tick.
 #[test]
-fn a_timeout_below_one_step_is_dropped_by_the_4x_engine() {
+fn the_cpp_engine_counts_timeouts_in_whole_steps() {
     let src = "if (created) { timeout = T; }\nif (timeout) { message t; timeout = T; }";
-    for (t, fires) in [("0.01", 0), ("0.025", 0), ("0.05", 20)] {
-        let (mut w, id) = npc_in(&src.replace('T', t), Era::V3153);
+    let fires = |era: Era, t: &str| {
+        let (mut w, id) = npc_in(&src.replace('T', t), era);
         w.fire(id, "created", &[]);
-        for _ in 0..20 {
+        for _ in 0..60 {
             w.tick(50);
         }
-        assert_eq!(messages(&mut w).len(), fires, "timeout = {t}");
+        messages(&mut w).len()
+    };
+    // 3 s of 50 ms steps: fires = 60 / steps.
+    for (t, n) in [
+        ("0.01", 0),
+        ("0.025", 0),
+        ("0.049", 0),
+        ("0.05", 60),
+        ("0.07", 60),
+        ("0.1", 30),
+        ("0.12", 30),
+        ("0.15", 20),
+    ] {
+        assert_eq!(fires(Era::V3153, t), n, "4.x timeout = {t}");
     }
-    let (mut w, id) = npc_in(&src.replace('T', "0.01"), Era::V217);
-    w.fire(id, "created", &[]);
-    for _ in 0..20 {
-        w.tick(50);
-    }
-    assert_eq!(messages(&mut w).len(), 20, "2.17 keeps one tick");
+    assert_eq!(fires(Era::V304, "0.01"), 0, "3.04 timeout = 0.01");
+    assert_eq!(fires(Era::V217, "0.01"), 60, "2.17 keeps one tick");
+    assert_eq!(fires(Era::V217, "0.07"), 30, "2.17 rounds up");
 }
 
 // ---- touch and cross-object calls ----

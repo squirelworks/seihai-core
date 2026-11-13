@@ -57,8 +57,14 @@ step per window, 2.68 tiles/s (the rest dropped).
 
 GS1 `timeout = 0.05` (weapon, counter in chat), fires per second:
 3.04 19.97, 4.04r2 19.97, 4.20r6 19.97, 4.04r2 under Wine 19.84; throttled
-9.72, 9.98, 9.98 and 6.71. On 4.20r6, `timeout = 0.01` and `0.025` **never
-fire**: a timeout below one step is dropped, not rounded up to one.
+9.72, 9.98, 9.98 and 6.71.
+
+A GS1 `timeout` counts whole 50 ms steps, **rounded down**, and a timeout of
+no whole step never fires. Swept on 4.04r2 (Linux), with each value checked
+in the script the client received: `0.01` and `0.049` never fire; `0.05`
+19.97/s and `0.07` 19.95/s (every 50 ms); `0.1` 9.99/s and `0.12` 9.98/s
+(every 100 ms); `0.15` 6.66/s (every 150 ms). 3.04 never fired `0.01`, and
+4.20r6 never fired `0.01` or `0.025`.
 
 `walk.gani` has 8 frames and no `WAIT`: one frame per step, a 0.4 s cycle
 (static read only).
@@ -69,9 +75,10 @@ fire**: a timeout below one step is dropped, not rounded up to one.
   `assets::gani`, `pose`, `protocol::walkcadence`) is right for 3.x, 4.x
   and 6.x as well; the walk cadences in `walkcadence` (3.04 X every 100 ms,
   4.x to 6.x X2/Y2 every 50 ms, 8 px a step) match.
-- Changed: in the 3.153 to 4.20 engine (`Era::V3153`) a GS1 `timeout`
-  below 0.05 s no longer fires. The other engines keep the round-up to one
-  tick, since they were not measured.
+- Changed: the C++ engine (`Era::V304` and `Era::V3153`) counts a GS1
+  `timeout` in whole steps, rounded down, and drops one below 0.05 s. The
+  other engines keep the round-up to at least one tick, since they were not
+  measured.
 - Not modelled: the real clients' behaviour when the machine falls behind
   (3.x/4.x slow down, 6.x catches up one step and drops the rest).
   `ScriptWorld::tick` still runs every missed tick.
@@ -81,5 +88,6 @@ fire**: a timeout below one step is dropped, not rounded up to one.
 - 6.03r7's script timer: the lab server sends no GS1 to clients after 5.007, has
   no GS2 compiler, and its NPC server crashes when a 6.x
   client gets a weapon.
-- Sub-0.05 timeouts on 3.04, 4.04r2 and the 1.x/2.x engines.
+- The timeout sweep on 5.x and 6.x, and on the 1.x/2.x engines.
+- Walk GANI frame timing at run time (read from the file only).
 - Per-frame timestamps under Wine (averages from `+fps` only).

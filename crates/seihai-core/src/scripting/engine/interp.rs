@@ -578,11 +578,7 @@ impl<'a> Run<'a> {
 
     fn set_timeout(&mut self, secs: f64) {
         self.obj.resume = None;
-        self.obj.due = if secs > 0.0 && !timeout_too_short(self.core.era, secs) {
-            Some(self.core.tick + secs_to_ticks(secs))
-        } else {
-            None
-        };
+        self.obj.due = timeout_ticks(self.core.era, secs).map(|t| self.core.tick + t);
     }
 
     // ---- expressions ----
@@ -1417,11 +1413,22 @@ pub fn tokenize(s: &str, extra: &str) -> Vec<String> {
     out
 }
 
-/// The real 4.20 rev 6 (lab 2026-11-13, `documentation/update-cadence.md`)
-/// never fired a GS1 `timeout` set below one 50 ms step: `timeout = 0.01`
-/// and `timeout = 0.025` stayed silent, where `0.05` fired 19.97 times a
-/// second. Only the 3.153 to 4.20 engine was measured; the older engines
-/// keep Seihai's round-up to one tick.
-fn timeout_too_short(era: Era, secs: f64) -> bool {
-    era == Era::V3153 && secs * 1000.0 < TICK_MS as f64 - 1e-6
+/// Ticks until a GS1 `timeout` of `secs` fires, or `None` if it never does.
+///
+/// The C++ engine (3.04, and 3.153 to 4.20) counts a timeout in whole 50 ms
+/// steps, rounding down, and a timeout of no whole step never fires (lab
+/// 2026-11-13, `documentation/update-cadence.md`): on the real 4.04r2
+/// `0.049` never fired, `0.07` fired every 50 ms, `0.12` every 100 ms and
+/// `0.15` every 150 ms; 3.04 and 4.20r6 never fired `0.01`. The other
+/// engines were not measured and keep Seihai's round-up to at least one
+/// tick.
+fn timeout_ticks(era: Era, secs: f64) -> Option<u64> {
+    if secs <= 0.0 {
+        return None;
+    }
+    if matches!(era, Era::V304 | Era::V3153) {
+        let steps = (secs * 1000.0 / TICK_MS as f64 + 1e-9).floor() as u64;
+        return (steps > 0).then_some(steps);
+    }
+    Some(secs_to_ticks(secs))
 }
