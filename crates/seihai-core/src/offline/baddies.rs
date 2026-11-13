@@ -81,7 +81,7 @@ impl BaddyRole {
 }
 
 impl OfflineSession {
-    /// Whether a baddy may not stand on `(x, y)` (`0x540140`): off the
+    /// Whether a baddy may not stand on `(x, y)`: off the
     /// board, a wall, a chest, water, a chair or a bed bottom. NPCs that
     /// block are not tested yet.
     pub(crate) fn baddy_blocked(&self, x: f32, y: f32) -> bool {
@@ -365,7 +365,7 @@ impl OfflineSession {
         }
     }
 
-    /// A baddy ran into the player (`0x4fbc38`): hurt mode with a push away
+    /// A baddy ran into the player: hurt mode with a push away
     /// from the baddy, when the player can be hurt.
     fn baddy_touch(&mut self, half: i32, dx: f64, dy: f64) {
         if self.victim().state != crate::combat::Vulnerability::Hurtable {
@@ -378,7 +378,7 @@ impl OfflineSession {
         self.throw_hurt = true;
     }
 
-    /// A thrown object's probe point against the baddies (`0x4d668c`): the
+    /// A thrown object's probe point against the baddies: the
     /// first one it hits takes `2 * power` and is thrown along the flight.
     /// True when one was hit (the object stops).
     pub(crate) fn throw_hits_baddy(&mut self, x: f32, y: f32, dir: u8, power: i32) -> bool {

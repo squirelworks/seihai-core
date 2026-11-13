@@ -857,7 +857,7 @@ impl OfflineSession {
         }
         if let Some(c) = cur_power {
             // Zero is applied, and the player dies: the 2.05 prop reader
-            // (case 2 at 0x530dd8) has no zero test, and a 2.22 client sent
+            // (case 2) has no zero test, and a 2.22 client sent
             // the dead gani on an injected CURPOWER 0. Respawn gives hearts.
             if c == 0 && self.hearts_half() > 0 {
                 eprintln!(
