@@ -160,6 +160,9 @@ pub struct Other {
     /// The chat bubble over the player (CURCHAT, 12), while it lasts: the
     /// server's empty CURCHAT or the bubble's own timer ends it.
     pub chat: Option<String>,
+    /// What the player holds over the head: the sprite CARRYSPRITE (19)
+    /// names; `None` empty hands.
+    pub carry: Option<u16>,
 }
 
 /// The network thread writes the other players here after each frame; the
@@ -224,8 +227,13 @@ pub struct Live {
     pub weapons: SharedWeapons,
     /// Other players' bombs, bomb removals, explosions and arrows, in the
     /// order they came, in the player's own cell's coordinates (the
-    /// sender's cell offset added on a gmap), for the view to take.
+    /// sender's cell offset added on a gmap), and the baddies of the
+    /// player's level (`PLO_BADDYPROPS`, `PLO_BADDYHURT`, cleared on a new
+    /// level), for the view to take.
     pub level_objects: SharedLevelObjects,
+    /// The server made the player the level's leader (`PLO_ISLEADER`, 10):
+    /// the leader runs the level's baddies and sends their props.
+    pub leader: Arc<std::sync::atomic::AtomicBool>,
     /// Other players who threw what they carried, for the view to take.
     pub throws: SharedThrows,
     /// Hits on the player from other players (their swings, and
@@ -293,8 +301,8 @@ fn take_hits(st: &mut SessionState, to: Option<&SharedHits>) {
     slot.nickname = st.nickname.clone();
 }
 
-/// [`Live::level_objects`]: only the `Bomb`, `BombDel`, `Explosion` and
-/// `Arrow` kinds of [`crate::protocol::LevelObject`].
+/// [`Live::level_objects`]: other players' bombs, explosions and arrows,
+/// and the baddies of the player's level ([`crate::protocol::LevelObject`]).
 pub type SharedLevelObjects = Arc<Mutex<Vec<crate::protocol::LevelObject>>>;
 
 /// [`Live::throws`].
@@ -353,8 +361,20 @@ fn take_level_objects(
                 out.push(L::Arrow { sender, arrow });
             }
             o @ L::BombDel { .. } => out.push(o),
-            // The baddies are not the view's yet: dropped.
-            _ => {}
+            // The baddies of the player's level. On a gmap a neighbour's
+            // baddies are not ours (Mae's rule), so their props are dropped.
+            L::BaddyProps { level, payload } => {
+                let here = st.current_level_name();
+                let ours = st.gmap.is_none()
+                    || match (level.as_deref(), here.as_deref()) {
+                        (Some(a), Some(b)) => a.eq_ignore_ascii_case(b),
+                        _ => true,
+                    };
+                if ours {
+                    out.push(L::BaddyProps { level, payload });
+                }
+            }
+            o @ (L::BaddyHurt(_) | L::BaddiesClear) => out.push(o),
         }
     }
     let thrown: Vec<OtherThrow> = std::mem::take(&mut st.throws)
@@ -779,6 +799,7 @@ fn others_of(st: &SessionState) -> Vec<Other> {
             status: o.status,
             looks: o.looks.clone(),
             chat: o.chat.clone().filter(|c| !c.is_empty()),
+            carry: o.carry,
         })
         .collect()
 }
@@ -1005,6 +1026,7 @@ pub fn run_hooked(
     let throws = live.as_ref().map(|l| l.throws.clone());
     let hits = live.as_ref().map(|l| l.hits.clone());
     let items = live.as_ref().map(|l| l.items.clone());
+    let leader = live.as_ref().map(|l| l.leader.clone());
     let say = live.as_ref().map(|l| l.say.clone());
     let chat = live.as_ref().map(|l| l.chat.clone());
     let outbox = live.as_ref().map(|l| l.send.clone());
@@ -1133,6 +1155,9 @@ pub fn run_hooked(
                     take_level_objects(&mut st, level_objects.as_ref(), throws.as_ref());
                     take_hits(&mut st, hits.as_ref());
                     take_items(&mut st, items.as_ref());
+                    if let Some(l) = leader.as_ref() {
+                        l.store(st.is_leader, std::sync::atomic::Ordering::Relaxed);
+                    }
                     if let Some(w) = st.server_warp.take() {
                         if owed {
                             log_level(level_lines, &store, &st, out, shown);
@@ -1628,6 +1653,18 @@ mod others_tests {
         m
     }
 
+    /// Another player's CARRYSPRITE (19) reaches the view, so it can draw
+    /// what they hold over their head.
+    #[test]
+    fn another_players_carried_object_is_shared() {
+        let mut st = SessionState::for_version(ClientVersion::V205);
+        let mut m = other(4, 20, 24);
+        m.pop();
+        m.extend([19 + 0x20, 1 + 0x20, b'\n']);
+        st.apply_body(&m);
+        assert_eq!(others_of(&st)[0].carry, Some(261), "1 is the bush");
+    }
+
     #[test]
     fn the_players_the_server_places_are_shared() {
         let mut st = SessionState::for_version(ClientVersion::V3153);
@@ -1755,10 +1792,10 @@ mod others_tests {
         assert!(take_say(&q).is_empty());
     }
 
-    /// Other players' bombs and arrows go to the view's queue; the
-    /// baddies do not, and the session's list is drained.
+    /// Other players' bombs and arrows go to the view's queue, and so do
+    /// the baddies of the player's level; the session's list is drained.
     #[test]
-    fn other_players_bombs_and_arrows_go_to_the_view() {
+    fn other_players_bombs_and_arrows_and_the_baddies_go_to_the_view() {
         use crate::protocol::LevelObject as L;
         let mut st = SessionState::for_version(ClientVersion::V205);
         let bomb = crate::bombs::BombAdd {
@@ -1768,16 +1805,28 @@ mod others_tests {
             fuse: 55,
             owned: true,
         };
+        let props = L::BaddyProps {
+            level: Some("onlinestartlocal.nw".into()),
+            payload: vec![0x21, 0x21, 0x20],
+        };
         st.level_objects.push(L::BaddiesClear);
         st.level_objects.push(L::Bomb { sender: 3, bomb });
         st.level_objects.push(L::BombDel { x: 1.0, y: 2.0 });
+        st.level_objects.push(props.clone());
+        st.level_objects.push(L::BaddyHurt(vec![0x21]));
         let q = SharedLevelObjects::default();
         let t = SharedThrows::default();
         take_level_objects(&mut st, Some(&q), Some(&t));
         assert!(st.level_objects.is_empty());
         assert_eq!(
             *q.lock().unwrap(),
-            vec![L::Bomb { sender: 3, bomb }, L::BombDel { x: 1.0, y: 2.0 }]
+            vec![
+                L::BaddiesClear,
+                L::Bomb { sender: 3, bomb },
+                L::BombDel { x: 1.0, y: 2.0 },
+                props,
+                L::BaddyHurt(vec![0x21]),
+            ]
         );
         assert!(t.lock().unwrap().is_empty());
         // With no view, the list is still drained.
