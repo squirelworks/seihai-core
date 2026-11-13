@@ -65,8 +65,8 @@ Before 0.1.0 every release was a 0.0.x bump and any of them could break.
   writing them (`set`, `unset`, `selectedweapon++`) and reading a flag
   inside `with` are refused with an error until a real client confirms the
   GS2 form (#30, #6).
-- **GS2 VM coverage.** 7.x clients and opcode 54 / `waitfor`'s timeout are
-  still open (#29).
+- **GS2 VM coverage.** The 7.x client and the Mac 4.04r2 and 5.12 VMs have
+  not been read (`documentation/gs2-vm-versions.md`).
 - **Profile audit and lab checks** listed in the roadmap (#7).
 
 ## Layout

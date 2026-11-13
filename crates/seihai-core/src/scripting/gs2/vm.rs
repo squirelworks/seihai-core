@@ -2,10 +2,11 @@
 //!
 //! The executor started from the 3.153 VM alone. These profiles come from
 //! the VMs of every client with a readable binary: 3.153 and 4.20r6 (Mac
-//! PPC), 4.20r8 and 5.00r7 (Windows engine DLLs) and 6.01r1 and 6.03r7
-//! (Linux x64). The binaries and what each one says are listed in
+//! PPC), 4.04r2, 4.20r8, 5.00r7 and 5.12 (Windows engine DLLs), 5.24r4 to
+//! 6.00r4 and 6.03r7 (Windows) and 6.01r1 and 6.03r7 (Linux x64). The
+//! binaries and what each one says are listed in
 //! `documentation/gs2-vm-versions.md`. A build with no binary takes the
-//! closest earlier profile that was read, and the document says so.
+//! closest profile that was read, and the document says so.
 //!
 //! What every client does the same way (number tolerance, `int()`, the
 //! number-to-text writer, the local-slot opcodes 45 to 47, `&&` and `||`
@@ -25,11 +26,12 @@ pub mod op {
     /// Resolves the variable on top (creating it), so a slot can keep it.
     /// Every client from 3.153.
     pub const RESOLVE_VAR: u8 = 47;
-    /// 5.00r7 only: an object literal from `n` name/value pairs.
+    /// 5.00r7 and 5.12 only: an object literal from `n` name/value pairs.
     pub const OBJECT_LITERAL: u8 = 48;
-    /// 5.00r7 only: a list literal from `n` numbers.
+    /// 5.00r7 and 5.12 only: a list literal from `n` numbers.
     pub const NUMBER_LIST: u8 = 49;
-    /// 5.00r7 on: a three-operand member store (not modelled).
+    /// 5.00r7 on: `obj.(name) = value`. Pops the object, the member name
+    /// and the value, and stores the value as `OP_ASSIGN` does.
     pub const MEMBER_STORE: u8 = 54;
     /// `a && b` as a value: 1 when both are non-zero. Every client.
     pub const LOGICAL_AND: u8 = 66;
@@ -82,7 +84,7 @@ pub struct VmProfile {
     pub compare_op: bool,
     /// Opcode 121 runs (5.00r7 on).
     pub add_or_join: bool,
-    /// Opcodes 48 and 49 run (5.00r7 only).
+    /// Opcodes 48 and 49 run (5.00r7 and 5.12 only).
     pub v5_literals: bool,
     /// Opcode 54 runs (5.00r7 on).
     pub member_store: bool,
@@ -114,6 +116,14 @@ pub const V420R6: VmProfile = VmProfile {
     ..V3153
 };
 
+/// 4.04r2 (Windows): 4.20r6's handler set and rules, on x86, so the
+/// shift count is taken mod 32.
+pub const V404R2: VmProfile = VmProfile {
+    label: "4.04r2",
+    shift: ShiftRule::X86,
+    ..V420R6
+};
+
 /// 4.20r8 (Windows): 4.20r6's rules on x86, with `waitfor`.
 pub const V420R8: VmProfile = VmProfile {
     label: "4.20r8",
@@ -142,7 +152,17 @@ pub const V500R7_PPC: VmProfile = VmProfile {
     ..V500R7
 };
 
-/// 6.01r1 and 6.03r7 (Linux x64, the same handler set): no stack limit,
+/// 5.24r4, and the same VM in 5.30r3, 5.31r4, 6.00r2 and 6.00r4 (Windows):
+/// the rewritten VM of the 6.x clients (load-time optimiser up to 242,
+/// opcodes 48 and 49 gone), still with 5.00r7's 10 000-value stack and its
+/// double-precision `x ^ 0.5`.
+pub const V524R4: VmProfile = VmProfile {
+    label: "5.24r4",
+    v5_literals: false,
+    ..V500R7
+};
+
+/// 6.03r7 (Windows and Linux x64) and 6.01r1 (Linux): no stack limit,
 /// `x ^ 0.5` in single precision, and 48 and 49 gone.
 pub const V6: VmProfile = VmProfile {
     label: "6.03r7",
@@ -158,17 +178,21 @@ impl VmProfile {
     pub fn for_version(v: ClientVersion) -> &'static VmProfile {
         use ClientVersion as C;
         match v {
-            // 4.04r2's VM was not read; 4.20r6 is the closest read build.
-            C::V404R2 | C::V404R2Mac | C::V420R6 => &V420R6,
+            C::V404R2 => &V404R2,
+            // The Mac 4.04r2 build was not read. The Windows 4.04r2 VM has
+            // 4.20r6's rules, and the Mac build runs on PowerPC as 4.20r6
+            // does.
+            C::V404R2Mac | C::V420R6 => &V420R6,
             C::V420R8 => &V420R8,
-            // 5.12 to 5.31r4 were not read; 5.00r7 is the closest.
-            C::V500R7 | C::V512 | C::V524R4 | C::V530R3 | C::V531R4 => &V500R7,
+            // 5.12's dispatcher is 5.00r7's, instruction for instruction.
+            C::V500R7 | C::V512 => &V500R7,
             // The Mac 5.12 build runs on PowerPC: 5.00r7's VM with the
             // PowerPC shift rule (assumed; its VM was not read).
             C::V512Mac => &V500R7_PPC,
-            // 6.00r2, 6.00r4, 6.015 and 6.034 were not read; they take
-            // 6.01r1/6.03r7's.
-            C::V600R2 | C::V600R4 | C::V6015 | C::V6034 | C::V603R7 | C::V603R7Linux => &V6,
+            C::V524R4 | C::V530R3 | C::V531R4 | C::V600R2 | C::V600R4 => &V524R4,
+            // 6.015 and 6.034 have no binary; they take the 6.01r1/6.03r7
+            // VM on either side of them.
+            C::V6015 | C::V6034 | C::V603R7 | C::V603R7Linux => &V6,
             _ => &V3153,
         }
     }
@@ -330,12 +354,14 @@ mod tests {
         let label = |v| VmProfile::for_version(v).label;
         assert_eq!(label(C::V3153), "3.153");
         assert_eq!(label(C::V231), "3.153");
-        assert_eq!(label(C::V404R2), "4.20r6");
+        assert_eq!(label(C::V404R2), "4.04r2");
         assert_eq!(label(C::V404R2Mac), "4.20r6");
+        assert_eq!(label(C::V512), "5.00r7");
         assert_eq!(label(C::V512Mac), "5.00r7 (PowerPC)");
         assert_eq!(label(C::V420R8), "4.20r8");
-        assert_eq!(label(C::V524R4), "5.00r7");
-        assert_eq!(label(C::V600R2), "6.03r7");
+        assert_eq!(label(C::V524R4), "5.24r4");
+        assert_eq!(label(C::V600R4), "5.24r4");
+        assert_eq!(label(C::V6015), "6.03r7");
         assert_eq!(label(C::V603R7Linux), "6.03r7");
     }
 

@@ -12,7 +12,7 @@ versioning rule is in the README.
 
 ## 0.0.x (any release could break)
 
-- **0.0.31** (#43, if it lands before 0.1.0): GS2 reads the VM of every Windows client from 4.04r2 to 6.03r7 and runs opcode 54.
+- **0.0.31** (#43): GS2 reads the VM of every Windows client from 4.04r2 to 6.03r7 and runs opcode 54.
 - **0.0.30** (#45): The combat and respawn rules of the 1.x and 2.17+ clients follow a new read of their binaries (Graal_analysis #444).
 - **0.0.29** (#40): The shared client session (`client`, used by Ato and Issho) hands the view the player's own counters and the chat, says what the player types, and sends the sword swing and what the view builds for the server.
 - **0.0.28** (#42): The client session can tell a client line about each game server before it logs in, and fetch files the client line names. Ato uses both for its Graal3D side.
