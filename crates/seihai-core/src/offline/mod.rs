@@ -295,6 +295,9 @@ pub struct OfflineSession {
     pub mannerisms: crate::protocol::Mannerisms,
     /// Who drops bush and pot items in this build (see `offline/drops.rs`).
     pub drops: crate::protocol::ItemDrops,
+    /// This build's baddy and tile rules (lava, the swamp soldier's sword
+    /// window): see [`crate::protocol::WorldRules`].
+    pub world: crate::protocol::WorldRules,
     /// Items lying on the floor of the current level.
     pub floor_items: Vec<crate::items::FloorItem>,
     /// The 1.x drop roll's `Random`.
@@ -723,6 +726,7 @@ impl OfflineSession {
             swim_was_moving: false,
             mannerisms: crate::protocol::MANNER_205,
             drops: crate::protocol::DROPS_142,
+            world: crate::protocol::WORLD_201,
             floor_items: Vec::new(),
             item_rng: crate::items::DelphiRandom::from_clock(),
             item_ms: 0,
@@ -931,13 +935,15 @@ impl OfflineSession {
     /// The lava burn on its 50 ms tick. The 2.05 client tests the point
     /// `(x + 1.5, y + 2)` against the lava list each tick: on lava a count
     /// goes up, and past 100 the player loses half a heart and the count
-    /// starts again; off lava the count is 0. Returns the half hearts taken.
+    /// starts again; off lava the count is 0. Every build from 1.28 beta 2
+    /// does the same; 1.21 has no burn ([`crate::protocol::WorldRules`]).
+    /// Returns the half hearts taken.
     pub fn tick_lava(&mut self, ms: u64) -> i32 {
         self.lava_ms += ms;
         let mut taken = 0;
         while self.lava_ms >= LAVA_TICK_MS {
             self.lava_ms -= LAVA_TICK_MS;
-            if self.life.is_dead() || !self.on_lava() {
+            if !self.world.lava_burns || self.life.is_dead() || !self.on_lava() {
                 self.lava_ticks = 0;
                 continue;
             }
@@ -950,6 +956,11 @@ impl OfflineSession {
             }
         }
         taken
+    }
+
+    /// Take the baddy and tile rules of a build.
+    pub fn set_world_rules(&mut self, w: crate::protocol::WorldRules) {
+        self.world = w;
     }
 
     /// Whether the burn test point is on a tile of the lava list.
@@ -5573,6 +5584,22 @@ mod tests {
             (r.cur_half, r.pose),
             (Some(6), Some(crate::life::ReportPose::Idle))
         );
+    }
+
+    /// Half a heart every 101 ticks on lava from 1.28 beta 2; 1.21 has no
+    /// burn (gap-2 research).
+    #[test]
+    fn lava_burns_from_1_28_only() {
+        let mut s = mortal();
+        s.current_level = Some(level(|_, _| LAVA));
+        assert!(s.on_lava());
+        let hearts = s.hearts_half();
+        assert_eq!(s.tick_lava(100 * LAVA_TICK_MS), 0, "100 ticks: not yet");
+        assert_eq!(s.tick_lava(LAVA_TICK_MS), 1, "the 101st burns");
+        assert_eq!(s.hearts_half(), hearts - 1);
+        s.set_world_rules(crate::protocol::WORLD_121);
+        assert_eq!(s.tick_lava(500 * LAVA_TICK_MS), 0, "1.21: no burn");
+        assert_eq!(s.hearts_half(), hearts - 1);
     }
 
     #[test]

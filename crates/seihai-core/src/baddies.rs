@@ -21,7 +21,8 @@
 //!   (the 2.22 capture: a walking baddy sends 43 then 42, the hare 2 then 3,
 //!   100 ms apart).
 
-use crate::items::DelphiRandom;
+use crate::items::{self, DelphiRandom};
+use crate::protocol::SwampSword;
 
 /// One baddy tick.
 pub const TICK_MS: u64 = 100;
@@ -126,6 +127,28 @@ pub trait World {
     /// The baddy touched the local player: `half` half hearts, pushed
     /// along `(dx, dy)`.
     fn touch_player(&mut self, half: i32, dx: f64, dy: f64);
+    /// Whether a baddy that starts dying rolls an item: the client does
+    /// in 1.21 to 1.41 ([`crate::protocol::ItemDrops::client_roll`]).
+    fn rolls_drops(&self) -> bool {
+        false
+    }
+    /// A dying baddy left `item` with its top-left at `(x, y)`.
+    fn drop_item(&mut self, _item: u8, _x: f64, _y: f64) {}
+}
+
+/// What a baddy of type `kind` leaves when it starts dying in 1.21 to 1.41,
+/// from one `Random(100)` (read in every build from 1.21 to 1.41; NewMain
+/// 1.42 and 2.x leave it to the server): 0 to 9 a green rupee, 10 to 14 a
+/// blue rupee, 15 to 29 a heart, and 30 to 74 arrows from an archer
+/// (types 3 and 9) or type 4.
+pub fn death_drop(kind: u8, roll: i32) -> Option<u8> {
+    match roll {
+        ..=9 => Some(items::GREENRUPEE),
+        10..=14 => Some(items::BLUERUPEE),
+        15..=29 => Some(items::HEART),
+        30..=74 if matches!(kind, 3 | 4 | 9) => Some(items::DARTS),
+        _ => None,
+    }
 }
 
 /// One baddy.
@@ -305,11 +328,36 @@ impl Baddy {
     /// dying, the swamp soldier only while it is up and not just hurt or
     /// shooting, the hare only in the air.
     pub fn hittable(&self) -> bool {
+        self.hittable_by(SwampSword::From22To36)
+    }
+
+    /// [`Self::hittable`] for the local player's sword, whose swamp-soldier
+    /// window depends on the build ([`SwampSword`]).
+    pub fn hittable_by(&self, swamp: SwampSword) -> bool {
         match self.mode {
             mode::HURT | mode::BUMPED | mode::DIE => false,
-            mode::SWAMPSHOT => self.aux < 1 && (22..=36).contains(&self.counter),
+            mode::SWAMPSHOT => {
+                self.aux < 1
+                    && match swamp {
+                        SwampSword::From17 => self.counter >= 17,
+                        SwampSword::From22To36 => (22..=36).contains(&self.counter),
+                    }
+            }
             mode::HAREJUMP => (17..=37).contains(&self.counter),
             _ => true,
+        }
+    }
+
+    /// Start dying with `counter` ticks to go; in 1.x the client rolls the
+    /// baddy's item here ([`death_drop`]).
+    fn start_dying(&mut self, w: &mut dyn World, counter: i32) {
+        self.mode = mode::DIE;
+        self.counter = counter;
+        if w.rolls_drops() {
+            let roll = w.random(100);
+            if let Some(item) = death_drop(self.kind, roll) {
+                w.drop_item(item, self.x, self.y);
+            }
         }
     }
 
@@ -814,8 +862,7 @@ impl Baddy {
             if self.aux < 1 {
                 self.blink = false;
                 if self.power < 1 {
-                    self.mode = mode::DIE;
-                    self.counter = 14;
+                    self.start_dying(w, 14);
                 }
             }
         }
@@ -834,8 +881,7 @@ impl Baddy {
         self.counter -= 1;
         if self.counter < 1 {
             if self.power < 1 {
-                self.mode = mode::DIE;
-                self.counter = 14;
+                self.start_dying(w, 14);
             } else {
                 if self.mode == mode::HURT && self.say_hurt {
                     self.say_hurt = false;
@@ -848,8 +894,7 @@ impl Baddy {
                 self.aux = 0;
             }
         } else if self.counter < 4 && self.kind == 6 {
-            self.mode = mode::DIE;
-            self.counter = 9;
+            self.start_dying(w, 9);
         }
     }
 
@@ -885,8 +930,8 @@ impl Baddy {
             }
             if self.kind == 5 {
                 self.mode = mode::DIE;
-                self.counter = 9;
                 self.y = self.centre().1 - 1.0;
+                self.start_dying(w, 9);
                 return;
             }
             self.mode = mode::HURT;
@@ -910,9 +955,10 @@ impl Baddy {
     /// The local player's sword against this baddy (`0x4d6268`), during
     /// swing ticks 1 to 3. `None` if it misses, else whether it was a clash.
     /// A soldier (types 0, 1, 2, 7) facing the player blocks with its own
-    /// sword from 2 to 5 tiles ahead.
-    pub fn sword_test(&self, px: f64, py: f64, pdir: u8) -> Option<bool> {
-        if !self.hittable() {
+    /// sword from 2 to 5 tiles ahead. `swamp` is the build's swamp-soldier
+    /// window.
+    pub fn sword_test(&self, px: f64, py: f64, pdir: u8, swamp: SwampSword) -> Option<bool> {
+        if !self.hittable_by(swamp) {
             return None;
         }
         let (cx, cy) = self.centre();
@@ -1447,6 +1493,8 @@ mod tests {
         sounds: Vec<String>,
         shots: Vec<Shot>,
         touched: Vec<i32>,
+        rolls: bool,
+        dropped: Vec<(u8, f64, f64)>,
     }
 
     impl Field {
@@ -1458,6 +1506,8 @@ mod tests {
                 sounds: Vec::new(),
                 shots: Vec::new(),
                 touched: Vec::new(),
+                rolls: false,
+                dropped: Vec::new(),
             }
         }
     }
@@ -1485,6 +1535,12 @@ mod tests {
         }
         fn touch_player(&mut self, half: i32, _: f64, _: f64) {
             self.touched.push(half);
+        }
+        fn rolls_drops(&self) -> bool {
+            self.rolls
+        }
+        fn drop_item(&mut self, item: u8, x: f64, y: f64) {
+            self.dropped.push((item, x, y));
         }
     }
 
@@ -1601,9 +1657,15 @@ mod tests {
         b.head = 2;
         // player below facing up, centre (21, 24), baddy centre (21, 21):
         // a soldier facing the player clashes
-        assert_eq!(b.sword_test(19.5, 22.0, 0), Some(true));
+        assert_eq!(
+            b.sword_test(19.5, 22.0, 0, SwampSword::From22To36),
+            Some(true)
+        );
         b.dir = 1;
-        assert_eq!(b.sword_test(19.5, 22.0, 0), Some(false));
+        assert_eq!(
+            b.sword_test(19.5, 22.0, 0, SwampSword::From22To36),
+            Some(false)
+        );
         b.hurt(&mut w, false, 1, 0.0, 3.0, false);
         assert_eq!((b.mode, b.power, b.counter), (mode::HURT, 1, 8));
         assert!(!b.hittable());
@@ -1633,6 +1695,64 @@ mod tests {
         let mut g = baddy(7, 20.0, 20.0);
         g.tick(&mut w, false);
         assert_eq!(w.touched, vec![1, 2]);
+    }
+
+    /// Read in every build from 1.21 to 1.41 (`Random(100)` against 10, 15,
+    /// 30 and 75).
+    #[test]
+    fn a_dying_baddy_rolls_its_item_in_1_x() {
+        assert_eq!(death_drop(0, 9), Some(items::GREENRUPEE));
+        assert_eq!(death_drop(0, 10), Some(items::BLUERUPEE));
+        assert_eq!(death_drop(0, 15), Some(items::HEART));
+        assert_eq!(death_drop(0, 30), None);
+        assert_eq!(death_drop(3, 74), Some(items::DARTS));
+        assert_eq!(death_drop(9, 30), Some(items::DARTS));
+        assert_eq!(death_drop(4, 50), Some(items::DARTS));
+        assert_eq!(death_drop(3, 75), None);
+        // One kill with the roll on and one with it off.
+        for rolls in [true, false] {
+            let mut w = Field::new(Some((19.5, 22.0)));
+            w.rolls = rolls;
+            let mut b = baddy(0, 20.0, 20.0);
+            b.power = 1;
+            b.hurt(&mut w, false, 1, 0.0, 3.0, false);
+            while b.mode == mode::HURT {
+                b.tick(&mut w, true);
+            }
+            assert_eq!(b.mode, mode::DIE);
+            // DelphiRandom seed 1: the first Random(100) is 0, a green rupee.
+            let want = if rolls {
+                vec![(items::GREENRUPEE, b.x, b.y)]
+            } else {
+                vec![]
+            };
+            assert_eq!(w.dropped, want, "rolls {rolls}");
+        }
+    }
+
+    /// 1.21 to 2.00 let the sword reach a surfacing swamp soldier from
+    /// counter 17 to the end of its round; 2.01 on only at 22 to 36.
+    #[test]
+    fn the_swamp_soldier_sword_window_follows_the_build() {
+        let mut b = baddy(6, 20.0, 20.0);
+        b.mode = mode::SWAMPSHOT;
+        b.aux = 0;
+        for (counter, old, new) in [
+            (16, false, false),
+            (17, true, false),
+            (22, true, true),
+            (36, true, true),
+            (40, true, false),
+        ] {
+            b.counter = counter;
+            assert_eq!(b.hittable_by(SwampSword::From17), old, "1.x at {counter}");
+            assert_eq!(
+                b.hittable_by(SwampSword::From22To36),
+                new,
+                "2.01 at {counter}"
+            );
+            assert_eq!(b.hittable(), new, "touch and objects at {counter}");
+        }
     }
 
     #[test]
