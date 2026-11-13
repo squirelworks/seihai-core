@@ -102,13 +102,39 @@ pub fn run(
 }
 
 /// Where the player stands and faces, as the game view last set it.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Pose {
     pub x: f32,
     pub y: f32,
     /// 0 up, 1 left, 2 down, 3 right.
     pub dir: u8,
     pub walking: bool,
+    /// The SPRITE value (17) when it is more than the direction: `dir +
+    /// 4 * S` during a sword swing on a build that shows the swing in the
+    /// sprite (core's `OfflineSession::sprite_value`). `None` sends `dir`.
+    pub sprite: Option<u8>,
+    /// The animation the view names in the GANI prop (10) on a GANI build:
+    /// `sword` or `spin` during a swing (core's
+    /// `OfflineSession::bow_slot_anim`). `None` is `walk` or `idle` by
+    /// `walking`.
+    pub gani: Option<&'static str>,
+}
+
+impl Pose {
+    /// The SPRITE value to send.
+    pub fn sprite_value(&self) -> u8 {
+        self.sprite.unwrap_or(self.dir)
+    }
+}
+
+/// `PLI_PLAYERPROPS` (2) with GANI (10): the animation by name, as a GANI
+/// build shows a swing to the other players.
+pub fn gani_props_message(gani: &str) -> Vec<u8> {
+    let name = &gani.as_bytes()[..gani.len().min(223)];
+    let mut m = vec![2 + 0x20, 10 + 0x20, name.len() as u8 + 0x20];
+    m.extend_from_slice(name);
+    m.push(b'\n');
+    m
 }
 
 /// The game view writes the pose here; the network thread reads it each
@@ -131,6 +157,9 @@ pub struct Other {
     pub status: Option<u8>,
     /// The pictures, colours and GANI the server sent for the player.
     pub looks: crate::protocol::OtherLooks,
+    /// The chat bubble over the player (CURCHAT, 12), while it lasts: the
+    /// server's empty CURCHAT or the bubble's own timer ends it.
+    pub chat: Option<String>,
 }
 
 /// The network thread writes the other players here after each frame; the
@@ -178,6 +207,18 @@ pub struct Live {
     /// (closes the connection) within a walk tick, so the server drops the
     /// player instead of keeping them until the process ends.
     pub closed: Arc<std::sync::atomic::AtomicBool>,
+    /// The player's own counters (hearts, gralats, bombs, arrows, AP).
+    pub own: SharedOwn,
+    /// Lines the player typed, in order; the network thread takes each and
+    /// says it in the level (CURCHAT), where the server also runs chat
+    /// commands such as `setnick` from it.
+    pub say: Arc<Mutex<Vec<String>>>,
+    /// The chat lines that came in, for the view to take.
+    pub chat: SharedChat,
+    /// Messages the view built for the server (core's `PLI_BOARDMODIFY`
+    /// for a cut, bomb and arrow adds), in order; the network thread sends
+    /// them after the walk of its next tick.
+    pub send: Arc<Mutex<Vec<Vec<u8>>>>,
 }
 
 /// One server record for an NPC: the level's lower-case name, the NPC id,
@@ -190,6 +231,54 @@ pub struct NpcChange {
     pub id: u32,
     pub props: Option<NpcProps>,
 }
+
+/// The player's own counters as the server last set them with
+/// `PLO_PLAYERPROPS` (9), for the view's status display. `None` is a prop
+/// the server has not sent yet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct OwnStats {
+    /// MAXPOWER (1): heart containers, in hearts.
+    pub max_power: Option<u8>,
+    /// CURPOWER (2): power in half hearts.
+    pub cur_power: Option<u8>,
+    /// RUPEESCOUNT (3), the gralats.
+    pub rupees: Option<u32>,
+    /// ARROWSCOUNT (4).
+    pub arrows: Option<u8>,
+    /// BOMBSCOUNT (5).
+    pub bombs: Option<u8>,
+    /// GLOVEPOWER (6).
+    pub glove_power: Option<u8>,
+    /// STATUS (18).
+    pub status: Option<u8>,
+    /// ALIGNMENT (32), the AP.
+    pub alignment: Option<u8>,
+}
+
+impl OwnStats {
+    /// The counters `st` holds.
+    pub fn of(st: &SessionState) -> OwnStats {
+        OwnStats {
+            max_power: st.own_max_power,
+            cur_power: st.own_cur_power,
+            rupees: st.own_rupees,
+            arrows: st.own_darts,
+            bombs: st.own_bombs,
+            glove_power: st.own_glove_power,
+            status: st.own_status,
+            alignment: st.own_alignment,
+        }
+    }
+}
+
+/// The network thread writes the player's counters here when they change;
+/// the view's status display reads them.
+pub type SharedOwn = Arc<Mutex<OwnStats>>;
+
+/// Chat lines from the network thread to the view, oldest first: the
+/// bubbles said in the level, toalls, PMs and admin lines, as core's
+/// session state reads them. The view takes them.
+pub type SharedChat = Arc<Mutex<Vec<crate::protocol::ChatLine>>>;
 
 /// Sound files from the network thread to the view: name and bytes.
 pub type SharedSounds = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
@@ -476,7 +565,33 @@ fn others_of(st: &SessionState) -> Vec<Other> {
             sprite: o.sprite,
             status: o.status,
             looks: o.looks.clone(),
+            chat: o.chat.clone().filter(|c| !c.is_empty()),
         })
+        .collect()
+}
+
+/// A post-login frame is still owed: the real clients send nothing else
+/// before it.
+fn burst_owed_now(login: &Option<LoginBurst>, lobby: &Option<LobbyBurst>) -> bool {
+    login.as_ref().is_some_and(|b| b.pending()) || lobby.as_ref().is_some_and(|b| b.pending())
+}
+
+/// Move the chat lines `st` has gathered into `to`, so the state does not
+/// keep them and the view sees each once.
+fn take_chat(st: &mut SessionState, to: &Mutex<Vec<crate::protocol::ChatLine>>) {
+    if st.chat_log.is_empty() {
+        return;
+    }
+    let lines = std::mem::take(&mut st.chat_log);
+    to.lock().unwrap_or_else(|e| e.into_inner()).extend(lines);
+}
+
+/// The lines the view asked to say, taken from `say`. Blank lines are
+/// dropped: an empty CURCHAT clears the bubble instead of saying anything.
+fn take_say(say: &Mutex<Vec<String>>) -> Vec<String> {
+    std::mem::take(&mut *say.lock().unwrap_or_else(|e| e.into_inner()))
+        .into_iter()
+        .filter(|t| !t.trim().is_empty())
         .collect()
 }
 
@@ -581,24 +696,36 @@ impl WalkSender {
         frame
     }
 
-    fn walk(&mut self, pose: Pose) -> Option<Vec<u8>> {
+    fn walk(&mut self, pose: Pose) -> Vec<Vec<u8>> {
+        let moving = if pose.walking { "walk" } else { "idle" };
         if let Some(wc) = self.cadence.as_mut() {
-            let gani = self
-                .ganis
-                .then_some(if pose.walking { "walk" } else { "idle" });
-            let st = wc.state(pose.x, pose.y, pose.dir, gani);
-            return wc.tick(st);
+            let gani = self.ganis.then_some(pose.gani.unwrap_or(moving));
+            let st = wc.state(pose.x, pose.y, pose.sprite_value(), gani);
+            return wc.tick(st).into_iter().collect();
         }
-        let first = self.last.is_none();
-        let same = self
-            .last
-            .is_some_and(|l| (l.x, l.y, l.dir) == (pose.x, pose.y, pose.dir));
+        let last = self.last;
         self.last = Some(pose);
         // The first pose is where the server put the player: nothing to say.
-        if first || same {
-            return None;
+        let Some(last) = last else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        // A GANI build with no captured cadence names only the view's own
+        // animations (a swing) and the return from one; its walk stays the
+        // walk message, as before.
+        if self.ganis && pose.gani != last.gani {
+            out.push(gani_props_message(pose.gani.unwrap_or(moving)));
         }
-        Some(walk_message_for(self.version, pose.x, pose.y, pose.dir))
+        let place = |p: &Pose| (p.x, p.y, p.sprite_value());
+        if place(&pose) != place(&last) {
+            out.push(walk_message_for(
+                self.version,
+                pose.x,
+                pose.y,
+                pose.sprite_value(),
+            ));
+        }
+        out
     }
 }
 
@@ -659,6 +786,12 @@ pub fn run_hooked(
     let board_mods = live.as_ref().map(|l| l.board_mods.clone());
     let npc_changes = live.as_ref().map(|l| l.npc_changes.clone());
     let closed = live.as_ref().map(|l| l.closed.clone());
+    let own = live.as_ref().map(|l| l.own.clone());
+    let say = live.as_ref().map(|l| l.say.clone());
+    let chat = live.as_ref().map(|l| l.chat.clone());
+    let outbox = live.as_ref().map(|l| l.send.clone());
+    // The bubbles' timers run on the loop's own clock.
+    let mut bubble_clock = Instant::now();
     let view_closed = || {
         closed
             .as_ref()
@@ -762,6 +895,16 @@ pub fn run_hooked(
                         if *slot != now {
                             *slot = now;
                         }
+                    }
+                    if let Some(o) = own.as_ref() {
+                        let now = OwnStats::of(&st);
+                        let mut slot = o.lock().unwrap_or_else(|e| e.into_inner());
+                        if *slot != now {
+                            *slot = now;
+                        }
+                    }
+                    if let Some(c) = chat.as_ref() {
+                        take_chat(&mut st, c);
                     }
                     if let Some(w) = st.server_warp.take() {
                         if owed {
@@ -905,6 +1048,33 @@ pub fn run_hooked(
                     }
                 }
                 Err(RecvTimeoutError::Disconnected) => return Ok(()),
+            }
+            // The other players' bubbles run out on their own timers.
+            let dt = bubble_clock.elapsed().as_millis().min(u128::from(u32::MAX)) as u32;
+            bubble_clock = Instant::now();
+            if st.tick_bubbles(dt) {
+                if let Some(o) = others.as_ref() {
+                    *o.lock().unwrap_or_else(|e| e.into_inner()) = others_of(&st);
+                }
+            }
+            // What the view built for the server, once the post-login frame
+            // has gone.
+            if let Some(q) = outbox
+                .as_ref()
+                .filter(|_| !burst_owed_now(&login_burst, &lobby_burst))
+            {
+                let msgs = std::mem::take(&mut *q.lock().unwrap_or_else(|e| e.into_inner()));
+                if !msgs.is_empty() {
+                    let _ = s.conn.send_messages(&msgs);
+                }
+            }
+            // What the player typed: said in the level.
+            if let Some(q) = say.as_ref() {
+                for text in take_say(q) {
+                    if s.conn.send_chat(&text).is_ok() {
+                        let _ = writeln!(out, "said {text:?}");
+                    }
+                }
             }
             // The walk, once a tick, after the post-login frame has gone
             // (the real clients send nothing before it).
@@ -1084,6 +1254,7 @@ mod tests {
             y: 30.0,
             dir,
             walking,
+            ..Default::default()
         }
     }
 
@@ -1101,6 +1272,41 @@ mod tests {
             vec![walk_message_for(ClientVersion::V3153, 30.5, 30.0, 3)]
         );
         assert!(w.tick(pose(30.5, 3, true)).is_empty());
+    }
+
+    /// A 6.x swing: the GANI prop names `sword` when the view starts it and
+    /// `idle` when it ends; standing still, no walk message goes with it.
+    #[test]
+    fn a_gani_build_names_the_swing_and_its_end() {
+        let v = ClientVersion::V603R7;
+        let mut w = WalkSender::new(v);
+        assert!(w.cadence.is_none() && w.ganis);
+        assert!(w.tick(pose(30.0, 2, false)).is_empty());
+        let mut swing = pose(30.0, 2, false);
+        swing.gani = Some("sword");
+        assert_eq!(w.tick(swing), vec![gani_props_message("sword")]);
+        assert!(w.tick(swing).is_empty(), "once");
+        assert_eq!(
+            w.tick(pose(30.0, 2, false)),
+            vec![gani_props_message("idle")]
+        );
+        assert_eq!(gani_props_message("sword"), b"\"*%sword\n");
+    }
+
+    /// A sprite build shows the swing in SPRITE: the walk message carries
+    /// `dir + 4 * S`.
+    #[test]
+    fn a_sprite_build_sends_the_swing_sprite() {
+        let v = ClientVersion::V3153;
+        let mut w = WalkSender::new(v);
+        assert!(w.tick(pose(30.0, 2, false)).is_empty());
+        let mut swing = pose(30.0, 2, false);
+        swing.sprite = Some(2 + 4 * 6);
+        let got = w.tick(swing);
+        assert!(
+            got.contains(&walk_message_for(v, 30.0, 30.0, 26)),
+            "{got:?}"
+        );
     }
 
     /// 3.04 and 4.04r2 walk on core's cadence: nothing on the first tick,
@@ -1220,6 +1426,81 @@ mod others_tests {
         assert_eq!(o.looks.colors, Some([1, 2, 3, 4, 5]));
         assert_eq!(o.looks.gani.as_deref(), Some("walk"));
         assert_eq!((o.sprite, o.status), (Some(6), Some(0)));
+    }
+
+    /// A player's chat bubble goes to the view while it lasts. An empty
+    /// CURCHAT lets it end once its minimum time is up (core's 2.05 rule),
+    /// and the loop's bubble clock takes it down then.
+    #[test]
+    fn the_bubble_goes_with_the_player() {
+        let mut st = SessionState::for_version(ClientVersion::V3153);
+        st.apply_body(&other(2, 20, 24));
+        // OTHERPLPROPS (8) for player 2: CURCHAT (12) "hi".
+        let say = |text: &str| {
+            let mut m = vec![8 + 0x20, 0x20, 2 + 0x20, 12 + 0x20, text.len() as u8 + 0x20];
+            m.extend_from_slice(text.as_bytes());
+            m.push(b'\n');
+            m
+        };
+        st.apply_body(&say("hi"));
+        assert_eq!(others_of(&st)[0].chat.as_deref(), Some("hi"));
+        st.apply_body(&say(""));
+        assert!(st.tick_bubbles(60_000), "the bubble ends");
+        assert_eq!(others_of(&st)[0].chat, None);
+    }
+
+    /// The chat lines move to the view once each; the state keeps none.
+    #[test]
+    fn chat_lines_go_to_the_view_once() {
+        use crate::protocol::ChatKind;
+        let mut st = SessionState::for_version(ClientVersion::V3153);
+        let to = Mutex::new(Vec::new());
+        st.push_chat(ChatKind::Toall, "Ann".into(), "hello".into());
+        take_chat(&mut st, &to);
+        take_chat(&mut st, &to);
+        let got = to.lock().unwrap();
+        assert_eq!(got.len(), 1);
+        assert_eq!(
+            (got[0].from.as_str(), got[0].text.as_str()),
+            ("Ann", "hello")
+        );
+        assert!(st.chat_log.is_empty());
+    }
+
+    /// What the player typed is taken in order; blank lines are not said.
+    #[test]
+    fn typed_lines_are_taken_in_order_without_blanks() {
+        let q = Mutex::new(vec!["one".to_string(), "  ".into(), "two".into()]);
+        assert_eq!(take_say(&q), vec!["one".to_string(), "two".into()]);
+        assert!(take_say(&q).is_empty());
+    }
+
+    /// The counters the status display draws come from the player props.
+    #[test]
+    fn own_counters_from_the_player_props() {
+        let mut st = SessionState::for_version(ClientVersion::V3153);
+        // PLAYERPROPS (9): MAXPOWER 3, CURPOWER 5, ARROWSCOUNT 7,
+        // BOMBSCOUNT 15, ALIGNMENT 50.
+        st.apply_body(&[
+            9 + 0x20,
+            1 + 0x20,
+            3 + 0x20,
+            2 + 0x20,
+            5 + 0x20,
+            4 + 0x20,
+            7 + 0x20,
+            5 + 0x20,
+            15 + 0x20,
+            32 + 0x20,
+            50 + 0x20,
+            b'\n',
+        ]);
+        let o = OwnStats::of(&st);
+        assert_eq!(
+            (o.max_power, o.cur_power, o.arrows, o.bombs, o.alignment),
+            (Some(3), Some(5), Some(7), Some(15), Some(50))
+        );
+        assert_eq!(o.rupees, None);
     }
 
     /// An NPC update after the level is handed on with the level it is
