@@ -25,6 +25,7 @@ mod props;
 pub mod seclogin;
 pub mod showimg;
 pub mod tampercheck;
+mod tokens;
 mod version;
 pub mod walkcadence;
 
@@ -65,6 +66,7 @@ pub use showimg::{
     ImgPart, ImgRecord, PlayerImage, PlayerImages, ShowImgInfo, ShowImgSender, ShowImgUpdate,
 };
 pub use tampercheck::{TamperImage, TamperSender, TamperWords};
+pub use tokens::{known_token, tokens_tsv, KnownToken, TokenGrade, TokenKind, KNOWN_TOKENS};
 pub use version::{ClientVersion, EncryptionGen};
 
 use std::io::{self, Write};
