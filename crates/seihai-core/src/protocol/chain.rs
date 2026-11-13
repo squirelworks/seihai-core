@@ -1172,9 +1172,12 @@ pub const CHAIN: &[Step] = &[
             showimg: Some(Some(SHOWIMG_404)),
             server_list: Some(ServerList::Direct),
             chat_text: Some(ChatText { face: ChatFace::Arial, height: 24 }),
+            // The engine DLL steps zlib/bz2 bodies len >> 2 times, at most 4, in
+            // both directions (read 2026-11-13).
+            gen5_round_down: Some(true),
             ..Delta::NONE
         },
-        source: "binary (stock engine DLL unpacked from the Thinstall installer) and one live lab run (live-behaviour-404): 98 PLO ids, login id 5 with G3D17026 and win,<3 md5> in the plain zlib frame, then 37; Login mode while the server name starts with login, until 178",
+        source: "binary (stock engine DLL unpacked from the Thinstall installer) and one live lab run (live-behaviour-404): 98 PLO ids, login id 5 with G3D17026 and win,<3 md5> in the plain zlib frame, then 37; Login mode while the server name starts with login, until 178; frame cipher read 2026-11-13: raw bodies (len + 3) >> 2 steps, at most 12, zlib/bz2 bodies len >> 2, at most 4 (round down)",
         unknown: &[
             Unknown { area: "pli", what: "the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34, 38 and 46 seen in the lab; the 2026-10-31 live run saw 2, 4, 9, 23, 24, 34, 37, 38, 44, 46, 152, 154 and 157, all in the set)" },
             Unknown { area: "login", what: "Seihai sends the three machine fields as an empty quoted string, as for 5.00r7; the real client sends three MD5s" },
@@ -1202,8 +1205,8 @@ pub const CHAIN: &[Step] = &[
             // without 41.
             plo: IdDelta::plus_minus(&[], &[41]),
             lobby: Some(Some(LOBBY_404_MAC)),
-            // Its frame cipher steps a zlib or bz2 body len >> 2 times, as 5.12.
-            gen5_round_down: Some(true),
+            // Its frame cipher steps a zlib or bz2 body len >> 2 times, as the
+            // Windows 4.04r2, so the flag carries over.
             ..Delta::NONE
         },
         source: "binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32; the frame cipher steps raw bodies (len + 3) >> 2 times, at most 12, and zlib/bz2 bodies len >> 2, at most 4, as 5.12; short C->S bodies under 48 bytes go raw), login id 5 with G3D18026 and mac,<md5>,<md5>,\"\" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38; PLO switch read statically (2026-11-13): 97 ids, the Windows 4.04r2 set without 41, 100 a case of the switch, no 107 or 108",

@@ -1238,6 +1238,7 @@ mod tests {
         assert_eq!(n(ClientVersion::V404R2), 98);
         assert_eq!(n(ClientVersion::V512), 100);
         for v in [
+            ClientVersion::V404R2,
             ClientVersion::V404R2Mac,
             ClientVersion::V420R6,
             ClientVersion::V420R8,
@@ -1246,11 +1247,7 @@ mod tests {
         ] {
             assert!(profile(v).protocol.gen5_round_down, "{v:?}");
         }
-        for v in [
-            ClientVersion::V404R2,
-            ClientVersion::V500R7,
-            ClientVersion::V524R4,
-        ] {
+        for v in [ClientVersion::V500R7, ClientVersion::V524R4] {
             assert!(!profile(v).protocol.gen5_round_down, "{v:?}");
         }
         assert!(!profile(ClientVersion::V231).protocol.plo.contains(44));

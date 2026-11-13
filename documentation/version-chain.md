@@ -510,6 +510,7 @@ Generated; do not edit between the markers.
 - protocol: **showimg (id 24)**: none -> every 5145 ms
 - protocol: **login frame**: head and default-weapon files, props without head or colours with OS mac and code page 1250, status icons -> none
 - protocol: **login lobby**: none -> first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252
+- protocol: **gen5_round_down**: no -> yes
 - ui: **server_list**: 3 tabs -> direct
 - ui: **chat_text**: ChatText { face: TempusSans, height: 24 } -> ChatText { face: Arial, height: 24 }
 - unknown (pli): the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34, 38 and 46 seen in the lab; the 2026-10-31 live run saw 2, 4, 9, 23, 24, 34, 37, 38, 44, 46, 152, 154 and 157, all in the set)
@@ -520,13 +521,12 @@ Generated; do not edit between the markers.
 - unknown (props): own and other prop sets are 3.153's; no 4.x prop parser was read (the lab saw X2/Y2, 78 and 79)
 - unknown (ui): chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
 - unknown (3d): Graal3DEngine.dll (Torque protocol 19, UDP on listed port + 1) is not modelled; seihai-ato::torque has its profile
-- source: binary (stock engine DLL unpacked from the Thinstall installer) and one live lab run (live-behaviour-404): 98 PLO ids, login id 5 with G3D17026 and win,<3 md5> in the plain zlib frame, then 37; Login mode while the server name starts with login, until 178
+- source: binary (stock engine DLL unpacked from the Thinstall installer) and one live lab run (live-behaviour-404): 98 PLO ids, login id 5 with G3D17026 and win,<3 md5> in the plain zlib frame, then 37; Login mode while the server name starts with login, until 178; frame cipher read 2026-11-13: raw bodies (len + 3) >> 2 steps, at most 12, zlib/bz2 bodies len >> 2, at most 4 (round down)
 
 #### 4.04r2 Mac (`G3D18026`, binary)
 
 - protocol: **plo (server ids handled)**: -41 STARTMESSAGE (98 -> 97 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252 -> first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0
-- protocol: **gen5_round_down**: no -> yes
 - unknown (pli): the Windows 4.04r2 set is kept; the lab saw 2, 18, 23, 24, 37, 38, 46 and 157
 - unknown (login): Seihai sends the three machine fields as empty quoted strings; the real client sent the MAC and /etc stat MD5s and an empty fourth field
 - unknown (3d): the Torque 3D mode is not modelled
