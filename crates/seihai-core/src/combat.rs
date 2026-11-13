@@ -146,6 +146,11 @@ pub enum Reject {
     /// `PLO_HITOBJECTS`: the player's centre is 2 or more tiles from the
     /// hit point on an axis.
     OutOfBlast,
+    /// The client is in ghost mode (`PLO_GHOSTMODE` 170): 2.17 on, no sword
+    /// hits.
+    GhostMode,
+    /// The client holds the flag `PLO` 176 or 177 sets: 2.17 on, no hits.
+    ServerStop,
 }
 
 /// Whether the player can be hurt right now.
@@ -184,6 +189,11 @@ pub struct Victim {
     pub state: Vulnerability,
     /// The level is a no-player-killing level (script `noplayerkilling`).
     pub no_pk: bool,
+    /// The server put this client in ghost mode (`PLO_GHOSTMODE` 170).
+    pub ghost: bool,
+    /// The server sent `PLO` 176 or 177, which set the flag the 2.17+ hit
+    /// judge tests first.
+    pub server_stop: bool,
 }
 
 /// A player swinging a sword, as the victim sees it from the props.
@@ -334,10 +344,18 @@ pub fn sword_half_hearts(rules: &CombatRules, power: i8) -> i32 {
 /// level, the attacker not hidden and not on the victim's guild, and the
 /// victim in the box in front of the attacker.
 pub fn judge_sword(rules: &CombatRules, s: &Swinger, v: &Victim) -> Result<i32, Reject> {
+    // 2.17 on: the 176/177 flag is the judge's first test.
+    if rules.ghost_and_stop_gates && v.server_stop {
+        return Err(Reject::ServerStop);
+    }
     if !is_swinging(rules, s) {
         return Err(Reject::NotSwinging);
     }
     v.state.check()?;
+    // 2.17 on: after the hurtable test, before the AP test.
+    if rules.ghost_and_stop_gates && v.ghost {
+        return Err(Reject::GhostMode);
+    }
     if v.ap == rules.immune_ap {
         return Err(Reject::Immune);
     }
@@ -447,7 +465,11 @@ pub fn parse_hitobjects(payload: &[u8]) -> Option<HitObjects> {
     })
 }
 
+/// `u8::MAX` as a range means no range test (1.31 to 1.39).
 fn within(a: (f32, f32), b: (f32, f32), half_tiles_range: u8) -> bool {
+    if half_tiles_range == u8::MAX {
+        return true;
+    }
     let (dx, dy) = (a.0 - b.0, a.1 - b.1);
     let r = half_tiles(half_tiles_range);
     dx * dx + dy * dy <= r * r
@@ -468,6 +490,10 @@ fn packet_gates(
 ) -> Result<(), Reject> {
     if npc.is_some() {
         return Err(Reject::NpcSource);
+    }
+    // 2.17 on: the "can be hurt" test checks the 176/177 flag first.
+    if rules.ghost_and_stop_gates && v.server_stop {
+        return Err(Reject::ServerStop);
     }
     v.state.check()?;
     let at = attacker_at.ok_or(Reject::TooFar)?;
@@ -889,6 +915,8 @@ impl OfflineSession {
             ap: self.alignment,
             state,
             no_pk: self.no_pk,
+            ghost: self.ghost_mode,
+            server_stop: self.server_stop,
         }
     }
 
@@ -1315,6 +1343,8 @@ mod tests {
             ap: 50,
             state: Vulnerability::Hurtable,
             no_pk: false,
+            ghost: false,
+            server_stop: false,
         }
     }
 
@@ -1838,10 +1868,11 @@ mod tests {
             hurtplayer_message(v, (20.0, 20.0), &target(21.0, 20.0), (0.0, 0.0), 0),
             Err(Reject::NoDamage)
         );
+        // 1.3 test and older have no id 40 handler (U7 static reads).
         for old in [
-            ClientVersion::V133,
-            ClientVersion::V138,
-            ClientVersion::V142,
+            ClientVersion::V121,
+            ClientVersion::V128B2,
+            ClientVersion::V13T,
         ] {
             assert_eq!(
                 hurtplayer_message(old, (20.0, 20.0), &target(21.0, 20.0), (0.0, 0.0), 2),
@@ -1869,27 +1900,42 @@ mod tests {
         }
         // Read in every 1.x binary (gap-2 research): no AP immunity before
         // 1.34, raw sword power and no judge stamp up to 2.00.
-        use crate::protocol::{COMBAT_121, COMBAT_139};
+        use crate::protocol::{COMBAT_121, COMBAT_131, COMBAT_139};
         for v in [
             ClientVersion::V121,
             ClientVersion::V128B2,
-            ClientVersion::V133,
+            ClientVersion::V13T,
         ] {
             assert_eq!(v.combat_rules(), Some(COMBAT_121), "{}", v.label());
         }
         for v in [
-            ClientVersion::V134,
+            ClientVersion::V131,
+            ClientVersion::V132,
+            ClientVersion::V133,
+        ] {
+            assert_eq!(v.combat_rules(), Some(COMBAT_131), "{}", v.label());
+        }
+        for v in [
+            ClientVersion::V135,
             ClientVersion::V138,
             ClientVersion::V139,
-            ClientVersion::V141,
         ] {
             assert_eq!(v.combat_rules(), Some(COMBAT_139), "{}", v.label());
         }
         assert_eq!(
+            ClientVersion::V134.combat_rules(),
+            Some(crate::protocol::COMBAT_134)
+        );
+        assert_eq!(
+            ClientVersion::V141.combat_rules(),
+            Some(crate::protocol::COMBAT_141)
+        );
+        assert_eq!(
             ClientVersion::V142.combat_rules(),
             Some(crate::protocol::COMBAT_142)
         );
-        const { assert!(!COMBAT_139.packet_hits) };
+        // Every 1.x build from 1.31 has an id 40 handler (U7 static reads).
+        const { assert!(COMBAT_139.packet_hits) };
         assert_eq!(COMBAT_139.swing_step_ticks, 1);
         assert_eq!(COMBAT_139.sword_power_store, PowerStore::Raw6Bit);
         const { assert!(!COMBAT_139.judge_throttle) };
@@ -1907,11 +1953,22 @@ mod tests {
             ClientVersion::V203,
             ClientVersion::V204,
             ClientVersion::V205,
+            ClientVersion::V210,
+        ] {
+            assert_eq!(v.combat_rules(), Some(COMBAT_205), "{}", v.label());
+        }
+        // 2.17.1, 2.22 and 2.31 add the ghost-mode and 176/177 tests.
+        for v in [
             ClientVersion::V217,
             ClientVersion::V222,
             ClientVersion::V231,
         ] {
-            assert_eq!(v.combat_rules(), Some(COMBAT_205), "{}", v.label());
+            assert_eq!(
+                v.combat_rules(),
+                Some(crate::protocol::COMBAT_217),
+                "{}",
+                v.label()
+            );
         }
         assert_eq!(COMBAT_205.immune_ap, 100);
         assert_eq!(
@@ -1922,6 +1979,63 @@ mod tests {
             ),
             (0, 8, 4)
         );
+    }
+
+    #[test]
+    fn packet_hits_in_1x_follow_the_handler_of_each_build() {
+        use crate::protocol::{COMBAT_131, COMBAT_134, COMBAT_139, COMBAT_141};
+        let far = Some((60.0, 20.0));
+        let v = victim(22.0, 20.0);
+        // 1.31 to 1.34: no range test and no cap.
+        for r in [COMBAT_131, COMBAT_134] {
+            assert_eq!(judge_hurtplayer(&r, &hurt(1, 9), far, &v), Ok(9));
+        }
+        // 1.35 to 1.39: no range test, capped at one heart.
+        assert_eq!(judge_hurtplayer(&COMBAT_139, &hurt(1, 9), far, &v), Ok(2));
+        // 1.41: the 2.00 handler, 10 tiles and one heart.
+        assert_eq!(
+            judge_hurtplayer(&COMBAT_141, &hurt(1, 9), far, &v),
+            Err(Reject::TooFar)
+        );
+        assert_eq!(
+            judge_hurtplayer(&COMBAT_141, &hurt(1, 9), Some((25.0, 20.0)), &v),
+            Ok(2)
+        );
+        // None of them tests AP 100 on a packet hit.
+        let saint = Victim { ap: 100, ..v };
+        assert_eq!(
+            judge_hurtplayer(&COMBAT_139, &hurt(1, 2), far, &saint),
+            Ok(2)
+        );
+    }
+
+    #[test]
+    fn from_217_ghost_mode_and_the_176_177_flag_stop_hits() {
+        use crate::protocol::COMBAT_217;
+        let s = swinger(3, sw(8, 3));
+        let v = victim(22.0, 20.0);
+        let ghost = Victim { ghost: true, ..v };
+        let stop = Victim {
+            server_stop: true,
+            ..v
+        };
+        assert!(judge_sword(&COMBAT_217, &s, &v).is_ok());
+        assert_eq!(judge_sword(&COMBAT_217, &s, &ghost), Err(Reject::GhostMode));
+        assert_eq!(judge_sword(&COMBAT_217, &s, &stop), Err(Reject::ServerStop));
+        // Ghost mode is a sword-judge test only; the 176/177 flag also stops
+        // packet hits.
+        let near = Some((24.0, 20.0));
+        assert_eq!(
+            judge_hurtplayer(&COMBAT_217, &hurt(1, 2), near, &ghost),
+            Ok(2)
+        );
+        assert_eq!(
+            judge_hurtplayer(&COMBAT_217, &hurt(1, 2), near, &stop),
+            Err(Reject::ServerStop)
+        );
+        // 2.05 has neither test.
+        assert!(judge_sword(&R, &s, &ghost).is_ok());
+        assert!(judge_sword(&R, &s, &stop).is_ok());
     }
 
     // ---- the session: damage, hurt mode, death ----
@@ -2805,16 +2919,31 @@ mod tests {
         st.apply_body(&m46);
         assert!(matches!(st.hits[0], IncomingHit::Hurt(h) if h.attacker == 12 && h.half == 2));
         assert!(matches!(st.hits[1], IncomingHit::Objects(h) if h.attacker == 12 && h.x == 20.0));
-        // No 1.x packet hit handler was traced: the ids decode to nothing.
+        // 1.3 test and older have no id 40 handler: nothing decodes. 1.31
+        // to 1.42 decode id 40 but not 46, which no 1.x build has (U7
+        // static reads).
         for v in [
-            ClientVersion::V133,
-            ClientVersion::V138,
-            ClientVersion::V142,
+            ClientVersion::V121,
+            ClientVersion::V128B2,
+            ClientVersion::V13T,
         ] {
             let mut st = SessionState::for_version(v);
             st.apply_body(&m40(12));
             st.apply_body(&m46);
             assert!(st.hits.is_empty(), "{}", v.label());
+        }
+        for v in [
+            ClientVersion::V131,
+            ClientVersion::V133,
+            ClientVersion::V138,
+            ClientVersion::V141,
+            ClientVersion::V142,
+        ] {
+            let mut st = SessionState::for_version(v);
+            st.apply_body(&m40(12));
+            st.apply_body(&m46);
+            assert_eq!(st.hits.len(), 1, "{}", v.label());
+            assert!(matches!(st.hits[0], IncomingHit::Hurt(h) if h.attacker == 12));
         }
         // 2.00 has the rules but no id 46 (added in 2.01): 40 is decoded, 46
         // is not.

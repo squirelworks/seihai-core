@@ -162,7 +162,8 @@ Generated; do not edit between the markers.
 #### 1.31 (`GSERV016`, binary, linked 1999-12-07)
 
 - protocol: **plo (server ids handled)**: +40 HURTPLAYER (41 -> 42 ids)
-- source: binary: PLO 40, default port 14900 (14804 before), noudp= and fixedudpport= options
+- life: **combat**: 1.21 rules (as 1.31, no packet hits) -> 1.31 rules (as 1.34, no AP immunity)
+- source: binary: PLO 40, default port 14900 (14804 before), noudp= and fixedudpport= options; the first id 40 handler (no range test, no cap, no AP test; U7 static reads)
 
 #### 1.32 (`GSERV018`, binary, linked 2000-01-12)
 
@@ -179,15 +180,16 @@ Generated; do not edit between the markers.
 #### 1.34 (`GNW22030`, binary, linked 2000-03-23)
 
 - props: **other-player props**: +34 ACCOUNTNAME (21 -> 22 ids)
-- life: **combat**: 1.21 rules (as 1.34, no AP immunity) -> 1.34 rules (one swing step a tick, raw sword power, no packet hits traced)
+- life: **combat**: 1.31 rules (as 1.34, no AP immunity) -> 1.34 rules (as 1.35, packet hits uncapped)
 - ui: **gs1_commands**: 88 -> 93
-- unknown (life): 1.34 to 1.41 also pass over a victim in player mode 7 in the sword judge; what mode 7 is was not traced, so Seihai does not test it
+- unknown (life): 1.34 to 1.41 also pass over a victim in player mode 7 in the sword judge. Mode 7 is a passenger on another local player's horse in same-PC play (U7 static reads), so it never applies online and Seihai does not test it
 - source: binary: other-player prop 34 (ACCOUNTNAME), GS1 table 88 to 93 (cross-version-timeline); the sword judge gains the AP 100 immunity and the attacker's hidden flag, and gates on the animation step
 
 #### 1.35 (`GNW13040`, binary, linked 2000-04-13)
 
+- life: **combat**: 1.34 rules (as 1.35, packet hits uncapped) -> 1.35 rules (one swing step a tick, raw sword power, packet hits capped, any range)
 - ui: **hud**: Letters -> LettersChat
-- source: shipped state.png: CHAT label on the HUD sheet; GS1 table unchanged
+- source: shipped state.png: CHAT label on the HUD sheet; GS1 table unchanged; the id 40 handler caps a hit at one heart (U7 static reads)
 
 #### 1.36 (`GNW10050`, binary, linked 2000-05-12)
 
@@ -216,12 +218,12 @@ Generated; do not edit between the markers.
 - protocol: **pli (client ids sent)**: +80 PROFILEGET, +81 PROFILESET (33 -> 35 ids)
 - props: **own-player props**: +34 ACCOUNTNAME (34 -> 35 ids)
 - props: **other-player props**: +33 ADDITFLAGS (22 -> 23 ids)
-- life: **death**: none -> 1.39 rules (respawn to max hearts, no AP bands)
+- life: **death**: none -> 1.39 rules (respawn with 3 hearts, no AP bands)
 - ui: **chat_recall**: no -> yes
 - ui: **chat_text**: ChatText { face: Dialog, height: 28 } -> ChatText { face: Helvetica, height: 24 }
 - ui: **gs1_commands**: 109 -> 111
-- unknown (life): the hurt sprite and the hurt-packet gates are the 2.00 values, no 1.x hurt-packet handler was traced; the six walk-probe and twelve knockback-probe offset tables are not profile fields; 1.33 to 1.38 keep no death row of their own and copy the 1.39 mannerisms
-- source: binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111; sword swing S 6 to 10 one per tick, sword box 0 to 4 tiles ahead and under 2 sideways, 40-tick hurt lock-out, five knockback steps, death timer 30 with the dead bit after 27, respawn hearts to max (no AP bands)
+- unknown (life): the hurt sprite is the 2.00 value; the id 40 handler was read (cap 1 heart, no range or AP test), but its finer gates (status field, modes 3 and 10) are not profile fields; the six walk-probe and twelve knockback-probe offset tables are not profile fields; 1.33 to 1.38 keep no death row of their own and copy the 1.39 mannerisms
+- source: binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111; sword swing S 6 to 10 one per tick, sword box 0 to 4 tiles ahead and under 2 sideways, 40-tick hurt lock-out, five knockback steps, death timer 30 with the dead bit after 27, respawn with 3 hearts (no AP bands; U7 static reads)
 
 #### 1.41 (`GNW13110`, binary)
 
@@ -232,14 +234,15 @@ Generated; do not edit between the markers.
 - props: **other-player props**: +35 BODYIMG, +36 RATING (23 -> 25 ids)
 - props: **npc_max**: 34 -> 35
 - levels: **nw**: no -> yes
-- life: **death**: 1.39 rules (respawn to max hearts, no AP bands) -> 2.05 rules (name-group test)
+- life: **death**: 1.39 rules (respawn with 3 hearts, no AP bands) -> 2.05 rules (name-group test)
+- life: **combat**: 1.35 rules (one swing step a tick, raw sword power, packet hits capped, any range) -> 1.41 rules (1.35 sword judge, 2.00 packet hits)
 - ui: **server_list**: direct -> one list
 - ui: **window**: 648×508 -> 648×514
 - ui: **gs1_commands**: 111 -> 126
 - unknown (drops): the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced
 - unknown (listserver): original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured
 - unknown (listserver): the real 1.41 rev 1 sent nothing to the lab listserver, which spoke first (shape S, 2026-10-30); whether the public service speaks first to a silent client is not known, so after 3 s with no reply Seihai sends shape B (id 0 `newmain`, then id 1 with the account), which 14923 answered on 2026-10-25
-- unknown (life): death rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them); combat was read in the 1.41 binary and is the 1.39 row
+- unknown (life): death rules come from the 2.05 template; the 1.41 rev 1 revive has the 2.05 AP bands (U7 static reads), the rest of its death handler was not traced (1.42 clears the row). Combat was read in the 1.41 binary: the 1.39 sword judge and the 2.00 id 40 handler
 - unknown (levels): the .nw loader was found by a string and function scan of the binary; no .nw level was loaded in a real 1.41
 - source: binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126, .nw (GLEVNW01) loader, main form 648×514
 
@@ -249,7 +252,7 @@ Generated; do not edit between the markers.
 - protocol: **plo (server ids handled)**: +42 NEWWORLDTIME, +44 HASNPCSERVER, +45 FILEUPTODATE, +150 NPCDEL2, +151 HIDENPCS, +153 SAY2 (45 -> 51 ids)
 - protocol: **pli (client ids sent)**: +34 UPDATEFILE (34 -> 35 ids)
 - life: **death**: 2.05 rules (name-group test) -> none
-- life: **combat**: 1.34 rules (one swing step a tick, raw sword power, no packet hits traced) -> 1.42 rules (2.00 sword judge, no packet hits traced)
+- life: **combat**: 1.41 rules (1.35 sword judge, 2.00 packet hits) -> 2.00 rules (raw sword power, fewer packet gates)
 - ui: **ganis**: no -> yes
 - ui: **chat_text**: ChatText { face: Helvetica, height: 24 } -> ChatText { face: TempusSans, height: 24 }
 - ui: **window**: 648×514 -> 648×507
@@ -265,7 +268,6 @@ Generated; do not edit between the markers.
 - protocol: **plo (server ids handled)**: +154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
 - levels: **nw**: yes -> no
 - life: **death**: none -> 2.05 rules (name-group test)
-- life: **combat**: 1.42 rules (2.00 sword judge, no packet hits traced) -> 2.00 rules (raw sword power, fewer packet gates)
 - ui: **gs1_commands**: 134 -> 142
 - unknown (life): combat read in 2.00 r0 only (Graal_analysis client-internals/combat-200-204.md); r1 to r3 assumed the same. Not run against a real client
 - unknown (login): props sent at login (verified for 2.05 only)
@@ -403,6 +405,7 @@ Generated; do not edit between the markers.
 - protocol: **login frame**: none -> files, process list, props, idle.gani at once, status icons, language and tamper check in the login frame, 96 ms after the level without 182
 - props: **npc_max**: 43 -> 73
 - levels: **heights**: no -> yes
+- life: **combat**: 2.05 rules -> 2.17 rules (as 2.05, no hits in ghost mode or after PLO 176/177)
 - ui: **window**: 648×514 -> 644×507
 - scripts: **gs1**: unknown -> yes
 - scripts: **gs2**: unknown -> no
@@ -410,7 +413,7 @@ Generated; do not edit between the markers.
 - unknown (ui): GS1 command count was not read; 161 is carried
 - unknown (login): the real 2.17.1 login to a lab listserver was captured: shape B (one plain zlib frame, id 0 `newmain` then id 1 with the account, no token), which Seihai sends. What the public service does for a real 2.17.1 was not observed; Seihai's frame got a legacy list on 14923 and no reply on 14922 on 2026-10-25 (with the default zlib header 78 9C; Seihai now sends 78 DA like the real client, not yet run)
 - unknown (showimg): the binary reading gave 2.17.1 2.22's send test (others in the level), and a solo 90 s capture on 2026-10-25 saw no id 24; the five solo 2026-10-30 runs on two lab servers saw it every 5.1 s, so Seihai follows those. Why the two disagree is not known, and the gap while walking (6.5 to 9.3 s) is not modelled
-- source: binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, main form 644×507, the post-login frame seen in the lab (image checks, process list, props up to the language), and id 24 about every 5.1 s when alone (lab, 2026-10-30)
+- source: binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, main form 644×507, the ghost-mode and 176/177 tests in the hit judge (U7 static reads), the post-login frame seen in the lab (image checks, process list, props up to the language), and id 24 about every 5.1 s when alone (lab, 2026-10-30)
 
 #### 2.22 (`GNW03014`, binary)
 

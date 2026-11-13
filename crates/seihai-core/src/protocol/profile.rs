@@ -596,14 +596,17 @@ pub const DEATH_21: DeathRules = DeathRules {
 };
 
 /// 1.39. The timer, the input lock, the dead bit and the online default
-/// spot match 2.05. Respawn hearts are the maximum: both AP thresholds are
-/// 0, so every alignment takes the last branch of [`crate::life::respawn_half_hearts`].
-/// 1.39 has no alignment-point HUD; those bands start in 1.41. There is no
-/// name-group test on the saved entry (that test is 2.00 to 2.05).
-/// Source: Graal_analysis `version-profiles/matrix/rules-139.md`.
+/// spot match 2.05. A respawn always gives 3 hearts: the revive routine
+/// sets 3.0 before anything else and reads no AP, so the low threshold is
+/// `u8::MAX` and every alignment takes the first branch of
+/// [`crate::life::respawn_half_hearts`]. 1.21 to 1.38 revive the same way;
+/// the AP bands start in 1.41 rev 1 (U7 static reads, 2026-11-13; this
+/// replaces the "hearts to the maximum" of Graal_analysis
+/// `version-profiles/matrix/rules-139.md`). There is no name-group test on
+/// the saved entry (that test is 2.00 to 2.05).
 pub const DEATH_139: DeathRules = DeathRules {
-    low_ap_below: 0,
-    mid_ap_below: 0,
+    low_ap_below: u8::MAX,
+    mid_ap_below: u8::MAX,
     entry_name_group: false,
     ..DEATH_205
 };
@@ -645,9 +648,11 @@ pub struct CombatRules {
     /// Sprite number others see while the player is hurt (S = 32).
     pub hurt_sprite: u8,
     /// `PLO_HURTPLAYER` (40) applies only when its attacker is within this
-    /// many half tiles of the victim (10 tiles).
+    /// many half tiles of the victim (10 tiles). `u8::MAX` means no range
+    /// test: 1.31 to 1.39 apply the hit from any distance.
     pub hurtplayer_range_half: u8,
     /// A hit by id 40 or 46 takes at most this many half hearts (1 heart).
+    /// `u8::MAX` means no cap: 1.31 to 1.34 take the power as sent.
     pub packet_hit_cap_half: u8,
     /// A sword hit takes the attacker's sword power in half hearts, with the
     /// power limited to plus or minus this (20). The wire value is power + 30
@@ -672,9 +677,16 @@ pub struct CombatRules {
     /// gates.
     pub packet_victim_gates: bool,
     /// The client takes hits by packet (`PLO_HURTPLAYER` 40, and 46 from
-    /// 2.01) under the gates above. Off for 1.x: no 1.x handler for id 40
-    /// was traced, so Seihai decodes none there.
+    /// 2.01) under the gates above. 1.31 is the first build with an id 40
+    /// handler; 1.21, 1.28 beta 2 and 1.3 test send id 40 to the default
+    /// case (U7 static reads, 2026-11-13).
     pub packet_hits: bool,
+    /// 2.17.1, 2.22 and 2.31: the sword judge does nothing while the client
+    /// is in ghost mode (`PLO_GHOSTMODE` 170), and neither the sword judge
+    /// nor the hurt packets hurt the player while the client holds the
+    /// flag that `PLO` 176 or 177 sets. 2.05 and 2.1 test 3 have neither
+    /// test (U7 static reads, 2026-11-13).
+    pub ghost_and_stop_gates: bool,
 }
 
 /// How the victim's client stores another player's sword power. Every build
@@ -710,9 +722,18 @@ pub const COMBAT_205: CombatRules = CombatRules {
     sword_power_store: PowerStore::Limited,
     packet_victim_gates: true,
     packet_hits: true,
+    ghost_and_stop_gates: false,
 };
 
-/// 1.34 to 1.41. One swing step per 50 ms tick: the lab capture of a real
+/// 2.17.1, 2.22 and 2.31: the 2.05 rules, plus the ghost-mode test in the
+/// sword judge and the 176/177 flag test in the sword judge and the hurt
+/// packets (read in all three binaries).
+pub const COMBAT_217: CombatRules = CombatRules {
+    ghost_and_stop_gates: true,
+    ..COMBAT_205
+};
+
+/// 1.35 to 1.39. One swing step per 50 ms tick: the lab capture of a real
 /// 1.39 (Graal_analysis live trace `item-drops/b4_139.txt`) sends S 6, 8, 10
 /// at 100 ms intervals and then the idle sprite, and the video read gives a
 /// 5-tick swing that cuts the bush; the 40-tick hurt lock-out is the
@@ -720,27 +741,45 @@ pub const COMBAT_205: CombatRules = CombatRules {
 /// The rest was read in the binaries of 1.34 to 1.41 (gap-2 research,
 /// 2026-11-13): the sword box is the 2.05 box, the sword judge tests AP 100
 /// and the attacker's hidden flag, has no once-a-second stamp, and keeps
-/// the sword power raw (no plus or minus 20 limit, as 2.00 to 2.02). No
-/// hurt-packet handler was traced, so packet hits are off.
+/// the sword power raw (no plus or minus 20 limit, as 2.00 to 2.02). Its
+/// id 40 handler caps the hit at one heart but tests no range, no AP and no
+/// no-kill level (U7 static reads, 2026-11-13).
 pub const COMBAT_139: CombatRules = CombatRules {
     swing_step_ticks: 1,
-    packet_hits: false,
+    hurtplayer_range_half: u8::MAX,
     ..COMBAT_200
 };
 
-/// NewMain 1.42: the 2.00 sword judge and raw power (read in NewMain 24 and
-/// 26), with packet hits off as in 1.x: its id 40 handler was not traced.
-pub const COMBAT_142: CombatRules = CombatRules {
-    packet_hits: false,
+/// 1.34: the 1.39 rules, but the id 40 handler takes the power as sent,
+/// with no one-heart cap.
+pub const COMBAT_134: CombatRules = CombatRules {
+    packet_hit_cap_half: u8::MAX,
+    ..COMBAT_139
+};
+
+/// 1.41 rev 1: the 1.39 sword judge, and the 2.00 id 40 handler (the
+/// 10-tile range and the one-heart cap, no AP test).
+pub const COMBAT_141: CombatRules = CombatRules {
+    swing_step_ticks: 1,
     ..COMBAT_200
 };
 
-/// 1.21 to 1.33: as 1.34, but the sword judge has no AP immunity (alignment
+/// NewMain 1.42: the 2.00 rules (read in NewMain 24 and 26). Its id 40
+/// handler is the 2.00 one, so packet hits are on.
+pub const COMBAT_142: CombatRules = COMBAT_200;
+
+/// 1.31 to 1.33: as 1.34, but the sword judge has no AP immunity (alignment
 /// arrives in 1.3 and the judge first tests it in 1.34) and gates on the
 /// attacker's sprite S 6 to 10 itself, polled every tick.
-pub const COMBAT_121: CombatRules = CombatRules {
+pub const COMBAT_131: CombatRules = CombatRules {
     immune_ap: u8::MAX,
-    ..COMBAT_139
+    ..COMBAT_134
+};
+
+/// 1.21, 1.28 beta 2 and 1.3 test: as 1.31, with no id 40 handler.
+pub const COMBAT_121: CombatRules = CombatRules {
+    packet_hits: false,
+    ..COMBAT_131
 };
 
 /// 2.01 and 2.02: as 2.05, but the sword power is stored without the offset
