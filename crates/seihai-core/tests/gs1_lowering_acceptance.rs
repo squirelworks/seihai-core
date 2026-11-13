@@ -72,14 +72,17 @@ fn flag_writes_are_the_gs2_set_and_unset_calls() {
 }
 
 #[test]
-fn reading_a_flag_by_its_plain_name_is_refused() {
-    // GS1 reads `gotkey` as the flag; GS2 would read the object's variable.
-    let err = compile::compile_gs1(
+fn reading_a_flag_by_its_plain_name_reads_the_player_flag() {
+    // GS1 reads `gotkey` as the flag; a real 5.24r4 client reads a server
+    // flag as `player.gotkey` (lab probe, 2026-11-13).
+    same(
         "if (playerenters) { set gotkey; }\nif (playertouchsme && gotkey) { hide; }\n",
-        Era::V217,
-    )
-    .unwrap_err()
-    .to_string();
+        "function onPlayerEnters() { set(\"gotkey\"); }\nfunction onPlayerTouchsMe() { if (player.gotkey) { hide(); } }\n",
+    );
+    // Writing it by its plain name is still refused.
+    let err = compile::compile_gs1("if (created) { set gotkey; gotkey = 2; }\n", Era::V217)
+        .unwrap_err()
+        .to_string();
     assert!(err.contains("player flag"), "{err}");
     // A plain variable the script never sets as a flag still lowers.
     gs1("if (created) { count = 1; }\n");
@@ -139,9 +142,12 @@ fn counts_and_old_command_names_lower() {
         "if (created) {\n  tokenize a b c;\n  this.n = tokenscount;\n  setgif door.png;\n  setgifpart door.png,0,0,32,32;\n}\n",
         "function onCreated() {\n  tokens = \"a b c\".tokenize();\n  this.n = tokens.size();\n  setimg(\"door.png\");\n  setimgpart(\"door.png\", 0, 0, 32, 32);\n}\n",
     );
+    same(
+        "if (created) { this.a = playerhp; this.b = weaponscount; hide; }\n",
+        "function onCreated() { this.a = player.hearts; this.b = player.weapons.size(); hide(); }\n",
+    );
     for (src, name) in [
-        ("if (created) { this.a = playerhp; }\n", "playerhp"),
-        ("if (created) { this.a = weaponscount; }\n", "weaponscount"),
+        ("if (created) { playerhp = 1; }\n", "playerhp"),
         ("if (created) { tokenscount = 1; }\n", "tokenscount"),
     ] {
         let err = compile::compile_gs1(src, Era::V217)
