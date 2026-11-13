@@ -173,6 +173,15 @@ impl ServerWarp {
         }
     }
 
+    /// True when the warp goes to a Graal3D server: its name starts with
+    /// `3 ` (the listserver's type prefix for a 3D world). The 4.20r6 and
+    /// 5.x clients open the Torque UDP link beside the TCP login for such a
+    /// server; the decision is made on the name only (Graal_analysis
+    /// `torque/udp-session.md` §1).
+    pub fn is_graal3d(&self) -> bool {
+        is_graal3d_name(&self.name)
+    }
+
     /// The name as the client keeps it: the listserver's two-character type
     /// prefix is dropped when the second character is a space (`P Name`
     /// becomes `Name`). The three clients do this to field 1 before they
@@ -184,6 +193,12 @@ impl ServerWarp {
             _ => self.name.clone(),
         }
     }
+}
+
+/// A server list or server warp name that starts with `3 `: a Graal3D
+/// world (`torque/udp-session.md` §1).
+pub fn is_graal3d_name(name: &str) -> bool {
+    name.starts_with("3 ")
 }
 
 pub fn parse_server_warp(payload: &[u8]) -> Option<ServerWarp> {
