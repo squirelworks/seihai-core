@@ -174,6 +174,10 @@ pub struct Live {
     /// The server's NPC updates (`PLO_NPCPROPS`, 3) for the player's level,
     /// in arrival order, for the view to put on the NPCs it draws.
     pub npc_changes: SharedNpcChanges,
+    /// Set by the view when its window closes: the network thread logs out
+    /// (closes the connection) within a walk tick, so the server drops the
+    /// player instead of keeping them until the process ends.
+    pub closed: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// One server record for an NPC: the level's lower-case name, the NPC id,
@@ -457,6 +461,12 @@ pub fn run_with(
     let crossings = live.as_ref().map(|l| l.crossings.clone());
     let board_mods = live.as_ref().map(|l| l.board_mods.clone());
     let npc_changes = live.as_ref().map(|l| l.npc_changes.clone());
+    let closed = live.as_ref().map(|l| l.closed.clone());
+    let view_closed = || {
+        closed
+            .as_ref()
+            .is_some_and(|c| c.load(std::sync::atomic::Ordering::SeqCst))
+    };
     // Crossings sent, over every connection: the view counts the same.
     let mut crossings_sent: u64 = 0;
     let gmap_rules = GmapRules::for_version(version);
@@ -517,6 +527,11 @@ pub fn run_with(
         let mut owed_at: Option<Instant> = None;
         let mut quit = false;
         loop {
+            if view_closed() {
+                let _ = s.conn.shutdown();
+                let _ = writeln!(out, "the window closed: logged out");
+                return Ok(());
+            }
             let burst_owed = login_burst.as_ref().is_some_and(|b| b.pending())
                 || lobby_burst.as_ref().is_some_and(|b| b.pending());
             let mut wait = match (owed, burst_owed) {
@@ -524,7 +539,8 @@ pub fn run_with(
                 (true, false) => SETTLE,
                 (false, false) => Duration::from_secs(3600),
             };
-            if pose.is_some() {
+            // A view polls for its window closing each walk tick.
+            if pose.is_some() || closed.is_some() {
                 wait = wait.min(WALK_TICK);
             }
             // The time `owed` started, so the settle wait is not cut short
