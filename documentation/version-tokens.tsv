@@ -1,0 +1,79 @@
+token	grade	kind	builds	seihai_profiles
+GR3DV002	W	graal3d	Graal3D (Feb 2000)	-
+GR3DV003	B	graal3d	Graal3D later beta (Genesis3D renderer)	-
+GSERV007	W	game	1.21	1.21
+GSERV009	B	game	1.25	-
+GSERV010	B	rc	RemoteControl shipped with 1.25	-
+GSERV011	B	game	1.27 (its RemoteControl, later RC 1.28, and RC 1.3 send it too)	-
+GSERV013	W	game	1.28 beta 2	1.28 beta 2
+GSERV014	W	game	1.3 test	1.3 test
+GSERV016	W	game	1.31	1.31
+GSERV018	W	game	1.32	1.32
+GNW20020	W	game	1.33	1.33
+GNW22030	B+	game	1.34	1.34
+GNW13040	B+	game	1.35	1.35
+GNW10050	B+	game	1.36	1.36
+GNW21050	B+	game	1.37	1.37
+GNW22060	B+	game	1.38	1.38
+GNW07080	W	game	1.39 (and one FileVersion 1.3.9.1 executable)	1.39
+GNW12080	L	game	1.391 (gs2lib only; the 1.3.9.1 executables read send GNW07080 or GNW23090)	-
+GNW23090	B	game	1.40, 1.40 rev1	-
+GNW13110	W	game	1.41 rev1	1.41
+GNW08011	W	game	NewMain 24, 26	1.42
+GNW24011	W	game	2.00, 2.00 rev1-rev3	2.00
+GNW23021	W	game	GraalX (2.01 pre-release), 2.01, 2.01 rev1	2.01
+GNW15041	W	game	2.02, 2.02 rev1	2.02
+GNW20041	W	game	2.02 rev2	2.02 rev2
+GNW06051	W	game	2.03	2.03
+GNW24061	W	game	2.04	2.04
+GNW03081	W	game	2.05, 2.05 rev1, 2.05 rev2, 2.1 test 2 and 3, Graal 2002 ver7-ver9	2.05
+G2N15041	W	game	NewWorld beta 1 (pre-update and final), beta 2	-
+GNW31101	B	game	2.1.0.0 public release, 2.1.0.0-2.1.0.4 (Graal 2002 ver10, ver13, v22)	2.1
+GNW01012	L	game	2.12	2.12
+GNW23012	L	game	2.13	2.13
+GNW30042	L	game	2.14	2.14
+GNW19052	L	game	2.15.0	2.15
+GNW20052	L	game	2.15.1, 2.15.2	-
+GNW12102	L	game	2.16	2.16
+GNW22122	W	game	2.17.0, 2.17.1	2.17
+GNW21033	L	game	2.18	-
+GNW15053	L	game	2.19	-
+GNW28063	L	game	2.2	-
+GNW01113	L	game	2.21	-
+GNW03014	W	game	2.22	2.22
+GNW14015	L	game	2.3	2.3
+GNW28015	W	game	2.31	2.31
+GNW30123	W	listserver	2.22 and 2.31 listserver hello (with newmain)	-
+G3D16053	B	game	3.0 Linux (3.0beta)	-
+G3D27063	B	game	3.01 Linux	-
+G3D03014	W	game	3.04 rev1 Linux	3.04
+G3D27015	B	game	3.151 Linux	-
+G3D28015	W	game	3.153 Mac (PPC)	3.153
+G3D30123	W	listserver	3.x listserver hello (with newmain)	-
+G3D28095	L	game	4.02.11	-
+G3D11125	B	game	4.03r1 Linux	-
+G3D09125	B	game	4.03r3 Windows (4.0.3.3; public list 4.03.4)	-
+G3D17026	W	game	4.04r2 Windows	4.04r2
+G3D18026	W	game	4.04r2 Mac (PPC)	4.04r2 Mac
+G3D19026	W	game	4.04r2 Linux	-
+G3D28076	B	game	4.10r2 Linux, 4.11 Linux	-
+G3D26076	B	game	4.11 Windows (4.1.1.0)	-
+G3D27076	W	game	Mac PPC build of 2006-09-19 (archived as 4.20r6, really 4.10r2/4.11 era), 4.10r2 Mac	4.20r6
+G3D21126	B	game	4.20r6 Mac (PPC, binary 2006-12-21)	-
+G3D22126	W	game	4.20r6 and 4.20r8 Linux	-
+G3D20126	W	game	4.20r8 Windows	4.20r8
+G3D22067	W	game	5.00r7 Windows	5.00r7
+G3D14097	W	game	5.12 Windows	5.12
+G3D15097	W	game	5.12 Mac (PPC)	5.12 Mac
+G3D03048	W	game	6.00 beta 1 Windows	-
+G3D15010	W	game	5.24r3, 5.24r4, 6.00 beta 2 Windows	5.24r4
+G3D26090	W	game	5.30r3, 5.31r4, 6.00r2, 6.00r4 Windows	5.30r3, 5.31r4, 6.00r2, 6.00r4
+G3D27090	B	game	6.004 Mac (June 2011 beta)	-
+G3D28090	B	game	6.x Linux beta (x86, x64; June 2011, probably 6.00r4)	-
+G3D3007A	W	game	6.0.0.7, 6.0.1.5 Windows	6.015
+G3D3107A	B	game	6.015 Mac	-
+G3D0108A	W	game	6.01r1 Linux (x86, x64)	-
+G3D2505C	B	game	6.0.3.4 Windows	6.034
+G3D0311C	W	game	6.03r7 Windows	6.03r7
+G3D0511C	W	game	6.03r7 Linux x64	6.03r7 Linux
+GNP1905C	S	server-script	6.1.1.3 Windows and 6.11r1 Mac (from the one captured connector script)	-

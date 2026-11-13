@@ -97,7 +97,12 @@ pub enum ClientVersion {
     /// Graal 4.04 rev 2 (`G3D18026`), the Mac OS X PowerPC build. Gen 5.
     /// Its own token; the Windows 4.04r2 login and lobby with a `mac` list.
     V404R2Mac,
-    /// Graal 4.20 rev 6 (`G3D27076`), the Mac OS X build. Gen 5.
+    /// The Mac OS X PowerPC build archived as "Graal 4.20 rev 6" (`G3D27076`).
+    /// Gen 5. Graal_analysis's token catalogue shows the label is wrong: the
+    /// binary is dated 2006-09-19 and the Mac 4.10r2 download sends the same
+    /// token, so it is a 4.10r2/4.11-era build. The real Mac 4.20r6 sends
+    /// `G3D21126` and has no profile (see [`super::KNOWN_TOKENS`]). The
+    /// variant and label keep the archive's name.
     V420R6,
     /// Graal 4.20 rev 8 (`G3D20126`), Windows. Gen 5.
     V420R8,
@@ -323,7 +328,7 @@ impl ClientVersion {
     /// Everything else (1.21, 1.32 to 1.38, 1.42, 2.00 to 2.04, the inferred 2.1x,
     /// 2.3, 6.015 and 6.034 rows, and the offline-only builds) is listed
     /// only under "All versions". Sources: Graal_analysis
-    /// `client-internals/version-id-map.md`, `protocol/file-transfer.md`
+    /// `client-internals/version-token-catalogue.md`, `protocol/file-transfer.md`
     /// and `server-notes/public-allowed-versions.md`.
     pub fn reborn_versions() -> &'static [ClientVersion] {
         &[
@@ -440,7 +445,7 @@ mod tests {
     }
 
     /// Stock gs2lib's `clientVersions[]` tokens that Seihai has rows for
-    /// (Graal_analysis `client-internals/version-id-map.md`,
+    /// (Graal_analysis `client-internals/version-token-catalogue.md`,
     /// `protocol/file-transfer.md`, `version-profiles/lab-v4`).
     const GS2LIB_TOKENS: &[&str] = &[
         "GSERV007", "GSERV013", "GSERV014", "GSERV016", "GNW07080", "GNW13110", "GNW03081",
