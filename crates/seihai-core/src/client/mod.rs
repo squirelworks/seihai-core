@@ -201,6 +201,171 @@ pub type SharedNpcChanges = Arc<Mutex<Vec<NpcChange>>>;
 /// view.
 pub type SharedBoardMods = Arc<Mutex<Vec<(String, BoardModify2)>>>;
 
+/// A game server the session is about to log in to: the first one, and
+/// each one a server warp (`PLO_SERVERWARP`, 178) names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServerJoin {
+    /// `host:port`.
+    pub addr: String,
+    /// The warp's name as sent, with its list-type prefix (`3 Lab3D`).
+    /// `None` for the first server, whose name the session does not know.
+    pub name: Option<String>,
+}
+
+impl ServerJoin {
+    /// A warp to a Graal3D world: its name starts with `3 `. The first
+    /// server is never one here; the caller knows from the server list
+    /// (`--graal3d`).
+    pub fn is_graal3d(&self) -> bool {
+        self.name
+            .as_deref()
+            .is_some_and(crate::protocol::layouts::is_graal3d_name)
+    }
+}
+
+/// Files a client line asks the session to fetch over TCP, and what came
+/// back. The Graal3D side uses it for the shapes and Sky textures its
+/// ghosts name: login step 6 waits until every one is answered, with the
+/// file or with `PLO_FILESENDFAILED` (Graal_analysis
+/// `torque/udp-session.md` §1).
+#[derive(Debug, Clone, Default)]
+pub struct FileAsks {
+    /// Names to fetch; the session takes them each tick.
+    pub wanted: Arc<Mutex<Vec<String>>>,
+    /// One answer per name taken, in arrival order.
+    pub answers: Arc<Mutex<Vec<FileAnswer>>>,
+}
+
+/// The answer for one name in [`FileAsks::wanted`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileAnswer {
+    /// The name as it was asked for.
+    pub name: String,
+    /// The file's bytes (sent now, or a copy already kept), or `None` when
+    /// the server could not send it.
+    pub data: Option<Vec<u8>>,
+}
+
+/// [`Hooks::on_server`].
+pub type OnServer = Arc<dyn Fn(&ServerJoin) + Send + Sync>;
+
+/// File messages to send, by the name they ask for.
+type FileSends = Vec<(String, Vec<Vec<u8>>)>;
+
+/// What a client line hooks into the session beyond [`Live`].
+#[derive(Clone, Default)]
+pub struct Hooks {
+    /// Called on the network thread just before each login, the first one
+    /// and each server warp's, so a client can open a second link (the
+    /// Graal3D UDP link) at the same moment.
+    pub on_server: Option<OnServer>,
+    /// Files to fetch for the client line.
+    pub files: Option<FileAsks>,
+}
+
+impl std::fmt::Debug for Hooks {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Hooks")
+            .field("on_server", &self.on_server.is_some())
+            .field("files", &self.files)
+            .finish()
+    }
+}
+
+/// The session's side of [`FileAsks`]: the names asked for and not yet
+/// answered.
+#[derive(Debug, Default)]
+struct FileAskState {
+    pending: Vec<String>,
+}
+
+/// Does a reply for `got` answer the request for `asked`? Names compare
+/// without case; a name asked for with no extension (the Sky's textures)
+/// is also answered by that name with one.
+fn answers(asked: &str, got: &str) -> bool {
+    let (a, g) = (
+        asked.trim().to_ascii_lowercase(),
+        got.trim().to_ascii_lowercase(),
+    );
+    if a == g {
+        return true;
+    }
+    !a.contains('.') && g.rsplit_once('.').is_some_and(|(stem, _)| stem == a)
+}
+
+impl FileAskState {
+    /// A new connection: what was still on the wire is asked for again.
+    fn new_connection(&mut self, asks: &FileAsks) {
+        let again = std::mem::take(&mut self.pending);
+        if !again.is_empty() {
+            let mut w = asks.wanted.lock().unwrap_or_else(|e| e.into_inner());
+            let later = std::mem::replace(&mut *w, again);
+            w.extend(later);
+        }
+    }
+
+    /// Take the wanted names: the messages to send, and the answers known
+    /// at once (a copy already kept, or a name that failed before).
+    fn take(&mut self, asks: &FileAsks, files: &mut FileSession) -> (FileSends, Vec<FileAnswer>) {
+        let names = std::mem::take(&mut *asks.wanted.lock().unwrap_or_else(|e| e.into_inner()));
+        let mut send = Vec::new();
+        let mut now = Vec::new();
+        for name in names {
+            let name = name.trim().to_string();
+            if self.pending.iter().any(|p| p.eq_ignore_ascii_case(&name)) {
+                continue;
+            }
+            let msgs = files.need(&name);
+            let on_wire = files
+                .requests
+                .wanted()
+                .iter()
+                .any(|n| n.eq_ignore_ascii_case(&name))
+                || files
+                    .requests
+                    .update_asked()
+                    .iter()
+                    .any(|n| n.eq_ignore_ascii_case(&name));
+            if !msgs.is_empty() || on_wire {
+                self.pending.push(name.clone());
+                if !msgs.is_empty() {
+                    send.push((name, msgs));
+                }
+            } else if files.requests.has_failed(&name) {
+                now.push(FileAnswer { name, data: None });
+            } else {
+                let data = files.store.read(&name);
+                now.push(FileAnswer { name, data });
+            }
+        }
+        (send, now)
+    }
+
+    /// The answers in what [`FileSession::process`] found.
+    fn settle(
+        &mut self,
+        got: &crate::filecache::Processed,
+        store: &DownloadStore,
+    ) -> Vec<FileAnswer> {
+        let mut out = Vec::new();
+        let replies = got
+            .written
+            .iter()
+            .chain(&got.up_to_date)
+            .map(|n| (n, false))
+            .chain(got.failed.iter().map(|n| (n, true)));
+        for (reply, failed) in replies {
+            let Some(i) = self.pending.iter().position(|p| answers(p, reply)) else {
+                continue;
+            };
+            let name = self.pending.remove(i);
+            let data = if failed { None } else { store.read(reply) };
+            out.push(FileAnswer { name, data });
+        }
+        out
+    }
+}
+
 /// [`WorldView::key`]: the gmap, the cell, the neighbours' cells and the
 /// crossings sent.
 type WorldKey = (String, (i32, i32), Vec<(i32, i32)>, u64);
@@ -452,6 +617,38 @@ pub fn run_with(
     live: Option<Live>,
     level_lines: LevelLines,
 ) -> Result<(), String> {
+    run_hooked(
+        addr,
+        version,
+        login,
+        assets,
+        first_level_only,
+        out,
+        shown,
+        live,
+        level_lines,
+        &Hooks::default(),
+    )
+}
+
+/// As [`run_with`], with the client line's [`Hooks`]: told of each server
+/// before its login, and fetching the files it asks for.
+#[allow(clippy::too_many_arguments)]
+pub fn run_hooked(
+    addr: &str,
+    version: ClientVersion,
+    login: &Login,
+    assets: Option<PathBuf>,
+    first_level_only: bool,
+    out: &mut impl Write,
+    shown: &mut dyn FnMut(&Level, &Arrival),
+    live: Option<Live>,
+    level_lines: LevelLines,
+    hooks: &Hooks,
+) -> Result<(), String> {
+    let mut asked = FileAskState::default();
+    // The name the next server was warped to under, as sent.
+    let mut warp_name: Option<String> = None;
     let pose = live.as_ref().map(|l| l.pose.clone());
     let others = live.as_ref().map(|l| l.others.clone());
     let link = live.as_ref().map(|l| l.link.clone());
@@ -482,6 +679,12 @@ pub fn run_with(
     let mut first_session = true;
     let mut server_name: Option<String> = None;
     'servers: loop {
+        if let Some(f) = hooks.on_server.as_ref() {
+            f(&ServerJoin {
+                addr: addr.clone(),
+                name: warp_name.take(),
+            });
+        }
         let mut s = login_gserver_with(
             &addr,
             version,
@@ -505,6 +708,9 @@ pub fn run_with(
         );
         let frames = s.conn.spawn_reader().map_err(|e| e.to_string())?;
         files.new_connection();
+        if let Some(a) = hooks.files.as_ref() {
+            asked.new_connection(a);
+        }
         let mut login_burst = LoginBurst::for_version(version);
         let mut lobby_burst = LobbyBurst::for_version(version);
         // 6.x: the nickname, once the first level is in (no recorded frame
@@ -540,7 +746,8 @@ pub fn run_with(
                 (false, false) => Duration::from_secs(3600),
             };
             // A view polls for its window closing each walk tick.
-            if pose.is_some() || closed.is_some() {
+            // So does a client line's file list.
+            if pose.is_some() || closed.is_some() || hooks.files.is_some() {
                 wait = wait.min(WALK_TICK);
             }
             // The time `owed` started, so the settle wait is not cut short
@@ -572,6 +779,7 @@ pub fn run_with(
                         }
                         let _ = writeln!(out, "server warp to {name:?}: {to}");
                         addr = to;
+                        warp_name = Some(w.name.clone());
                         server_name = Some(name);
                         continue 'servers;
                     }
@@ -599,6 +807,15 @@ pub fn run_with(
                         }
                     }
                     let got = files.process(&mut st);
+                    if let Some(a) = hooks.files.as_ref() {
+                        let done = asked.settle(&got, &files.store);
+                        if !done.is_empty() {
+                            a.answers
+                                .lock()
+                                .unwrap_or_else(|e| e.into_inner())
+                                .extend(done);
+                        }
+                    }
                     if !got.send.is_empty() {
                         let _ = s.conn.send_messages(&got.send);
                     }
@@ -766,6 +983,21 @@ pub fn run_with(
                     }
                     arrive_by_link(&mut st, &a);
                     let _ = writeln!(out, "link to {} at {} {}", a.dest, a.x, a.y);
+                }
+            }
+            // Files the client line asked for: ask the server for them.
+            if let Some(a) = hooks.files.as_ref() {
+                let (send, now) = asked.take(a, &mut files);
+                for (name, msgs) in send {
+                    if s.conn.send_messages(&msgs).is_ok() {
+                        let _ = writeln!(out, "requesting {name}");
+                    }
+                }
+                if !now.is_empty() {
+                    a.answers
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .extend(now);
                 }
             }
             // Sounds the view is missing: ask the server for them.
@@ -1125,5 +1357,135 @@ mod sound_request_tests {
             arrived_sounds_of(&written, &store),
             vec![("steps2.wav".to_string(), b"RIFF..".to_vec())]
         );
+    }
+}
+
+#[cfg(test)]
+mod hook_tests {
+    use super::*;
+    use crate::assets::AssetResolver;
+    use crate::filecache::Processed;
+
+    fn session() -> FileSession {
+        FileSession::new(AssetResolver::empty(ClientVersion::V512.profile()), false)
+    }
+
+    fn ask(asks: &FileAsks, names: &[&str]) {
+        asks.wanted
+            .lock()
+            .unwrap()
+            .extend(names.iter().map(|n| n.to_string()));
+    }
+
+    #[test]
+    fn a_warp_name_with_the_3_prefix_is_a_graal3d_server() {
+        let j = |name: Option<&str>| ServerJoin {
+            addr: "127.0.0.1:14900".into(),
+            name: name.map(String::from),
+        };
+        assert!(j(Some("3 Lab3D")).is_graal3d());
+        assert!(!j(Some("Lab Server")).is_graal3d());
+        assert!(!j(Some("3D world")).is_graal3d());
+        assert!(!j(None).is_graal3d());
+    }
+
+    #[test]
+    fn a_texture_asked_for_without_an_extension_is_answered_by_its_file() {
+        assert!(answers("labcube.3ds", "LabCube.3DS"));
+        assert!(answers("sky_front", "sky_front.png"));
+        assert!(!answers("sky_front.png", "sky_front"));
+        assert!(!answers("labcube.3ds", "labcube.dts"));
+    }
+
+    /// Each name goes out once; the server's file, its failure and an
+    /// already-kept copy each give one answer, under the name asked for.
+    #[test]
+    fn every_asked_name_gets_one_answer() {
+        let asks = FileAsks::default();
+        let mut files = session();
+        let mut st = FileAskState::default();
+        ask(
+            &asks,
+            &["labcube.3ds", "sky_front", "labcube.3ds", "missing.dts"],
+        );
+        let (send, now) = st.take(&asks, &mut files);
+        let sent: Vec<&str> = send.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(sent, ["labcube.3ds", "sky_front", "missing.dts"]);
+        assert!(now.is_empty());
+        // Asked again while on the wire: nothing more goes out.
+        ask(&asks, &["LABCUBE.3DS"]);
+        let (send, now) = st.take(&asks, &mut files);
+        assert!(send.is_empty() && now.is_empty());
+
+        files.store.store("labcube.3ds", b"3ds", None).unwrap();
+        files.store.store("sky_front.png", b"png", None).unwrap();
+        let got = Processed {
+            written: vec!["labcube.3ds".into(), "sky_front.png".into()],
+            failed: vec!["missing.dts".into()],
+            ..Default::default()
+        };
+        let done = st.settle(&got, &files.store);
+        assert_eq!(
+            done,
+            vec![
+                FileAnswer {
+                    name: "labcube.3ds".into(),
+                    data: Some(b"3ds".to_vec())
+                },
+                FileAnswer {
+                    name: "sky_front".into(),
+                    data: Some(b"png".to_vec())
+                },
+                FileAnswer {
+                    name: "missing.dts".into(),
+                    data: None
+                },
+            ]
+        );
+        assert!(st.pending.is_empty());
+    }
+
+    /// A name the session already settled is answered at once.
+    #[test]
+    fn a_copy_already_kept_is_answered_at_once() {
+        let asks = FileAsks::default();
+        let mut files = session();
+        let mut st = FileAskState::default();
+        files.store.store("ground.3ds", b"g", None).unwrap();
+        files.requests.done("ground.3ds");
+        files.requests.failed("gone.dts");
+        ask(&asks, &["ground.3ds", "gone.dts"]);
+        let (send, now) = st.take(&asks, &mut files);
+        assert!(send.is_empty());
+        assert_eq!(
+            now,
+            vec![
+                FileAnswer {
+                    name: "ground.3ds".into(),
+                    data: Some(b"g".to_vec())
+                },
+                FileAnswer {
+                    name: "gone.dts".into(),
+                    data: None
+                },
+            ]
+        );
+    }
+
+    /// After a server warp, the names still on the wire are asked again
+    /// before any new ones.
+    #[test]
+    fn a_new_connection_asks_again_for_what_was_pending() {
+        let asks = FileAsks::default();
+        let mut files = session();
+        let mut st = FileAskState::default();
+        ask(&asks, &["a.3ds"]);
+        let _ = st.take(&asks, &mut files);
+        ask(&asks, &["b.3ds"]);
+        st.new_connection(&asks);
+        files.new_connection();
+        let (send, _) = st.take(&asks, &mut files);
+        let sent: Vec<&str> = send.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(sent, ["a.3ds", "b.3ds"]);
     }
 }
