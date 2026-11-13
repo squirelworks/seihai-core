@@ -131,7 +131,7 @@ fn parse_all_unique_npc_scripts() {
                 );
             }
             total += 1;
-            let s21 = parse(&body, Era::V21);
+            let s21 = parse(&body, Era::V217);
             if !s21.diagnostics.is_empty() {
                 failed_21 += 1;
                 if std::env::var("STRESS_ALL").is_ok() {

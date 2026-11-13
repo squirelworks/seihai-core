@@ -430,7 +430,7 @@ fn compile_script_picks_the_front_end() {
     let compile_script = |src: &str, era: Era| {
         compile(src, Language::Detect(era), Mode::Legacy).map(|c| (c.script, c.front))
     };
-    let v21 = Era::V21;
+    let v21 = Era::V217;
     let gs1 = "if (playerenters) { setimgpart door.png,0,0,32,32; message hi; }";
     assert_eq!(compile_script(gs1, v21).unwrap().1, Front::Gs1);
     let gs2 = "function onCreated() { setimgpart door.png,0,0,32,32; }";

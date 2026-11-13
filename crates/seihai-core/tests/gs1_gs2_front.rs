@@ -251,7 +251,7 @@ fn commands_and_functions_without_gs2_are_errors() {
         "{:?}",
         got.strings
     );
-    let err = compile::compile_gs1("if (created) { addstring a,b; }\n", Era::V21).unwrap_err();
+    let err = compile::compile_gs1("if (created) { addstring a,b; }\n", Era::V217).unwrap_err();
     assert!(err.to_string().contains("addstring"), "{err}");
     let err = compile::compile_gs1("if (created) { putnpc x,1,2; }\n", Era::V205).unwrap_err();
     assert!(err.to_string().contains("putnpc"), "{err}");
@@ -259,7 +259,7 @@ fn commands_and_functions_without_gs2_are_errors() {
         .unwrap_err();
     assert!(err.to_string().contains("playersays"), "{err}");
     // A command inside `with` runs against the `with` object in both.
-    assert!(compile::compile_gs1("if (created) { with (player) { hide; } }\n", Era::V21).is_ok());
+    assert!(compile::compile_gs1("if (created) { with (player) { hide; } }\n", Era::V217).is_ok());
     let err = compile::compile_gs1(
         "function onCreated() { hide; }\nfunction onCreated() { show; }\n",
         Era::V205,
@@ -393,7 +393,7 @@ fn first_literal(script: &Script) -> Vec<(Op, seihai_core::scripting::gs2::Opera
 
 fn run_created(script: Script) -> Machine {
     let mut machine = Machine::new(script);
-    let mut host = EffectHost::new(Era::V21, 7);
+    let mut host = EffectHost::new(Era::V217, 7);
     assert_eq!(machine.run_top_level(&mut host), Outcome::Done);
     assert_eq!(
         machine.call_event("onCreated", &[], &mut host),
@@ -407,7 +407,7 @@ fn run_created(script: Script) -> Machine {
 fn array_literal_matches_the_existing_fixture_and_both_front_ends() {
     let gs2 = compile_gs2("function onCreated() { this.a = {10, \"two\", 30}; }").unwrap();
     let gs1 =
-        compile::compile_gs1("if (created) { this.a = {10, \"two\", 30}; }", Era::V21).unwrap();
+        compile::compile_gs1("if (created) { this.a = {10, \"two\", 30}; }", Era::V217).unwrap();
     assert_eq!(gs1.write(), gs2.write());
     let reference = Script::parse(&fixture("lists.gs2bc")).unwrap();
     assert_eq!(&gs2.strings[..2], &reference.strings[..2]);
@@ -464,7 +464,7 @@ fn gs2_literal_calls_preserve_the_reverse_push_order_and_array_marker() {
 fn gs1_sparse_entries_and_scalar_expressions_lower_without_losing_positions() {
     let gs1 = compile::compile_gs1(
         "if (created) { this.a = {1 + 2, , -4,}; this.b = {}; }",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     let gs2 =
@@ -502,14 +502,14 @@ fn malformed_and_unsupported_array_forms_fail_clearly() {
         let source = format!(
             "function next() {{ return 1; }}\nfunction keep(v) {{ this.k = v; }}\nif (created) {{ keep({literal}); }}"
         );
-        let error = compile::compile_gs1(&source, Era::V21)
+        let error = compile::compile_gs1(&source, Era::V217)
             .unwrap_err()
             .to_string();
         assert!(error.contains(want), "{source}: {error}");
     }
     assert!(compile::compile_gs1("if (created) { this.a = {1, 2}; }", Era::V205).is_err());
     assert!(compile_gs2("function onCreated() { this.a[0] = {1}; }").is_ok());
-    assert!(compile::compile_gs1("if (created) { this.a[0] = {1}; }", Era::V21).is_err());
+    assert!(compile::compile_gs1("if (created) { this.a[0] = {1}; }", Era::V217).is_err());
 }
 
 /// Instructions `from..=to` with string operands written out, so two scripts
@@ -552,7 +552,7 @@ fn element_read_and_write_match_the_lists_fixture() {
     // GS1 has no `temp.`; `this.` lowers the same way on both sides.
     let gs1 = compile::compile_gs1(
         "if (created) {\n  this.first = this.a[0];\n  this.a[1] = 20;\n}\n",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     let gs2 =
@@ -574,7 +574,7 @@ fn two_index_read_and_write_match_the_lists_fixture() {
     assert_eq!(body(&gs2), want);
     let gs1 = compile::compile_gs1(
         "if (created) {\n  this.h[1, 2] = 9;\n  this.g = this.h[1, 2];\n}\n",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     let gs2 =
@@ -591,7 +591,7 @@ fn in_array_matches_the_lists_fixture() {
     let gs2 = compile_gs2("function onCreated() {\n  this.has = 40 in temp.a;\n}\n").unwrap();
     assert_eq!(body(&gs2), want);
     let gs1 =
-        compile::compile_gs1("if (created) {\n  this.has = 40 in this.a;\n}\n", Era::V21).unwrap();
+        compile::compile_gs1("if (created) {\n  this.has = 40 in this.a;\n}\n", Era::V217).unwrap();
     let gs2 = compile_gs2("function onCreated() {\n  this.has = 40 in this.a;\n}\n").unwrap();
     assert_eq!(gs1.write(), gs2.write());
 }
@@ -609,7 +609,7 @@ fn lowered_elements_run_on_the_gs2_machine() {
   this.not = 8 in this.a;
 }
 ",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     // A computed index is converted like any numeric operand.
@@ -652,7 +652,7 @@ fn element_forms_without_a_fixture_stay_errors() {
     ];
     for (stmt, want) in cases {
         let source = format!("if (created) {{ {stmt} }}");
-        let error = compile::compile_gs1(&source, Era::V21)
+        let error = compile::compile_gs1(&source, Era::V217)
             .unwrap_err()
             .to_string();
         assert!(error.contains(want), "{source}: {error}");
@@ -716,7 +716,7 @@ fn joins_conditionals_ranges_and_player_position_lower_and_run() {
   this.o = 9 in |1, 5|;
 }
 ",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     let machine = run_created(script);
@@ -745,8 +745,8 @@ fn compound_element_assignment_lowers_to_read_and_write() {
         ("this.m[1, 2] += 1;", "this.m[1, 2] = this.m[1, 2] + 1;"),
     ];
     for (short, long) in pairs {
-        let a = compile::compile_gs1(&format!("if (created) {{ {short} }}"), Era::V21).unwrap();
-        let b = compile::compile_gs1(&format!("if (created) {{ {long} }}"), Era::V21).unwrap();
+        let a = compile::compile_gs1(&format!("if (created) {{ {short} }}"), Era::V217).unwrap();
+        let b = compile::compile_gs1(&format!("if (created) {{ {long} }}"), Era::V217).unwrap();
         assert_eq!(a.write(), b.write(), "{short}");
     }
     let script = compile::compile_gs1(
@@ -759,7 +759,7 @@ fn compound_element_assignment_lowers_to_read_and_write() {
   this.q = this.a[1];
 }
 ",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     let machine = run_created(script);
@@ -768,7 +768,7 @@ fn compound_element_assignment_lowers_to_read_and_write() {
     // The index is pushed twice: one that calls is refused.
     let error = compile::compile_gs1(
         "function pick() { return 0; }\nif (created) { this.a[pick()] += 1; }",
-        Era::V21,
+        Era::V217,
     )
     .unwrap_err()
     .to_string();
@@ -781,10 +781,10 @@ fn compound_element_assignment_lowers_to_read_and_write() {
 #[test]
 fn in_a_literal_list_lowers_to_equality_tests() {
     let a =
-        compile::compile_gs1("if (created) { this.r = this.n in {1, 2, 3}; }", Era::V21).unwrap();
+        compile::compile_gs1("if (created) { this.r = this.n in {1, 2, 3}; }", Era::V217).unwrap();
     let b = compile::compile_gs1(
         "if (created) { this.r = this.n == 1 || this.n == 2 || this.n == 3; }",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     assert_eq!(a.write(), b.write());
@@ -795,7 +795,7 @@ fn in_a_literal_list_lowers_to_equality_tests() {
   if (this.n in {4, 5}) this.miss = 1;
 }
 ",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     let machine = run_created(script);
@@ -803,7 +803,7 @@ fn in_a_literal_list_lowers_to_equality_tests() {
     assert_eq!(machine.var(Root::This, "miss"), None);
     assert!(compile::compile_gs1(
         "function pick() { return 0; }\nif (created) { this.r = pick() in {1, 2}; }",
-        Era::V21,
+        Era::V217,
     )
     .is_err());
 }
@@ -822,7 +822,7 @@ fn array_literals_whose_order_cannot_matter_lower_with_calls() {
     ] {
         let gs1 = compile::compile_gs1(
             &format!("function next() {{ return 4; }}\nif (created) {{ this.a = {literal}; }}"),
-            Era::V21,
+            Era::V217,
         )
         .unwrap();
         let gs2 = compile_gs2(&format!(
@@ -833,7 +833,7 @@ fn array_literals_whose_order_cannot_matter_lower_with_calls() {
     }
     let script = compile::compile_gs1(
         "function next() { return 4; }\nif (created) { this.v = 2.5; this.a = {int(this.v), 9}; this.b = {next(), 7}; }",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     let machine = run_created(script);
@@ -849,7 +849,7 @@ fn array_literals_whose_order_cannot_matter_lower_with_calls() {
     // read left to right through `temp.` variables.
     let script = compile::compile_gs1(
         "function next() { this.v = 9; return 4; }\nif (created) { this.v = 1; this.a = {this.v, next(), this.v, 5}; }",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     assert!(
@@ -869,7 +869,7 @@ fn array_literals_whose_order_cannot_matter_lower_with_calls() {
     // In a call's argument the order is still refused.
     assert!(compile::compile_gs1(
         "function next() { return 4; }\nfunction keep(v) { this.k = v; }\nif (created) { keep({next(), int(this.v)}); }",
-        Era::V21,
+        Era::V217,
     )
     .is_err());
 }
@@ -903,7 +903,7 @@ fn with_matches_the_rest_fixture_in_both_front_ends() {
     .unwrap();
     let gs1 = compile::compile_gs1(
         "if (created) {\n  with (player) {\n    x = 12;\n    this.inw = 1;\n  }\n  with (null) {\n    this.never = 1;\n  }\n}\n",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     for got in [&gs2, &gs1] {
@@ -920,7 +920,7 @@ fn with_matches_the_rest_fixture_in_both_front_ends() {
 fn gs1_with_over_an_element_lowers_and_reads_outer_variables() {
     let script = compile::compile_gs1(
         "if (created) {\n  for (i = 0; i < 3; i++) with (this.list[i]) {\n    if (this.hp < i) x = i;\n    while (this.hp > 0) { if (this.hp == 1) break; this.hp--; }\n  }\n}\n",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     let names = ops(&script);
@@ -956,14 +956,14 @@ fn gs1_with_bodies_that_change_meaning_stay_errors() {
         let src = format!(
             "function next() {{ return 1; }}\nif (created) {{ with (this.o) {{ {body} }} }}\n"
         );
-        let err = compile::compile_gs1(&src, Era::V21)
+        let err = compile::compile_gs1(&src, Era::V217)
             .unwrap_err()
             .to_string();
         assert!(err.contains(needle), "{body}: {err}");
     }
     let err = compile::compile_gs1(
         "if (created) { while (1) { with (this.o) { break; } } }\n",
-        Era::V21,
+        Era::V217,
     )
     .unwrap_err()
     .to_string();
@@ -993,7 +993,7 @@ fn repeated_event_tests_merge_into_one_function_in_source_order() {
 
     let err = compile::compile_gs1(
         "if (created) { if (x) return; hide; }\nif (created) show;\n",
-        Era::V21,
+        Era::V217,
     )
     .unwrap_err();
     assert!(err.to_string().contains("not merged"), "{err}");
@@ -1002,7 +1002,7 @@ fn repeated_event_tests_merge_into_one_function_in_source_order() {
 #[test]
 fn gs1_join_lowers_to_the_gs2_join_call() {
     assert!(!gs1_commands_without_gs2().contains(&"join"));
-    let got = compile::compile_gs1("if (created) { join baddyclass; }\n", Era::V21).unwrap();
+    let got = compile::compile_gs1("if (created) { join baddyclass; }\n", Era::V217).unwrap();
     let want = compile_gs2("function onCreated() { join(\"baddyclass\"); }\n").unwrap();
     assert_eq!(ops(&got), ops(&want));
     assert_eq!(got.strings, want.strings);
@@ -1055,7 +1055,7 @@ fn gs2_front_end_differs_from_two_fixtures_by_one_deliberate_instruction() {
 fn gs2_switch_default_without_break_leaves_the_switch() {
     let src = "function onCreated() {\n  switch (this.n) {\n    case 1: this.a = 1; break;\n    default: this.a = 2;\n  }\n  this.done = 1;\n}\n";
     let mut m = Machine::new(compile_gs2(src).unwrap());
-    let mut h = EffectHost::new(Era::V21, 1);
+    let mut h = EffectHost::new(Era::V217, 1);
     assert_eq!(m.run_top_level(&mut h), Outcome::Done);
     assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
     assert_eq!(m.var(Root::This, "a"), Some(&Val::Num(2.0)));
@@ -1082,7 +1082,7 @@ fn gs2_corpus_shapes_compile() {
 fn gs1_top_level_join_and_guard_chains_lower() {
     let got = compile::compile_gs1(
         "join mover;\nif (playertouchsme && this.on == 1 && !isweapon) { hide; }\n",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     let dis = got.disassemble();
@@ -1090,7 +1090,8 @@ fn gs1_top_level_join_and_guard_chains_lower() {
     assert!(dis.contains("\"join\""), "{dis}");
     assert_eq!(got.functions[0].name, "onPlayerTouchsMe");
     // A call before the event would run in every GS1 event: not taken.
-    let err = compile::compile_gs1("if (f() && playertouchsme) { hide; }\n", Era::V21).unwrap_err();
+    let err =
+        compile::compile_gs1("if (f() && playertouchsme) { hide; }\n", Era::V217).unwrap_err();
     assert!(err.to_string().contains("too complex"), "{err}");
 }
 
@@ -1107,9 +1108,9 @@ fn gs1_message_codes_and_string_commands_lower_and_run() {
   this.k = strcontains(#s(this.s),=5);
 }
 ";
-    let script = compile::compile_gs1(src, Era::V21).unwrap();
+    let script = compile::compile_gs1(src, Era::V217).unwrap();
     let mut m = Machine::new(script);
-    let mut h = EffectHost::new(Era::V21, 3);
+    let mut h = EffectHost::new(Era::V217, 3);
     assert_eq!(m.run_top_level(&mut h), Outcome::Done);
     m.call_event("onCreated", &[], &mut h);
     let s = |m: &Machine, n: &str| match m.var(Root::This, n) {
@@ -1122,10 +1123,10 @@ fn gs1_message_codes_and_string_commands_lower_and_run() {
     assert_eq!(m.var(Root::This, "f"), Some(&Val::Num(2.5)));
     assert_eq!(m.var(Root::This, "k"), Some(&Val::Num(1.0)));
     // Codes Seihai cannot lower are errors, not literal text.
-    let err = compile::compile_gs1("if (created) { message #w; }\n", Era::V21).unwrap_err();
+    let err = compile::compile_gs1("if (created) { message #w; }\n", Era::V217).unwrap_err();
     assert!(err.to_string().contains("#w"), "{err}");
     // A `#` that starts no code stays text.
-    compile::compile_gs1("if (created) { message #1 and # ok; }\n", Era::V21).unwrap();
+    compile::compile_gs1("if (created) { message #1 and # ok; }\n", Era::V217).unwrap();
 }
 
 #[test]
@@ -1134,7 +1135,7 @@ fn gs2_assigns_to_members_and_elements_of_values() {
     compile_gs2(src).unwrap();
     compile::compile_gs1(
         "if (created) { message #s(clientr.x) #s(serverr.y); }\n",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
 }
@@ -1145,7 +1146,7 @@ fn gs2_assigns_to_members_and_elements_of_values() {
 fn gs1_with_bodies_keep_commands_and_calls() {
     let s = compile::compile_gs1(
         "function next() { return 1; }\nif (created) { with (getplayer(this.acct)) { hide; setlevel2 a.nw,30,30; this.a = strlen(#s(this.b)); } }\n",
-        Era::V21,
+        Era::V217,
     )
     .unwrap();
     assert!(s.strings.iter().any(|t| t == "findplayer"));

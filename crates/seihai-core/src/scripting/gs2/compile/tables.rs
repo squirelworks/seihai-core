@@ -75,7 +75,7 @@ fn statement_lowering(name: &str) -> Option<&'static str> {
     Some(match name {
         "setstring" => "`this.`/`client.` names: an assignment; any other name is a player flag: `set(\"name=value\")` or `unset(\"name\")`",
         "addstring" | "insertstring" | "replacestring" | "removestring" | "deletestring" => {
-            "the GS2 list method on a `this.`/`client.` list (`add`, `insert`, `replace`, `remove`, `delete`); before 2.1 `addstring` appends text"
+            "the GS2 list method on a `this.`/`client.` list (`add`, `insert`, `replace`, `remove`, `delete`); before 2.1 the builds have no `addstring`"
         }
         "tokenize" | "tokenize2" => "`tokens = text.tokenize(seps)`",
         "setcharprop" => "an assignment to the NPC's own property (`this.nick`, `this.colors[i]`, ...)",
