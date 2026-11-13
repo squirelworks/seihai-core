@@ -385,7 +385,7 @@ pub static COMMANDS: &[Cmd] = &[
     c("changeimgzoom", "RR", V142, Effect),
     c("hideimg", "R", V121, Effect),
     c("hideimgs", "RR", V217, Effect),
-    c("showtext", "RRSSS", V217, Effect),
+    c("showtext", "RRRSSS", V217, Effect),
     // Parsed but ignored by the 2.05 client.
     c("seturllevel", "S", V121, NoExec),
     c("setfocus", "RR", V133, NoExec),
@@ -400,18 +400,21 @@ pub static COMMANDS: &[Cmd] = &[
     c("setbacktile2", "RRRRR", V205, NoExec),
     c("setz", "RRRRRRRR", V205, NoExec),
     c("updateterrain", "", V205, NoExec),
-    // 1.21 to 1.33 only. The executor was not read; Seihai ignores it.
-    c("unseteffect", "", V121, NoExec),
+    // 1.21 to 1.33 only, no arguments: frees the `seteffect` effect and
+    // clears its flag.
+    c("unseteffect", "", V121, Effect),
     // First in 2.17.1 (none of 2.12 to 2.16 has a binary; 2.12 and 2.15 are
-    // dated by the release notes). The host draws or sends them; Seihai's
-    // own engine passes them on as commands.
+    // dated by the release notes). Letters as the 2.17.1, 2.22 and 2.31
+    // start-up routine registers them, which match 3.04's. `putnpc2`,
+    // `savelog2`, `sendpm`, `sendtonc`, `sendtorc` and `setpm` have no
+    // client-side executor in 2.17.1 to 3.04: they matter on a server.
     c("wraptext", "RSS", V212, Effect),
     c("wraptext2", "RRSS", V212, Effect),
     c("showimg2", "RFRRR", V215, Effect),
     c("putnpc2", "RRS", V217, Effect),
     c("showtext2", "RRRRSSS", V217, Effect),
-    c("showani", "RRRRSS", V217, Effect),
-    c("showani2", "RRRRRSS", V217, Effect),
+    c("showani", "RRRRS", V217, Effect),
+    c("showani2", "RRRRRS", V217, Effect),
     c("showpoly", "RS", V217, Effect),
     c("showpoly2", "RS", V217, Effect),
     c("changeimgmode", "RR", V217, Effect),
@@ -424,8 +427,8 @@ pub static COMMANDS: &[Cmd] = &[
     c("sendtorc", "S", V217, Effect),
     c("savelog", "S", V217, Effect),
     c("savelog2", "SS", V217, Effect),
-    c("setcursor", "F", V217, Effect),
-    c("setcursor2", "S", V217, Effect),
+    c("setcursor", "R", V217, Effect),
+    c("setcursor2", "F", V217, Effect),
     c("enablemap", "", V217, Effect),
     c("disablemap", "", V217, Effect),
     c("enablepause", "", V217, Effect),
