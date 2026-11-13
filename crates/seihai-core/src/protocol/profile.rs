@@ -627,10 +627,12 @@ pub struct CombatRules {
     /// inclusive) ...
     pub reach_min_half: u8,
     pub reach_max_half: u8,
-    /// ... and strictly less than `lateral_below_half` to the side (under
-    /// 2 tiles).
-    pub lateral_below_half: u8,
+    /// ... and at most `lateral_max_half` to the side (2 tiles, the edge
+    /// included: every build from 1.21 to 2.31 compares `|side| <= 2.0`).
+    pub lateral_max_half: u8,
     /// A victim with exactly this alignment (AP) cannot be hit by a sword.
+    /// `u8::MAX` (never an AP) where the build has no such test (before
+    /// 1.34).
     pub immune_ap: u8,
     /// Hurt mode (mode 3) lasts this many ticks; a hurt player cannot be
     /// hurt again until it ends (40 ticks, 2 s).
@@ -664,6 +666,10 @@ pub struct CombatRules {
     /// 2.00 handler tests neither; it has only the hurtable, guild and range
     /// gates.
     pub packet_victim_gates: bool,
+    /// The client takes hits by packet (`PLO_HURTPLAYER` 40, and 46 from
+    /// 2.01) under the gates above. Off for 1.x: no 1.x handler for id 40
+    /// was traced, so Seihai decodes none there.
+    pub packet_hits: bool,
 }
 
 /// How the victim's client stores another player's sword power. Every build
@@ -686,7 +692,7 @@ pub const COMBAT_205: CombatRules = CombatRules {
     swing_step_ticks: 2,
     reach_min_half: 0,
     reach_max_half: 8,
-    lateral_below_half: 4,
+    lateral_max_half: 4,
     immune_ap: 100,
     hurt_ticks: 40,
     hurt_sprite: 32,
@@ -698,19 +704,38 @@ pub const COMBAT_205: CombatRules = CombatRules {
     judge_throttle: true,
     sword_power_store: PowerStore::Limited,
     packet_victim_gates: true,
+    packet_hits: true,
 };
 
-/// 1.39. One swing step per 50 ms tick: the lab capture of a real 1.39
-/// (Graal_analysis live trace `item-drops/b4_139.txt`) sends S 6, 8, 10 at
-/// 100 ms intervals and then the idle sprite, and the video read gives a
+/// 1.34 to 1.41. One swing step per 50 ms tick: the lab capture of a real
+/// 1.39 (Graal_analysis live trace `item-drops/b4_139.txt`) sends S 6, 8, 10
+/// at 100 ms intervals and then the idle sprite, and the video read gives a
 /// 5-tick swing that cuts the bush; the 40-tick hurt lock-out is the
 /// video's too (`player-mannerisms-live.md`, "Cross-version table").
-/// The sword box is the same as 2.05 (0 to 4 tiles ahead, under 2 sideways),
-/// traced in Graal_analysis `version-profiles/matrix/rules-139.md`. Sword
-/// power, AP immunity and the hurt sprite are still the 2.05 template.
+/// The rest was read in the binaries of 1.34 to 1.41 (gap-2 research,
+/// 2026-11-13): the sword box is the 2.05 box, the sword judge tests AP 100
+/// and the attacker's hidden flag, has no once-a-second stamp, and keeps
+/// the sword power raw (no plus or minus 20 limit, as 2.00 to 2.02). No
+/// hurt-packet handler was traced, so packet hits are off.
 pub const COMBAT_139: CombatRules = CombatRules {
     swing_step_ticks: 1,
-    ..COMBAT_205
+    packet_hits: false,
+    ..COMBAT_200
+};
+
+/// NewMain 1.42: the 2.00 sword judge and raw power (read in NewMain 24 and
+/// 26), with packet hits off as in 1.x: its id 40 handler was not traced.
+pub const COMBAT_142: CombatRules = CombatRules {
+    packet_hits: false,
+    ..COMBAT_200
+};
+
+/// 1.21 to 1.33: as 1.34, but the sword judge has no AP immunity (alignment
+/// arrives in 1.3 and the judge first tests it in 1.34) and gates on the
+/// attacker's sprite S 6 to 10 itself, polled every tick.
+pub const COMBAT_121: CombatRules = CombatRules {
+    immune_ap: u8::MAX,
+    ..COMBAT_139
 };
 
 /// 2.01 and 2.02: as 2.05, but the sword power is stored without the offset
@@ -865,6 +890,48 @@ pub const DROPS_142: ItemDrops = ItemDrops {
     del_on_expiry: true,
 };
 
+/// Baddy and tile rules where builds differ. Read in every client binary
+/// from 1.21 to 2.31 (gap-2 research, 2026-11-13): the baddy tables (step,
+/// look, aim, rock, arrow, power and hare height) are the same bytes in all
+/// of them, and the baddy AI the same code apart from the fields here. A
+/// dying baddy's item roll follows [`ItemDrops::client_roll`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WorldRules {
+    /// Standing on lava burns: half a heart once every 101 ticks of 50 ms,
+    /// tested at the player's `(x + 1.5, y + 2)`. Every build from 1.28
+    /// beta 2 has it; 1.21 does not.
+    pub lava_burns: bool,
+    /// When the local player's sword reaches a swamp soldier rising from
+    /// the water.
+    pub swamp_sword: SwampSword,
+}
+
+/// When a sword hits a swamp soldier that is up (mode 6, no hurt blink).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SwampSword {
+    /// From counter 17, when it surfaces, to the end of its round (1.21 to
+    /// 2.00, every revision). Its touch and object tests keep 22 to 36.
+    From17,
+    /// Counter 22 to 36, the window its touch and object tests use (2.01 on).
+    From22To36,
+}
+
+/// 1.21: no lava burn.
+pub const WORLD_121: WorldRules = WorldRules {
+    lava_burns: false,
+    swamp_sword: SwampSword::From17,
+};
+/// 1.28 beta 2 to 2.00.
+pub const WORLD_128: WorldRules = WorldRules {
+    lava_burns: true,
+    ..WORLD_121
+};
+/// 2.01 on.
+pub const WORLD_201: WorldRules = WorldRules {
+    swamp_sword: SwampSword::From22To36,
+    ..WORLD_128
+};
+
 /// Everything that makes one client version itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VersionProfile {
@@ -884,6 +951,7 @@ pub struct VersionProfile {
     pub ui: Ui,
     pub mannerisms: Mannerisms,
     pub drops: ItemDrops,
+    pub world: WorldRules,
     /// Which script engines the build runs, as far as the evidence goes.
     pub scripts: Scripts,
 }
@@ -1793,7 +1861,7 @@ mod tests {
             (
                 p.life.combat.unwrap().reach_min_half,
                 p.life.combat.unwrap().reach_max_half,
-                p.life.combat.unwrap().lateral_below_half,
+                p.life.combat.unwrap().lateral_max_half,
             ),
             (0, 8, 4)
         );

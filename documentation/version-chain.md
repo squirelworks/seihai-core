@@ -147,7 +147,8 @@ Generated; do not edit between the markers.
 - props: **npc_max**: 17 -> 32
 - ui: **window**: 648×509 -> 648×508
 - ui: **gs1_commands**: 71 -> 84
-- source: binary: PLO 30 and 35-38, send ids to 29, player props to 31, NPC props to 32, direct data packages (UDP ids 0, 10-22), language files, GS1 table 71 to 84, main form 648×508
+- world: **world**: 1.21 (no lava burn, sword hits a swamp soldier from 17) -> 1.28 (lava burns, sword hits a swamp soldier from 17)
+- source: binary: PLO 30 and 35-38, send ids to 29, player props to 31, NPC props to 32, direct data packages (UDP ids 0, 10-22), language files, GS1 table 71 to 84, main form 648×508; lava burns (half a heart every 101 ticks)
 
 #### 1.3 test (`GSERV014`, binary, linked 1999-11-29)
 
@@ -178,8 +179,10 @@ Generated; do not edit between the markers.
 #### 1.34 (`GNW22030`, binary, linked 2000-03-23)
 
 - props: **other-player props**: +34 ACCOUNTNAME (21 -> 22 ids)
+- life: **combat**: 1.21 rules (as 1.34, no AP immunity) -> 1.34 rules (one swing step a tick, raw sword power, no packet hits traced)
 - ui: **gs1_commands**: 88 -> 93
-- source: binary: other-player prop 34 (ACCOUNTNAME), GS1 table 88 to 93 (cross-version-timeline)
+- unknown (life): 1.34 to 1.41 also pass over a victim in player mode 7 in the sword judge; what mode 7 is was not traced, so Seihai does not test it
+- source: binary: other-player prop 34 (ACCOUNTNAME), GS1 table 88 to 93 (cross-version-timeline); the sword judge gains the AP 100 immunity and the attacker's hidden flag, and gates on the animation step
 
 #### 1.35 (`GNW13040`, binary, linked 2000-04-13)
 
@@ -214,11 +217,10 @@ Generated; do not edit between the markers.
 - props: **own-player props**: +34 ACCOUNTNAME (34 -> 35 ids)
 - props: **other-player props**: +33 ADDITFLAGS (22 -> 23 ids)
 - life: **death**: none -> 1.39 rules (respawn to max hearts, no AP bands)
-- life: **combat**: none -> 1.39 rules (one swing step a tick, the rest 2.05)
 - ui: **chat_recall**: no -> yes
 - ui: **chat_text**: ChatText { face: Dialog, height: 28 } -> ChatText { face: Helvetica, height: 24 }
 - ui: **gs1_commands**: 109 -> 111
-- unknown (life): sword power, AP immunity and the hurt sprite are still the 2.05 template; the six walk-probe and twelve knockback-probe offset tables are not profile fields; 1.33 to 1.38 keep no combat or death row of their own and copy the 1.39 mannerisms
+- unknown (life): the hurt sprite and the hurt-packet gates are the 2.00 values, no 1.x hurt-packet handler was traced; the six walk-probe and twelve knockback-probe offset tables are not profile fields; 1.33 to 1.38 keep no death row of their own and copy the 1.39 mannerisms
 - source: binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111; sword swing S 6 to 10 one per tick, sword box 0 to 4 tiles ahead and under 2 sideways, 40-tick hurt lock-out, five knockback steps, death timer 30 with the dead bit after 27, respawn hearts to max (no AP bands)
 
 #### 1.41 (`GNW13110`, binary)
@@ -231,14 +233,13 @@ Generated; do not edit between the markers.
 - props: **npc_max**: 34 -> 35
 - levels: **nw**: no -> yes
 - life: **death**: 1.39 rules (respawn to max hearts, no AP bands) -> 2.05 rules (name-group test)
-- life: **combat**: 1.39 rules (one swing step a tick, the rest 2.05) -> 2.05 rules
 - ui: **server_list**: direct -> one list
 - ui: **window**: 648×508 -> 648×514
 - ui: **gs1_commands**: 111 -> 126
 - unknown (drops): the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced
 - unknown (listserver): original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured
 - unknown (listserver): the real 1.41 rev 1 sent nothing to the lab listserver, which spoke first (shape S, 2026-10-30); whether the public service speaks first to a silent client is not known, so after 3 s with no reply Seihai sends shape B (id 0 `newmain`, then id 1 with the account), which 14923 answered on 2026-10-25
-- unknown (life): death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)
+- unknown (life): death rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them); combat was read in the 1.41 binary and is the 1.39 row
 - unknown (levels): the .nw loader was found by a string and function scan of the binary; no .nw level was loaded in a real 1.41
 - source: binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126, .nw (GLEVNW01) loader, main form 648×514
 
@@ -248,7 +249,7 @@ Generated; do not edit between the markers.
 - protocol: **plo (server ids handled)**: +42 NEWWORLDTIME, +44 HASNPCSERVER, +45 FILEUPTODATE, +150 NPCDEL2, +151 HIDENPCS, +153 SAY2 (45 -> 51 ids)
 - protocol: **pli (client ids sent)**: +34 UPDATEFILE (34 -> 35 ids)
 - life: **death**: 2.05 rules (name-group test) -> none
-- life: **combat**: 2.05 rules -> none
+- life: **combat**: 1.34 rules (one swing step a tick, raw sword power, no packet hits traced) -> 1.42 rules (2.00 sword judge, no packet hits traced)
 - ui: **ganis**: no -> yes
 - ui: **chat_text**: ChatText { face: Helvetica, height: 24 } -> ChatText { face: TempusSans, height: 24 }
 - ui: **window**: 648×514 -> 648×507
@@ -257,14 +258,14 @@ Generated; do not edit between the markers.
 - drops: **drops**: client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE -> server drops (PLO_ITEMADD), pickups go through PLI_ITEMTAKE
 - unknown (listserver): built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured
 - unknown (listserver): the real NewMain 26 sent shape A (id 0 `newmain` only) to the lab listserver (2026-10-30), which Seihai sends; no run on the public service has used shape A, so the port is assumed
-- source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, main form 648×507, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)
+- source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, main form 648×507, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt, and no item roll for a dying baddy); sword judge as 2.00 (raw sword power, no judge stamp, read in NewMain 24 and 26)
 
 #### 2.00 (`GNW24011`, binary, linked 2001-02-01)
 
 - protocol: **plo (server ids handled)**: +154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
 - levels: **nw**: yes -> no
 - life: **death**: none -> 2.05 rules (name-group test)
-- life: **combat**: none -> 2.00 rules (raw sword power, fewer packet gates)
+- life: **combat**: 1.42 rules (2.00 sword judge, no packet hits traced) -> 2.00 rules (raw sword power, fewer packet gates)
 - ui: **gs1_commands**: 134 -> 142
 - unknown (life): combat read in 2.00 r0 only (Graal_analysis client-internals/combat-200-204.md); r1 to r3 assumed the same. Not run against a real client
 - unknown (login): props sent at login (verified for 2.05 only)
@@ -281,8 +282,9 @@ Generated; do not edit between the markers.
 - life: **combat**: 2.00 rules (raw sword power, fewer packet gates) -> 2.01 rules (raw sword power)
 - ui: **window**: 648×507 -> 648×514
 - ui: **gs1_commands**: 142 -> 144
+- world: **world**: 1.28 (lava burns, sword hits a swamp soldier from 17) -> 2.01 (lava burns, sword hits a swamp soldier at 22 to 36)
 - unknown (listserver): 2.01 to 2.04 (and 2.02 rev 2): login frame inferred, not captured. Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; no real client of these builds was captured and no run on the public service has used shape A, so the port is assumed. The 2026-10-25 matrix used Seihai's older shape B: a legacy list on 14923, nothing on 14922. 14921, the port the build carries, is dead
-- source: binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144, main form 648×514; the hurt packet gains the AP 100, no-kill and once-a-second gates
+- source: binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144, main form 648×514; the hurt packet gains the AP 100, no-kill and once-a-second gates; the sword reaches a surfacing swamp soldier only at counter 22 to 36
 
 #### 2.02 (`GNW15041`, binary, linked 2001-04-15)
 

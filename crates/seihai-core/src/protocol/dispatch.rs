@@ -1114,12 +1114,12 @@ impl SessionState {
                 }
             }
             10 => self.is_leader = true,
-            40 if self.combat.is_some() => {
+            40 if self.combat.is_some_and(|r| r.packet_hits) => {
                 if let Some(h) = combat::parse_hurtplayer(&msg.payload) {
                     self.hits.push(IncomingHit::Hurt(h));
                 }
             }
-            46 if self.combat.is_some() => {
+            46 if self.combat.is_some_and(|r| r.packet_hits) => {
                 if let Some(h) = combat::parse_hitobjects(&msg.payload) {
                     self.hits.push(IncomingHit::Objects(h));
                 }
