@@ -6,7 +6,8 @@ versioning rule is in the README.
 
 ## 0.1.x
 
-- **0.1.1**: The shared client session hands the view the player's weapons (built-in and the server's), for the item list and weapon key of Ato and Issho.
+- **0.1.2**: The shared client session hands the view the player's weapons (built-in and the server's), for the item list and weapon key of Ato and Issho.
+- **0.1.1**: GS1 writes `selectedweapon`, reads a bare-number loop condition as false, and rounds `timeout` down to whole 50 ms steps on 1.41 to 2.31, as real clients did in the lab.
 - **0.1.0**: First release under the written versioning rule. No API
   changes beyond hiding `dev`, `difftest` and `viewer` from the docs.
   Known gap: GS1 flag and built-in writes are still refused (#30, #6).
