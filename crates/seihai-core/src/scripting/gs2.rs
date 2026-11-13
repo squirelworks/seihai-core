@@ -17,6 +17,7 @@ pub mod exec;
 pub mod lists;
 pub mod maths;
 pub mod strings;
+pub mod vm;
 
 macro_rules! ops {
     ($($v:literal $name:ident $doc:literal,)*) => {

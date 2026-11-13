@@ -81,6 +81,10 @@ integer (`F3`–`F5`) or a decimal (`F6`) · `jump` an op index (`F3`–`F5`).
 
 ## Opcodes
 
+Which client VMs run each opcode, and the opcodes this table leaves
+unnamed (45–49, 54, 66, 67, 121, 164 and the optimiser's 200–242), are in
+`gs2-vm-versions.md`.
+
 Column **Emitted**: `yes` the compiler writes it · `no` it is in the enum
 but nothing in the compiler writes it.
 
@@ -121,19 +125,19 @@ but nothing in the compiler writes it.
 | 42 | 0x2A | OP_NEW_OBJECT | — | `new T(…)`, after the type name | yes |
 | 43 | 0x2B | OP_OBJ_FROM_STR | — | *(enum comment: from setstring)* | no |
 | 44 | 0x2C | OP_INLINE_CONDITIONAL | — | End of an `&&`/`\|\|` chain outside an `if` or loop test | yes |
-| 45–47 | 0x2D–0x2F | OP_UNKNOWN_45 … 47 | — | Placeholders in the enum | no |
+| 45–47 | 0x2D–0x2F | OP_UNKNOWN_45 … 47 | int | Placeholders in the enum. The client VMs run them as local-slot store, load and resolve (`gs2-vm-versions.md`) | no |
 | 50 | 0x32 | OP_ASSIGN | — | `=` and the store of a compound assignment | yes |
 | 51 | 0x33 | OP_FUNC_PARAMS_END | — | End of a function's parameter list | yes |
 | 52 | 0x34 | OP_INC | — | `++`, and the index step in `for`-each | yes |
 | 53 | 0x35 | OP_DEC | — | `--` | yes |
-| 54 | 0x36 | OP_UNKNOWN_54 | — | Placeholder | no |
+| 54 | 0x36 | OP_UNKNOWN_54 | — | Placeholder. 5.00r7 and later have a handler (`gs2-vm-versions.md`) | no |
 | 60 | 0x3C | OP_ADD | — | `+`, `+=` | yes |
 | 61 | 0x3D | OP_SUB | — | `-`, `-=` | yes |
 | 62 | 0x3E | OP_MUL | — | `*`, `*=` | yes |
 | 63 | 0x3F | OP_DIV | — | `/`, `/=` | yes |
 | 64 | 0x40 | OP_MOD | — | `%`, `%=` | yes |
 | 65 | 0x41 | OP_POW | — | `^`, `pow(a, b)`. `^=` has no opcode in the compiler's operator map | yes |
-| 66–67 | 0x42–0x43 | OP_UNKNOWN_66, 67 | — | Placeholders | no |
+| 66–67 | 0x42–0x43 | OP_UNKNOWN_66, 67 | — | Placeholders. The client VMs run them as `&&` and `\|\|` that give 1 or 0 (`gs2-vm-versions.md`) | no |
 | 68 | 0x44 | OP_NOT | — | `!` | yes |
 | 69 | 0x45 | OP_UNARYSUB | — | Unary `-` | yes |
 | 70 | 0x46 | OP_EQ | — | `==`, and the `switch` case test | yes |

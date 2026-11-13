@@ -4,14 +4,13 @@
 //! `documentation/gs2-commands.md`. Strings are bytes, one `char` each, as
 //! in the reader.
 
-use crate::scripting::engine::value::num_to_string;
 use crate::scripting::engine::Val;
 
-/// The client's number-to-integer conversion: rounds down, so
-/// `int(-1.5)` is -2. The client adds a small constant first, which was not
-/// read.
+/// The client's number-to-integer conversion (the same in 3.153, 4.20r8,
+/// 5.00r7 and 6.x): `floor(x + 0.0001)`, so `int(-1.5)` is -2 and
+/// `int(0.99995)` is 1.
 pub fn client_int(x: f64) -> i32 {
-    x.floor() as i32
+    (x + super::vm::TOLERANCE).floor() as i32
 }
 
 /// `s.trim()`: drops leading and trailing bytes whose low 7 bits are a
@@ -120,11 +119,14 @@ pub fn format(fmt: &str, args: &[Val]) -> String {
                 out.push_str(&integer(n, width, precision, plus, left));
             }
             // The client's float writer is not given the width or precision.
-            'f' => out.push_str(&num_to_string(args.next().map_or(0.0, Val::num))),
+            'f' => out.push_str(&super::vm::num_text(args.next().map_or(0.0, Val::num))),
             's' => {
                 let s: Vec<char> = args
                     .next()
-                    .map(Val::text)
+                    .map(|v| match v {
+                        Val::Num(n) => super::vm::num_text(*n),
+                        Val::Str(s) => s.clone(),
+                    })
                     .unwrap_or_default()
                     .chars()
                     .collect();

@@ -7,8 +7,12 @@
 //! (`set`, `unset`, `say2`, `setlevel2`, `showimg`, `hideimg`, …) into the
 //! GS1 engine's [`Effect`]s, so whatever applies GS1 effects can apply
 //! these. Opcodes outside that set are logged and skipped; they are
-//! Stage D. Behaviour is from the 3.153 client's VM, as described in
-//! `documentation/gs2-executor.md`. Nothing here runs on the classic path.
+//! Stage D. Behaviour was first taken from the 3.153 client's VM
+//! (`documentation/gs2-executor.md`); what later VMs change (limits,
+//! `%`, `^`, shifts, the opcodes they added) is a [`VmProfile`]
+//! (`documentation/gs2-vm-versions.md`). [`Machine::new`] runs 3.153's
+//! rules; [`Machine::for_version`] runs the rules of the client being
+//! presented as. Nothing here runs on the classic path.
 //!
 //! The timer commands (`settimer`, `timeout`, `scheduleevent`,
 //! `cancelevents`) are the machine's own and run on [`Machine::tick`]
@@ -17,19 +21,16 @@
 use super::lists::{self, Value};
 use super::maths;
 use super::strings::{self, client_int};
+use super::vm::{self, VmProfile};
 use super::{Op, Operand, Script};
+use crate::protocol::ClientVersion;
 use crate::scripting::engine::vocab::{self, Exec};
 use crate::scripting::engine::world::ObjId;
 use crate::scripting::engine::{Effect, Era, Val};
 use std::collections::HashMap;
 
-/// The 3.153 VM stops a script whose stack goes past 256 entries.
-const STACK_LIMIT: usize = 256;
-/// Passes of one `OP_CMD_CALL` before "Script exceeded loop limit". The
-/// client compares against a constant that was not read from the binary;
-/// 10 000 is the gs2-parser enum comment's figure.
-const LOOP_LIMIT: u32 = 10_000;
-/// The 3.153 VM refuses a call deeper than this ("callstack overrun").
+/// Every VM read (3.153 to 6.03r7) refuses a call deeper than this
+/// ("callstack overrun"). The stack and loop limits are in [`VmProfile`].
 const CALL_LIMIT: usize = 10_000;
 /// Seihai's own guard against a script that never yields.
 const STEP_LIMIT: u64 = 2_000_000;
@@ -104,6 +105,16 @@ pub enum Outcome {
     Stopped(String),
     /// No function of that name.
     NoSuchEvent,
+    /// `waitfor(object, event, timeout)` (4.20r8 on): the run waits for
+    /// `event` on `object` or for `timeout` seconds. Call
+    /// [`Machine::resume_waitfor`] with whether the event came.
+    WaitFor {
+        /// The object as the script named it (`None` for a null object).
+        object: Option<String>,
+        /// The event without its `on`, as the client stores it.
+        event: String,
+        timeout: f64,
+    },
 }
 
 struct Frame {
@@ -115,6 +126,8 @@ struct Frame {
     /// `with` blocks open when the function was entered: a `return` from
     /// inside a block closes the ones the function opened.
     with_depth: usize,
+    /// Local slots (opcodes 45 and 46), at most 1024.
+    slots: Vec<Slot>,
 }
 
 /// A `scheduleevent` waiting for its frame.
@@ -129,6 +142,11 @@ struct Scheduled {
 /// A loaded script and its variables.
 pub struct Machine {
     script: Script,
+    profile: &'static VmProfile,
+    /// The loop limit in force: the profile's, or `maxlooplimit`.
+    loop_limit: u32,
+    /// Local slots used outside any function.
+    top_slots: Vec<Slot>,
     vars: HashMap<(Root, String), Value>,
     stack: Vec<Slot>,
     frames: Vec<Frame>,
@@ -168,9 +186,22 @@ fn event_name(name: &str) -> &str {
 }
 
 impl Machine {
+    /// A machine with the 3.153 VM's rules.
     pub fn new(script: Script) -> Machine {
+        Machine::with_profile(script, &vm::V3153)
+    }
+
+    /// A machine with the VM rules of the client `version`.
+    pub fn for_version(script: Script, version: ClientVersion) -> Machine {
+        Machine::with_profile(script, VmProfile::for_version(version))
+    }
+
+    pub fn with_profile(script: Script, profile: &'static VmProfile) -> Machine {
         Machine {
             script,
+            profile,
+            loop_limit: profile.loop_limit,
+            top_slots: Vec::new(),
             vars: HashMap::new(),
             stack: Vec::new(),
             frames: Vec::new(),
@@ -187,6 +218,11 @@ impl Machine {
 
     pub fn script(&self) -> &Script {
         &self.script
+    }
+
+    /// The VM rules this machine runs by.
+    pub fn profile(&self) -> &'static VmProfile {
+        self.profile
     }
 
     /// A script variable (not a host property). `This` and `ThisO` share one
@@ -214,6 +250,7 @@ impl Machine {
         self.loops.clear();
         self.with.clear();
         self.with_span.clear();
+        self.top_slots.clear();
         self.pc = 0;
         self.running = true;
         self.exec(host)
@@ -230,6 +267,7 @@ impl Machine {
         self.loops.clear();
         self.with.clear();
         self.with_span.clear();
+        self.top_slots.clear();
         self.stack.push(Slot::Marker);
         for a in args.iter().rev() {
             self.stack.push(match a {
@@ -242,6 +280,7 @@ impl Machine {
             ret: None,
             base: 0,
             locals: HashMap::new(),
+            slots: Vec::new(),
         });
         self.pc = start;
         self.running = true;
@@ -327,6 +366,129 @@ impl Machine {
         self.exec(host)
     }
 
+    /// Continues after `Outcome::WaitFor`: `waitfor` gives 1 when the event
+    /// came and 0 when the time ran out.
+    pub fn resume_waitfor(&mut self, caught: bool, host: &mut dyn Host) -> Outcome {
+        if !self.running {
+            return Outcome::Done;
+        }
+        self.stack.push(Slot::Num(if caught { 1.0 } else { 0.0 }));
+        self.exec(host)
+    }
+
+    /// The local slots of the running function (or of the top level).
+    fn slots(&mut self) -> &mut Vec<Slot> {
+        match self.frames.last_mut() {
+            Some(f) => &mut f.slots,
+            None => &mut self.top_slots,
+        }
+    }
+
+    /// The opcodes gs2-parser does not name that the client VMs run
+    /// (`documentation/gs2-vm-versions.md`). `Some` ends the run.
+    fn run_extra(
+        &mut self,
+        n: u8,
+        operand: &Operand,
+        at: usize,
+        host: &mut dyn Host,
+    ) -> Option<Outcome> {
+        let fault = |m: &mut Machine, host: &mut dyn Host| {
+            Some(m.stop(format!("stack fault at opcode {n} (op {at})"), host))
+        };
+        let index = operand_num(operand).map(client_int);
+        match n {
+            // Copies the top into a local slot without popping it.
+            vm::op::SLOT_STORE => {
+                let Some(top) = self.stack.last().cloned() else {
+                    return fault(self, host);
+                };
+                if let Some(i) = index.filter(|&i| i >= 0 && (i as usize) < SLOT_LIMIT) {
+                    let slots = self.slots();
+                    let i = i as usize;
+                    if slots.len() <= i {
+                        slots.resize(i + 1, Slot::Num(0.0));
+                    }
+                    slots[i] = top;
+                }
+            }
+            // Pushes a copy of a local slot.
+            vm::op::SLOT_LOAD => {
+                let slot = index
+                    .filter(|&i| i >= 0)
+                    .and_then(|i| self.slots().get(i as usize).cloned())
+                    .unwrap_or(Slot::Num(0.0));
+                if !self.push(slot) {
+                    return fault(self, host);
+                }
+            }
+            // Turns the top into a variable reference for the slots. A
+            // variable is read when it is used, so it stays as it is.
+            vm::op::RESOLVE_VAR => {
+                if self.stack.is_empty() {
+                    return fault(self, host);
+                }
+            }
+            // `a && b` and `a || b` as values (1 or 0), both sides run.
+            vm::op::LOGICAL_AND | vm::op::LOGICAL_OR => {
+                let (Some(b), Some(a)) = (self.pop_num(host), self.pop_num(host)) else {
+                    return fault(self, host);
+                };
+                let t = if n == vm::op::LOGICAL_AND {
+                    a != 0.0 && b != 0.0
+                } else {
+                    a != 0.0 || b != 0.0
+                };
+                self.push(Slot::Num(t as i32 as f64));
+            }
+            // `+` that joins when either side is a string (5.00r7 on).
+            vm::op::ADD_OR_JOIN => {
+                let (Some(b), Some(a)) = (self.pop(), self.pop()) else {
+                    return fault(self, host);
+                };
+                let join = matches!(a, Slot::Str(_)) || matches!(b, Slot::Str(_));
+                let (a, b) = (self.value(a, host), self.value(b, host));
+                self.push(if join {
+                    Slot::Str(val_text(&a) + &val_text(&b))
+                } else {
+                    Slot::Num(a.num() + b.num())
+                });
+            }
+            // A list of numbers from the values on the stack (5.00r7).
+            vm::op::NUMBER_LIST => {
+                let count = index.unwrap_or(0).clamp(0, 10_000) as usize;
+                if self.stack.len() < count {
+                    return fault(self, host);
+                }
+                let at = self.stack.len() - count;
+                let items: Vec<Slot> = self.stack.drain(at..).collect();
+                let list = items
+                    .into_iter()
+                    .map(|s| Value::Val(Val::Num(self.value(s, host).num())))
+                    .collect();
+                self.push(Slot::List(list));
+            }
+            // An object literal from name/value pairs (5.00r7). Seihai has
+            // no object values: the pairs are dropped and the result is null.
+            vm::op::OBJECT_LITERAL => {
+                let pairs = index.unwrap_or(0).clamp(0, 10_000) as usize;
+                if self.stack.len() < pairs * 2 {
+                    return fault(self, host);
+                }
+                let keep = self.stack.len() - pairs * 2;
+                self.stack.truncate(keep);
+                host.log(format!(
+                    "gs2: object literal at op {at}: Seihai has no object values, gives null"
+                ));
+                self.push(Slot::Obj(None));
+            }
+            _ => host.log(format!(
+                "gs2: opcode {n} at op {at} is not run yet, skipped"
+            )),
+        }
+        None
+    }
+
     fn find_function(&self, name: &str) -> Option<usize> {
         let public = format!("public.{name}");
         self.script
@@ -378,6 +540,11 @@ impl Machine {
             Some(Root::This | Root::ThisO) if name.eq_ignore_ascii_case("timeout") => {
                 Val::Num(self.timeout()).into()
             }
+            Some(Root::This | Root::ThisO)
+                if self.profile.max_loop_limit && name.eq_ignore_ascii_case("maxlooplimit") =>
+            {
+                Val::Num(self.loop_limit as f64).into()
+            }
             Some(r) => {
                 if let Some(v) = host.get_prop(r, name) {
                     return v.into();
@@ -396,6 +563,12 @@ impl Machine {
                 let this = self.this_root();
                 if this == Root::This && name.eq_ignore_ascii_case("timeout") {
                     return Val::Num(self.timeout()).into();
+                }
+                if this == Root::This
+                    && self.profile.max_loop_limit
+                    && name.eq_ignore_ascii_case("maxlooplimit")
+                {
+                    return Val::Num(self.loop_limit as f64).into();
                 }
                 if let Some(v) = host.get_prop(this, name) {
                     return v.into();
@@ -427,6 +600,13 @@ impl Machine {
                 self.timeout = frames(value.num());
                 return;
             }
+            // `TGraalVar::setMaxLoopLimit` (5.00r7): 100 to 1 000 000.
+            Some(Root::This | Root::ThisO)
+                if self.profile.max_loop_limit && name.eq_ignore_ascii_case("maxlooplimit") =>
+            {
+                self.loop_limit = (client_int(value.num()).clamp(100, 1_000_000)) as u32;
+                return;
+            }
             Some(r) => {
                 if host.set_prop(r, name, &value.val()) {
                     return;
@@ -445,6 +625,13 @@ impl Machine {
                 let this = self.this_root();
                 if this == Root::This && name.eq_ignore_ascii_case("timeout") {
                     self.timeout = frames(value.num());
+                    return;
+                }
+                if this == Root::This
+                    && self.profile.max_loop_limit
+                    && name.eq_ignore_ascii_case("maxlooplimit")
+                {
+                    self.loop_limit = (client_int(value.num()).clamp(100, 1_000_000)) as u32;
                     return;
                 }
                 if host.set_prop(this, name, &value.val()) {
@@ -537,7 +724,11 @@ impl Machine {
     }
 
     fn push(&mut self, s: Slot) -> bool {
-        if self.stack.len() >= STACK_LIMIT {
+        if self
+            .profile
+            .stack_limit
+            .is_some_and(|limit| self.stack.len() >= limit)
+        {
             return false;
         }
         self.stack.push(s);
@@ -573,6 +764,14 @@ impl Machine {
             let fault = |m: &mut Machine, host: &mut dyn Host| {
                 m.stop(format!("stack fault at {} (op {at})", ins.op), host)
             };
+            if !self.profile.runs(ins.op.value()) {
+                host.log(format!(
+                    "gs2: opcode {} at op {at} is not in the {} VM, skipped",
+                    ins.op.value(),
+                    self.profile.label
+                ));
+                continue;
+            }
             match ins.op {
                 Op::NoOp => {}
                 // Jumps. Targets are op indices.
@@ -617,7 +816,7 @@ impl Machine {
                 Op::CmdCall => {
                     let n = self.loops.entry(at).or_insert(0);
                     *n += 1;
-                    if *n > LOOP_LIMIT {
+                    if *n > self.loop_limit {
                         return self.stop("Script exceeded loop limit".into(), host);
                     }
                 }
@@ -733,7 +932,7 @@ impl Machine {
                     self.push(if ins.op == Op::ConvToFloat {
                         Slot::Num(v.num())
                     } else {
-                        Slot::Str(v.text())
+                        Slot::Str(val_text(&v))
                     });
                 }
                 Op::ConvToObject => {
@@ -812,12 +1011,11 @@ impl Machine {
                         Op::Add => a + b,
                         Op::Sub => a - b,
                         Op::Mul => a * b,
-                        // Division by zero gives 0 in the client.
+                        // Division by zero gives 0 in every VM.
                         Op::Div if b == 0.0 => 0.0,
                         Op::Div => a / b,
-                        Op::Mod if b == 0.0 => 0.0,
-                        Op::Mod => a % b,
-                        Op::Pow => a.powf(b),
+                        Op::Mod => self.profile.modulo(a, b),
+                        Op::Pow => self.profile.pow(a, b),
                         Op::BitOr => (ia | ib) as f64,
                         Op::BitAnd => (ia & ib) as f64,
                         Op::BitXor => (ia ^ ib) as f64,
@@ -873,7 +1071,7 @@ impl Machine {
                     let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else {
                         return fault(self, host);
                     };
-                    self.push(Slot::Str(a.text() + &b.text()));
+                    self.push(Slot::Str(val_text(&a) + &val_text(&b)));
                 }
 
                 // Strings (Stage D). The compiler converts the object to a
@@ -884,15 +1082,15 @@ impl Machine {
                     };
                     self.push(match ins.op {
                         Op::Char => Slot::Str(strings::char_of(v.num())),
-                        Op::ObjTrim => Slot::Str(strings::trim(&v.text())),
-                        _ => Slot::Num(v.text().chars().count() as f64),
+                        Op::ObjTrim => Slot::Str(strings::trim(&val_text(&v))),
+                        _ => Slot::Num(val_text(&v).chars().count() as f64),
                     });
                 }
                 Op::ObjPos | Op::ObjCharAt | Op::ObjStarts | Op::ObjEnds => {
                     let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else {
                         return fault(self, host);
                     };
-                    let (s, t) = (a.text(), b.text());
+                    let (s, t) = (val_text(&a), val_text(&b));
                     self.push(match ins.op {
                         Op::ObjPos => Slot::Num(strings::pos(&s, &t) as f64),
                         Op::ObjCharAt => Slot::Str(strings::charat(&s, b.num())),
@@ -907,7 +1105,7 @@ impl Machine {
                     else {
                         return fault(self, host);
                     };
-                    self.push(Slot::Str(strings::substring(&s.text(), start, len)));
+                    self.push(Slot::Str(strings::substring(&val_text(&s), start, len)));
                 }
                 // `_(s)`: the client leaves the value as it is.
                 Op::Translate => {
@@ -928,7 +1126,7 @@ impl Machine {
                     }
                     self.stack.truncate(m);
                     let text = match vals.split_first() {
-                        Some((fmt, args)) => strings::format(&fmt.text(), args),
+                        Some((fmt, args)) => strings::format(&val_text(fmt), args),
                         None => String::new(),
                     };
                     self.push(Slot::Str(text));
@@ -1124,9 +1322,9 @@ impl Machine {
                         return fault(self, host);
                     };
                     self.push(if ins.op == Op::ObjPositions {
-                        Slot::List(lists::positions(&a.text(), &b.text()))
+                        Slot::List(lists::positions(&val_text(&a), &val_text(&b)))
                     } else {
-                        let t = lists::tokenize(&a.text(), &b.text());
+                        let t = lists::tokenize(&val_text(&a), &val_text(&b));
                         // No tokens gives no list at all.
                         if t.is_empty() {
                             Slot::Obj(None)
@@ -1193,12 +1391,9 @@ impl Machine {
                     let (Some(b), Some(a)) = (self.pop_num(host), self.pop_num(host)) else {
                         return fault(self, host);
                     };
-                    let (a, b) = (client_int(a), client_int(b));
-                    let f = if ins.op == Op::ShiftLeft {
-                        maths::shl(a, b)
-                    } else {
-                        maths::shr(a, b)
-                    };
+                    let f =
+                        self.profile
+                            .shift(client_int(a), client_int(b), ins.op == Op::ShiftLeft);
                     self.push(Slot::Num(f as f64));
                 }
                 // `x in |a, b|`; a list `x` is in when each element is.
@@ -1281,7 +1476,43 @@ impl Machine {
                     self.with_span.pop();
                 }
 
-                Op::Unknown(n) => host.log(format!("gs2: unknown opcode {n} at op {at}, skipped")),
+                // `waitfor(object, event, timeout)` (4.20r8 on).
+                Op::WaitFor => {
+                    let (Some(t), Some(e), Some(o)) =
+                        (self.pop_num(host), self.pop_val(host), self.pop())
+                    else {
+                        return fault(self, host);
+                    };
+                    let event = event_name(&val_text(&e)).to_string();
+                    if !event.is_empty() && t > 0.0 {
+                        let object = match o {
+                            Slot::Obj(None) => None,
+                            Slot::Obj(Some((root, path))) if path.is_empty() => {
+                                Some(root_name(root).to_string())
+                            }
+                            Slot::Obj(Some((_, path))) => Some(path),
+                            other => Some(val_text(&self.value(other, host))),
+                        };
+                        return Outcome::WaitFor {
+                            object,
+                            event,
+                            timeout: t,
+                        };
+                    }
+                    self.push(Slot::Num(0.0));
+                }
+                // `OP_OBJ_COMPARE` (4.20r6 on): -1, 0 or 1.
+                Op::ObjCompare => {
+                    let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else {
+                        return fault(self, host);
+                    };
+                    self.push(Slot::Num(compare(&a, &b).signum() as f64));
+                }
+                Op::Unknown(n) => {
+                    if let Some(o) = self.run_extra(n, &ins.operand, at, host) {
+                        return o;
+                    }
+                }
                 other => host.log(format!(
                     "gs2: {other} at op {at} is not run yet (Stage D), skipped"
                 )),
@@ -1311,6 +1542,7 @@ impl Machine {
                     ret: Some(self.pc),
                     base: m,
                     locals: HashMap::new(),
+                    slots: Vec::new(),
                 });
                 self.pc = start;
                 return None;
@@ -1402,18 +1634,36 @@ fn root_name(r: Root) -> &'static str {
     }
 }
 
-/// Two numbers compare as numbers, two strings as text, and a string
-/// against a number as the number it reads as.
+/// Two numbers compare as numbers (equal within [`vm::TOLERANCE`], as in
+/// every VM read), two strings as text, and a string against a number as
+/// the number it reads as.
 fn compare(a: &Val, b: &Val) -> i32 {
-    let ord = match (a, b) {
-        (Val::Str(x), Val::Str(y)) => x.cmp(y),
-        _ => a
-            .num()
-            .partial_cmp(&b.num())
-            .unwrap_or(std::cmp::Ordering::Equal),
-    };
-    ord as i32
+    match (a, b) {
+        (Val::Str(x), Val::Str(y)) => x.cmp(y) as i32,
+        _ => vm::num_cmp(a.num(), b.num()),
+    }
 }
+
+/// A value as text, numbers written as the client writes them
+/// ([`vm::num_text`]).
+fn val_text(v: &Val) -> String {
+    match v {
+        Val::Num(n) => vm::num_text(*n),
+        Val::Str(s) => s.clone(),
+    }
+}
+
+/// The number after an opcode, written as an integer or a decimal.
+fn operand_num(o: &Operand) -> Option<f64> {
+    match o {
+        Operand::Int(v) => Some(*v as f64),
+        Operand::Decimal(d) => d.trim().parse().ok(),
+        _ => None,
+    }
+}
+
+/// The most local slots a frame has (opcodes 45 and 46).
+const SLOT_LIMIT: usize = 1024;
 
 /// A number in [0, 1). The client's generator is not reproduced; this is
 /// a small xorshift seeded from the clock.
