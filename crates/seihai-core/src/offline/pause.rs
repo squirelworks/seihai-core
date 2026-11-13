@@ -13,7 +13,7 @@
 //! * A paused player cannot be hurt, unless the level is a `sparringzone`.
 //!   Seihai has no sparring zones, so a paused player is never hurt.
 //! * Other players' names get ` (paused)` when their STATUS has the bit
-//!   (the 2.00 name label, 0x4ebd1a).
+//!   (the 2.00 name label).
 //! * The STATUS the server gives back is kept without bit 0x01. The lab
 //!   accounts' template has STATUS 21 (0x15), so copying the bit would show
 //!   the player as paused to everyone; only P and the focus set it.
