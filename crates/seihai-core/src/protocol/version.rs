@@ -97,12 +97,12 @@ pub enum ClientVersion {
     /// Graal 4.04 rev 2 (`G3D18026`), the Mac OS X PowerPC build. Gen 5.
     /// Its own token; the Windows 4.04r2 login and lobby with a `mac` list.
     V404R2Mac,
-    /// The Mac OS X PowerPC build archived as "Graal 4.20 rev 6" (`G3D27076`).
+    /// The Mac OS X PowerPC build labelled "Graal 4.20 rev 6" (`G3D27076`).
     /// Gen 5. Graal_analysis's token catalogue shows the label is wrong: the
     /// binary is dated 2006-09-19 and the Mac 4.10r2 download sends the same
     /// token, so it is a 4.10r2/4.11-era build. The real Mac 4.20r6 sends
     /// `G3D21126` and has no profile (see [`super::KNOWN_TOKENS`]). The
-    /// variant and label keep the archive's name.
+    /// variant and label keep that label.
     V420R6,
     /// Graal 4.20 rev 8 (`G3D20126`), Windows. Gen 5.
     V420R8,

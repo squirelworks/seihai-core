@@ -263,7 +263,7 @@ pub const KNOWN_TOKENS: &[KnownToken] = {
             "G3D27076",
             G::Wire,
             K::Game,
-            "Mac PPC build of 2006-09-19 (archived as 4.20r6, really 4.10r2/4.11 era), 4.10r2 Mac",
+            "Mac PPC build of 2006-09-19 (labelled 4.20r6, really 4.10r2/4.11 era), 4.10r2 Mac",
             &[V::V420R6],
         ),
         KnownToken::new(
