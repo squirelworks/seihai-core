@@ -5,8 +5,11 @@
 //! documents:
 //!
 //! - A leading `+` on the name means looped, and is stripped.
-//! - `.wav` is an effect. Any other extension is music, which this client
-//!   does not play: it is logged once and skipped.
+//! - `.wav` is an effect. Any other extension is music, which the 2.05
+//!   client does not play. The 6.x worlds play `.mp3` music through FMOD
+//!   (`#446`); Seihai plays an `.mp3` on one music slot of its own (see
+//!   [`SoundEngine::play`]). MIDI (`.mid`) has no synthesizer here: it is
+//!   logged once and skipped.
 //! - At most 8 effects play at once. A ninth is dropped.
 //! - Pan is `(sound x - listener x) * 150`, clamped to +/-10000, and
 //!   `reversestereo` negates it.
@@ -51,7 +54,7 @@ pub enum Outcome {
     Missing,
     /// The file is there but is not a WAV this decoder reads.
     Undecodable,
-    /// Not a `.wav`: music, which is not played.
+    /// Music this engine cannot play (MIDI, or an unknown extension).
     NotAnEffect,
     /// Eight voices are busy.
     VoiceCap,
@@ -67,13 +70,19 @@ pub fn wanted_name(file: &str) -> String {
 
 /// Whether `name` is a sound effect the engine plays: a `.wav` or an
 /// `.ogg` (6.x worlds ship Ogg effects), in any case, with or without a
-/// path. `.mp3` and `.mid` are music.
+/// path, or `.mp3` music. `.mid` is music this engine does not play.
 pub fn is_sound_name(name: &str) -> bool {
-    is_effect_name(&name.trim().to_ascii_lowercase())
+    let lower = name.trim().to_ascii_lowercase();
+    is_effect_name(&lower) || is_music_name(&lower)
 }
 
 fn is_effect_name(lower: &str) -> bool {
     lower.ends_with(".wav") || lower.ends_with(".ogg")
+}
+
+/// Music the engine plays: `.mp3` (the 6.x worlds' music).
+fn is_music_name(lower: &str) -> bool {
+    lower.ends_with(".mp3")
 }
 
 /// Pan for a sound at `sound_x` heard from `listener_x`.
@@ -105,6 +114,9 @@ pub struct SoundEngine {
     last_scan_ms: Option<u64>,
     cache: HashMap<String, Option<Arc<Pcm>>>,
     voices: Vec<Voice>,
+    /// The music playing, by its cache key: one at a time, outside the
+    /// effect voices.
+    music: Option<String>,
     /// Every distinct warning, in order. Each is printed once.
     pub warnings: Vec<String>,
     warned: HashSet<String>,
@@ -127,6 +139,7 @@ impl SoundEngine {
             last_scan_ms: None,
             cache: HashMap::new(),
             voices: Vec::new(),
+            music: None,
             warnings: Vec::new(),
             warned: HashSet::new(),
         }
@@ -190,6 +203,11 @@ impl SoundEngine {
     }
 
     /// Play `ev` as heard from `listener` (level tiles) at `now_ms`.
+    ///
+    /// An `.mp3` is music: it goes on a slot of its own, centred, outside
+    /// the eight effect voices, and a new piece stops the one playing.
+    /// That slot is Seihai's: how FMOD mixes the 6.x client's music was not
+    /// read, so the effect rules (pan, the voice cap) are left out of it.
     pub fn play(&mut self, ev: &SoundEvent, listener: (f32, f32), now_ms: u64) -> Outcome {
         if !self.enabled {
             return Outcome::Off;
@@ -197,6 +215,9 @@ impl SoundEngine {
         let (name, looped) = Self::normalize(&ev.file);
         if name.is_empty() {
             return Outcome::Missing;
+        }
+        if is_music_name(&name) {
+            return self.play_music(name, looped, now_ms);
         }
         if !is_effect_name(&name) {
             self.warn_once(format!("music skipped: {name}"));
@@ -250,11 +271,42 @@ impl SoundEngine {
         }
     }
 
+    fn play_music(&mut self, name: String, looped: bool, now_ms: u64) -> Outcome {
+        let pcm = match self.load(&name, now_ms) {
+            Ok(p) => p,
+            Err(o) => return o,
+        };
+        self.stop_music();
+        self.out.play(&PlayRequest {
+            name: name.clone(),
+            pcm,
+            pan: 0,
+            looped,
+        });
+        self.music = Some(name);
+        Outcome::Played
+    }
+
+    /// The music playing, by its lower-cased file name.
+    pub fn music(&self) -> Option<&str> {
+        self.music.as_deref()
+    }
+
+    /// Stop the music, if any plays.
+    pub fn stop_music(&mut self) {
+        if let Some(old) = self.music.take() {
+            self.out.stop(&old);
+        }
+    }
+
     /// `stopsound`: stop a sound by file name (the path is ignored).
     pub fn stop(&mut self, file: &str) {
         let (name, _) = Self::normalize(file);
         self.out.stop(&name);
         self.voices.retain(|v| v.name != name);
+        if self.music.as_deref() == Some(name.as_str()) {
+            self.music = None;
+        }
     }
 
     /// Leaving a level stops every looped effect.
@@ -529,9 +581,48 @@ mod tests {
         std::fs::copy(dir.join("tone440.mp3"), tmp.join("steps2.wav")).unwrap();
         assert_eq!(e.play(&ev("timpani.ogg"), L, 0), Outcome::Played);
         assert_eq!(e.play(&ev("steps2.wav"), L, 0), Outcome::Played);
-        assert_eq!(e.play(&ev("song.mp3"), L, 0), Outcome::NotAnEffect);
+        assert_eq!(e.play(&ev("song.mp3"), L, 0), Outcome::Missing);
         assert_eq!(rec.log().len(), 2);
-        assert!(is_sound_name("x.OGG") && !is_sound_name("x.mp3"));
+        assert!(is_sound_name("x.OGG") && is_sound_name("x.mp3") && !is_sound_name("x.mid"));
+    }
+
+    /// 6.x music (#446): an `.mp3` plays on the music slot, centred and
+    /// outside the voice cap; the next piece stops it; `stopsound` and
+    /// `stop_music` end it.
+    #[test]
+    fn mp3_music_plays_one_piece_at_a_time() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/sound");
+        let (mut e, rec, tmp) = engine("mp3music", &[("s.wav", 8000, 8000)]);
+        std::fs::copy(dir.join("tone440.mp3"), tmp.join("theme.mp3")).unwrap();
+        std::fs::copy(dir.join("tone440.mp3"), tmp.join("town.mp3")).unwrap();
+        for i in 0..MAX_VOICES {
+            assert_eq!(e.play(&ev("s.wav"), L, i as u64), Outcome::Played);
+        }
+        let far = SoundEvent {
+            file: "+Music/Theme.MP3".into(),
+            x: 60.0,
+            y: 0.0,
+        };
+        assert_eq!(e.play(&far, L, 10), Outcome::Played, "not held by the cap");
+        assert_eq!(e.music(), Some("theme.mp3"));
+        assert_eq!(
+            rec.log().last(),
+            Some(&Call::Play {
+                name: "theme.mp3".into(),
+                pan: 0,
+                looped: true
+            })
+        );
+        assert_eq!(e.play(&ev("town.mp3"), L, 20), Outcome::Played);
+        let log = rec.log();
+        assert_eq!(log[log.len() - 2], Call::Stop("theme.mp3".into()));
+        assert_eq!(e.music(), Some("town.mp3"));
+        e.stop("TOWN.mp3");
+        assert_eq!(e.music(), None);
+        assert_eq!(e.play(&ev("town.mp3"), L, 30), Outcome::Played);
+        e.stop_music();
+        assert_eq!(e.music(), None);
+        assert_eq!(rec.log().last(), Some(&Call::Stop("town.mp3".into())));
     }
 
     #[test]

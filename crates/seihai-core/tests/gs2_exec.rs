@@ -415,3 +415,52 @@ fn resolve_host_is_a_builtin_only_when_the_profile_has_it() {
         Some(Val::Str(String::new()))
     );
 }
+
+/// #446: a GS2 script's `play`, `playlooped` and `play2` are the GS1
+/// engine's sound effects, so they reach the session's sound queue;
+/// `stopsound` and `stopmidi` too. Era-free: a 6.x host plays them.
+#[test]
+fn play_and_its_kin_are_sound_effects() {
+    use seihai_core::scripting::gs2::compile::compile_gs2;
+    let src = "function onCreated() {\n\
+                 play(\"chest.wav\");\n\
+                 this.playlooped(\"+rain.wav\");\n\
+                 play2(\"swish.wav\", 12.5, 20);\n\
+                 stopsound(\"rain.wav\");\n\
+                 stopmidi();\n\
+               }\n";
+    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let mut h = EffectHost::new(
+        Era::for_version(seihai_core::protocol::ClientVersion::V6034),
+        7,
+    );
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    assert!(h.log.is_empty(), "{:?}", h.log);
+    assert_eq!(
+        h.effects,
+        [
+            Effect::Play {
+                obj: 7,
+                file: "chest.wav".into(),
+                looped: false,
+                at: None
+            },
+            Effect::Play {
+                obj: 7,
+                file: "+rain.wav".into(),
+                looped: true,
+                at: None
+            },
+            Effect::Play {
+                obj: 7,
+                file: "swish.wav".into(),
+                looped: false,
+                at: Some((12.5, 20.0))
+            },
+            Effect::StopSound {
+                file: "rain.wav".into()
+            },
+            Effect::StopMidi,
+        ]
+    );
+}

@@ -1826,6 +1826,26 @@ impl Host for EffectHost {
                 let addr = crate::net::resolve_host(&text(args, 0)).unwrap_or_default();
                 return Some(Val::Str(addr));
             }
+            // `play`, `playlooped` and `play2`: the GS1 engine's sound
+            // effects, so the sound reaches the session's sound queue as a
+            // GS1 script's does (#446). `play2` names the place; the others
+            // sound at the object.
+            "play" | "playlooped" => self.effects.push(Effect::Play {
+                obj,
+                file: text(args, 0),
+                looped: name == "playlooped",
+                at: None,
+            }),
+            "play2" => self.effects.push(Effect::Play {
+                obj,
+                file: text(args, 0),
+                looped: false,
+                at: Some((num(args, 1), num(args, 2))),
+            }),
+            "stopsound" => self.effects.push(Effect::StopSound {
+                file: text(args, 0),
+            }),
+            "stopmidi" => self.effects.push(Effect::StopMidi),
             // How `seteffect` mixes. The GS1 vocabulary dates it to 2.1;
             // a GS2 host takes it whatever era it was made for, and sends it
             // as GS1 does.

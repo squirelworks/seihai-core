@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.1.x
 
+- **0.1.7**: The client session hands the game the level's baddies, the leader flag and other players' carried objects; GS2 `play` and its kin make sound; `.mp3` music plays.
 - **0.1.6**: `KNOWN_TOKENS`, every login token in the Graal_analysis catalogue (78, with or without a profile), and its generated `documentation/version-tokens.tsv`.
 - **0.1.5**: A file the server names with no extension (the Graal3D Sky's textures) is taken instead of dropped, so Ato's 3D login reaches step 6.
 - **0.1.4**: The shared client session hands the game the server's floor items (`PLO_ITEMADD` / `PLO_ITEMDEL`), for other players' drops in Ato and Issho.
