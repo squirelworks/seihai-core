@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.1.x
 
+- **0.1.4**: The shared client session hands the game the server's floor items (`PLO_ITEMADD` / `PLO_ITEMDEL`), for other players' drops in Ato and Issho.
 - **0.1.3**: The shared client session hands the game the hits on the player (other players' swings and ids 40 and 46), for being hit in Ato and Issho.
 - **0.1.2**: The shared client session hands the view the player's weapons (built-in and the server's), for the item list and weapon key of Ato and Issho, and other players' bombs, arrows and throws.
 - **0.1.1**: GS1 writes `selectedweapon`, reads a bare-number loop condition as false, and rounds `timeout` down to whole 50 ms steps on 1.41 to 2.31, as real clients did in the lab.

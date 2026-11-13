@@ -233,6 +233,23 @@ pub struct Live {
     /// `OfflineSession::receive_all` on the victim's side, as the real
     /// clients do.
     pub hits: SharedHits,
+    /// Items the server put on the floor or took off it
+    /// (`PLO_ITEMADD` / `PLO_ITEMDEL`: other players' drops, and the
+    /// items the server rolls), in the order they came, for the game to
+    /// add to or take from the level.
+    pub items: SharedItems,
+}
+
+/// [`Live::items`].
+pub type SharedItems = Arc<Mutex<Vec<crate::protocol::ServerItem>>>;
+
+/// Move the server's floor item changes `st` holds to the game's queue.
+/// Drained either way, so nothing builds up with no game.
+fn take_items(st: &mut SessionState, to: Option<&SharedItems>) {
+    let items = std::mem::take(&mut st.items);
+    if let (Some(to), false) = (to, items.is_empty()) {
+        to.lock().unwrap_or_else(|e| e.into_inner()).extend(items);
+    }
 }
 
 /// [`Live::hits`].
@@ -987,6 +1004,7 @@ pub fn run_hooked(
     let level_objects = live.as_ref().map(|l| l.level_objects.clone());
     let throws = live.as_ref().map(|l| l.throws.clone());
     let hits = live.as_ref().map(|l| l.hits.clone());
+    let items = live.as_ref().map(|l| l.items.clone());
     let say = live.as_ref().map(|l| l.say.clone());
     let chat = live.as_ref().map(|l| l.chat.clone());
     let outbox = live.as_ref().map(|l| l.send.clone());
@@ -1114,6 +1132,7 @@ pub fn run_hooked(
                     }
                     take_level_objects(&mut st, level_objects.as_ref(), throws.as_ref());
                     take_hits(&mut st, hits.as_ref());
+                    take_items(&mut st, items.as_ref());
                     if let Some(w) = st.server_warp.take() {
                         if owed {
                             log_level(level_lines, &store, &st, out, shown);
@@ -1688,6 +1707,26 @@ mod others_tests {
         st.swings.push(2);
         take_hits(&mut st, None);
         assert!(st.swings.is_empty());
+    }
+
+    /// The server's floor item changes go to the game once each, in
+    /// order; with no game they are dropped.
+    #[test]
+    fn the_server_items_go_to_the_game() {
+        use crate::protocol::ServerItem;
+        let mut st = SessionState::for_version(ClientVersion::V205);
+        st.items.push(ServerItem::Del(10.0, 12.0));
+        st.items.push(ServerItem::Del(11.0, 12.0));
+        let to: SharedItems = Arc::default();
+        take_items(&mut st, Some(&to));
+        assert!(st.items.is_empty());
+        let got = std::mem::take(&mut *to.lock().unwrap());
+        assert!(
+            matches!(got[..], [ServerItem::Del(x, _), ServerItem::Del(y, _)] if x == 10.0 && y == 11.0)
+        );
+        st.items.push(ServerItem::Del(1.0, 1.0));
+        take_items(&mut st, None);
+        assert!(st.items.is_empty());
     }
 
     /// The chat lines move to the view once each; the state keeps none.
