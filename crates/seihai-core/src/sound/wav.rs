@@ -3,8 +3,14 @@
 //! Reads what the shipped sound folders hold: PCM at 8 or 16 bits, mono,
 //! at rates from 5 kHz to 27 kHz, and the four IMA ADPCM files (format
 //! tag 17) in the 2.22 folder. It also reads 24 and 32-bit PCM and
-//! WAVE_FORMAT_EXTENSIBLE wrappers of those. Anything else is an error,
-//! and the caller logs it and plays nothing.
+//! WAVE_FORMAT_EXTENSIBLE wrappers of those, A-law and mu-law (tags 6 and
+//! 7: 5.00r7 ships A-law menu sounds), and MPEG audio inside a WAV (tag
+//! 0x55: 43 of 5.00r7's sounds). Anything else is an error, and the caller
+//! logs it and plays nothing.
+//!
+//! [`decode_sound`] is the entry point for a sound of any kind: it looks at
+//! the bytes, not the name, because 6.x worlds ship an MP3 as
+//! `steps2.wav` (the 6.1.1.3 install, survey #446), and Ogg Vorbis effects.
 
 /// Decoded audio: interleaved signed 16-bit samples.
 #[derive(Debug, Clone, PartialEq)]
@@ -131,6 +137,9 @@ pub fn decode_wav(bytes: &[u8]) -> Result<Pcm, String> {
             .map(|c| i16::from_le_bytes([c[2], c[3]]))
             .collect(),
         (17, 4) => decode_ima(data, &fmt)?,
+        (6, 8) => data.iter().map(|&b| alaw(b)).collect(),
+        (7, 8) => data.iter().map(|&b| ulaw(b)).collect(),
+        (0x55, _) => return decode_mp3(data),
         (tag, bits) => return Err(format!("unsupported WAV format tag {tag} at {bits} bits")),
     };
     Ok(Pcm {
@@ -138,6 +147,89 @@ pub fn decode_wav(bytes: &[u8]) -> Result<Pcm, String> {
         rate: fmt.rate,
         samples,
     })
+}
+
+/// G.711 A-law to linear 16-bit.
+fn alaw(b: u8) -> i16 {
+    let a = b ^ 0x55;
+    let exp = (a & 0x70) >> 4;
+    let mant = (a & 0x0F) as i16;
+    let mag = if exp == 0 {
+        (mant << 4) + 8
+    } else {
+        ((mant << 4) + 0x108) << (exp - 1)
+    };
+    if a & 0x80 != 0 {
+        mag
+    } else {
+        -mag
+    }
+}
+
+/// G.711 mu-law to linear 16-bit.
+fn ulaw(b: u8) -> i16 {
+    let u = !b;
+    let exp = (u & 0x70) >> 4;
+    let mant = (u & 0x0F) as i16;
+    let mag = (((mant << 3) + 0x84) << exp) - 0x84;
+    if u & 0x80 != 0 {
+        -mag
+    } else {
+        mag
+    }
+}
+
+/// MPEG audio (MP3, or MP1/MP2): a whole file or a WAV's tag-0x55 data.
+pub fn decode_mp3(bytes: &[u8]) -> Result<Pcm, String> {
+    let d = nanomp3::decode_all::<i16>(bytes);
+    let channels = d.channels.ok_or("no MPEG audio frames")?.num() as u16;
+    if d.samples.is_empty() || d.sample_rate == 0 {
+        return Err("no MPEG audio frames".into());
+    }
+    Ok(Pcm {
+        channels,
+        rate: d.sample_rate,
+        samples: d.samples,
+    })
+}
+
+/// Ogg Vorbis.
+pub fn decode_ogg(bytes: &[u8]) -> Result<Pcm, String> {
+    let mut r = lewton::inside_ogg::OggStreamReader::new(std::io::Cursor::new(bytes))
+        .map_err(|e| format!("Ogg Vorbis: {e}"))?;
+    let channels = r.ident_hdr.audio_channels as u16;
+    let rate = r.ident_hdr.audio_sample_rate;
+    if channels == 0 || channels > 2 {
+        return Err(format!("unsupported channel count {channels}"));
+    }
+    let mut samples = Vec::new();
+    while let Some(p) = r
+        .read_dec_packet_itl()
+        .map_err(|e| format!("Ogg Vorbis: {e}"))?
+    {
+        samples.extend(p);
+    }
+    Ok(Pcm {
+        channels,
+        rate,
+        samples,
+    })
+}
+
+/// Decode a sound by its contents, whatever its name says: RIFF/WAVE, Ogg
+/// Vorbis, or MPEG audio (an ID3 tag or a frame sync at the start).
+pub fn decode_sound(bytes: &[u8]) -> Result<Pcm, String> {
+    if bytes.starts_with(b"RIFF") {
+        decode_wav(bytes)
+    } else if bytes.starts_with(b"OggS") {
+        decode_ogg(bytes)
+    } else if bytes.starts_with(b"ID3")
+        || (bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] & 0xE0 == 0xE0)
+    {
+        decode_mp3(bytes)
+    } else {
+        Err("not a sound file (no RIFF, OggS or MPEG header)".into())
+    }
 }
 
 /// Microsoft IMA ADPCM: blocks with a 4-byte header per channel (the
@@ -295,10 +387,10 @@ mod tests {
         assert!(decode_wav(b"").is_err());
         assert!(decode_wav(b"RIFF0000WAVEjunk").is_err());
         assert!(decode_wav(b"not a wav file at all").is_err());
-        // mu-law (tag 7) is not supported.
-        assert!(decode_wav(&wav(7, 1, 8000, 8, 1, &[], &[0, 1]))
+        // MS ADPCM (tag 2) is not supported: no shipped sound uses it.
+        assert!(decode_wav(&wav(2, 1, 8000, 4, 256, &[], &[0, 1]))
             .unwrap_err()
-            .contains("tag 7"));
+            .contains("tag 2"));
         // A fmt with no data chunk.
         let mut b = wav(1, 1, 8000, 8, 1, &[], &[]);
         b.truncate(b.len() - 8);
@@ -353,5 +445,62 @@ mod tests {
             n += 1;
         }
         eprintln!("decoded {n} files");
+    }
+
+    // A 0.25 s 440 Hz tone at 22050 Hz, mono, made with ffmpeg (libmp3lame
+    // 32 kbps; libvorbis q0).
+    const TONE_MP3: &[u8] = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/sound/tone440.mp3"
+    ));
+    const TONE_OGG: &[u8] = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/sound/tone440.ogg"
+    ));
+
+    fn is_tone(p: &Pcm) {
+        assert_eq!((p.channels, p.rate), (1, 22050));
+        // About 0.25 s, give or take a codec frame.
+        assert!(
+            (200..=320).contains(&p.duration_ms()),
+            "{} ms",
+            p.duration_ms()
+        );
+        let peak = p.samples.iter().map(|s| s.unsigned_abs()).max().unwrap();
+        // ffmpeg's sine source is at 1/8 of full scale (about 4096).
+        assert!((3000..6000).contains(&peak), "peak {peak}");
+    }
+
+    #[test]
+    fn g711_a_law_and_mu_law() {
+        assert_eq!((alaw(0xD5), alaw(0x55)), (8, -8));
+        assert_eq!(alaw(0xAA), 32256);
+        assert_eq!((ulaw(0xFF), ulaw(0x80), ulaw(0x00)), (0, 32124, -32124));
+        let p = decode_wav(&wav(6, 1, 22050, 8, 1, &[], &[0xD5, 0xAA])).unwrap();
+        assert_eq!(p.samples, [8, 32256]);
+        let p = decode_wav(&wav(7, 2, 8000, 8, 2, &[], &[0xFF, 0x80])).unwrap();
+        assert_eq!(
+            (p.channels, p.samples.as_slice()),
+            (2, [0, 32124].as_slice())
+        );
+    }
+
+    #[test]
+    fn mp3_ogg_and_mpeg_in_wav() {
+        is_tone(&decode_mp3(TONE_MP3).unwrap());
+        is_tone(&decode_ogg(TONE_OGG).unwrap());
+        // 5.00r7: MPEG Layer 3 inside a WAV, format tag 0x55.
+        is_tone(&decode_wav(&wav(0x55, 1, 22050, 0, 1, &[], TONE_MP3)).unwrap());
+    }
+
+    #[test]
+    fn sounds_are_sniffed_by_content_not_name() {
+        // 6.1.1.3's steps2.wav is an MP3 with an ID3 tag.
+        assert!(TONE_MP3.starts_with(b"ID3") || TONE_MP3[0] == 0xFF);
+        is_tone(&decode_sound(TONE_MP3).unwrap());
+        is_tone(&decode_sound(TONE_OGG).unwrap());
+        assert_eq!(decode_sound(&test_wav(8000, 800)).unwrap().rate, 8000);
+        assert!(decode_sound(b"MThd midi is music").is_err());
+        assert!(decode_sound(b"").is_err());
     }
 }

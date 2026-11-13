@@ -21,7 +21,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use super::wav::{decode_wav, Pcm};
+use super::wav::{decode_sound, Pcm};
 use super::{PlayRequest, SoundOut};
 
 /// Effects that can play at once.
@@ -65,10 +65,15 @@ pub fn wanted_name(file: &str) -> String {
     file.strip_prefix('+').unwrap_or(file).trim().to_string()
 }
 
-/// Whether `name` is a sound effect the engine plays: a `.wav`, in any
-/// case, with or without a path.
+/// Whether `name` is a sound effect the engine plays: a `.wav` or an
+/// `.ogg` (6.x worlds ship Ogg effects), in any case, with or without a
+/// path. `.mp3` and `.mid` are music.
 pub fn is_sound_name(name: &str) -> bool {
-    name.trim().to_ascii_lowercase().ends_with(".wav")
+    is_effect_name(&name.trim().to_ascii_lowercase())
+}
+
+fn is_effect_name(lower: &str) -> bool {
+    lower.ends_with(".wav") || lower.ends_with(".ogg")
 }
 
 /// Pan for a sound at `sound_x` heard from `listener_x`.
@@ -193,7 +198,7 @@ impl SoundEngine {
         if name.is_empty() {
             return Outcome::Missing;
         }
-        if !name.ends_with(".wav") {
+        if !is_effect_name(&name) {
             self.warn_once(format!("music skipped: {name}"));
             return Outcome::NotAnEffect;
         }
@@ -232,7 +237,7 @@ impl SoundEngine {
         if name.is_empty() {
             return Err("no name".into());
         }
-        match decode_wav(bytes) {
+        match decode_sound(bytes) {
             Ok(pcm) => {
                 self.cache.insert(name, Some(Arc::new(pcm)));
                 Ok(())
@@ -268,7 +273,7 @@ impl SoundEngine {
         };
         let decoded = std::fs::read(&path)
             .map_err(|e| e.to_string())
-            .and_then(|b| decode_wav(&b));
+            .and_then(|b| decode_sound(&b));
         match decoded {
             Ok(pcm) => {
                 let pcm = Arc::new(pcm);
@@ -512,6 +517,21 @@ mod tests {
         assert_eq!(e.play(&ev("song.mid"), L, 1), Outcome::NotAnEffect);
         assert!(rec.log().is_empty());
         assert_eq!(e.warnings, vec!["music skipped: song.mid".to_string()]);
+    }
+
+    /// 6.x: an Ogg effect plays, and so does an MP3 saved as `.wav` (the
+    /// 6.1.1.3 install's `steps2.wav`); `.mp3` by name is still music.
+    #[test]
+    fn ogg_effects_and_an_mp3_named_wav_play() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/sound");
+        let (mut e, rec, tmp) = engine("formats", &[]);
+        std::fs::copy(dir.join("tone440.ogg"), tmp.join("timpani.ogg")).unwrap();
+        std::fs::copy(dir.join("tone440.mp3"), tmp.join("steps2.wav")).unwrap();
+        assert_eq!(e.play(&ev("timpani.ogg"), L, 0), Outcome::Played);
+        assert_eq!(e.play(&ev("steps2.wav"), L, 0), Outcome::Played);
+        assert_eq!(e.play(&ev("song.mp3"), L, 0), Outcome::NotAnEffect);
+        assert_eq!(rec.log().len(), 2);
+        assert!(is_sound_name("x.OGG") && !is_sound_name("x.mp3"));
     }
 
     #[test]
