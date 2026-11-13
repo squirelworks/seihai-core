@@ -63,7 +63,7 @@ pub fn zeros(n: i32) -> Vec<Value> {
     vec![Value::Val(Val::Num(0.0)); n.clamp(0, 10_000) as usize]
 }
 
-/// `s.tokenize(seps)` as the client's `0x3c1884` splits: a token runs to
+/// `s.tokenize(seps)` as the client splits it: a token runs to
 /// the next separator byte; one that starts with `"` runs to the next lone
 /// `"`, and `""` inside it is one `"`. Tokens are trimmed (`trim`); an
 /// empty token is dropped unless it was quoted.
@@ -113,7 +113,7 @@ pub fn positions(s: &str, t: &str) -> Vec<Value> {
 }
 
 /// `a.subarray(start, len)`: `start` kept to the list, a `len` below 0 runs
-/// to the end (`0x3da47c`).
+/// to the end.
 pub fn subarray(list: &[Value], start: i32, len: i32) -> Vec<Value> {
     let n = list.len() as i64;
     let start = (start as i64).clamp(0, n);

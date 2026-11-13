@@ -298,6 +298,9 @@ pub struct OfflineSession {
     /// This build's baddy and tile rules (lava, the swamp soldier's sword
     /// window): see [`crate::protocol::WorldRules`].
     pub world: crate::protocol::WorldRules,
+    /// The spark on the player's sword after it hit a baddy's sword
+    /// (`baddies::SwordSpark`); drawn with the player's facing.
+    pub sword_spark: Option<crate::baddies::SwordSpark>,
     /// Items lying on the floor of the current level.
     pub floor_items: Vec<crate::items::FloorItem>,
     /// The 1.x drop roll's `Random`.
@@ -727,6 +730,7 @@ impl OfflineSession {
             mannerisms: crate::protocol::MANNER_205,
             drops: crate::protocol::DROPS_142,
             world: crate::protocol::WORLD_201,
+            sword_spark: None,
             floor_items: Vec::new(),
             item_rng: crate::items::DelphiRandom::from_clock(),
             item_ms: 0,
@@ -853,7 +857,7 @@ impl OfflineSession {
         }
         if let Some(c) = cur_power {
             // Zero is applied, and the player dies: the 2.05 prop reader
-            // (case 2 at 0x530dd8) has no zero test, and a 2.22 client sent
+            // (case 2) has no zero test, and a 2.22 client sent
             // the dead gani on an injected CURPOWER 0. Respawn gives hearts.
             if c == 0 && self.hearts_half() > 0 {
                 eprintln!(
