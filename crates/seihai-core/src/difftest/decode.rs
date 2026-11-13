@@ -921,14 +921,20 @@ mod tests {
         assert!(!gen5_for(ClientVersion::V512, true, 0x21).is_round_down());
         assert!(!gen5_for(ClientVersion::V222, false, 0x21).is_round_down());
         assert!(!gen5_for(ClientVersion::V603R7, false, 0x21).is_round_down());
-        // The Mac PowerPC 4.04r2 and 5.12 round down too (read in their
-        // binaries, Tiger lab 2026-11-13), but only the Windows 5.12
-        // compresses every frame; the Mac 4.20r6 was not read.
-        for v in [ClientVersion::V404R2Mac, ClientVersion::V512Mac] {
+        // The 4.x builds (Windows 4.04r2 and 4.20r8, Mac PowerPC 4.04r2 and
+        // 4.20r6) and the Mac 5.12 round down too (read in their binaries,
+        // 2026-11-13), but only the Windows 5.12 compresses every frame.
+        for v in [
+            ClientVersion::V404R2,
+            ClientVersion::V404R2Mac,
+            ClientVersion::V420R6,
+            ClientVersion::V420R8,
+            ClientVersion::V512Mac,
+        ] {
             assert!(gen5_for(v, false, 0x21).is_round_down(), "{}", v.label());
             assert!(!v.profile().protocol.gen5_compress_all, "{}", v.label());
         }
-        assert!(!gen5_for(ClientVersion::V420R6, false, 0x21).is_round_down());
+        assert!(!gen5_for(ClientVersion::V500R7, false, 0x21).is_round_down());
         assert!(ClientVersion::V512.profile().protocol.gen5_compress_all);
         assert!(!ClientVersion::V524R4.profile().protocol.gen5_compress_all);
     }
