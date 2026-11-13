@@ -921,6 +921,10 @@ impl Runs {
 pub struct Scripts {
     pub gs1: Runs,
     pub gs2: Runs,
+    /// The GS2 builtin `resolveHost(host)`, a DNS lookup of a host name.
+    /// Only 6.00r4 registers it: 6.00r2 and the 6.037 stub have no such
+    /// name (Graal_analysis `client-internals/engine-600r4.md`).
+    pub resolve_host: bool,
 }
 
 impl Scripts {
@@ -928,11 +932,13 @@ impl Scripts {
     pub const GS1: Scripts = Scripts {
         gs1: Runs::Yes,
         gs2: Runs::No,
+        resolve_host: false,
     };
     /// No binary: neither is known.
     pub const UNKNOWN: Scripts = Scripts {
         gs1: Runs::Unknown,
         gs2: Runs::Unknown,
+        resolve_host: false,
     };
 }
 
@@ -1515,7 +1521,7 @@ mod tests {
             }
         }
         assert_eq!(seen, classic.len() + gen5.len());
-        assert_eq!(lobby, 13);
+        assert_eq!(lobby, 14);
         assert_eq!(seen + 12 + lobby, PROFILES.len());
     }
 

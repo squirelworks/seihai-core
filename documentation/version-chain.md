@@ -583,10 +583,18 @@ Generated; do not edit between the markers.
 - unknown (ui): whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
 - source: unpacked from Themida, lab on Windows 11 (RunAsDate) and the 6.x thread's notes (v5v6/6x-findings.md): 93 PLO ids (165 and 169 out), token G3D26090 as 5.30r3, Tempus Sans ITC 24, 6.x long frame lengths
 
+#### 6.00r4 (`G3D26090`, binary, linked 2011-06-26)
+
+- scripts: **resolve_host**: no -> yes
+- unknown (pli): not read; 6.00r2's set (Linux 6.01r1's) is taken
+- unknown (framing): the 0xFFFF long frame length is taken from 6.00r2, which takes it from 6.01r1
+- source: unpacked from Themida (static read, Graal_analysis client-internals/engine-600r4.md) and lab on Windows 11 (clock set back): 6.00r2's token and PLO set; adds resolveHost and the HTTP keep-alive header
+
 #### 6.015 (`G3D3007A`, inferred)
 
 - protocol: **plo (server ids handled)**: -175 SHOOT, -184 TAKESCREENSHOT (93 -> 91 ids)
 - scripts: **gs2**: yes -> unknown
+- scripts: **resolve_host**: yes -> no
 - unknown (binary): no 6.00r7 or 6.01r5 binary; every value of this step is inferred
 - unknown (token): G3D3007A comes from GServer-v2's allowedversions.txt and gs2lib only; no 6.00r7 or 6.01r5 login was captured
 - unknown (plo): Linux 6.01r1's set; whether 6.00r7 (the earlier of the two builds) already drops 175 and 184 is not known
@@ -624,5 +632,4 @@ Generated; do not edit between the markers.
 - unknown (lab): the Linux client was not run; the Windows 6.03r7 lab run (2026-10-31) stands in for it
 - unknown (files): Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for
 - source: binary (Linux x64 ELF, not packed): token stored as the scrambled string g3d0511c, login list linux plus four machine ids (eth0 MAC md5, /etc inode md5, empty, kernel string); PLO and PLI sets are the ones the Windows row took from it; gs2lib names the token 6.037 (Linux)
-
 <!-- version-chain:end -->

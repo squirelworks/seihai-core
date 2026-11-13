@@ -1055,7 +1055,7 @@ pub const CHAIN: &[Step] = &[
         basis: Basis::Binary,
         delta: Delta {
             // No 131 in its server ids; nothing read on GS1.
-            scripts: Some(Scripts { gs1: Runs::Unknown, gs2: Runs::No }),
+            scripts: Some(Scripts { gs1: Runs::Unknown, gs2: Runs::No, resolve_host: false }),
             // Against 2.31: 44, 101 and 102 in; 170, 177, 182, 183 and MOVE2 (189) out.
             plo: IdDelta::plus_minus(&[44, 101, 102], &[170, 177, 182, 183, 189]),
             // PUTNPC (21), 36 and 81 in; TAMPERCHECK (39), PROCESSLIST (44)
@@ -1096,7 +1096,7 @@ pub const CHAIN: &[Step] = &[
         basis: Basis::Binary,
         delta: Delta {
             // 131 handled and its GS2 VM read (gs2-executor.md); nothing read on GS1.
-            scripts: Some(Scripts { gs1: Runs::Unknown, gs2: Runs::Yes }),
+            scripts: Some(Scripts { gs1: Runs::Unknown, gs2: Runs::Yes, resolve_host: false }),
             plo: IdDelta::plus_minus(&[67, 74, 82, 104, 131, 132, 133, 134, 187, 189], &[44]),
             pli: IdDelta::plus(&[46, 50, 93, 96, 97, 98, 152, 154, 155, 156, 157, 158]),
             // Same G3D30123 login as 3.04; the 2026-10-31 Tiger lab run sent shape D (id 7 and id 1 in one plain frame).
@@ -1329,6 +1329,27 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "ui", what: "whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them" },
         ],
     },
+    // 6.00r4: the same program two weeks on, with the same token and the same
+    // 93 PLO ids (Graal_analysis client-internals/engine-600r4.md, v5v6 notes).
+    // It adds the GS2 builtin resolveHost and the HTTP header
+    // `Connection: Keep-Alive`; Seihai has no 6.x HTTP client, so only the
+    // first is a profile field.
+    Step {
+        version: ClientVersion::V600R4,
+        label: "6.00r4",
+        token: "G3D26090",
+        date: "2011-06-26",
+        basis: Basis::Binary,
+        delta: Delta {
+            scripts: Some(Scripts { gs1: Runs::Unknown, gs2: Runs::Yes, resolve_host: true }),
+            ..Delta::NONE
+        },
+        source: "unpacked from Themida (static read, Graal_analysis client-internals/engine-600r4.md) and lab on Windows 11 (clock set back): 6.00r2's token and PLO set; adds resolveHost and the HTTP keep-alive header",
+        unknown: &[
+            Unknown { area: "pli", what: "not read; 6.00r2's set (Linux 6.01r1's) is taken" },
+            Unknown { area: "framing", what: "the 0xFFFF long frame length is taken from 6.00r2, which takes it from 6.01r1" },
+        ],
+    },
     // 6.015 and 6.034 have no binary. Their tokens are in GServer-v2's
     // allowedversions.txt (G3D3007A for 6.00r7 and 6.01r5, G3D2505C for
     // 6.03r4) and stock gs2lib knows both (CLVER_6_015, CLVER_6_034). Their id
@@ -1395,7 +1416,7 @@ pub const CHAIN: &[Step] = &[
         delta: Delta {
             lobby: Some(Some(LOBBY_531)),
             // A binary again after the two inferred 6.0x rows: 131 handled.
-            scripts: Some(Scripts { gs1: Runs::Unknown, gs2: Runs::Yes }),
+            scripts: Some(Scripts { gs1: Runs::Unknown, gs2: Runs::Yes, resolve_host: false }),
             ..Delta::NONE
         },
         source: "unpacked from Themida and lab: 92 PLO ids (against 6.00r2: 175 and 184 out, 111 in), equal to Linux 6.03r7; send ids and the long frame length from Linux 6.03r7 (same release); 111 stores its body as creationtime.dat and gets no reply, so Seihai drops it; no expiry date; draws no tiles before the warp",
@@ -2010,6 +2031,14 @@ pub fn diff(a: &VersionProfile, b: &VersionProfile) -> Vec<Change> {
         &a.scripts.gs2,
         &b.scripts.gs2,
         runs_text,
+    );
+    value_change(
+        &mut o,
+        "scripts",
+        "resolve_host",
+        &a.scripts.resolve_host,
+        &b.scripts.resolve_host,
+        yes_no,
     );
     o
 }
