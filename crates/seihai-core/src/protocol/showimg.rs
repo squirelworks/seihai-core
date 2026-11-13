@@ -398,7 +398,20 @@ mod tests {
             .filter(|p| p.protocol.showimg.is_some())
             .map(|p| p.label)
             .collect();
-        assert_eq!(with, ["2.17", "2.22", "2.31", "4.04r2", "4.20r6", "4.20r8"]);
+        // The Mac 4.04r2 and 4.20r6 keep the Windows 4.04r2's record; their
+        // own showimg sends were not timed.
+        assert_eq!(
+            with,
+            [
+                "2.17",
+                "2.22",
+                "2.31",
+                "4.04r2",
+                "4.04r2 Mac",
+                "4.20r6",
+                "4.20r8"
+            ]
+        );
         let i404 = ClientVersion::V404R2.profile().protocol.showimg.unwrap();
         assert!(!i404.needs_others);
         assert_eq!(i404.period, MS(5145));

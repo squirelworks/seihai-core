@@ -509,11 +509,20 @@ Generated; do not edit between the markers.
 - unknown (3d): Graal3DEngine.dll (Torque protocol 19, UDP on listed port + 1) is not modelled; seihai-ato::torque has its profile
 - source: binary (stock engine DLL unpacked from the Thinstall installer) and one live lab run (live-behaviour-404): 98 PLO ids, login id 5 with G3D17026 and win,<3 md5> in the plain zlib frame, then 37; Login mode while the server name starts with login, until 178
 
+#### 4.04r2 Mac (`G3D18026`, binary)
+
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252 -> first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0
+- unknown (plo): the PLO set is taken from the Windows 4.04r2; the Mac binary's switch was not read
+- unknown (pli): the Windows 4.04r2 set is kept; the lab saw 2, 18, 23, 24, 37, 38, 46 and 157
+- unknown (login): Seihai sends the three machine fields as empty quoted strings; the real client sent the MAC and /etc stat MD5s and an empty fourth field
+- unknown (3d): the Torque 3D mode is not modelled
+- source: binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32), login id 5 with G3D18026 and mac,<md5>,<md5>,"" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38
+
 #### 4.20r6 (`G3D27076`, binary, linked 2006-09)
 
 - protocol: **plo (server ids handled)**: +107 BOARDLAYER, +108 UNKNOWN108; -41 STARTMESSAGE (98 -> 99 ids)
 - protocol: **pli (client ids sent)**: +162 RC_UNKNOWN162 (58 -> 59 ids)
-- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252 -> first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS mac and code page 0
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0 -> first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS mac and code page 0
 - unknown (pli): 162 (the answer to 108) is from the Mac binary and 2, 23, 24, 34, 37, 44, 46 and 157 were seen in the lab; the rest of 4.20r8's set is taken
 - unknown (login): the real client sent mac,"",<md5 hex of the /etc stat>,"" in the lab (the MAC field empty under qemu's NIC); Seihai sends all three machine fields as empty quoted strings
 - unknown (flags): the real client sent no 18 for the lab level's gr.x/gr.y clientside setstring; Seihai's flat path does
@@ -551,9 +560,19 @@ Generated; do not edit between the markers.
 - unknown (framing): a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
 - source: unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed
 
+#### 5.12 Mac (`G3D15097`, binary)
+
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends mac,"","","","8.0.0  Darwin Kernel Version 8.0.0: Sat Mar 26 14:15:22 PST 2005; root:xnu-792.obj~1/RELEASE_PPC"; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0
+- unknown (plo): the PLO set is taken from the Windows 5.12; the Mac binary's switch was not read
+- unknown (pli): the Windows 5.12 set is kept; the lab saw 2, 23, 24, 37, 46 and 157
+- unknown (login): the kernel string is the one Mac OS X 10.4.0 gave in the lab; a real Mac sends its own
+- unknown (render): on a modern gserver world the level stayed black even with the lab's render shim; the cause was not found
+- source: binary (Mac OS X PPC Mach-O, main exe sha256 a76dc557...2d206f10; the "Unknown" v5 Mac builds are byte-identical copies) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways, login id 5 with G3D15097 and mac,<md5>,<md5>,"",<quoted Darwin kernel string> in the plain zlib frame; auto-login as guest with a client-made password; first props as 4.04r2 Mac; asked arial.ttf, chest.png, state.png and steps.wav; sent no 18
+
 #### 5.24r4 (`G3D15010`, binary, linked 2010-02-01)
 
 - protocol: **plo (server ids handled)**: +109 UNKNOWN109, +198 SERVEROPTIONS; -75 PROFILE, -132 UNKNOWN132, -133 UNKNOWN133, -171 BIGMAP, -193 UNKNOWN193 (100 -> 97 ids)
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends mac,"","","","8.0.0  Darwin Kernel Version 8.0.0: Sat Mar 26 14:15:22 PST 2005; root:xnu-792.obj~1/RELEASE_PPC"; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0 -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - protocol: **gen5_round_down**: yes -> no
 - unknown (pli): not read; 5.00r7's set is kept
 - unknown (files): stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md

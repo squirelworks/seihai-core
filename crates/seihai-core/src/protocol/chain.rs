@@ -22,7 +22,8 @@
 //! `documentation/version-chain.tsv` (a unit test fails when it is stale).
 
 use super::lobby::{
-    Lobby, LOBBY_404, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_531, LOBBY_603_LINUX,
+    Lobby, LOBBY_404, LOBBY_404_MAC, LOBBY_420_MAC, LOBBY_500, LOBBY_512, LOBBY_512_MAC, LOBBY_531,
+    LOBBY_603_LINUX,
 };
 use super::login::{LoginInfo, LOGIN_217, LOGIN_222, LOGIN_231, LOGIN_304, LOGIN_3153};
 use super::profile::{
@@ -1181,6 +1182,29 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "3d", what: "Graal3DEngine.dll (Torque protocol 19, UDP on listed port + 1) is not modelled; seihai-ato::torque has its profile" },
         ],
     },
+    // The Mac PowerPC 4.04r2 and 5.12 were run unchanged on Mac OS X 10.4 in
+    // qemu against the lab gserver (Tiger lab, 2026-11-13, `mac-ppc-404-512`):
+    // each logged in on the Login server, took the 178 warp, loaded the
+    // level and walked. Each step changes only its login and lobby, so the
+    // Windows build after it starts from the same row as before.
+    Step {
+        version: ClientVersion::V404R2Mac,
+        label: "4.04r2 Mac",
+        token: "G3D18026",
+        date: "",
+        basis: Basis::Binary,
+        delta: Delta {
+            lobby: Some(Some(LOBBY_404_MAC)),
+            ..Delta::NONE
+        },
+        source: "binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32), login id 5 with G3D18026 and mac,<md5>,<md5>,\"\" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38",
+        unknown: &[
+            Unknown { area: "plo", what: "the PLO set is taken from the Windows 4.04r2; the Mac binary's switch was not read" },
+            Unknown { area: "pli", what: "the Windows 4.04r2 set is kept; the lab saw 2, 18, 23, 24, 37, 38, 46 and 157" },
+            Unknown { area: "login", what: "Seihai sends the three machine fields as empty quoted strings; the real client sent the MAC and /etc stat MD5s and an empty fourth field" },
+            Unknown { area: "3d", what: "the Torque 3D mode is not modelled" },
+        ],
+    },
     Step {
         version: ClientVersion::V420R6,
         label: "4.20r6",
@@ -1276,6 +1300,24 @@ pub const CHAIN: &[Step] = &[
         ],
     },
     Step {
+        version: ClientVersion::V512Mac,
+        label: "5.12 Mac",
+        token: "G3D15097",
+        date: "",
+        basis: Basis::Binary,
+        delta: Delta {
+            lobby: Some(Some(LOBBY_512_MAC)),
+            ..Delta::NONE
+        },
+        source: "binary (Mac OS X PPC Mach-O, main exe sha256 a76dc557...2d206f10; the \"Unknown\" v5 Mac builds are byte-identical copies) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways, login id 5 with G3D15097 and mac,<md5>,<md5>,\"\",<quoted Darwin kernel string> in the plain zlib frame; auto-login as guest with a client-made password; first props as 4.04r2 Mac; asked arial.ttf, chest.png, state.png and steps.wav; sent no 18",
+        unknown: &[
+            Unknown { area: "plo", what: "the PLO set is taken from the Windows 5.12; the Mac binary's switch was not read" },
+            Unknown { area: "pli", what: "the Windows 5.12 set is kept; the lab saw 2, 23, 24, 37, 46 and 157" },
+            Unknown { area: "login", what: "the kernel string is the one Mac OS X 10.4.0 gave in the lab; a real Mac sends its own" },
+            Unknown { area: "render", what: "on a modern gserver world the level stayed black even with the lab's render shim; the cause was not found" },
+        ],
+    },
+    Step {
         version: ClientVersion::V524R4,
         label: "5.24r4",
         token: "G3D15010",
@@ -1284,6 +1326,8 @@ pub const CHAIN: &[Step] = &[
         delta: Delta {
             plo: IdDelta::plus_minus(&[109, 198], &[75, 132, 133, 171, 193]),
             gen5_round_down: Some(false),
+            // The Windows 5.12 lobby again, after the Mac 5.12 row.
+            lobby: Some(Some(LOBBY_512)),
             ..Delta::NONE
         },
         source: "unpacked from MoleBox and lab: 97 PLO ids (75, 132, 133, 171 and 193 out, 109 and 198 in), one MSVC exe, short bodies sent uncompressed as 2.22, font=Arial",
@@ -1684,9 +1728,14 @@ fn lobby_text(l: &Option<Lobby>) -> String {
             String::from_utf8_lossy(&l.login_tail()),
             match l.after_login {
                 Some(a) => format!(
-                    "; after the login {} (first session also {}), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS {} and code page {}",
+                    "; after the login {} (first session also {}), after the burst idle.gani, {}46, 44, props with OS {} and code page {}",
                     a.after_language.join(", "),
                     a.first_session_files.join(", "),
+                    if a.texts.is_empty() {
+                        ""
+                    } else {
+                        "152/154 PM and lister setup, "
+                    },
                     a.os_props.0,
                     a.os_props.1
                 ),

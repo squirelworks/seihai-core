@@ -1589,7 +1589,7 @@ mod tests {
             }
         }
         assert_eq!(seen, classic.len() + gen5.len());
-        assert_eq!(lobby, 14);
+        assert_eq!(lobby, 16);
         assert_eq!(seen + 12 + lobby, PROFILES.len());
     }
 
