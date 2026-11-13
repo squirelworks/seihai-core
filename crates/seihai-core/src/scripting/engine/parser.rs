@@ -334,7 +334,7 @@ impl<'a> Parser<'a> {
                     self.recover();
                     return Some(Stmt::Block(Vec::new()));
                 }
-                let cond = self.expr();
+                let cond = self.cond();
                 self.expect_op(")");
                 let body = Box::new(self.stmt().unwrap_or(Stmt::Block(Vec::new())));
                 Some(Stmt::While { cond, body })
@@ -349,7 +349,7 @@ impl<'a> Parser<'a> {
                 let cond = if self.is_op(";") {
                     None
                 } else {
-                    Some(self.expr())
+                    Some(self.cond_until(";"))
                 };
                 self.expect_op(";");
                 let step = self.simple_stmt().map(Box::new);
@@ -709,14 +709,22 @@ impl<'a> Parser<'a> {
         e
     }
 
-    /// A condition after `if (` or `elseif (`. A bare number
-    /// there goes through the flag-name path, so `if (1)` tests a flag named
-    /// `1` and is false: read in 2.05r2 and 1.41 rev 1, and run false on
-    /// 1.41 rev 1, 2.05r2, 2.17.1, 2.22 and 2.31 [lab]. 3.04 does the same
-    /// (Graal_analysis `linux-304-gs1-runtime.md`). `while (1)` was not
-    /// run, so loops keep the plain number.
+    /// A condition after `if (`, `elseif (` or `while (`, or the middle of
+    /// a `for`; `end` is the token that closes it. A bare number there
+    /// goes through the flag-name path, so `if (1)` tests a flag named `1`
+    /// and is false: read in 2.05r2 and 1.41 rev 1, and run false on 1.41
+    /// rev 1, 2.05r2, 2.17.1, 2.22 and 2.31 [lab]. 3.04 does the same
+    /// (Graal_analysis `linux-304-gs1-runtime.md`). Loops too: `while (1)`,
+    /// `while (0.5)` and `for (;1;)` never ran their body on those five
+    /// builds, while `while ((0+1))` did (lab, 2026-11-13, Graal_analysis
+    /// #442). Seihai does not look the flag up: a script that sets a flag
+    /// named `1` is not modelled.
     fn cond(&mut self) -> Expr {
-        let bare = matches!(self.peek().tok, Tok::Num(_)) && self.second_is_op(")");
+        self.cond_until(")")
+    }
+
+    fn cond_until(&mut self, end: &str) -> Expr {
+        let bare = matches!(self.peek().tok, Tok::Num(_)) && self.second_is_op(end);
         let e = self.expr();
         if bare {
             Expr::Num(0.0)
@@ -1484,13 +1492,13 @@ mod twogta_recovery {
     #[test]
     fn break_and_continue_written_as_calls() {
         let s = parse(
-            "while (1) { if (a) continue(); break(); }\nthis.b = 1;",
+            "while (b) { if (a) continue(); break(); }\nthis.b = 1;",
             Era::V217,
         );
         assert!(s.diagnostics.is_empty(), "{:?}", s.diagnostics);
         assert_eq!(
             s.to_string(),
-            "(while 1 (block (if a (continue)) (break)))\n(= this.b 1)\n"
+            "(while b (block (if a (continue)) (break)))\n(= this.b 1)\n"
         );
         // Anything inside the parentheses is still an error.
         assert!(!parse("while (1) { break(1); }", Era::V217)
