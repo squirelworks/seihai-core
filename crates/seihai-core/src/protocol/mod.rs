@@ -33,7 +33,7 @@ pub use compress::{bz2_compress, bz2_decompress};
 pub use dispatch::{
     latin1, read_gint3, read_gshort, script_text, split_messages, sword_power_from_wire, ChatKind,
     ChatLine, IncomingFile, LevelObject, Message, NpcDelete, OtherLooks, OtherPlayer, ServerItem,
-    SessionState, Splitter,
+    SessionState, Splitter, Weapon,
 };
 pub use extras::MapSpec;
 pub use frame::{

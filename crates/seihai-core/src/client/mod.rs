@@ -219,6 +219,101 @@ pub struct Live {
     /// for a cut, bomb and arrow adds), in order; the network thread sends
     /// them after the walk of its next tick.
     pub send: Arc<Mutex<Vec<Vec<u8>>>>,
+    /// The player's weapons as the server last listed them, for the
+    /// view's item list (Q) and weapon key (D).
+    pub weapons: SharedWeapons,
+    /// Other players' bombs, bomb removals, explosions and arrows, in the
+    /// order they came, in the player's own cell's coordinates (the
+    /// sender's cell offset added on a gmap), for the view to take.
+    pub level_objects: SharedLevelObjects,
+    /// Other players who threw what they carried, for the view to take.
+    pub throws: SharedThrows,
+}
+
+/// [`Live::level_objects`]: only the `Bomb`, `BombDel`, `Explosion` and
+/// `Arrow` kinds of [`crate::protocol::LevelObject`].
+pub type SharedLevelObjects = Arc<Mutex<Vec<crate::protocol::LevelObject>>>;
+
+/// [`Live::throws`].
+pub type SharedThrows = Arc<Mutex<Vec<OtherThrow>>>;
+
+/// Another player threw what they carried (`PLO_THROWCARRIED`, 21): the
+/// object, and where they stood and faced, in the player's own cell's
+/// coordinates.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OtherThrow {
+    pub id: u16,
+    pub sprite: u16,
+    pub x: f32,
+    pub y: f32,
+    pub dir: u8,
+}
+
+/// Move what `st` holds of other players' bombs, explosions, arrows and
+/// throws to the view's queues, in the player's own cell's coordinates.
+/// Drained either way, so nothing builds up with no view.
+fn take_level_objects(
+    st: &mut SessionState,
+    objects: Option<&SharedLevelObjects>,
+    throws: Option<&SharedThrows>,
+) {
+    use crate::protocol::LevelObject as L;
+    let own_cell = st.gmap.as_ref().map(|g| g.cell);
+    let shift = |st: &SessionState, id: u16| {
+        st.others
+            .iter()
+            .find(|o| o.id == id)
+            .map_or((0.0, 0.0), |o| {
+                let (x, y) = o.position_from(own_cell);
+                (x - o.x, y - o.y)
+            })
+    };
+    let mut out = Vec::new();
+    for obj in std::mem::take(&mut st.level_objects) {
+        match obj {
+            L::Bomb { sender, mut bomb } => {
+                let (dx, dy) = shift(st, sender);
+                (bomb.x, bomb.y) = (bomb.x + dx, bomb.y + dy);
+                out.push(L::Bomb { sender, bomb });
+            }
+            L::Explosion {
+                sender,
+                mut explosion,
+            } => {
+                let (dx, dy) = shift(st, sender);
+                (explosion.x, explosion.y) = (explosion.x + dx, explosion.y + dy);
+                out.push(L::Explosion { sender, explosion });
+            }
+            L::Arrow { sender, mut arrow } => {
+                let (dx, dy) = shift(st, sender);
+                (arrow.x, arrow.y) = (arrow.x + dx, arrow.y + dy);
+                out.push(L::Arrow { sender, arrow });
+            }
+            o @ L::BombDel { .. } => out.push(o),
+            // The baddies are not the view's yet: dropped.
+            _ => {}
+        }
+    }
+    let thrown: Vec<OtherThrow> = std::mem::take(&mut st.throws)
+        .into_iter()
+        .filter_map(|o| {
+            let sprite = o.carry?;
+            let (x, y) = o.position_from(own_cell);
+            Some(OtherThrow {
+                id: o.id,
+                sprite,
+                x,
+                y,
+                dir: o.dir,
+            })
+        })
+        .collect();
+    if let (Some(q), false) = (objects, out.is_empty()) {
+        q.lock().unwrap_or_else(|e| e.into_inner()).extend(out);
+    }
+    if let (Some(q), false) = (throws, thrown.is_empty()) {
+        q.lock().unwrap_or_else(|e| e.into_inner()).extend(thrown);
+    }
 }
 
 /// One server record for an NPC: the level's lower-case name, the NPC id,
@@ -270,6 +365,61 @@ impl OwnStats {
         }
     }
 }
+
+/// The player's weapons as the server listed them: the built-in ones
+/// (`PLO_DEFAULTWEAPON`, 43) by id and the server's (`PLO_NPCWEAPONADD`,
+/// 33, less `PLO_NPCWEAPONDEL`, 34) with their image and GS1 script.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OwnWeapons {
+    pub defaults: Vec<u8>,
+    pub named: Vec<crate::protocol::Weapon>,
+}
+
+impl OwnWeapons {
+    /// The weapons `st` holds.
+    pub fn of(st: &SessionState) -> OwnWeapons {
+        OwnWeapons {
+            defaults: st.default_weapons.clone(),
+            named: st.weapons.clone(),
+        }
+    }
+
+    /// The names the item list shows, in the 2.05 order: the built-in
+    /// weapons first ([`default_weapon_name`]), then the server's. A
+    /// hidden weapon (its name starts with `-`) is left out, and a name
+    /// listed twice shows once.
+    pub fn names(&self) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        let names = self
+            .defaults
+            .iter()
+            .filter_map(|&i| default_weapon_name(i))
+            .chain(self.named.iter().map(|w| w.name.clone()));
+        for n in names {
+            if !n.is_empty() && !n.starts_with('-') && !out.contains(&n) {
+                out.push(n);
+            }
+        }
+        out
+    }
+}
+
+/// The name a built-in weapon (`PLO_DEFAULTWEAPON` id) has in the
+/// player's list: the item name with its first letter in upper case
+/// (`Bow`, `Bomb`), for the seven ids that are weapons. `None` for the
+/// other items.
+pub fn default_weapon_name(id: u8) -> Option<String> {
+    if !matches!(id, 7 | 8 | 12 | 20 | 21 | 22 | 23) {
+        return None;
+    }
+    let item = crate::offline::ITEM_NAMES.get(usize::from(id))?;
+    let mut c = item.chars();
+    let first = c.next()?;
+    Some(first.to_uppercase().chain(c).collect())
+}
+
+/// The network thread writes the player's weapons here when they change.
+pub type SharedWeapons = Arc<Mutex<OwnWeapons>>;
 
 /// The network thread writes the player's counters here when they change;
 /// the view's status display reads them.
@@ -787,6 +937,9 @@ pub fn run_hooked(
     let npc_changes = live.as_ref().map(|l| l.npc_changes.clone());
     let closed = live.as_ref().map(|l| l.closed.clone());
     let own = live.as_ref().map(|l| l.own.clone());
+    let weapons = live.as_ref().map(|l| l.weapons.clone());
+    let level_objects = live.as_ref().map(|l| l.level_objects.clone());
+    let throws = live.as_ref().map(|l| l.throws.clone());
     let say = live.as_ref().map(|l| l.say.clone());
     let chat = live.as_ref().map(|l| l.chat.clone());
     let outbox = live.as_ref().map(|l| l.send.clone());
@@ -903,9 +1056,16 @@ pub fn run_hooked(
                             *slot = now;
                         }
                     }
+                    if let Some(w) = weapons.as_ref() {
+                        let mut slot = w.lock().unwrap_or_else(|e| e.into_inner());
+                        if slot.defaults != st.default_weapons || slot.named != st.weapons {
+                            *slot = OwnWeapons::of(&st);
+                        }
+                    }
                     if let Some(c) = chat.as_ref() {
                         take_chat(&mut st, c);
                     }
+                    take_level_objects(&mut st, level_objects.as_ref(), throws.as_ref());
                     if let Some(w) = st.server_warp.take() {
                         if owed {
                             log_level(level_lines, &store, &st, out, shown);
@@ -1473,6 +1633,56 @@ mod others_tests {
         let q = Mutex::new(vec!["one".to_string(), "  ".into(), "two".into()]);
         assert_eq!(take_say(&q), vec!["one".to_string(), "two".into()]);
         assert!(take_say(&q).is_empty());
+    }
+
+    /// Other players' bombs and arrows go to the view's queue; the
+    /// baddies do not, and the session's list is drained.
+    #[test]
+    fn other_players_bombs_and_arrows_go_to_the_view() {
+        use crate::protocol::LevelObject as L;
+        let mut st = SessionState::for_version(ClientVersion::V205);
+        let bomb = crate::bombs::BombAdd {
+            x: 10.0,
+            y: 12.0,
+            power: 1,
+            fuse: 55,
+            owned: true,
+        };
+        st.level_objects.push(L::BaddiesClear);
+        st.level_objects.push(L::Bomb { sender: 3, bomb });
+        st.level_objects.push(L::BombDel { x: 1.0, y: 2.0 });
+        let q = SharedLevelObjects::default();
+        let t = SharedThrows::default();
+        take_level_objects(&mut st, Some(&q), Some(&t));
+        assert!(st.level_objects.is_empty());
+        assert_eq!(
+            *q.lock().unwrap(),
+            vec![L::Bomb { sender: 3, bomb }, L::BombDel { x: 1.0, y: 2.0 }]
+        );
+        assert!(t.lock().unwrap().is_empty());
+        // With no view, the list is still drained.
+        st.level_objects.push(L::Bomb { sender: 3, bomb });
+        take_level_objects(&mut st, None, None);
+        assert!(st.level_objects.is_empty());
+    }
+
+    /// The item list's names: built-in weapons first, by their item
+    /// names, then the server's; hidden and repeated names left out.
+    #[test]
+    fn own_weapons_list_built_ins_then_the_servers() {
+        use crate::protocol::Weapon;
+        let w = |n: &str| Weapon {
+            name: n.into(),
+            image: None,
+            script: None,
+        };
+        let o = OwnWeapons {
+            defaults: vec![8, 3, 7],
+            named: vec![w("Lamp"), w("-hidden"), w("Bow"), w("")],
+        };
+        assert_eq!(o.names(), vec!["Bomb", "Bow", "Lamp"]);
+        assert_eq!(default_weapon_name(23).as_deref(), Some("Joltbomb"));
+        assert_eq!(default_weapon_name(5), None);
     }
 
     /// The counters the status display draws come from the player props.
