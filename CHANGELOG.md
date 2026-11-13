@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.1.x
 
+- **0.1.1**: The shared client session hands the view the player's weapons (built-in and the server's), for the item list and weapon key of Ato and Issho.
 - **0.1.0**: First release under the written versioning rule. No API
   changes beyond hiding `dev`, `difftest` and `viewer` from the docs.
   Known gap: GS1 flag and built-in writes are still refused (#30, #6).

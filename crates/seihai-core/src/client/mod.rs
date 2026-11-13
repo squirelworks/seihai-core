@@ -219,6 +219,9 @@ pub struct Live {
     /// for a cut, bomb and arrow adds), in order; the network thread sends
     /// them after the walk of its next tick.
     pub send: Arc<Mutex<Vec<Vec<u8>>>>,
+    /// The player's weapons as the server last listed them, for the
+    /// view's item list (Q) and weapon key (D).
+    pub weapons: SharedWeapons,
 }
 
 /// One server record for an NPC: the level's lower-case name, the NPC id,
@@ -270,6 +273,61 @@ impl OwnStats {
         }
     }
 }
+
+/// The player's weapons as the server listed them: the built-in ones
+/// (`PLO_DEFAULTWEAPON`, 43) by id and the server's (`PLO_NPCWEAPONADD`,
+/// 33, less `PLO_NPCWEAPONDEL`, 34) with their image and GS1 script.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OwnWeapons {
+    pub defaults: Vec<u8>,
+    pub named: Vec<crate::protocol::Weapon>,
+}
+
+impl OwnWeapons {
+    /// The weapons `st` holds.
+    pub fn of(st: &SessionState) -> OwnWeapons {
+        OwnWeapons {
+            defaults: st.default_weapons.clone(),
+            named: st.weapons.clone(),
+        }
+    }
+
+    /// The names the item list shows, in the 2.05 order: the built-in
+    /// weapons first ([`default_weapon_name`]), then the server's. A
+    /// hidden weapon (its name starts with `-`) is left out, and a name
+    /// listed twice shows once.
+    pub fn names(&self) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        let names = self
+            .defaults
+            .iter()
+            .filter_map(|&i| default_weapon_name(i))
+            .chain(self.named.iter().map(|w| w.name.clone()));
+        for n in names {
+            if !n.is_empty() && !n.starts_with('-') && !out.contains(&n) {
+                out.push(n);
+            }
+        }
+        out
+    }
+}
+
+/// The name a built-in weapon (`PLO_DEFAULTWEAPON` id) has in the
+/// player's list: the item name with its first letter in upper case
+/// (`Bow`, `Bomb`), for the seven ids that are weapons. `None` for the
+/// other items.
+pub fn default_weapon_name(id: u8) -> Option<String> {
+    if !matches!(id, 7 | 8 | 12 | 20 | 21 | 22 | 23) {
+        return None;
+    }
+    let item = crate::offline::ITEM_NAMES.get(usize::from(id))?;
+    let mut c = item.chars();
+    let first = c.next()?;
+    Some(first.to_uppercase().chain(c).collect())
+}
+
+/// The network thread writes the player's weapons here when they change.
+pub type SharedWeapons = Arc<Mutex<OwnWeapons>>;
 
 /// The network thread writes the player's counters here when they change;
 /// the view's status display reads them.
@@ -787,6 +845,7 @@ pub fn run_hooked(
     let npc_changes = live.as_ref().map(|l| l.npc_changes.clone());
     let closed = live.as_ref().map(|l| l.closed.clone());
     let own = live.as_ref().map(|l| l.own.clone());
+    let weapons = live.as_ref().map(|l| l.weapons.clone());
     let say = live.as_ref().map(|l| l.say.clone());
     let chat = live.as_ref().map(|l| l.chat.clone());
     let outbox = live.as_ref().map(|l| l.send.clone());
@@ -901,6 +960,12 @@ pub fn run_hooked(
                         let mut slot = o.lock().unwrap_or_else(|e| e.into_inner());
                         if *slot != now {
                             *slot = now;
+                        }
+                    }
+                    if let Some(w) = weapons.as_ref() {
+                        let mut slot = w.lock().unwrap_or_else(|e| e.into_inner());
+                        if slot.defaults != st.default_weapons || slot.named != st.weapons {
+                            *slot = OwnWeapons::of(&st);
                         }
                     }
                     if let Some(c) = chat.as_ref() {
@@ -1473,6 +1538,25 @@ mod others_tests {
         let q = Mutex::new(vec!["one".to_string(), "  ".into(), "two".into()]);
         assert_eq!(take_say(&q), vec!["one".to_string(), "two".into()]);
         assert!(take_say(&q).is_empty());
+    }
+
+    /// The item list's names: built-in weapons first, by their item
+    /// names, then the server's; hidden and repeated names left out.
+    #[test]
+    fn own_weapons_list_built_ins_then_the_servers() {
+        use crate::protocol::Weapon;
+        let w = |n: &str| Weapon {
+            name: n.into(),
+            image: None,
+            script: None,
+        };
+        let o = OwnWeapons {
+            defaults: vec![8, 3, 7],
+            named: vec![w("Lamp"), w("-hidden"), w("Bow"), w("")],
+        };
+        assert_eq!(o.names(), vec!["Bomb", "Bow", "Lamp"]);
+        assert_eq!(default_weapon_name(23).as_deref(), Some("Joltbomb"));
+        assert_eq!(default_weapon_name(5), None);
     }
 
     /// The counters the status display draws come from the player props.
