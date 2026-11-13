@@ -398,6 +398,17 @@ mod tests {
             "{l:?}"
         );
         assert!(l.ends_with(b"linux,\"\",\"\",\"\",\"\""), "{l:?}");
+        // The Mac PowerPC 4.04r2 and 5.12 (Tiger lab, 2026-11-13): their own
+        // tokens and `mac`; 5.12 adds the quoted Darwin kernel string.
+        let m4 = line(ClientVersion::V404R2Mac, 0x25);
+        assert!(m4.starts_with(b"%EG3D18026%guest(7Y3bdzjfmac,"), "{m4:?}");
+        assert!(m4.ends_with(b"mac,\"\",\"\",\"\""), "{m4:?}");
+        let m5 = line(ClientVersion::V512Mac, 0x5A);
+        assert!(m5.starts_with(b"%zG3D15097%guest(7Y3bdzjfmac,"), "{m5:?}");
+        assert!(
+            m5.ends_with(b",\"8.0.0  Darwin Kernel Version 8.0.0: Sat Mar 26 14:15:22 PST 2005; root:xnu-792.obj~1/RELEASE_PPC\""),
+            "{m5:?}"
+        );
         // Builds before 5.00 end at the password.
         assert!(line(ClientVersion::V3153, 1).ends_with(b"(7Y3bdzjf"));
     }

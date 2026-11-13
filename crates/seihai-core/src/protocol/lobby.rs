@@ -66,6 +66,36 @@ pub const LOBBY_420_MAC: Lobby = Lobby {
     }),
     ..LOBBY_404
 };
+/// The after-login messages of the Mac PowerPC 4.04r2 and 5.12, as the
+/// unchanged clients sent them on Mac OS X 10.4 in qemu (Tiger lab,
+/// 2026-11-13, `mac-ppc-404-512`): `basepackage.gupd` twice with the
+/// language and `bigmap.txt` in the first session, as the Windows 4.x;
+/// then `idle.gani` with 157, 46, the image checks and the own props with
+/// `OSTYPE` `mac` and `TEXTCODEPAGE` 0 (the same bytes in both builds).
+/// No `PLI_REQUESTTEXT` or `PLI_SENDTEXT` lister messages were seen.
+pub const LOBBY_LOGIN_MAC_PPC: LobbyLogin = LobbyLogin {
+    texts: &[],
+    os_props: ("mac", 0),
+    ..LOBBY_LOGIN_4X
+};
+/// The Mac PowerPC 4.04r2 (`G3D18026`): `mac`, the MAC and `/etc` stat
+/// hashes and an empty fourth field, as the Mac 4.20r6 (captured as
+/// `mac,<32 hex>,<32 hex>,""`).
+pub const LOBBY_404_MAC: Lobby = Lobby {
+    platform: "mac",
+    after_login: Some(LOBBY_LOGIN_MAC_PPC),
+    ..LOBBY_404
+};
+/// The Darwin kernel string the Mac PowerPC 5.12 sent as its fifth login
+/// field on Mac OS X 10.4.0 (`uname -r`, two spaces, `uname -v`), quoted.
+pub const MAC_TIGER_KERNEL: &str = "\"8.0.0  Darwin Kernel Version 8.0.0: Sat Mar 26 14:15:22 PST 2005; root:xnu-792.obj~1/RELEASE_PPC\"";
+/// The Mac PowerPC 5.12 (`G3D15097`): 4.04r2 Mac's list plus the quoted
+/// kernel string as the fifth field (where the Windows 5.12 sends its
+/// Windows version).
+pub const LOBBY_512_MAC: Lobby = Lobby {
+    os_version: Some(MAC_TIGER_KERNEL),
+    ..LOBBY_404_MAC
+};
 /// 5.00r7: the same login line as 4.x. Its after-login messages were not
 /// recorded.
 pub const LOBBY_500: Lobby = Lobby {
@@ -432,6 +462,23 @@ mod tests {
         assert_eq!(LOBBY_500.login_tail(), b"win,\"\",\"\",\"\"");
         assert_eq!(LOBBY_512.login_tail(), b"win,\"\",\"\",\"\",\"6.2 9200 \"");
         assert_eq!(LOBBY_603_LINUX.login_tail(), b"linux,\"\",\"\",\"\",\"\"");
+        assert_eq!(LOBBY_404_MAC.login_tail(), b"mac,\"\",\"\",\"\"");
+        assert_eq!(
+            LOBBY_512_MAC.login_tail(),
+            &b"mac,\"\",\"\",\"\",\"8.0.0  Darwin Kernel Version 8.0.0: Sat Mar 26 14:15:22 PST 2005; root:xnu-792.obj~1/RELEASE_PPC\""[..]
+        );
+    }
+
+    /// The real Mac PowerPC 4.04r2 and 5.12 sent the same own props as the
+    /// Mac 4.20r6 (Tiger lab, 2026-11-13): `unknown`, STATUS 20, UDPPORT 0,
+    /// ADDITFLAGS 0, `English`, `mac`, TEXTCODEPAGE 0.
+    #[test]
+    fn props_match_the_real_mac_404_and_512() {
+        let own = [18 + 0x20, 20 + 0x20];
+        for lobby in [LOBBY_404_MAC, LOBBY_512_MAC] {
+            let m = lobby_props_message(&lobby.after_login.unwrap(), &own, "unknown", None);
+            assert_eq!(m, b"\x22 'unknown24?   A T'Englishk#macl   \n");
+        }
     }
 
     #[test]
@@ -459,7 +506,8 @@ mod tests {
             );
         }
         for v in [
-            V404R2, V420R6, V420R8, V500R7, V512, V524R4, V530R3, V600R2, V6015, V6034,
+            V404R2, V404R2Mac, V420R6, V420R8, V500R7, V512, V512Mac, V524R4, V530R3, V600R2,
+            V6015, V6034,
         ] {
             assert!(
                 v.profile().protocol.lobby.unwrap().login_tiles,
@@ -478,6 +526,8 @@ mod tests {
             LOBBY_512,
             LOBBY_531,
             LOBBY_603_LINUX,
+            LOBBY_404_MAC,
+            LOBBY_512_MAC,
         ] {
             for name in ["GServer-RS", "Zelda-A-Link-to-the-Past"] {
                 let first = first_server_name(&lobby, Some(name));
