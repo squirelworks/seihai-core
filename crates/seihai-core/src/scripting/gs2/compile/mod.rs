@@ -391,7 +391,29 @@ fn detect(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors> {
     }
     match gs2_script(src, Mode::Legacy) {
         Ok(c) => Ok(guessed(c)),
-        Err(e) => gs1_script(src, era, mode).map(guessed).map_err(|_| e),
+        Err(gs2) => gs1_script(src, era, mode).map(guessed).map_err(|gs1| {
+            // Both fronts failed: report both, the likelier one first.
+            let tag = |front: &str, e: CompileErrors| {
+                e.errors.into_iter().map(move |mut e| {
+                    e.message = format!("as {front}: {}", e.message);
+                    e
+                })
+            };
+            let (first, second) = if looks_gs1(src) {
+                (
+                    tag("GS1", gs1).collect::<Vec<_>>(),
+                    tag("GS2", gs2).collect::<Vec<_>>(),
+                )
+            } else {
+                (
+                    tag("GS2", gs2).collect::<Vec<_>>(),
+                    tag("GS1", gs1).collect::<Vec<_>>(),
+                )
+            };
+            CompileErrors {
+                errors: first.into_iter().chain(second).collect(),
+            }
+        }),
     }
 }
 

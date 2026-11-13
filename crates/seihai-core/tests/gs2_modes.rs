@@ -332,3 +332,17 @@ fn strict_mode_takes_what_the_engine_tolerates_and_warns() {
     assert_eq!(err.errors.len(), 1, "{err}");
     assert!(err.to_string().contains("missing `;`"), "{err}");
 }
+
+#[test]
+fn detect_reports_both_fronts_when_both_fail() {
+    let err = compile(
+        "if (created) { x = ; }",
+        Language::Detect(Era::V205),
+        Mode::Legacy,
+    )
+    .unwrap_err()
+    .to_string();
+    let gs1 = err.find("as GS1: ").unwrap_or_else(|| panic!("{err}"));
+    let gs2 = err.find("as GS2: ").unwrap_or_else(|| panic!("{err}"));
+    assert!(gs1 < gs2, "{err}");
+}
