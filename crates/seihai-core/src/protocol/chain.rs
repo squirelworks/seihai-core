@@ -1203,7 +1203,7 @@ pub const CHAIN: &[Step] = &[
             gen5_round_down: Some(true),
             ..Delta::NONE
         },
-        source: "binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32; the frame cipher at 0x3f73b4/0x3f7940 steps raw bodies (len + 3) >> 2 times, at most 12, and zlib/bz2 bodies len >> 2, at most 4, as 5.12; short C->S bodies under 48 bytes go raw), login id 5 with G3D18026 and mac,<md5>,<md5>,\"\" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38",
+        source: "binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32; its frame cipher steps raw bodies (len + 3) >> 2 times, at most 12, and zlib/bz2 bodies len >> 2, at most 4, as 5.12; short C->S bodies under 48 bytes go raw), login id 5 with G3D18026 and mac,<md5>,<md5>,\"\" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38",
         unknown: &[
             Unknown { area: "plo", what: "the PLO set is taken from the Windows 4.04r2; the Mac binary's switch was not read" },
             Unknown { area: "pli", what: "the Windows 4.04r2 set is kept; the lab saw 2, 18, 23, 24, 37, 38, 46 and 157" },
@@ -1321,7 +1321,7 @@ pub const CHAIN: &[Step] = &[
             gen5_compress_all: Some(false),
             ..Delta::NONE
         },
-        source: "binary (Mac OS X PPC Mach-O, main exe sha256 a76dc557...2d206f10; the \"Unknown\" v5 Mac builds are byte-identical copies) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways with 5.12's round-down step (frame cipher at 0x2690d8/0x26974c), login id 5 with G3D15097 and mac,<md5>,<md5>,\"\",<quoted Darwin kernel string> in the plain zlib frame; auto-login as guest with a client-made password; first props as 4.04r2 Mac; asked arial.ttf, chest.png, state.png and steps.wav; sent no 18",
+        source: "binary (Mac OS X PPC Mach-O, main exe sha256 a76dc557...2d206f10; the \"Unknown\" v5 Mac builds are byte-identical copies) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways with 5.12's round-down step (read in its frame cipher), login id 5 with G3D15097 and mac,<md5>,<md5>,\"\",<quoted Darwin kernel string> in the plain zlib frame; auto-login as guest with a client-made password; first props as 4.04r2 Mac; asked arial.ttf, chest.png, state.png and steps.wav; sent no 18",
         unknown: &[
             Unknown { area: "plo", what: "the PLO set is taken from the Windows 5.12; the Mac binary's switch was not read" },
             Unknown { area: "pli", what: "the Windows 5.12 set is kept; the lab saw 2, 23, 24, 37, 46 and 157" },
