@@ -835,14 +835,14 @@ fn gs2_name(name: &str) -> String {
     }
 }
 
-/// GS1 built-in variables with no GS2 name Seihai is sure of. Passing them
-/// through as a plain name would compile to a variable nothing sets, so
-/// they are refused.
+/// GS1 built-in variables that are read-only under their GS2 names
+/// (`player.hearts`, `player.fullhearts`, `player.weapons.size()`), so a
+/// write to them is refused. `selectedweapon` keeps its name in GS2 and
+/// may be written: on a real 5.24r4 client `selectedweapon = 1`, `= 0` and
+/// `++` each read back as written, with no script error, the same for
+/// Seihai's bytecode and gs2-parser's (lab write probe, 2026-11-13).
 fn builtin_without_gs2(name: &str) -> bool {
-    matches!(
-        name,
-        "playerhp" | "playermaxhp" | "weaponscount" | "selectedweapon"
-    )
+    matches!(name, "playerhp" | "playermaxhp" | "weaponscount")
 }
 
 /// The list a GS1 count variable counts: `tokenscount` is
@@ -1093,8 +1093,9 @@ impl Lower {
         {
             self.err(format!(
                 "`{}` is a player flag the script sets; writing a GS1 flag by its plain name, or \
-                 reading it inside `with`, has no client-checked GS2 form",
-                v.name
+                 reading it inside `with`, has no client-checked GS2 form (a 5.x client sends \
+                 no flag for `player.{}` = ...)",
+                v.name, v.name
             ));
         }
         if v.index.is_empty() && builtin_without_gs2(&v.name) {

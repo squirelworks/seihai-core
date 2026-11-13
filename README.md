@@ -60,11 +60,12 @@ Before 0.1.0 every release was a 0.0.x bump and any of them could break.
 
 ## Known gaps
 
-- **GS1 flag and built-in writes.** GS1 lowered to GS2 reads player flags
-  and `playerhp`, `playermaxhp`, `weaponscount` and `selectedweapon`, but
-  writing them (`set`, `unset`, `selectedweapon++`) and reading a flag
-  inside `with` are refused with an error until a real client confirms the
-  GS2 form (#30, #6).
+- **GS1 flag writes.** GS1 lowered to GS2 reads player flags and
+  `playerhp`, `playermaxhp`, `weaponscount` and `selectedweapon`, and
+  writes `selectedweapon`. Writing a flag by its plain name and reading a
+  flag inside `with` are still refused: on a real 5.24r4 client a GS2
+  `player.<flag> = ...` sends no flag to the server and is gone after a
+  relogin, so flag writes need a server-side path (#30, #6).
 - **GS2 VM coverage.** The 7.x client and the Mac 4.04r2 and 5.12 VMs have
   not been read (`documentation/gs2-vm-versions.md`).
 - **Profile audit and lab checks** listed in the roadmap (#7).

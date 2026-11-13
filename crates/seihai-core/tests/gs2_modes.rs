@@ -349,11 +349,7 @@ fn detect_reports_both_fronts_when_both_fail() {
 
 #[test]
 fn a_gs1_error_names_the_line_of_the_statement() {
-    let err = compile_gs1(
-        "if (created) {\n  hide;\n\n  selectedweapon++;\n}",
-        Era::V205,
-    )
-    .unwrap_err();
+    let err = compile_gs1("if (created) {\n  hide;\n\n  playerhp++;\n}", Era::V205).unwrap_err();
     assert_eq!(err.errors[0].line, 4, "{err}");
 }
 
@@ -368,7 +364,23 @@ fn gs1_flag_and_player_builtin_reads_take_their_client_checked_gs2_names() {
             .write(),
         compile_gs2(gs2).unwrap().write()
     );
-    // Writes stay refused until a client shows their form.
-    assert!(compile_gs1("if (created) { selectedweapon++; }", Era::V205).is_err());
+    // Flag writes stay refused: on 5.24r4 `player.f = ...` sends no flag
+    // packet and does not outlive the session (lab write probe).
     assert!(compile_gs1("if (created) { set a; a = 2; }", Era::V205).is_err());
+    assert!(compile_gs1("if (created) { playerhp = 1; }", Era::V205).is_err());
+}
+
+#[test]
+fn gs1_selectedweapon_writes_keep_the_gs2_name() {
+    // On a real 5.24r4 client `selectedweapon = 1; = 0; ++` read back
+    // 1, 0, 1 with Seihai's bytecode and with gs2-parser's (lab write
+    // probe, 2026-11-13).
+    let gs1 = "if (created) {\n  selectedweapon = 1;\n  selectedweapon = 0;\n  selectedweapon++;\n  hide;\n}";
+    let gs2 = "function onCreated() {\n  selectedweapon = 1;\n  selectedweapon = 0;\n  selectedweapon++;\n  hide();\n}";
+    assert_eq!(
+        compile_gs1(gs1, Era::V205)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .write(),
+        compile_gs2(gs2).unwrap().write()
+    );
 }
