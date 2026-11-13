@@ -3,6 +3,6 @@ members = ["crates/seihai-core", "crates/seihai-draw"]
 resolver = "2"
 
 [workspace.package]
-version = "0.0.15"
+version = "0.0.16"
 edition = "2021"
 license = "MIT OR Apache-2.0"
