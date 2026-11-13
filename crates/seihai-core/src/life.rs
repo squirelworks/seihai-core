@@ -525,11 +525,12 @@ mod tests {
     }
 
     #[test]
-    fn respawn_hearts_139_are_always_the_maximum() {
+    fn respawn_hearts_139_are_always_three() {
+        // The 1.39 revive sets 3.0 hearts and reads no AP (U7 static reads).
         let r = DEATH_139;
         for ap in [0u8, 19, 20, 39, 40, 100] {
-            assert_eq!(respawn_half_hearts(&r, ap, 12), 12, "ap {ap}");
-            assert_eq!(respawn_half_hearts(&r, ap, 0), 0, "ap {ap}");
+            assert_eq!(respawn_half_hearts(&r, ap, 12), 6, "ap {ap}");
+            assert_eq!(respawn_half_hearts(&r, ap, 20), 6, "ap {ap}");
         }
         assert!(!r.entry_name_group);
         assert_eq!(

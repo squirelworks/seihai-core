@@ -29,11 +29,11 @@ use super::login::{LoginInfo, LOGIN_217, LOGIN_222, LOGIN_231, LOGIN_304, LOGIN_
 use super::profile::{
     Basis, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, ItemDrops, Levels,
     ListKind, Listserver, LoginShape, Mannerisms, PortStatus, Props, Protocol, Runs, Scripts,
-    ServerList, ShapeBasis, Ui, VersionProfile, WindowPx, WorldRules, COMBAT_121, COMBAT_139,
-    COMBAT_142, COMBAT_200, COMBAT_201, COMBAT_205, DEATH_139, DEATH_205, DEATH_21, DROPS_133,
-    DROPS_138, DROPS_142, LEGACY_LIST_PORT, MANNER_139, MANNER_141, MANNER_205, MANNER_222,
-    SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222, TAMPER_230,
-    TAMPER_231, WORLD_121, WORLD_128, WORLD_201,
+    ServerList, ShapeBasis, Ui, VersionProfile, WindowPx, WorldRules, COMBAT_121, COMBAT_131,
+    COMBAT_134, COMBAT_139, COMBAT_141, COMBAT_142, COMBAT_200, COMBAT_201, COMBAT_205, COMBAT_217,
+    DEATH_139, DEATH_205, DEATH_21, DROPS_133, DROPS_138, DROPS_142, LEGACY_LIST_PORT, MANNER_139,
+    MANNER_141, MANNER_205, MANNER_222, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404,
+    TAMPER_217, TAMPER_222, TAMPER_230, TAMPER_231, WORLD_121, WORLD_128, WORLD_201,
 };
 use super::showimg::ShowImgInfo;
 use super::tampercheck::TamperInfo;
@@ -518,9 +518,10 @@ pub const CHAIN: &[Step] = &[
         basis: Basis::Binary,
         delta: Delta {
             plo: IdDelta::plus(&[40]),
+            combat: Some(Some(COMBAT_131)),
             ..Delta::NONE
         },
-        source: "binary: PLO 40, default port 14900 (14804 before), noudp= and fixedudpport= options",
+        source: "binary: PLO 40, default port 14900 (14804 before), noudp= and fixedudpport= options; the first id 40 handler (no range test, no cap, no AP test; U7 static reads)",
         unknown: &[],
     },
     Step {
@@ -552,12 +553,12 @@ pub const CHAIN: &[Step] = &[
         delta: Delta {
             other_props: IdDelta::plus(&[34]),
             gs1_commands: Some(93),
-            combat: Some(Some(COMBAT_139)),
+            combat: Some(Some(COMBAT_134)),
             ..Delta::NONE
         },
         source: "binary: other-player prop 34 (ACCOUNTNAME), GS1 table 88 to 93 (cross-version-timeline); the sword judge gains the AP 100 immunity and the attacker's hidden flag, and gates on the animation step",
         unknown: &[
-            Unknown { area: "life", what: "1.34 to 1.41 also pass over a victim in player mode 7 in the sword judge; what mode 7 is was not traced, so Seihai does not test it" },
+            Unknown { area: "life", what: "1.34 to 1.41 also pass over a victim in player mode 7 in the sword judge. Mode 7 is a passenger on another local player's horse in same-PC play (U7 static reads), so it never applies online and Seihai does not test it" },
         ],
     },
     Step {
@@ -566,8 +567,12 @@ pub const CHAIN: &[Step] = &[
         token: "GNW13040",
         date: "2000-04-13",
         basis: Basis::Binary,
-        delta: Delta { hud: Some(HudArt::LettersChat), ..Delta::NONE },
-        source: "shipped state.png: CHAT label on the HUD sheet; GS1 table unchanged",
+        delta: Delta {
+            hud: Some(HudArt::LettersChat),
+            combat: Some(Some(COMBAT_139)),
+            ..Delta::NONE
+        },
+        source: "shipped state.png: CHAT label on the HUD sheet; GS1 table unchanged; the id 40 handler caps a hit at one heart (U7 static reads)",
         unknown: &[],
     },
     Step {
@@ -626,9 +631,9 @@ pub const CHAIN: &[Step] = &[
             death: Some(Some(DEATH_139)),
             ..Delta::NONE
         },
-        source: "binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111; sword swing S 6 to 10 one per tick, sword box 0 to 4 tiles ahead and under 2 sideways, 40-tick hurt lock-out, five knockback steps, death timer 30 with the dead bit after 27, respawn hearts to max (no AP bands)",
+        source: "binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111; sword swing S 6 to 10 one per tick, sword box 0 to 4 tiles ahead and under 2 sideways, 40-tick hurt lock-out, five knockback steps, death timer 30 with the dead bit after 27, respawn with 3 hearts (no AP bands; U7 static reads)",
         unknown: &[
-            Unknown { area: "life", what: "the hurt sprite and the hurt-packet gates are the 2.00 values, no 1.x hurt-packet handler was traced; the six walk-probe and twelve knockback-probe offset tables are not profile fields; 1.33 to 1.38 keep no death row of their own and copy the 1.39 mannerisms" },
+            Unknown { area: "life", what: "the hurt sprite is the 2.00 value; the id 40 handler was read (cap 1 heart, no range or AP test), but its finer gates (status field, modes 3 and 10) are not profile fields; the six walk-probe and twelve knockback-probe offset tables are not profile fields; 1.33 to 1.38 keep no death row of their own and copy the 1.39 mannerisms" },
         ],
     },
     // 1.41 is the first gen 3 build. Its row was built on the 2.05 template,
@@ -656,6 +661,7 @@ pub const CHAIN: &[Step] = &[
             other_props: IdDelta::plus(&[35, 36]),
             npc_max: Some(35),
             death: Some(Some(DEATH_205)),
+            combat: Some(Some(COMBAT_141)),
             server_list: Some(ServerList::Single),
             window: Some(WindowPx { width: 648, height: 514 }),
             gs1_commands: Some(126),
@@ -670,7 +676,7 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "drops", what: "the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced" },
             Unknown { area: "listserver", what: "original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured" },
             Unknown { area: "listserver", what: "the real 1.41 rev 1 sent nothing to the lab listserver, which spoke first (shape S, 2026-10-30); whether the public service speaks first to a silent client is not known, so after 3 s with no reply Seihai sends shape B (id 0 `newmain`, then id 1 with the account), which 14923 answered on 2026-10-25" },
-            Unknown { area: "life", what: "death rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them); combat was read in the 1.41 binary and is the 1.39 row" },
+            Unknown { area: "life", what: "death rules come from the 2.05 template; the 1.41 rev 1 revive has the 2.05 AP bands (U7 static reads), the rest of its death handler was not traced (1.42 clears the row). Combat was read in the 1.41 binary: the 1.39 sword judge and the 2.00 id 40 handler" },
             Unknown { area: "levels", what: "the .nw loader was found by a string and function scan of the binary; no .nw level was loaded in a real 1.41" },
         ],
     },
@@ -971,9 +977,10 @@ pub const CHAIN: &[Step] = &[
             npc_max: Some(73),
             heights: Some(true),
             window: Some(WindowPx { width: 644, height: 507 }),
+            combat: Some(Some(COMBAT_217)),
             ..Delta::NONE
         },
-        source: "binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, main form 644×507, the post-login frame seen in the lab (image checks, process list, props up to the language), and id 24 about every 5.1 s when alone (lab, 2026-10-30)",
+        source: "binary (2.17.1): TAMPERCHECK (39) with its constant, SHOOT (40), MUTEPLAYER (43), process-list pair (44, 45), PLO 175 to 185, level heights, NPC props to 73, main form 644×507, the ghost-mode and 176/177 tests in the hit judge (U7 static reads), the post-login frame seen in the lab (image checks, process list, props up to the language), and id 24 about every 5.1 s when alone (lab, 2026-10-30)",
         unknown: &[
             Unknown { area: "props", what: "other-player prop parser was not read; the 2.22 set is used" },
             Unknown { area: "ui", what: "GS1 command count was not read; 161 is carried" },
@@ -1775,7 +1782,7 @@ fn death_text(d: &Option<DeathRules>) -> String {
     match d {
         None => "none".into(),
         Some(d) if *d == DEATH_205 => "2.05 rules (name-group test)".into(),
-        Some(d) if *d == DEATH_139 => "1.39 rules (respawn to max hearts, no AP bands)".into(),
+        Some(d) if *d == DEATH_139 => "1.39 rules (respawn with 3 hearts, no AP bands)".into(),
         Some(d) if *d == DEATH_21 => "2.1 rules (no name-group test)".into(),
         Some(_) => "custom".into(),
     }
@@ -1785,13 +1792,17 @@ fn combat_text(c: &Option<super::profile::CombatRules>) -> String {
     match c {
         None => "none".into(),
         Some(c) if *c == COMBAT_205 => "2.05 rules".into(),
+        Some(c) if *c == COMBAT_217 => {
+            "2.17 rules (as 2.05, no hits in ghost mode or after PLO 176/177)".into()
+        }
         Some(c) if *c == COMBAT_139 => {
-            "1.34 rules (one swing step a tick, raw sword power, no packet hits traced)".into()
+            "1.35 rules (one swing step a tick, raw sword power, packet hits capped, any range)"
+                .into()
         }
-        Some(c) if *c == COMBAT_121 => "1.21 rules (as 1.34, no AP immunity)".into(),
-        Some(c) if *c == COMBAT_142 => {
-            "1.42 rules (2.00 sword judge, no packet hits traced)".into()
-        }
+        Some(c) if *c == COMBAT_134 => "1.34 rules (as 1.35, packet hits uncapped)".into(),
+        Some(c) if *c == COMBAT_131 => "1.31 rules (as 1.34, no AP immunity)".into(),
+        Some(c) if *c == COMBAT_121 => "1.21 rules (as 1.31, no packet hits)".into(),
+        Some(c) if *c == COMBAT_141 => "1.41 rules (1.35 sword judge, 2.00 packet hits)".into(),
         Some(c) if *c == COMBAT_201 => "2.01 rules (raw sword power)".into(),
         Some(c) if *c == COMBAT_200 => "2.00 rules (raw sword power, fewer packet gates)".into(),
         Some(_) => "custom".into(),
@@ -2333,6 +2344,10 @@ mod tests {
     /// was read in its own binary (gap-2 research, 2026-11-13): 1.21 to 1.42
     /// got combat rows, the side limit became inclusive (`lateral_max_half`)
     /// and every row says whether packet hits are decoded (`packet_hits`).
+    /// The U7 static reads (2026-11-13) then found the 1.x id 40 handler
+    /// (1.31 on, so 1.31 to 1.42 decode packet hits, with 1.31 to 1.39
+    /// testing no range), the flat 3-heart revive of 1.39, and the 2.17+
+    /// ghost and 176/177 tests (`ghost_and_stop_gates`).
     #[test]
     fn chain_equals_the_hand_written_rows() {
         let mut seen = 0;
