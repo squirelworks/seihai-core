@@ -19,6 +19,7 @@ struct Around<'a> {
     shots: Vec<Shot>,
     touches: Vec<(i32, f64, f64)>,
     drops: Vec<(u8, f64, f64)>,
+    spark: bool,
 }
 
 impl World for Around<'_> {
@@ -53,6 +54,9 @@ impl World for Around<'_> {
     fn drop_item(&mut self, item: u8, x: f64, y: f64) {
         self.drops.push((item, x, y));
     }
+    fn sword_spark(&mut self) {
+        self.spark = true;
+    }
 }
 
 /// How the session's baddies run this frame.
@@ -77,7 +81,7 @@ impl BaddyRole {
 }
 
 impl OfflineSession {
-    /// Whether a baddy may not stand on `(x, y)` (`0x540140`): off the
+    /// Whether a baddy may not stand on `(x, y)`: off the
     /// board, a wall, a chest, water, a chair or a bed bottom. NPCs that
     /// block are not tested yet.
     pub(crate) fn baddy_blocked(&self, x: f32, y: f32) -> bool {
@@ -212,6 +216,7 @@ impl OfflineSession {
             shots: Vec::new(),
             touches: Vec::new(),
             drops: Vec::new(),
+            spark: false,
         }
     }
 
@@ -250,6 +255,11 @@ impl OfflineSession {
         while self.baddy_clock_ms >= b::PLAYER_TICK_MS {
             self.baddy_clock_ms -= b::PLAYER_TICK_MS;
             self.baddy_phase = !self.baddy_phase;
+            if let Some(sp) = &mut self.sword_spark {
+                if !sp.tick() {
+                    self.sword_spark = None;
+                }
+            }
             self.baddy_sword(role);
             if self.baddy_phase {
                 self.baddy_tick(role, &others);
@@ -285,9 +295,16 @@ impl OfflineSession {
             }
         }
         let Around {
-            rng, sounds, drops, ..
+            rng,
+            sounds,
+            drops,
+            spark,
+            ..
         } = w;
         self.after_hits(rng, sounds, drops);
+        if spark {
+            self.sword_spark = Some(b::SwordSpark::new(px, py));
+        }
         self.baddy_sends.extend(sends);
         self.baddies = baddies;
     }
@@ -348,7 +365,7 @@ impl OfflineSession {
         }
     }
 
-    /// A baddy ran into the player (`0x4fbc38`): hurt mode with a push away
+    /// A baddy ran into the player: hurt mode with a push away
     /// from the baddy, when the player can be hurt.
     fn baddy_touch(&mut self, half: i32, dx: f64, dy: f64) {
         if self.victim().state != crate::combat::Vulnerability::Hurtable {
@@ -361,7 +378,7 @@ impl OfflineSession {
         self.throw_hurt = true;
     }
 
-    /// A thrown object's probe point against the baddies (`0x4d668c`): the
+    /// A thrown object's probe point against the baddies: the
     /// first one it hits takes `2 * power` and is thrown along the flight.
     /// True when one was hit (the object stops).
     pub(crate) fn throw_hits_baddy(&mut self, x: f32, y: f32, dir: u8, power: i32) -> bool {

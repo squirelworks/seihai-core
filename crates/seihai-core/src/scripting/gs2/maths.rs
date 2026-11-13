@@ -5,7 +5,7 @@
 
 use std::f64::consts::PI;
 
-/// `getangle(dx, dy)` (`0x3dc038`): `atan(-dy / dx)`, plus π when `dx` is
+/// `getangle(dx, dy)`: `atan(-dy / dx)`, plus π when `dx` is
 /// below 0, plus 2π when that is still below 0, so 0..2π with y down.
 /// `dx == 0` gives 3π/2 when `dy > 0`, else π/2 **[inferred]**.
 pub fn angle(dx: f64, dy: f64) -> f64 {

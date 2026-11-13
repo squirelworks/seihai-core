@@ -7,7 +7,7 @@
 use crate::scripting::engine::value::num_to_string;
 use crate::scripting::engine::Val;
 
-/// The client's number-to-integer conversion (`0x3d3ab8`): rounds down, so
+/// The client's number-to-integer conversion: rounds down, so
 /// `int(-1.5)` is -2. The client adds a small constant first, which was not
 /// read.
 pub fn client_int(x: f64) -> i32 {
@@ -64,7 +64,7 @@ pub fn char_of(n: f64) -> String {
     ((n as i64) as u8 as char).to_string()
 }
 
-/// `format(fmt, args…)`, as the client's `0x3dbb0c` reads the pattern:
+/// `format(fmt, args…)`, as the client reads the pattern:
 /// `%[-][+][width][.precision][l]` then `d`/`i`, `u`, `f`, `s` or `%`.
 /// Width and precision stop at 120. Any other letter after `%` is dropped
 /// with it. Arguments the pattern asks for and the call did not give are
