@@ -240,14 +240,14 @@ pub fn forward_and_side(a: Pose, tx: f32, ty: f32) -> (f32, f32) {
     }
 }
 
-/// The sword box: 0 to 4 tiles ahead (both ends count), under 2 tiles to the
-/// side.
+/// The sword box: 0 to 4 tiles ahead and up to 2 tiles to the side, every
+/// edge counting (each build from 1.21 to 2.31 tests `|side| <= 2.0`).
 pub fn in_sword_box(rules: &CombatRules, a: Pose, tx: f32, ty: f32) -> Result<(), Reject> {
     let (fwd, side) = forward_and_side(a, tx, ty);
     if fwd < half_tiles(rules.reach_min_half) || fwd > half_tiles(rules.reach_max_half) {
         return Err(Reject::OutOfReach);
     }
-    if side >= half_tiles(rules.lateral_below_half) {
+    if side > half_tiles(rules.lateral_max_half) {
         return Err(Reject::OffLine);
     }
     Ok(())
@@ -585,7 +585,8 @@ pub fn hurtplayer_message(
     let Some(rules) = p.life.combat else {
         return Err(Reject::NotInBuild);
     };
-    if !p.protocol.pli.contains(PLI_HURTPLAYER) {
+    // No 1.x handler for hits by packet was traced: send none there.
+    if !p.protocol.pli.contains(PLI_HURTPLAYER) || !rules.packet_hits {
         return Err(Reject::NotInBuild);
     }
     attacker_may_send(&rules, from, t)?;
@@ -1355,22 +1356,25 @@ mod tests {
     }
 
     #[test]
-    fn the_side_limit_is_strictly_under_2_tiles() {
+    fn the_side_limit_includes_2_tiles() {
         // Facing east: forward is x, sideways is y.
         let a = at(20.0, 20.0, 3);
         assert_eq!(in_sword_box(&R, a, 22.0, 21.5), Ok(()));
         assert_eq!(in_sword_box(&R, a, 22.0, 18.5), Ok(()), "either side");
+        // Every build compares |side| <= 2.0 (`fcomp 2.0; jbe`).
+        assert_eq!(in_sword_box(&R, a, 22.0, 22.0), Ok(()), "exactly 2 is in");
+        assert_eq!(in_sword_box(&R, a, 22.0, 18.0), Ok(()));
         assert_eq!(
-            in_sword_box(&R, a, 22.0, 22.0),
+            in_sword_box(&R, a, 22.0, 22.01),
             Err(Reject::OffLine),
-            "exactly 2 is out"
+            "past 2 is out"
         );
-        assert_eq!(in_sword_box(&R, a, 22.0, 18.0), Err(Reject::OffLine));
-        assert_eq!(in_sword_box(&R, a, 22.0, 21.99), Ok(()));
+        assert_eq!(in_sword_box(&R, a, 22.0, 17.99), Err(Reject::OffLine));
         // Facing north: sideways is x.
         let n = at(20.0, 20.0, 0);
         assert_eq!(in_sword_box(&R, n, 21.5, 17.0), Ok(()));
-        assert_eq!(in_sword_box(&R, n, 22.0, 17.0), Err(Reject::OffLine));
+        assert_eq!(in_sword_box(&R, n, 22.0, 17.0), Ok(()));
+        assert_eq!(in_sword_box(&R, n, 22.5, 17.0), Err(Reject::OffLine));
     }
 
     #[test]
@@ -1408,7 +1412,7 @@ mod tests {
             "behind an east-facing swing"
         );
         assert_eq!(
-            judge_sword(&R, &s, &victim(20.0, 18.0)),
+            judge_sword(&R, &s, &victim(20.0, 17.5)),
             Err(Reject::OffLine),
             "where a north-facing swing would have hit"
         );
@@ -1863,19 +1867,33 @@ mod tests {
                 assert!(c.reach_min_half <= c.reach_max_half, "{}", p.label);
             }
         }
+        // Read in every 1.x binary (gap-2 research): no AP immunity before
+        // 1.34, raw sword power and no judge stamp up to 2.00.
+        use crate::protocol::{COMBAT_121, COMBAT_139};
         for v in [
+            ClientVersion::V121,
+            ClientVersion::V128B2,
             ClientVersion::V133,
-            ClientVersion::V138,
-            ClientVersion::V142,
         ] {
-            assert!(v.combat_rules().is_none(), "{}", v.label());
+            assert_eq!(v.combat_rules(), Some(COMBAT_121), "{}", v.label());
         }
-        // 1.39 swings one step a tick (lab capture), the rest from 2.05.
+        for v in [
+            ClientVersion::V134,
+            ClientVersion::V138,
+            ClientVersion::V139,
+            ClientVersion::V141,
+        ] {
+            assert_eq!(v.combat_rules(), Some(COMBAT_139), "{}", v.label());
+        }
         assert_eq!(
-            ClientVersion::V139.combat_rules(),
-            Some(crate::protocol::COMBAT_139)
+            ClientVersion::V142.combat_rules(),
+            Some(crate::protocol::COMBAT_142)
         );
-        assert_eq!(crate::protocol::COMBAT_139.swing_step_ticks, 1);
+        const { assert!(!COMBAT_139.packet_hits) };
+        assert_eq!(COMBAT_139.swing_step_ticks, 1);
+        assert_eq!(COMBAT_139.sword_power_store, PowerStore::Raw6Bit);
+        const { assert!(!COMBAT_139.judge_throttle) };
+        assert_eq!(COMBAT_121.immune_ap, u8::MAX);
         // Read in each binary (Graal_analysis `client-internals/combat-200-204.md`).
         assert_eq!(ClientVersion::V200.combat_rules(), Some(COMBAT_200));
         for v in [
@@ -1900,7 +1918,7 @@ mod tests {
             (
                 COMBAT_205.reach_min_half,
                 COMBAT_205.reach_max_half,
-                COMBAT_205.lateral_below_half
+                COMBAT_205.lateral_max_half
             ),
             (0, 8, 4)
         );
@@ -2787,7 +2805,7 @@ mod tests {
         st.apply_body(&m46);
         assert!(matches!(st.hits[0], IncomingHit::Hurt(h) if h.attacker == 12 && h.half == 2));
         assert!(matches!(st.hits[1], IncomingHit::Objects(h) if h.attacker == 12 && h.x == 20.0));
-        // A build without the rules decodes nothing and counts the ids as unhandled.
+        // No 1.x packet hit handler was traced: the ids decode to nothing.
         for v in [
             ClientVersion::V133,
             ClientVersion::V138,
@@ -2797,10 +2815,6 @@ mod tests {
             st.apply_body(&m40(12));
             st.apply_body(&m46);
             assert!(st.hits.is_empty(), "{}", v.label());
-            let mut sw_props = vec![17 + 0x20, 0x20 + sw(8, 3)];
-            sw_props.extend_from_slice(&[15 + 0x20, 0x20 + 40]);
-            st.apply_body(&plo8(5, &sw_props));
-            assert!(st.swings.is_empty(), "{}: no swing is noticed", v.label());
         }
         // 2.00 has the rules but no id 46 (added in 2.01): 40 is decoded, 46
         // is not.

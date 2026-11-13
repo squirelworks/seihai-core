@@ -19,7 +19,7 @@ fn machine(name: &str) -> Machine {
 }
 
 fn host() -> EffectHost {
-    let mut h = EffectHost::new(Era::V21, 7);
+    let mut h = EffectHost::new(Era::V217, 7);
     h.x = 30.0;
     h.y = 31.0;
     h

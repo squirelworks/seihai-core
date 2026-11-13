@@ -864,9 +864,10 @@ impl<'a> Run<'a> {
     // ---- message codes ----
 
     /// Replace message codes in `s`: `#c` chat, `#n` nickname, `#a`
-    /// account, `#w` selected weapon, `#L`/`#F` level, `#v(expr)`, `#s(name)`, and from 2.02
+    /// account, `#w` selected weapon, `#L` level (`#F` from 2.17), `#v(expr)`, `#s(name)`,
+    /// `#K(n)` (2.00), and from 2.02
     /// `#t(i)`, `#e(start,len,text)`, `#T(text)`, and from 2.03 `#p(n)`.
-    /// Anything else stays as written.
+    /// Anything else stays as written from 2.17; before, the `#` is dropped.
     fn expand(&mut self, s: &str, depth: usize) -> String {
         if !s.contains('#') || depth > 8 {
             return s.to_string();
@@ -952,7 +953,27 @@ impl<'a> Run<'a> {
                             .unwrap_or_default(),
                     )
                 }
-                ('L', None) | ('F', None) => Some(self.core.level.clone()),
+                ('L', None) => Some(self.core.level.clone()),
+                // `#F`, the level file, is a code of the 2.17 engine; 1.41
+                // rev 1 has no `#F` [lab].
+                ('F', None) if era >= Era::V217 => Some(self.core.level.clone()),
+                // `#K(n)`: the character with code `n`, empty below 0. In
+                // 2.05r2 [lab]; 1.41 rev 1 shows `K(65)` [lab]. The first
+                // build with it is not read; 2.00 is assumed.
+                ('K', Some(x)) if era >= Era::V200 => {
+                    let n = self
+                        .expand(x, depth + 1)
+                        .trim()
+                        .parse::<f64>()
+                        .unwrap_or(-1.0);
+                    Some(if n < 0.0 {
+                        String::new()
+                    } else {
+                        char::from_u32(n as u32)
+                            .map(String::from)
+                            .unwrap_or_default()
+                    })
+                }
                 ('v', Some(x)) => match parse_expr(x, era) {
                     Some(e) => Some(self.eval(&e).text()),
                     None => Some(String::new()),
@@ -1032,6 +1053,25 @@ impl<'a> Run<'a> {
                     out.push_str(&s[lit_from..i]);
                     out.push_str(&r);
                     i = end;
+                    lit_from = i;
+                }
+                // The 1.x to 2.1 expander (2.05r2 and 1.41 rev 1 [lab]):
+                // `##` is `#`, `#b` is empty in a message, a code that needs
+                // an argument and has none is empty (`A#vB` is `AB`), and
+                // any other `#` is dropped (`A#?B` is `A?B`, and 1.41's
+                // `#e(1,2,x)` is `e(1,2,x)`). The 2.17 engine keeps unknown
+                // codes as written, `#b` included.
+                None if era.old_engine() => {
+                    out.push_str(&s[lit_from..i]);
+                    match code {
+                        '#' => {
+                            out.push('#');
+                            i += 2;
+                        }
+                        'b' => i += 2,
+                        'v' | 's' if inner.is_none() => i += 2,
+                        _ => i += 1,
+                    }
                     lit_from = i;
                 }
                 None => i += 1,
@@ -1130,11 +1170,6 @@ impl<'a> Run<'a> {
                     return;
                 }
                 let cur = self.core.flags.get(&k).cloned().unwrap_or_default();
-                // Before 2.1 `addstring` adds text to the string.
-                if name == "addstring" && self.era() < Era::V21 {
-                    self.write_flag(&k, format!("{cur}{}", sv(v, 1)));
-                    return;
-                }
                 let mut items = split_list(&cur);
                 let at = |i: usize| nv(v, i).max(0.0).floor() as usize;
                 match name {
@@ -1243,12 +1278,8 @@ impl<'a> Run<'a> {
             }
             "move" => {
                 let (dx, dy) = (nv(&v, 0), nv(&v, 1));
-                // Before 2.03 `move` takes only the two offsets.
-                let (time, options) = if self.era() >= Era::V203 {
-                    (nv(&v, 2), nv(&v, 3) as i64)
-                } else {
-                    (0.0, 0)
-                };
+                // `move` is first in 2.03's table, with all four arguments.
+                let (time, options) = (nv(&v, 2), nv(&v, 3) as i64);
                 self.obj.x += dx;
                 self.obj.y += dy;
                 self.core.effects.push(Effect::Move {
@@ -1258,7 +1289,7 @@ impl<'a> Run<'a> {
                     time,
                     options,
                 });
-                if options & 8 != 0 && self.era() >= Era::V203 {
+                if options & 8 != 0 {
                     self.core.pending.push_back(Pending {
                         target: Target::Id(id),
                         event: "movementfinished".into(),

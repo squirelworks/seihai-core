@@ -45,6 +45,14 @@ pub enum BinOp {
 }
 
 impl BinOp {
+    /// `==`, `!=`, `<`, `>`, `<=`, `>=`.
+    pub fn compares(self) -> bool {
+        matches!(
+            self,
+            BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Gt | BinOp::Le | BinOp::Ge
+        )
+    }
+
     pub fn symbol(self) -> &'static str {
         match self {
             BinOp::Add => "+",

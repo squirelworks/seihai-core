@@ -18,6 +18,8 @@ struct Around<'a> {
     sounds: Vec<SoundEvent>,
     shots: Vec<Shot>,
     touches: Vec<(i32, f64, f64)>,
+    drops: Vec<(u8, f64, f64)>,
+    spark: bool,
 }
 
 impl World for Around<'_> {
@@ -46,6 +48,15 @@ impl World for Around<'_> {
     fn touch_player(&mut self, half: i32, dx: f64, dy: f64) {
         self.touches.push((half, dx, dy));
     }
+    fn rolls_drops(&self) -> bool {
+        self.s.drops.client_roll
+    }
+    fn drop_item(&mut self, item: u8, x: f64, y: f64) {
+        self.drops.push((item, x, y));
+    }
+    fn sword_spark(&mut self) {
+        self.spark = true;
+    }
 }
 
 /// How the session's baddies run this frame.
@@ -70,7 +81,7 @@ impl BaddyRole {
 }
 
 impl OfflineSession {
-    /// Whether a baddy may not stand on `(x, y)` (`0x540140`): off the
+    /// Whether a baddy may not stand on `(x, y)`: off the
     /// board, a wall, a chest, water, a chair or a bed bottom. NPCs that
     /// block are not tested yet.
     pub(crate) fn baddy_blocked(&self, x: f32, y: f32) -> bool {
@@ -184,8 +195,10 @@ impl OfflineSession {
         if let Some(bd) = baddies.iter_mut().find(|bd| bd.id == h.id) {
             let mut w = self.around(Vec::new());
             bd.hurt(&mut w, false, h.power, h.dx, h.dy, false);
-            let sounds = std::mem::take(&mut w.sounds);
-            self.sound_events.extend(sounds);
+            let Around {
+                rng, sounds, drops, ..
+            } = w;
+            self.after_hits(rng, sounds, drops);
         }
         self.baddies = baddies;
     }
@@ -202,6 +215,23 @@ impl OfflineSession {
             sounds: Vec::new(),
             shots: Vec::new(),
             touches: Vec::new(),
+            drops: Vec::new(),
+            spark: false,
+        }
+    }
+
+    /// Take back what a hit left behind: the `Random` state, the sounds and
+    /// any item a dying baddy rolled.
+    fn after_hits(
+        &mut self,
+        rng: crate::items::DelphiRandom,
+        sounds: Vec<SoundEvent>,
+        drops: Vec<(u8, f64, f64)>,
+    ) {
+        self.item_rng = rng;
+        self.sound_events.extend(sounds);
+        for (item, x, y) in drops {
+            self.put_rolled(item, x as f32, y as f32);
         }
     }
 
@@ -225,6 +255,11 @@ impl OfflineSession {
         while self.baddy_clock_ms >= b::PLAYER_TICK_MS {
             self.baddy_clock_ms -= b::PLAYER_TICK_MS;
             self.baddy_phase = !self.baddy_phase;
+            if let Some(sp) = &mut self.sword_spark {
+                if !sp.tick() {
+                    self.sword_spark = None;
+                }
+            }
             self.baddy_sword(role);
             if self.baddy_phase {
                 self.baddy_tick(role, &others);
@@ -243,11 +278,12 @@ impl OfflineSession {
         }
         let (px, py, pdir) = self.player_seed();
         let power = i32::from(self.sword_power);
+        let swamp = self.world.swamp_sword;
         let mut baddies = std::mem::take(&mut self.baddies);
         let mut w = self.around(Vec::new());
         let mut sends = Vec::new();
         for bd in baddies.iter_mut() {
-            let Some(clash) = bd.sword_test(px, py, pdir) else {
+            let Some(clash) = bd.sword_test(px, py, pdir, swamp) else {
                 continue;
             };
             let (cx, cy) = bd.centre();
@@ -258,8 +294,17 @@ impl OfflineSession {
                 sends.push(b::follower_hurt_props(bd));
             }
         }
-        let sounds = std::mem::take(&mut w.sounds);
-        self.sound_events.extend(sounds);
+        let Around {
+            rng,
+            sounds,
+            drops,
+            spark,
+            ..
+        } = w;
+        self.after_hits(rng, sounds, drops);
+        if spark {
+            self.sword_spark = Some(b::SwordSpark::new(px, py));
+        }
         self.baddy_sends.extend(sends);
         self.baddies = baddies;
     }
@@ -291,9 +336,13 @@ impl OfflineSession {
             sounds,
             shots,
             touches,
+            drops,
             ..
         } = w;
         self.item_rng = rng;
+        for (item, x, y) in drops {
+            self.put_rolled(item, x as f32, y as f32);
+        }
         baddies.retain(|bd| !bd.removed);
         self.baddies = baddies;
         self.sound_events.extend(sounds);
@@ -316,7 +365,7 @@ impl OfflineSession {
         }
     }
 
-    /// A baddy ran into the player (`0x4fbc38`): hurt mode with a push away
+    /// A baddy ran into the player: hurt mode with a push away
     /// from the baddy, when the player can be hurt.
     fn baddy_touch(&mut self, half: i32, dx: f64, dy: f64) {
         if self.victim().state != crate::combat::Vulnerability::Hurtable {
@@ -329,7 +378,7 @@ impl OfflineSession {
         self.throw_hurt = true;
     }
 
-    /// A thrown object's probe point against the baddies (`0x4d668c`): the
+    /// A thrown object's probe point against the baddies: the
     /// first one it hits takes `2 * power` and is thrown along the flight.
     /// True when one was hit (the object stops).
     pub(crate) fn throw_hits_baddy(&mut self, x: f32, y: f32, dir: u8, power: i32) -> bool {

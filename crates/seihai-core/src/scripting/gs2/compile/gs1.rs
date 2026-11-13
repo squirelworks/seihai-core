@@ -1309,7 +1309,7 @@ impl Lower {
     ///   `set("name=value")`, or `unset("name")` for a literal empty value.
     /// - `addstring`, `insertstring`, `replacestring`, `removestring`,
     ///   `deletestring` (2.1 lists) on `this.`/`client.` names: the GS2 list
-    ///   methods. Before 2.1 `addstring` appends text.
+    ///   methods. `addstring` is first in NewWorld beta 2 and 2.1.
     /// - `tokenize text` / `tokenize2 text,seps`: `tokens = text.tokenize()`,
     ///   which `#t(i)` then reads as `tokens[i]`.
     /// - `setcharprop code,value`: the NPC's own property (see
@@ -1369,14 +1369,6 @@ impl Lower {
                     return Some(Stmt::empty());
                 }
                 let list = Expr::var(self.name(&var));
-                if name == "addstring" && self.era < Era::V21 {
-                    let value = self.expr(&raw_value(args.get(1)));
-                    return Some(Stmt::Assign {
-                        target: Var::plain(self.name(&var)),
-                        op: AssignOp::Set,
-                        value: Expr::bin(BinOp::Cat, list, value),
-                    });
-                }
                 let method = match name {
                     "addstring" => "add",
                     "insertstring" => "insert",

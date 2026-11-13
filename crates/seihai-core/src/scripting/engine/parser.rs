@@ -279,13 +279,33 @@ impl<'a> Parser<'a> {
     }
 
     fn ident_stmt(&mut self, w: String, line: u32, start: usize) -> Option<Stmt> {
+        // A statement word this build's table does not have (`while` before
+        // 1.28 beta 2, `function` before 1.41, `with` outside 2.17 to 3.04):
+        // the statement is read so parsing stays in step, then skipped.
+        let is_with = w == "with" && self.is_op("(");
+        let known = vocab::KEYWORDS.iter().any(|(k, _, _)| *k == w);
+        if known && (w != "with" || is_with) && !vocab::keyword_in(&w, self.era) {
+            let era = self.era;
+            self.era = Era::V217;
+            let _ = self.ident_stmt_inner(w.clone(), line, start);
+            self.era = era;
+            self.diag(&format!(
+                "`{w}` is not in the {} command table; the statement is skipped",
+                era.label()
+            ));
+            return Some(Stmt::Block(Vec::new()));
+        }
+        self.ident_stmt_inner(w, line, start)
+    }
+
+    fn ident_stmt_inner(&mut self, w: String, line: u32, start: usize) -> Option<Stmt> {
         match w.as_str() {
             "if" => {
                 if !self.expect_op("(") {
                     self.recover();
                     return Some(Stmt::Block(Vec::new()));
                 }
-                let cond = self.expr();
+                let cond = self.cond();
                 self.expect_op(")");
                 let then = Box::new(self.stmt().unwrap_or(Stmt::Block(Vec::new())));
                 self.skip_semis_before_else();
@@ -404,7 +424,7 @@ impl<'a> Parser<'a> {
                     self.recover();
                     return Some(Stmt::Block(Vec::new()));
                 }
-                let cond = self.expr();
+                let cond = self.cond();
                 self.expect_op(")");
                 let then = Box::new(self.stmt().unwrap_or(Stmt::Block(Vec::new())));
                 Some(Stmt::If {
@@ -413,9 +433,9 @@ impl<'a> Parser<'a> {
                     els: None,
                 })
             }
-            // `with (target) body`: from the 2.1 clients (the word first
-            // appears in 2.17) and the NPC server.
-            "with" if self.era >= Era::V21 && self.is_op("(") => {
+            // `with (target) body`: in the 2.17.1 to 2.31 tables and 3.04's
+            // engine table, and on the NPC server.
+            "with" if vocab::keyword_in("with", self.era) && self.is_op("(") => {
                 self.next();
                 let target = self.expr();
                 self.expect_op(")");
@@ -689,6 +709,22 @@ impl<'a> Parser<'a> {
         e
     }
 
+    /// A condition after `if (` or `elseif (`. A bare number
+    /// there goes through the flag-name path, so `if (1)` tests a flag named
+    /// `1` and is false: read in 2.05r2 and 1.41 rev 1, and run false on
+    /// 1.41 rev 1, 2.05r2, 2.17.1, 2.22 and 2.31 [lab]. 3.04 does the same
+    /// (Graal_analysis `linux-304-gs1-runtime.md`). `while (1)` was not
+    /// run, so loops keep the plain number.
+    fn cond(&mut self) -> Expr {
+        let bare = matches!(self.peek().tok, Tok::Num(_)) && self.second_is_op(")");
+        let e = self.expr();
+        if bare {
+            Expr::Num(0.0)
+        } else {
+            e
+        }
+    }
+
     fn binary(&mut self, min: u8) -> Expr {
         let mut lhs = self.unary();
         loop {
@@ -748,7 +784,15 @@ impl<'a> Parser<'a> {
                 Tok::Op("--") => Expr::Unary(UnOp::Neg, Box::new(rhs)),
                 _ => rhs,
             };
-            lhs = Expr::Bin(op, Box::new(lhs), Box::new(rhs));
+            lhs = if self.era.old_engine() && op.compares() && constant(&lhs) && constant(&rhs) {
+                // The old compiler turns a comparison of two constants into
+                // a numeric leaf before evaluating it, so it keeps the leaf's
+                // initial 0: `1==1` and `(1+0)==1` are 0 (2.05r2 and 1.41
+                // rev 1 [bin][lab]). 2.17.1 to 2.31 give 1 [lab].
+                Expr::Num(0.0)
+            } else {
+                Expr::Bin(op, Box::new(lhs), Box::new(rhs))
+            };
         }
         lhs
     }
@@ -989,12 +1033,29 @@ fn text_arg(raw: &str, quoted: bool, era: Era) -> Expr {
     Expr::Str(raw.to_string())
 }
 
+/// A numeric constant as the old compiler folds it: numbers joined by
+/// arithmetic.
+fn constant(e: &Expr) -> bool {
+    match e {
+        Expr::Num(_) => true,
+        Expr::Unary(UnOp::Neg, e) => constant(e),
+        Expr::Bin(op, a, b) => {
+            matches!(
+                op,
+                BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod | BinOp::Pow
+            ) && constant(a)
+                && constant(b)
+        }
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn g(src: &str) -> String {
-        parse(src, Era::V21).to_string()
+        parse(src, Era::V217).to_string()
     }
 
     #[test]
@@ -1220,7 +1281,7 @@ mod tests {
             "(cmd showimg 5 \"@a@#s(l) (#v(x), #v(y))\" 1 2)\n"
         );
         // An unknown command whose text starts with `(`.
-        assert!(parse("addguildmember (g),#t(1),#t(2);", Era::V21)
+        assert!(parse("addguildmember (g),#t(1),#t(2);", Era::V217)
             .diagnostics
             .is_empty());
     }
@@ -1262,11 +1323,11 @@ mod tests {
     #[test]
     fn expression_only_parsing() {
         assert_eq!(
-            parse_expr("this.a + 1", Era::V21).unwrap().to_string(),
+            parse_expr("this.a + 1", Era::V217).unwrap().to_string(),
             "(+ this.a 1)"
         );
-        assert!(parse_expr("1 +", Era::V21).is_none());
-        assert!(parse_expr("1 2", Era::V21).is_none());
+        assert!(parse_expr("1 +", Era::V217).is_none());
+        assert!(parse_expr("1 2", Era::V217).is_none());
     }
 
     #[test]
@@ -1324,11 +1385,11 @@ mod tests {
 
     #[test]
     fn errors_are_diagnostics_and_parsing_continues() {
-        let s = parse("if created) { hide; }\nshow;\n} hide;", Era::V21);
+        let s = parse("if created) { hide; }\nshow;\n} hide;", Era::V217);
         assert!(!s.diagnostics.is_empty());
         assert!(s.to_string().contains("(cmd show)"));
         assert!(s.to_string().contains("(cmd hide)"));
-        let s = parse("if (a) { hide;", Era::V21);
+        let s = parse("if (a) { hide;", Era::V217);
         assert!(s.diagnostics.iter().any(|d| d.msg.contains("missing `}`")));
         assert!(s.to_string().contains("(cmd hide)"));
     }
@@ -1336,16 +1397,16 @@ mod tests {
     #[test]
     fn deep_nesting_is_cut_off_without_overflowing() {
         let src = "{".repeat(5000) + "hide;";
-        let s = parse(&src, Era::V21);
+        let s = parse(&src, Era::V217);
         assert!(s.diagnostics.iter().any(|d| d.msg.contains("too deep")));
         let src = format!("x = {}1{};", "(".repeat(5000), ")".repeat(5000));
-        let s = parse(&src, Era::V21);
+        let s = parse(&src, Era::V217);
         assert!(s.diagnostics.iter().any(|d| d.msg.contains("too deep")));
     }
 
     #[test]
     fn diagnostics_carry_line_numbers() {
-        let s = parse("hide;\nhide;\nx = ;\n", Era::V21);
+        let s = parse("hide;\nhide;\nx = ;\n", Era::V217);
         assert_eq!(s.diagnostics[0].line, 3);
     }
 
@@ -1371,7 +1432,7 @@ mod tests {
             "x in |",
             "x = a in {1,",
         ] {
-            let _ = parse(src, Era::V21);
+            let _ = parse(src, Era::V217);
             let _ = parse(src, Era::V200);
         }
     }
@@ -1393,7 +1454,7 @@ mod twogta_recovery {
     use super::*;
 
     fn g(src: &str) -> String {
-        parse(src, Era::V21).to_string()
+        parse(src, Era::V217).to_string()
     }
 
     /// A block "commented out" with a `*` does nothing; before, its body ran
@@ -1415,7 +1476,7 @@ mod twogta_recovery {
 
     #[test]
     fn colon_equals_assigns() {
-        let s = parse("this.a := 3; this.b := this.a + 1;", Era::V21);
+        let s = parse("this.a := 3; this.b := this.a + 1;", Era::V217);
         assert!(s.diagnostics.is_empty(), "{:?}", s.diagnostics);
         assert_eq!(s.to_string(), "(= this.a 3)\n(= this.b (+ this.a 1))\n");
     }
@@ -1424,7 +1485,7 @@ mod twogta_recovery {
     fn break_and_continue_written_as_calls() {
         let s = parse(
             "while (1) { if (a) continue(); break(); }\nthis.b = 1;",
-            Era::V21,
+            Era::V217,
         );
         assert!(s.diagnostics.is_empty(), "{:?}", s.diagnostics);
         assert_eq!(
@@ -1432,7 +1493,7 @@ mod twogta_recovery {
             "(while 1 (block (if a (continue)) (break)))\n(= this.b 1)\n"
         );
         // Anything inside the parentheses is still an error.
-        assert!(!parse("while (1) { break(1); }", Era::V21)
+        assert!(!parse("while (1) { break(1); }", Era::V217)
             .diagnostics
             .is_empty());
     }
