@@ -530,7 +530,7 @@ Generated; do not edit between the markers.
 - unknown (pli): the Windows 4.04r2 set is kept; the lab saw 2, 18, 23, 24, 37, 38, 46 and 157
 - unknown (login): Seihai sends the three machine fields as empty quoted strings; the real client sent the MAC and /etc stat MD5s and an empty fourth field
 - unknown (3d): the Torque 3D mode is not modelled
-- source: binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32; the frame cipher at 0x3f73b4/0x3f7940 steps raw bodies (len + 3) >> 2 times, at most 12, and zlib/bz2 bodies len >> 2, at most 4, as 5.12; short C->S bodies under 48 bytes go raw), login id 5 with G3D18026 and mac,<md5>,<md5>,"" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38
+- source: binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32; the frame cipher steps raw bodies (len + 3) >> 2 times, at most 12, and zlib/bz2 bodies len >> 2, at most 4, as 5.12; short C->S bodies under 48 bytes go raw), login id 5 with G3D18026 and mac,<md5>,<md5>,"" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38
 
 #### 4.20r6 (`G3D27076`, binary, linked 2006-09)
 
@@ -585,7 +585,7 @@ Generated; do not edit between the markers.
 - unknown (pli): the Windows 5.12 set is kept; the lab saw 2, 23, 24, 37, 46 and 157
 - unknown (login): the kernel string is the one Mac OS X 10.4.0 gave in the lab; a real Mac sends its own
 - unknown (render): on a modern gserver world the level stayed black even with the lab's render shim; the cause was not found
-- source: binary (Mac OS X PPC Mach-O, main exe sha256 a76dc557...2d206f10; the "Unknown" v5 Mac builds are byte-identical copies) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways with 5.12's round-down step (frame cipher at 0x2690d8/0x26974c), login id 5 with G3D15097 and mac,<md5>,<md5>,"",<quoted Darwin kernel string> in the plain zlib frame; auto-login as guest with a client-made password; first props as 4.04r2 Mac; asked arial.ttf, chest.png, state.png and steps.wav; sent no 18
+- source: binary (Mac OS X PPC Mach-O, main exe sha256 a76dc557...2d206f10; the "Unknown" v5 Mac builds are byte-identical copies) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways with 5.12's round-down step, login id 5 with G3D15097 and mac,<md5>,<md5>,"",<quoted Darwin kernel string> in the plain zlib frame; auto-login as guest with a client-made password; first props as 4.04r2 Mac; asked arial.ttf, chest.png, state.png and steps.wav; sent no 18
 
 #### 5.24r4 (`G3D15010`, binary, linked 2010-02-01)
 
