@@ -208,16 +208,16 @@ fn the_reference_fixtures_are_strict_gs2() {
 #[test]
 fn only_legacy_mode_guesses_the_language() {
     let gs1 = "if (playerenters) { message hi; }";
-    assert!(compile(gs1, Language::Detect(Era::V21), Mode::Strict).is_err());
-    let got = compile(gs1, Language::Detect(Era::V21), Mode::Legacy).unwrap();
+    assert!(compile(gs1, Language::Detect(Era::V217), Mode::Strict).is_err());
+    let got = compile(gs1, Language::Detect(Era::V217), Mode::Legacy).unwrap();
     assert_eq!(got.front, Front::Gs1);
     assert_eq!(got.warnings[0].quirk, Quirk::GuessedLanguage(Front::Gs1));
     // Named as GS1, the same script needs no guess and has no warning.
-    let named = compile(gs1, Language::Gs1(Era::V21), Mode::Strict).unwrap();
+    let named = compile(gs1, Language::Gs1(Era::V217), Mode::Strict).unwrap();
     assert!(named.warnings.is_empty());
     assert_eq!(named.script.write(), got.script.write());
     assert_eq!(
-        compile_gs1(gs1, Era::V21).unwrap().write(),
+        compile_gs1(gs1, Era::V217).unwrap().write(),
         got.script.write()
     );
 }
@@ -253,7 +253,7 @@ fn legacy_mode_reads_later_gs1_as_gs1_2_1() {
         assert_eq!(quirks, [Quirk::LaterGs1(Era::V205)], "{src}");
         assert_eq!(
             got.script.write(),
-            compile_gs1(src, Era::V21).unwrap().write(),
+            compile_gs1(src, Era::V217).unwrap().write(),
             "{src}"
         );
     }
@@ -265,11 +265,11 @@ fn a_gs1_with_keeps_plain_variables_on_the_npc() {
     // them through `thiso`.
     let plain = "if (created) {\n  with (getplayer(#a)) {\n    n = 1;\n    m = n + x;\n    if (n in b) hide;\n  }\n}";
     let thiso = "if (created) {\n  with (getplayer(#a)) {\n    thiso.n = 1;\n    thiso.m = thiso.n + x;\n    if (n in thiso.b) hide;\n  }\n}";
-    let got = compile_gs1(plain, Era::V21).unwrap_or_else(|e| panic!("{e}"));
-    let want = compile_gs1(thiso, Era::V21).unwrap_or_else(|e| panic!("{e}"));
+    let got = compile_gs1(plain, Era::V217).unwrap_or_else(|e| panic!("{e}"));
+    let want = compile_gs1(thiso, Era::V217).unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(got.write(), want.write());
     let nested = "if (created) { with (a) { with (b) { n = 1; } } }";
-    assert!(compile_gs1(nested, Era::V21).is_err());
+    assert!(compile_gs1(nested, Era::V217).is_err());
 }
 
 #[test]

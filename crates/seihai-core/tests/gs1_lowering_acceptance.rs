@@ -16,7 +16,7 @@ use seihai_core::scripting::gs2::exec::{EffectHost, Machine, Outcome, Root};
 use seihai_core::scripting::gs2::Script;
 
 fn gs1(src: &str) -> Script {
-    compile::compile_gs1(src, Era::V21).unwrap_or_else(|e| panic!("{src}\n{e}"))
+    compile::compile_gs1(src, Era::V217).unwrap_or_else(|e| panic!("{src}\n{e}"))
 }
 
 fn gs2(src: &str) -> Script {
@@ -37,7 +37,7 @@ fn same(gs1_src: &str, gs2_src: &str) -> Script {
 
 fn created(script: Script) -> (Machine, EffectHost) {
     let mut m = Machine::new(script);
-    let mut host = EffectHost::new(Era::V21, 3);
+    let mut host = EffectHost::new(Era::V217, 3);
     assert_eq!(m.run_top_level(&mut host), Outcome::Done);
     assert_eq!(m.call_event("onCreated", &[], &mut host), Outcome::Done);
     (m, host)
@@ -76,7 +76,7 @@ fn reading_a_flag_by_its_plain_name_is_refused() {
     // GS1 reads `gotkey` as the flag; GS2 would read the object's variable.
     let err = compile::compile_gs1(
         "if (playerenters) { set gotkey; }\nif (playertouchsme && gotkey) { hide; }\n",
-        Era::V21,
+        Era::V217,
     )
     .unwrap_err()
     .to_string();
@@ -121,7 +121,7 @@ fn player_properties_lower_to_the_player_object() {
         "function onPlayerEnters() {\n  setplayerprop(\"#c\", \"hello\");\n  player.dir = 2;\n  player.rupees += 5;\n  this.h = player.hearts;\n  this.s = player.swordpower + player.shieldpower;\n  this.b = player.bombs + player.darts;\n  this.p = player.x + player.y;\n}\n",
     );
     let mut m = Machine::new(s);
-    let mut host = EffectHost::new(Era::V21, 3);
+    let mut host = EffectHost::new(Era::V217, 3);
     m.run_top_level(&mut host);
     assert_eq!(
         m.call_event("onPlayerEnters", &[], &mut host),
@@ -144,7 +144,9 @@ fn counts_and_old_command_names_lower() {
         ("if (created) { this.a = weaponscount; }\n", "weaponscount"),
         ("if (created) { tokenscount = 1; }\n", "tokenscount"),
     ] {
-        let err = compile::compile_gs1(src, Era::V21).unwrap_err().to_string();
+        let err = compile::compile_gs1(src, Era::V217)
+            .unwrap_err()
+            .to_string();
         assert!(err.contains(name), "{src}: {err}");
     }
 }
@@ -165,7 +167,7 @@ fn every_gs1_command_says_how_it_lowers() {
                 missing.push(c.name);
                 // A missing command is a compile error naming it.
                 let src = format!("if (created) {{ {}; }}\n", c.name);
-                if let Err(e) = compile::compile_gs1(&src, Era::V21) {
+                if let Err(e) = compile::compile_gs1(&src, Era::V217) {
                     assert!(e.to_string().contains(c.name), "{}: {e}", c.name);
                 }
             }
