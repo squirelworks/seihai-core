@@ -346,3 +346,13 @@ fn detect_reports_both_fronts_when_both_fail() {
     let gs2 = err.find("as GS2: ").unwrap_or_else(|| panic!("{err}"));
     assert!(gs1 < gs2, "{err}");
 }
+
+#[test]
+fn a_gs1_error_names_the_line_of_the_statement() {
+    let err = compile_gs1(
+        "if (created) {\n  hide;\n\n  selectedweapon++;\n}",
+        Era::V205,
+    )
+    .unwrap_err();
+    assert_eq!(err.errors[0].line, 4, "{err}");
+}

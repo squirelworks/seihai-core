@@ -416,7 +416,7 @@ fn stmt_calls(s: &g::Stmt, gs1: bool) -> bool {
         g::Stmt::Function { body, .. } => body.iter().any(s_),
         g::Stmt::Return(v) => v.as_ref().is_some_and(e),
         g::Stmt::Assign { target, value, .. } => index(target) || e(value),
-        g::Stmt::Call { name, args } => name_is_call(name, gs1) || args.iter().any(e),
+        g::Stmt::Call { name, args, .. } => name_is_call(name, gs1) || args.iter().any(e),
         g::Stmt::Command { name, args, .. } => {
             command_is_call(name, args, gs1)
                 || args
@@ -540,7 +540,7 @@ fn with_escape(s: &g::Stmt, in_loop: bool) -> bool {
         g::Stmt::Command { name, args, .. } => {
             is_wait(name) || args.iter().any(|a| matches!(a, g::Arg::Num(e) if waits(e)))
         }
-        g::Stmt::Call { name, args } => is_wait(name) || args.iter().any(waits),
+        g::Stmt::Call { name, args, .. } => is_wait(name) || args.iter().any(waits),
         g::Stmt::Assign { target, value, .. } => index(target) || waits(value),
         g::Stmt::IncDec { target, .. } => index(target),
         g::Stmt::Function { .. } | g::Stmt::Unknown { .. } => false,
@@ -979,14 +979,29 @@ impl Lower {
                 target,
                 op: g::AssignOp::Set,
                 value: g::Expr::List(values),
+                line,
             } if target.index.is_empty()
                 && !values.iter().any(has_nested_list)
                 && list_problem(values).is_some() =>
             {
+                self.line = *line;
                 self.ordered_list(target, values)
             }
-            g::Stmt::Assign { target, op, value } => self.assign(target, assign_op(*op), value),
-            g::Stmt::IncDec { target, delta } => {
+            g::Stmt::Assign {
+                target,
+                op,
+                value,
+                line,
+            } => {
+                self.line = *line;
+                self.assign(target, assign_op(*op), value)
+            }
+            g::Stmt::IncDec {
+                target,
+                delta,
+                line,
+            } => {
+                self.line = *line;
                 if target.index.is_empty() {
                     return Stmt::IncDec {
                         target: self.var(target),
@@ -1002,10 +1017,13 @@ impl Lower {
                 };
                 self.assign(target, op, &g::Expr::Num(1.0))
             }
-            g::Stmt::Call { name, args } => match self.call(name, args) {
-                Expr::Call { name, args } => Stmt::Call { name, args },
-                other => Stmt::Eval(other),
-            },
+            g::Stmt::Call { name, args, line } => {
+                self.line = *line;
+                match self.call(name, args) {
+                    Expr::Call { name, args } => Stmt::Call { name, args },
+                    other => Stmt::Eval(other),
+                }
+            }
             g::Stmt::Command { name, args, line } => {
                 self.line = *line;
                 self.command(name, args)

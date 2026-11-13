@@ -482,7 +482,11 @@ impl<'a> Parser<'a> {
             let args = self.call_args(&w);
             if !(self.diags.len() == saved.2 && self.is_op(",")) {
                 self.end_stmt();
-                return Some(Stmt::Call { name: w, args });
+                return Some(Stmt::Call {
+                    name: w,
+                    args,
+                    line,
+                });
             }
             // `name (...),`: not a call but an unknown command whose text
             // starts with `(` (`addguildmember (guildname),#t(1),#t(2);`).
@@ -611,6 +615,7 @@ impl<'a> Parser<'a> {
     }
 
     fn assign_tail(&mut self, target: VarRef) -> Stmt {
+        let line = self.line();
         let op = match self.peek().tok.clone() {
             Tok::Op("=" | ":=") => AssignOp::Set,
             Tok::Op("+=") => AssignOp::Add,
@@ -619,13 +624,18 @@ impl<'a> Parser<'a> {
             Tok::Op("/=") => AssignOp::Div,
             Tok::Op("++") => {
                 self.next();
-                return Stmt::IncDec { target, delta: 1.0 };
+                return Stmt::IncDec {
+                    target,
+                    delta: 1.0,
+                    line,
+                };
             }
             Tok::Op("--") => {
                 self.next();
                 return Stmt::IncDec {
                     target,
                     delta: -1.0,
+                    line,
                 };
             }
             _ => {
@@ -636,7 +646,12 @@ impl<'a> Parser<'a> {
         };
         self.next();
         let value = self.expr();
-        Stmt::Assign { target, op, value }
+        Stmt::Assign {
+            target,
+            op,
+            value,
+            line,
+        }
     }
 
     /// The init and step parts of `for`: an assignment or `x++`, or nothing.
