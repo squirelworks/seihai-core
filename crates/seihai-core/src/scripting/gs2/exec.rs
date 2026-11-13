@@ -1447,6 +1447,9 @@ pub struct EffectHost {
     pub flags: HashMap<String, String>,
     pub effects: Vec<Effect>,
     pub log: Vec<String>,
+    /// `resolveHost(host)` is a builtin (6.00r4 only:
+    /// `VersionProfile::scripts.resolve_host`). Off by default.
+    pub resolve_host: bool,
 }
 
 impl EffectHost {
@@ -1459,6 +1462,7 @@ impl EffectHost {
             flags: HashMap::new(),
             effects: Vec::new(),
             log: Vec::new(),
+            resolve_host: false,
         }
     }
 }
@@ -1532,6 +1536,12 @@ impl Host for EffectHost {
             "strequals" => {
                 let same = text(args, 0).to_lowercase() == text(args, 1).to_lowercase();
                 return Some(Val::Num(if same { 1.0 } else { 0.0 }));
+            }
+            // 6.00r4's `resolveHost(host)`: a DNS lookup, giving the address
+            // as text, or "" when the name does not resolve.
+            "resolvehost" if self.resolve_host => {
+                let addr = crate::net::resolve_host(&text(args, 0)).unwrap_or_default();
+                return Some(Val::Str(addr));
             }
             // How `seteffect` mixes. The GS1 vocabulary dates it to 2.1;
             // a GS2 host takes it whatever era it was made for, and sends it

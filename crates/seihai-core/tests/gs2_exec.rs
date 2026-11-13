@@ -393,3 +393,25 @@ fn a_function_returns_the_value_of_its_own_variable() {
     assert_eq!(m.var(Root::This, "b"), Some(&Val::Num(7.0)));
     assert_eq!(m.var(Root::This, "c"), Some(&Val::Num(8.0)));
 }
+
+/// `resolveHost` is a builtin only where the profile registers it (6.00r4):
+/// off, the name falls through as an unknown command; on, it gives the
+/// address as text, and "" for an empty name.
+#[test]
+fn resolve_host_is_a_builtin_only_when_the_profile_has_it() {
+    use seihai_core::scripting::gs2::exec::Host;
+    let mut h = host();
+    assert_ne!(
+        h.command("resolveHost", &[Val::Str("127.0.0.1".into())]),
+        Some(Val::Str("127.0.0.1".into()))
+    );
+    h.resolve_host = true;
+    assert_eq!(
+        h.command("resolveHost", &[Val::Str("127.0.0.1".into())]),
+        Some(Val::Str("127.0.0.1".into()))
+    );
+    assert_eq!(
+        h.command("resolvehost", &[Val::Str(String::new())]),
+        Some(Val::Str(String::new()))
+    );
+}

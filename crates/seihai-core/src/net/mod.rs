@@ -33,6 +33,22 @@ pub const PLI_ENTERLEVEL: u8 = 46;
 /// sends for a level it already holds.
 pub const PLI_LEVELWARPMOD: u8 = 30;
 
+/// A DNS lookup of `host` (6.00r4's script builtin `resolveHost`): the
+/// first IPv4 address as text, else the first address, or `None` when the
+/// name does not resolve. A literal address comes back as it is.
+pub fn resolve_host(host: &str) -> Option<String> {
+    let host = host.trim();
+    if host.is_empty() {
+        return None;
+    }
+    let addrs: Vec<SocketAddr> = (host, 0).to_socket_addrs().ok()?.collect();
+    addrs
+        .iter()
+        .find(|a| a.is_ipv4())
+        .or(addrs.first())
+        .map(|a| a.ip().to_string())
+}
+
 /// The `PLI_ENTERLEVEL` message: the id and one `GCHAR 1`. The payload was
 /// 1 in every one of the 7 level entries a real 2.31 client made in the lab
 /// (login and 6 gmap crossings); no other value has been seen.
@@ -3907,6 +3923,17 @@ mod tests {
         .unwrap()
     }
 
+    /// resolveHost's lookup: an address stays as it is, a name resolves, an
+    /// empty name gives nothing.
+    #[test]
+    fn resolve_host_looks_up_names() {
+        assert_eq!(resolve_host("127.0.0.1").as_deref(), Some("127.0.0.1"));
+        assert_eq!(resolve_host(" 127.0.0.1 ").as_deref(), Some("127.0.0.1"));
+        assert!(resolve_host("localhost").is_some());
+        assert_eq!(resolve_host(""), None);
+        assert_eq!(resolve_host("   "), None);
+    }
+
     const ENTER: [u8; 3] = [46 + 0x20, 1 + 0x20, b'\n'];
 
     /// The send sets of 2.3, 2.31, 3.153 and the 4.x to 6.x builds have 46; no
@@ -3942,6 +3969,7 @@ mod tests {
                 "5.30r3",
                 "5.31r4",
                 "6.00r2",
+                "6.00r4",
                 "6.015",
                 "6.034",
                 "6.03r7",

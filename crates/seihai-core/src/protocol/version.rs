@@ -112,6 +112,9 @@ pub enum ClientVersion {
     V531R4,
     /// Graal 6.00 rev 2 (`G3D26090`), Windows. Gen 5.
     V600R2,
+    /// Graal 6.00 rev 4 (`G3D26090`, as 6.00r2), Windows, two weeks after
+    /// 6.00r2. Adds the script builtin `resolveHost`. Gen 5.
+    V600R4,
     /// Graal 6.015 (`G3D3007A`), Windows: the token 6.00r7 and 6.01r5 send.
     /// Gen 5. No binary; inferred from Linux 6.01r1.
     V6015,
@@ -386,6 +389,7 @@ impl ClientVersion {
             Self::V530R3,
             Self::V531R4,
             Self::V600R2,
+            Self::V600R4,
             Self::V6015,
             Self::V6034,
             Self::V603R7,
@@ -499,6 +503,7 @@ mod tests {
             V524R4,
             V530R3,
             V600R2,
+            V600R4,
             V6015,
             V6034,
             V603R7Linux,
