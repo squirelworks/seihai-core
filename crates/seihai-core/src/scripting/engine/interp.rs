@@ -1419,14 +1419,17 @@ pub fn tokenize(s: &str, extra: &str) -> Vec<String> {
 /// steps, rounding down, and a timeout of no whole step never fires (lab
 /// 2026-11-13, `documentation/update-cadence.md`): on the real 4.04r2
 /// `0.049` never fired, `0.07` fired every 50 ms, `0.12` every 100 ms and
-/// `0.15` every 150 ms; 3.04 and 4.20r6 never fired `0.01`. The other
-/// engines were not measured and keep Seihai's round-up to at least one
-/// tick.
+/// `0.15` every 150 ms; 3.04 and 4.20r6 never fired `0.01`. The Delphi
+/// engine does the same: on 1.41 rev 1, 2.05r2, 2.17.1 and 2.31 `0.01` and
+/// `0.03` never fired, `0.05` and `0.07` fired every 50 ms and `0.1` and
+/// `0.12` every 100 ms (lab 2026-11-13, Graal_analysis #443), so 1.41 to
+/// 4.20 round down. 1.21 to 1.39 and 5.x/6.x were not measured and keep
+/// Seihai's round-up to at least one tick.
 fn timeout_ticks(era: Era, secs: f64) -> Option<u64> {
     if secs <= 0.0 {
         return None;
     }
-    if matches!(era, Era::V304 | Era::V3153) {
+    if (Era::V141..=Era::V3153).contains(&era) {
         let steps = (secs * 1000.0 / TICK_MS as f64 + 1e-9).floor() as u64;
         return (steps > 0).then_some(steps);
     }

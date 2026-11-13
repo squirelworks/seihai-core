@@ -562,7 +562,7 @@ fn while_for_break_continue() {
 
 #[test]
 fn infinite_loops_stop_after_ten_thousand_passes() {
-    let (mut w, id) = npc("if (created) { while (1) { this.n++; } message unreachable; }");
+    let (mut w, id) = npc("if (created) { while ((0+1)) { this.n++; } message unreachable; }");
     w.fire(id, "created", &[]);
     assert_eq!(var(&w, id, "this.n"), Val::Num(10000.0));
     assert!(messages(&mut w).is_empty());
@@ -809,8 +809,44 @@ fn the_cpp_engine_counts_timeouts_in_whole_steps() {
         assert_eq!(fires(Era::V3153, t), n, "4.x timeout = {t}");
     }
     assert_eq!(fires(Era::V304, "0.01"), 0, "3.04 timeout = 0.01");
-    assert_eq!(fires(Era::V217, "0.01"), 60, "2.17 keeps one tick");
-    assert_eq!(fires(Era::V217, "0.07"), 30, "2.17 rounds up");
+    // The Delphi engine too (lab 2026-11-13 on 1.41 rev 1, 2.05r2, 2.17.1
+    // and 2.31, Graal_analysis #443).
+    for era in [Era::V141, Era::V205, Era::V217] {
+        for (t, n) in [
+            ("0.01", 0),
+            ("0.03", 0),
+            ("0.05", 60),
+            ("0.07", 60),
+            ("0.1", 30),
+            ("0.12", 30),
+        ] {
+            assert_eq!(fires(era, t), n, "{} timeout = {t}", era.label());
+        }
+    }
+    // 1.39 and older were not measured: one tick at least.
+    assert_eq!(fires(Era::V139, "0.01"), 60, "1.39 keeps one tick");
+}
+
+/// A bare number as a loop condition is a flag name too: `while (1)`,
+/// `while (0.5)` and `for (;1;)` never ran their body on 1.41 rev 1, 2.05r2,
+/// 2.17.1, 2.22 and 2.31, and `while ((0+1))` did (lab 2026-11-13,
+/// Graal_analysis #442).
+#[test]
+fn a_bare_number_loop_condition_is_false() {
+    for (cond, want) in [
+        ("while (1) { this.n++; if (this.n >= 3) break; }", "0"),
+        ("while (0.5) { this.n++; if (this.n >= 3) break; }", "0"),
+        ("for (;1;) { this.n++; if (this.n >= 3) break; }", "0"),
+        ("while ((0+1)) { this.n++; if (this.n >= 3) break; }", "3"),
+        ("for (;(0+1);) { this.n++; if (this.n >= 3) break; }", "3"),
+    ] {
+        for era in [Era::V141, Era::V205, Era::V217] {
+            let src = format!("if (created) {{ this.n = 0; {cond} message #v(this.n); }}");
+            let (mut w, _) = npc_in(&src, era);
+            w.start_all();
+            assert_eq!(messages(&mut w), [want], "{cond} in {}", era.label());
+        }
+    }
 }
 
 // ---- touch and cross-object calls ----
