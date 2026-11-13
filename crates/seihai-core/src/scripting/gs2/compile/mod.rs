@@ -393,28 +393,27 @@ fn detect(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors> {
         Ok(c) => Ok(guessed(c)),
         Err(gs2) => gs1_script(src, era, mode).map(guessed).map_err(|gs1| {
             // Both fronts failed: report both, the likelier one first.
-            let tag = |front: &str, e: CompileErrors| {
-                e.errors.into_iter().map(move |mut e| {
-                    e.message = format!("as {front}: {}", e.message);
-                    e
-                })
-            };
             let (first, second) = if looks_gs1(src) {
-                (
-                    tag("GS1", gs1).collect::<Vec<_>>(),
-                    tag("GS2", gs2).collect::<Vec<_>>(),
-                )
+                (tagged("GS1", gs1), tagged("GS2", gs2))
             } else {
-                (
-                    tag("GS2", gs2).collect::<Vec<_>>(),
-                    tag("GS1", gs1).collect::<Vec<_>>(),
-                )
+                (tagged("GS2", gs2), tagged("GS1", gs1))
             };
             CompileErrors {
                 errors: first.into_iter().chain(second).collect(),
             }
         }),
     }
+}
+
+/// The errors, each marked with the front that gave it.
+fn tagged(front: &str, e: CompileErrors) -> Vec<CompileError> {
+    e.errors
+        .into_iter()
+        .map(|mut e| {
+            e.message = format!("as {front}: {}", e.message);
+            e
+        })
+        .collect()
 }
 
 /// No `function` keyword, and an `if (` whose condition starts with a GS1
