@@ -19,6 +19,7 @@ struct Around<'a> {
     shots: Vec<Shot>,
     touches: Vec<(i32, f64, f64)>,
     drops: Vec<(u8, f64, f64)>,
+    spark: bool,
 }
 
 impl World for Around<'_> {
@@ -52,6 +53,9 @@ impl World for Around<'_> {
     }
     fn drop_item(&mut self, item: u8, x: f64, y: f64) {
         self.drops.push((item, x, y));
+    }
+    fn sword_spark(&mut self) {
+        self.spark = true;
     }
 }
 
@@ -212,6 +216,7 @@ impl OfflineSession {
             shots: Vec::new(),
             touches: Vec::new(),
             drops: Vec::new(),
+            spark: false,
         }
     }
 
@@ -250,6 +255,11 @@ impl OfflineSession {
         while self.baddy_clock_ms >= b::PLAYER_TICK_MS {
             self.baddy_clock_ms -= b::PLAYER_TICK_MS;
             self.baddy_phase = !self.baddy_phase;
+            if let Some(sp) = &mut self.sword_spark {
+                if !sp.tick() {
+                    self.sword_spark = None;
+                }
+            }
             self.baddy_sword(role);
             if self.baddy_phase {
                 self.baddy_tick(role, &others);
@@ -285,9 +295,16 @@ impl OfflineSession {
             }
         }
         let Around {
-            rng, sounds, drops, ..
+            rng,
+            sounds,
+            drops,
+            spark,
+            ..
         } = w;
         self.after_hits(rng, sounds, drops);
+        if spark {
+            self.sword_spark = Some(b::SwordSpark::new(px, py));
+        }
         self.baddy_sends.extend(sends);
         self.baddies = baddies;
     }

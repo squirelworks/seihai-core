@@ -298,6 +298,9 @@ pub struct OfflineSession {
     /// This build's baddy and tile rules (lava, the swamp soldier's sword
     /// window): see [`crate::protocol::WorldRules`].
     pub world: crate::protocol::WorldRules,
+    /// The spark on the player's sword after it hit a baddy's sword
+    /// (`baddies::SwordSpark`); drawn with the player's facing.
+    pub sword_spark: Option<crate::baddies::SwordSpark>,
     /// Items lying on the floor of the current level.
     pub floor_items: Vec<crate::items::FloorItem>,
     /// The 1.x drop roll's `Random`.
@@ -727,6 +730,7 @@ impl OfflineSession {
             mannerisms: crate::protocol::MANNER_205,
             drops: crate::protocol::DROPS_142,
             world: crate::protocol::WORLD_201,
+            sword_spark: None,
             floor_items: Vec::new(),
             item_rng: crate::items::DelphiRandom::from_clock(),
             item_ms: 0,
