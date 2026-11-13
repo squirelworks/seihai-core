@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.1.x
 
+- **0.1.8**: 5.x builds send the nickname once the first level is in, so 4.x players no longer see them as "default".
 - **0.1.7**: The client session hands the game the level's baddies, the leader flag and other players' carried objects; GS2 `play` and its kin make sound; `.mp3` music plays.
 - **0.1.6**: `KNOWN_TOKENS`, every login token in the Graal_analysis catalogue (78, with or without a profile), and its generated `documentation/version-tokens.tsv`.
 - **0.1.5**: A file the server names with no extension (the Graal3D Sky's textures) is taken instead of dropped, so Ato's 3D login reaches step 6.
