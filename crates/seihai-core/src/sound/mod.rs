@@ -12,6 +12,7 @@
 //! [`default_backend`] picks the one a client starts with.
 
 mod engine;
+mod midi;
 #[cfg(feature = "audio")]
 mod rodio_out;
 mod wav;
@@ -22,6 +23,7 @@ pub use rodio_out::RodioSound;
 pub use engine::{
     is_sound_name, pan_for, wanted_name, Outcome, SoundEngine, SoundEvent, MAX_VOICES, PAN_PER_TILE,
 };
+pub use midi::render_midi;
 pub use wav::{decode_mp3, decode_ogg, decode_sound, decode_wav, Pcm};
 
 use std::cell::RefCell;

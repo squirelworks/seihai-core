@@ -223,12 +223,14 @@ pub fn decode_sound(bytes: &[u8]) -> Result<Pcm, String> {
         decode_wav(bytes)
     } else if bytes.starts_with(b"OggS") {
         decode_ogg(bytes)
+    } else if bytes.starts_with(b"MThd") {
+        super::midi::render_midi(bytes)
     } else if bytes.starts_with(b"ID3")
         || (bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] & 0xE0 == 0xE0)
     {
         decode_mp3(bytes)
     } else {
-        Err("not a sound file (no RIFF, OggS or MPEG header)".into())
+        Err("not a sound file (no RIFF, OggS, MThd or MPEG header)".into())
     }
 }
 

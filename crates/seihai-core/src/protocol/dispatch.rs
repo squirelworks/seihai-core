@@ -119,6 +119,38 @@ pub fn parse_weapon_add(b: &[u8]) -> Option<Weapon> {
     Some(w)
 }
 
+/// A script from `PLO_NPCWEAPONSCRIPT` (140).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScriptDelivery {
+    /// The header's first field, lower-cased: `weapon` or `class`.
+    pub kind: String,
+    /// The weapon's or class's name.
+    pub name: String,
+    /// The compiled script that follows the header.
+    pub body: Vec<u8>,
+}
+
+/// Parse a `PLO_NPCWEAPONSCRIPT` (140) payload: a GSHORT header length
+/// `h`, then `h` header bytes (`type,name,cache flag,` and the two GINT5
+/// words of the cache key), then the compiled script. The body starts at
+/// `2 + h`: the Linux 6.03r7 lab run put the bodies of three such
+/// packets exactly there (Graal_analysis `protocol/linux-603-network-gs2.md`;
+/// the header layout is `protocol/v5x-clients.md`). Only the type and the
+/// name are read from the header. `None` when the payload is shorter than
+/// its header or the header has no name.
+pub fn parse_script_delivery(b: &[u8]) -> Option<ScriptDelivery> {
+    let h = read_gshort(b)? as usize;
+    let header = b.get(2..2 + h)?;
+    let body = b[2 + h..].to_vec();
+    let mut fields = header.split(|&c| c == b',');
+    let kind = latin1(fields.next()?).trim().to_ascii_lowercase();
+    let name = latin1(fields.next()?);
+    if name.is_empty() {
+        return None;
+    }
+    Some(ScriptDelivery { kind, name, body })
+}
+
 /// A weapon script from the wire. The server writes a line break as `§`:
 /// the one byte 0xA7 from a Latin-1 server, the two bytes C2 A7 from one
 /// that sends UTF-8. Both become `\n`, so the script keeps its lines (as a
@@ -449,6 +481,13 @@ pub struct SessionState {
     /// 131 records for an NPC no `PLO_NPCPROPS` has named yet. The 3.153
     /// client drops these; so does Seihai.
     pub npc_bytecode_dropped: usize,
+    /// `PLO_NPCWEAPONSCRIPT` (140) of type `weapon`: the compiled GS2
+    /// script of each of the player's weapons, by weapon name, as sent
+    /// (the four-segment container). Dropped with the weapon
+    /// (`PLO_NPCWEAPONDEL`). Nothing here runs it.
+    pub weapon_bytecode: std::collections::BTreeMap<String, Vec<u8>>,
+    /// 140 of type `class`: compiled GS2 class scripts by class name.
+    pub class_bytecode: std::collections::BTreeMap<String, Vec<u8>>,
     /// `PLO_ITEMADD` (22) and `PLO_ITEMDEL` (23) in arrival order, drained
     /// by the game loop onto the floor (see [`crate::items`]).
     pub items: Vec<ServerItem>,
@@ -1049,6 +1088,22 @@ impl SessionState {
                 // PLO_NPCWEAPONDEL: rest = name.
                 let name = latin1(&msg.payload);
                 self.weapons.retain(|w| w.name != name);
+                self.weapon_bytecode.remove(&name);
+            }
+            140 => {
+                // PLO_NPCWEAPONSCRIPT, behind PLO_RAWDATA: a weapon's or a
+                // class's compiled GS2.
+                if let Some(d) = parse_script_delivery(&msg.payload) {
+                    match d.kind.as_str() {
+                        "weapon" => {
+                            self.weapon_bytecode.insert(d.name, d.body);
+                        }
+                        "class" => {
+                            self.class_bytecode.insert(d.name, d.body);
+                        }
+                        _ => {}
+                    }
+                }
             }
             42 => {
                 // PLO_NEWWORLDTIME: GINT4.
@@ -4341,6 +4396,59 @@ mod tests {
         ];
         out.extend(m);
         out
+    }
+
+    /// `PLO_NPCWEAPONSCRIPT` (140) behind `PLO_RAWDATA`: the header
+    /// `type,name,flag,` and a ten-byte key, then the body.
+    fn weapon_script(kind: &str, name: &str, code: &[u8]) -> Vec<u8> {
+        let mut header = format!("{kind},{name},1,").into_bytes();
+        header.extend_from_slice(&[0x20 + 1; 10]);
+        let h = header.len();
+        let mut m = vec![140 + 0x20, gc((h >> 7) as u8 & 0x7F), gc(h as u8 & 0x7F)];
+        m.extend(header);
+        m.extend_from_slice(code);
+        let n = m.len();
+        let mut out = vec![
+            100 + 0x20,
+            gc((n >> 14) as u8 & 0x7F),
+            gc((n >> 7) as u8 & 0x7F),
+            gc(n as u8 & 0x7F),
+            b'\n',
+        ];
+        out.extend(m);
+        out
+    }
+
+    #[test]
+    fn weapon_and_class_scripts_are_kept_by_name_on_6x() {
+        let code = b"\0\0\0\x01\0\0\0\x04\0\0\0\0";
+        let body = [
+            weapon_script("weapon", "Bomb", code),
+            weapon_script("class", "shop", b"xyz"),
+            weapon_script("weapon", "-System", code),
+        ]
+        .concat();
+        let mut st = SessionState::for_version(ClientVersion::V600R2);
+        st.apply_body(&body);
+        assert_eq!(
+            st.weapon_bytecode.get("Bomb").map(Vec::as_slice),
+            Some(&code[..])
+        );
+        assert_eq!(st.weapon_bytecode.len(), 2);
+        assert_eq!(
+            st.class_bytecode.get("shop").map(Vec::as_slice),
+            Some(&b"xyz"[..])
+        );
+        // Deleting the weapon drops its script.
+        st.apply_body(&msg(34, b"Bomb"));
+        assert!(!st.weapon_bytecode.contains_key("Bomb"));
+        // 2.05 has no 140.
+        let mut st = SessionState::for_version(ClientVersion::V205);
+        st.apply_body(&body);
+        assert!(st.weapon_bytecode.is_empty());
+        // A header longer than the payload is dropped.
+        assert_eq!(parse_script_delivery(b"\x20\x7fweapon,x"), None);
+        assert_eq!(parse_script_delivery(b"\x20\x27weapon"), None);
     }
 
     #[test]

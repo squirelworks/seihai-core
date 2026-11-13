@@ -254,11 +254,11 @@ fn rest_fixture_runs_the_maths_ranges_types_and_with() {
     assert_eq!((v("tl"), v("tn")), (n(3.0), n(0.0)));
     assert_eq!(m.list(Root::This, "arr").map(<[_]>::len), Some(3));
     assert_eq!(v("an"), n(3.0));
-    // `with (player)`: `x` and `this.inw` land on the player; the null
-    // `with` block is skipped.
+    // `with (player)`: `x` and `this.inw` land on the player (`x` is the
+    // host's player place, #497); the null `with` block is skipped.
     assert_eq!(
-        (m.var(Root::Player, "x"), m.var(Root::Player, "inw")),
-        (Some(&n(12.0)), Some(&n(1.0)))
+        (h.player.x, m.var(Root::Player, "inw")),
+        (12.0, Some(&n(1.0)))
     );
     assert_eq!((v("px"), h.x), (n(12.0), 30.0));
     assert_eq!(m.var(Root::This, "never"), None);
@@ -461,6 +461,51 @@ fn play_and_its_kin_are_sound_effects() {
                 file: "rain.wav".into()
             },
             Effect::StopMidi,
+        ]
+    );
+}
+
+/// #497: `player.chat` and the player's place and counters read from the
+/// host's snapshot; writing `player.chat` says it (GS1's `setplayerprop
+/// #c`), and writing a place or counter is the GS1 player variable.
+#[test]
+fn player_props_read_the_snapshot_and_writes_are_player_effects() {
+    use seihai_core::scripting::gs2::compile::compile_gs2;
+    let src = "function onPlayerChats() {\n\
+                 if (player.chat == \"hello\") player.chat = \"hi \" @ player.nick;\n\
+                 this.at = player.x + player.y;\n\
+                 player.rupees += 5;\n\
+                 player.dir = 6;\n\
+               }\n";
+    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let mut h = EffectHost::new(
+        Era::for_version(seihai_core::protocol::ClientVersion::V600R2),
+        7,
+    );
+    h.player.chat = "hello".into();
+    h.player.nick = "Squirrel".into();
+    h.player.x = 30.0;
+    h.player.y = 2.5;
+    h.player.rupees = 10.0;
+    assert_eq!(m.call_event("onPlayerChats", &[], &mut h), Outcome::Done);
+    assert!(h.log.is_empty(), "{:?}", h.log);
+    assert_eq!(m.var(Root::This, "at"), Some(&Val::Num(32.5)));
+    assert_eq!(h.player.chat, "hi Squirrel");
+    assert_eq!(
+        h.effects,
+        [
+            Effect::SetPlayerProp {
+                code: "#c".into(),
+                value: "hi Squirrel".into()
+            },
+            Effect::SetPlayerVar {
+                name: "playerrupees".into(),
+                value: 15.0
+            },
+            Effect::SetPlayerVar {
+                name: "playerdir".into(),
+                value: 2.0
+            },
         ]
     );
 }
