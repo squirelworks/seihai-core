@@ -482,6 +482,11 @@ pub struct OfflineSession {
     /// The current level said `noplayerkilling`: sword and packet hits
     /// from other players do nothing. Cleared when a level loads.
     pub no_pk: bool,
+    /// The server put the client in ghost mode (`PLO_GHOSTMODE` 170). In
+    /// 2.17 on no sword hit lands then (`CombatRules::ghost_and_stop_gates`).
+    pub ghost_mode: bool,
+    /// The server sent `PLO` 176 or 177. In 2.17 on no hit lands then.
+    pub server_stop: bool,
     /// Per attacker id: the second of the day it was last judged (see
     /// `CombatRules::judge_throttle`).
     pub judged_at: std::collections::HashMap<u16, u32>,
@@ -799,6 +804,8 @@ impl OfflineSession {
             entry: None,
             entered: None,
             no_pk: false,
+            ghost_mode: false,
+            server_stop: false,
             judged_at: HashMap::new(),
             knock_moved: false,
             knock_unsent: false,
