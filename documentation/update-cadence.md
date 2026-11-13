@@ -1,6 +1,6 @@
 # Update cadence of the 3.x, 4.x and 6.x clients
 
-Lab, 2026-11-13, GwenTea2 (Graal_analysis E#301). The Linux 3.04, 4.04r2,
+Lab, 2026-11-13 (Graal_analysis E#301). The Linux 3.04, 4.04r2,
 4.20r6 and 6.03r7 clients ran natively under Xvfb, and the Windows 4.04r2
 under Wine 10. Timing calls were logged with an `LD_PRELOAD` shim, walking
 was read at a decrypting proxy, and a GS1 weapon counted its own `timeout`
