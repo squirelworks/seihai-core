@@ -177,16 +177,19 @@ pub enum Stmt {
         target: VarRef,
         op: AssignOp,
         value: Expr,
+        line: u32,
     },
     /// `x++` (`delta` 1) and `x--` (`delta` -1).
     IncDec {
         target: VarRef,
         delta: f64,
+        line: u32,
     },
     /// A function call used as a statement.
     Call {
         name: String,
         args: Vec<Expr>,
+        line: u32,
     },
     Command {
         name: String,
@@ -337,11 +340,13 @@ impl fmt::Display for Stmt {
             Stmt::Return(None) => write!(f, "(return)"),
             Stmt::Break => write!(f, "(break)"),
             Stmt::Continue => write!(f, "(continue)"),
-            Stmt::Assign { target, op, value } => write!(f, "({} {target} {value})", op.symbol()),
-            Stmt::IncDec { target, delta } => {
+            Stmt::Assign {
+                target, op, value, ..
+            } => write!(f, "({} {target} {value})", op.symbol()),
+            Stmt::IncDec { target, delta, .. } => {
                 write!(f, "({} {target})", if *delta > 0.0 { "++" } else { "--" })
             }
-            Stmt::Call { name, args } => {
+            Stmt::Call { name, args, .. } => {
                 write!(f, "(call {name}")?;
                 for a in args {
                     write!(f, " {a}")?;

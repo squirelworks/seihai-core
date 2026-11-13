@@ -149,6 +149,9 @@ fn cases() -> Vec<(Quirk, &'static str, Option<&'static str>)> {
 #[test]
 fn strict_mode_refuses_each_quirk_and_legacy_mode_warns() {
     for (quirk, src, _) in cases() {
+        if quirk.tolerated() {
+            continue;
+        }
         let err = compile_gs2(src).unwrap_err().to_string();
         assert!(err.contains("legacy mode"), "{src}: {err}");
         let got = compile_gs2_legacy(src).unwrap_or_else(|e| panic!("{src}: {e}"));
@@ -273,15 +276,20 @@ fn a_gs1_with_keeps_plain_variables_on_the_npc() {
 }
 
 #[test]
-fn detect_tries_gs2_before_later_gs1() {
-    // Looks like GS1, fails as GS1 2.05, and is valid GS2: read as GS2.
+fn detect_keeps_gs1_that_needs_a_later_version_as_gs1() {
+    // Looks like GS1 and fails as GS1 2.05; read as GS2, `created` would be
+    // a variable, so it is read as GS1 2.1.
     let src = "if (created) {\n  this.a = {0,1,2,3};\n}";
     let got = compile(src, Language::Detect(Era::V205), Mode::Legacy).unwrap();
-    assert_eq!(got.front, Front::Gs2);
-    assert!(!got
-        .warnings
-        .iter()
-        .any(|w| w.quirk == Quirk::LaterGs1(Era::V205)));
+    assert_eq!(got.front, Front::Gs1);
+    let quirks: Vec<Quirk> = got.warnings.into_iter().map(|w| w.quirk).collect();
+    assert_eq!(
+        quirks,
+        [
+            Quirk::GuessedLanguage(Front::Gs1),
+            Quirk::LaterGs1(Era::V205)
+        ]
+    );
 }
 
 #[test]
@@ -295,4 +303,56 @@ fn a_gs1_method_call_is_a_member_call() {
         compile_gs1(gs1, Era::V205).unwrap().write(),
         compile_gs2(gs2).unwrap().write()
     );
+}
+
+#[test]
+fn strict_mode_takes_what_the_engine_tolerates_and_warns() {
+    // The reference compilers accept these with the clean spelling's bytes.
+    let mut seen = 0;
+    for (quirk, src, clean) in cases() {
+        if !quirk.tolerated() {
+            continue;
+        }
+        seen += 1;
+        let got =
+            compile(src, Language::Gs2, Mode::Strict).unwrap_or_else(|e| panic!("{src}: {e}"));
+        assert!(!got.warnings.is_empty(), "{src}");
+        assert!(got.warnings.iter().all(|w| w.quirk == quirk), "{src}");
+        if let Some(clean) = clean {
+            assert_eq!(
+                got.script.write(),
+                compile_gs2(clean).unwrap().write(),
+                "{src}"
+            );
+        }
+    }
+    assert_eq!(seen, 10);
+    // Mixed with one that is not tolerated, only that one is an error.
+    let err = compile_gs2("function f() { if (a <> 1) b = 2;; c = 1\n d = 2; }").unwrap_err();
+    assert_eq!(err.errors.len(), 1, "{err}");
+    assert!(err.to_string().contains("missing `;`"), "{err}");
+}
+
+#[test]
+fn detect_reports_both_fronts_when_both_fail() {
+    let err = compile(
+        "if (created) { x = ; }",
+        Language::Detect(Era::V205),
+        Mode::Legacy,
+    )
+    .unwrap_err()
+    .to_string();
+    let gs1 = err.find("as GS1: ").unwrap_or_else(|| panic!("{err}"));
+    let gs2 = err.find("as GS2: ").unwrap_or_else(|| panic!("{err}"));
+    assert!(gs1 < gs2, "{err}");
+}
+
+#[test]
+fn a_gs1_error_names_the_line_of_the_statement() {
+    let err = compile_gs1(
+        "if (created) {\n  hide;\n\n  selectedweapon++;\n}",
+        Era::V205,
+    )
+    .unwrap_err();
+    assert_eq!(err.errors[0].line, 4, "{err}");
 }

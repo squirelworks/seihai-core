@@ -219,20 +219,22 @@ impl Compiler {
                     self.stack.last_mut().unwrap().continues.push(j);
                 }
             },
-            Stmt::Assign { target, op, value } => {
+            Stmt::Assign {
+                target, op, value, ..
+            } => {
                 self.emit(Node::Assign {
                     target: target.clone(),
                     op: *op,
                     value: value.clone(),
                 });
             }
-            Stmt::IncDec { target, delta } => {
+            Stmt::IncDec { target, delta, .. } => {
                 self.emit(Node::IncDec {
                     target: target.clone(),
                     delta: *delta,
                 });
             }
-            Stmt::Call { name, args } => {
+            Stmt::Call { name, args, .. } => {
                 self.emit(Node::Eval(Expr::Call {
                     name: name.clone(),
                     args: args.clone(),

@@ -11,8 +11,10 @@
 //!
 //! # Strict and legacy
 //!
-//! [`Mode::Strict`], the default, takes the language as written and nothing
-//! else. Live scripts from the 2.x and 3.x servers lean on forms the
+//! [`Mode::Strict`], the default, takes the language as written, plus the
+//! few loose spellings the engine's own compiler takes with the same
+//! meaning ([`Quirk::tolerated`]; strict mode still warns about them).
+//! Live scripts from the 2.x and 3.x servers lean on forms the
 //! original compilers let through: a missing `;`, `=` used as a comparison,
 //! a GS1 command line in a GS2 script, a function defined twice, and more
 //! (see [`Quirk`]). [`Mode::Legacy`] reads each of those the way the live
@@ -71,7 +73,8 @@ pub enum Front {
 }
 
 /// A form live scripts use that the language does not have. Legacy mode
-/// accepts each one with a [`Warning`]; strict mode refuses it.
+/// accepts each one with a [`Warning`]; strict mode refuses it unless it is
+/// [`tolerated`](Quirk::tolerated), and then warns as well.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Quirk {
     /// A statement ends at a line break, `}` or the end of the file
@@ -135,6 +138,26 @@ pub enum Quirk {
     /// with a variable or `<a, b>`, `{…}` lists, newer commands); it was
     /// compiled as GS1 2.1.
     LaterGs1(Era),
+}
+
+impl Quirk {
+    /// Whether strict mode accepts the quirk too. These are the spellings
+    /// both reference GS2 compilers (Preagonal and gs2-parser, run as black
+    /// boxes on one-quirk probes) accept and compile to the same bytes as
+    /// the clean spelling: the engine itself tolerates them. Strict mode
+    /// still reports each one as a warning.
+    pub fn tolerated(&self) -> bool {
+        matches!(
+            self,
+            Quirk::EmptyStatement
+                | Quirk::UnterminatedComment
+                | Quirk::ElseIf
+                | Quirk::OldOperator(_)
+                | Quirk::BracelessFunctionBody
+                | Quirk::MissingFunctionBody
+                | Quirk::CallOfCallResult
+        )
+    }
 }
 
 impl fmt::Display for Quirk {
@@ -250,8 +273,8 @@ impl From<CompileError> for CompileErrors {
 pub struct Compiled {
     pub script: Script,
     pub front: Front,
-    /// The quirks legacy mode accepted, in source order. Always empty in
-    /// strict mode.
+    /// The quirks accepted, in source order. In strict mode, only
+    /// [tolerated](Quirk::tolerated) ones.
     pub warnings: Vec<Warning>,
 }
 
@@ -320,10 +343,11 @@ fn gs2_script(src: &str, mode: Mode) -> Result<Compiled, CompileErrors> {
         .map(|(line, quirk)| Warning { line, quirk })
         .collect();
     if mode == Mode::Strict {
-        if !warnings.is_empty() {
+        if warnings.iter().any(|w| !w.quirk.tolerated()) {
             return Err(CompileErrors {
                 errors: warnings
                     .into_iter()
+                    .filter(|w| !w.quirk.tolerated())
                     .map(|w| CompileError {
                         line: w.line,
                         message: format!("{} (accepted only in legacy mode)", w.quirk),
@@ -358,17 +382,38 @@ fn detect(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors> {
         );
         c
     };
-    // GS1 at the given version first, then GS2; GS1 newer than the
-    // version only once GS2 has failed too.
+    // A script that looks like GS1 stays GS1, read as a later GS1 if it
+    // needs to be: as GS2 its event tests would be variable tests.
     if looks_gs1(src) {
-        if let Ok(c) = gs1_script(src, era, Mode::Strict) {
+        if let Ok(c) = gs1_script(src, era, mode) {
             return Ok(guessed(c));
         }
     }
     match gs2_script(src, Mode::Legacy) {
         Ok(c) => Ok(guessed(c)),
-        Err(e) => gs1_script(src, era, mode).map(guessed).map_err(|_| e),
+        Err(gs2) => gs1_script(src, era, mode).map(guessed).map_err(|gs1| {
+            // Both fronts failed: report both, the likelier one first.
+            let (first, second) = if looks_gs1(src) {
+                (tagged("GS1", gs1), tagged("GS2", gs2))
+            } else {
+                (tagged("GS2", gs2), tagged("GS1", gs1))
+            };
+            CompileErrors {
+                errors: first.into_iter().chain(second).collect(),
+            }
+        }),
     }
+}
+
+/// The errors, each marked with the front that gave it.
+fn tagged(front: &str, e: CompileErrors) -> Vec<CompileError> {
+    e.errors
+        .into_iter()
+        .map(|mut e| {
+            e.message = format!("as {front}: {}", e.message);
+            e
+        })
+        .collect()
 }
 
 /// No `function` keyword, and an `if (` whose condition starts with a GS1
