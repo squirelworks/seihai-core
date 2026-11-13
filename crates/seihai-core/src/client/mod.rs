@@ -228,6 +228,52 @@ pub struct Live {
     pub level_objects: SharedLevelObjects,
     /// Other players who threw what they carried, for the view to take.
     pub throws: SharedThrows,
+    /// Hits on the player from other players (their swings, and
+    /// `PLO_HURTPLAYER` / `PLO_HITOBJECTS`), for the game to judge with
+    /// `OfflineSession::receive_all` on the victim's side, as the real
+    /// clients do.
+    pub hits: SharedHits,
+}
+
+/// [`Live::hits`].
+pub type SharedHits = Arc<Mutex<IncomingHits>>;
+
+/// What the game needs to judge the hits on the player: the hits since it
+/// last took them, and the other players and the player's own cell and
+/// nickname as they were when the last hit came.
+#[derive(Debug, Clone, Default)]
+pub struct IncomingHits {
+    /// Other players whose update was a sword swing, by id.
+    pub swings: Vec<u16>,
+    /// `PLO_HURTPLAYER` (40) and `PLO_HITOBJECTS` (46), in the order they came.
+    pub hits: Vec<crate::combat::IncomingHit>,
+    pub others: Vec<crate::protocol::OtherPlayer>,
+    pub own_cell: Option<(i32, i32)>,
+    pub nickname: Option<String>,
+}
+
+impl IncomingHits {
+    /// No hit is waiting.
+    pub fn is_empty(&self) -> bool {
+        self.swings.is_empty() && self.hits.is_empty()
+    }
+}
+
+/// Move the hits `st` holds to the game's queue, with the players as they
+/// stand now. Drained either way, so nothing builds up with no game.
+fn take_hits(st: &mut SessionState, to: Option<&SharedHits>) {
+    let swings = std::mem::take(&mut st.swings);
+    let hits = std::mem::take(&mut st.hits);
+    let Some(to) = to else { return };
+    if swings.is_empty() && hits.is_empty() {
+        return;
+    }
+    let mut slot = to.lock().unwrap_or_else(|e| e.into_inner());
+    slot.swings.extend(swings);
+    slot.hits.extend(hits);
+    slot.others = st.others.clone();
+    slot.own_cell = st.gmap.as_ref().map(|g| g.cell);
+    slot.nickname = st.nickname.clone();
 }
 
 /// [`Live::level_objects`]: only the `Bomb`, `BombDel`, `Explosion` and
@@ -940,6 +986,7 @@ pub fn run_hooked(
     let weapons = live.as_ref().map(|l| l.weapons.clone());
     let level_objects = live.as_ref().map(|l| l.level_objects.clone());
     let throws = live.as_ref().map(|l| l.throws.clone());
+    let hits = live.as_ref().map(|l| l.hits.clone());
     let say = live.as_ref().map(|l| l.say.clone());
     let chat = live.as_ref().map(|l| l.chat.clone());
     let outbox = live.as_ref().map(|l| l.send.clone());
@@ -1066,6 +1113,7 @@ pub fn run_hooked(
                         take_chat(&mut st, c);
                     }
                     take_level_objects(&mut st, level_objects.as_ref(), throws.as_ref());
+                    take_hits(&mut st, hits.as_ref());
                     if let Some(w) = st.server_warp.take() {
                         if owed {
                             log_level(level_lines, &store, &st, out, shown);
@@ -1607,6 +1655,39 @@ mod others_tests {
         st.apply_body(&say(""));
         assert!(st.tick_bubbles(60_000), "the bubble ends");
         assert_eq!(others_of(&st)[0].chat, None);
+    }
+
+    /// Other players' swings and the hit packets go to the game with the
+    /// players as they stand, once each; the state keeps none, and with no
+    /// game they are dropped.
+    #[test]
+    fn the_hits_go_to_the_game_with_the_players() {
+        let mut st = SessionState::for_version(ClientVersion::V205);
+        st.apply_body(&other(2, 20, 24));
+        st.nickname = Some("me".into());
+        st.swings.push(2);
+        let hurt = crate::combat::HurtPlayer {
+            attacker: 2,
+            dx: 1.0,
+            dy: 0.0,
+            half: 2,
+            npc: None,
+        };
+        st.hits.push(crate::combat::IncomingHit::Hurt(hurt));
+        let to: SharedHits = Arc::default();
+        take_hits(&mut st, Some(&to));
+        assert!(st.swings.is_empty() && st.hits.is_empty());
+        let got = std::mem::take(&mut *to.lock().unwrap());
+        assert_eq!(got.swings, vec![2]);
+        assert_eq!(got.hits.len(), 1);
+        assert_eq!(got.others.len(), 1);
+        assert_eq!(got.nickname.as_deref(), Some("me"));
+        assert!(!got.is_empty());
+        take_hits(&mut st, Some(&to));
+        assert!(to.lock().unwrap().is_empty());
+        st.swings.push(2);
+        take_hits(&mut st, None);
+        assert!(st.swings.is_empty());
     }
 
     /// The chat lines move to the view once each; the state keeps none.
