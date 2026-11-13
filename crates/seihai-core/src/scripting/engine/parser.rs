@@ -305,7 +305,7 @@ impl<'a> Parser<'a> {
                     self.recover();
                     return Some(Stmt::Block(Vec::new()));
                 }
-                let cond = self.expr();
+                let cond = self.cond();
                 self.expect_op(")");
                 let then = Box::new(self.stmt().unwrap_or(Stmt::Block(Vec::new())));
                 self.skip_semis_before_else();
@@ -334,7 +334,7 @@ impl<'a> Parser<'a> {
                     self.recover();
                     return Some(Stmt::Block(Vec::new()));
                 }
-                let cond = self.expr();
+                let cond = self.cond();
                 self.expect_op(")");
                 let body = Box::new(self.stmt().unwrap_or(Stmt::Block(Vec::new())));
                 Some(Stmt::While { cond, body })
@@ -424,7 +424,7 @@ impl<'a> Parser<'a> {
                     self.recover();
                     return Some(Stmt::Block(Vec::new()));
                 }
-                let cond = self.expr();
+                let cond = self.cond();
                 self.expect_op(")");
                 let then = Box::new(self.stmt().unwrap_or(Stmt::Block(Vec::new())));
                 Some(Stmt::If {
@@ -694,6 +694,23 @@ impl<'a> Parser<'a> {
         e
     }
 
+    /// A condition after `if (`, `while (` or `elseif (`. The 1.x to 2.1
+    /// clients compile a bare number there through the flag-name path, so
+    /// `if (1)` tests a flag named `1` and is false (2.05r2 and 1.41 rev 1
+    /// [bin], 2.05r2 [lab]; Graal_analysis `gs1-condition-truth-205r2.md`).
+    /// The 2.17 engine has its own condition compiler.
+    fn cond(&mut self) -> Expr {
+        let bare = self.era.old_condition_compiler()
+            && matches!(self.peek().tok, Tok::Num(_))
+            && self.second_is_op(")");
+        let e = self.expr();
+        if bare {
+            Expr::Num(0.0)
+        } else {
+            e
+        }
+    }
+
     fn binary(&mut self, min: u8) -> Expr {
         let mut lhs = self.unary();
         loop {
@@ -753,7 +770,19 @@ impl<'a> Parser<'a> {
                 Tok::Op("--") => Expr::Unary(UnOp::Neg, Box::new(rhs)),
                 _ => rhs,
             };
-            lhs = Expr::Bin(op, Box::new(lhs), Box::new(rhs));
+            lhs = if self.era.old_condition_compiler()
+                && op.compares()
+                && constant(&lhs)
+                && constant(&rhs)
+            {
+                // The old compiler turns a comparison of two constants into
+                // a numeric leaf before evaluating it, so it keeps the leaf's
+                // initial 0: `1==1` and `(1+0)==1` are 0 (2.05r2 and 1.41
+                // rev 1 [bin], 2.05r2 [lab]).
+                Expr::Num(0.0)
+            } else {
+                Expr::Bin(op, Box::new(lhs), Box::new(rhs))
+            };
         }
         lhs
     }
@@ -992,6 +1021,23 @@ fn text_arg(raw: &str, quoted: bool, era: Era) -> Expr {
         }
     }
     Expr::Str(raw.to_string())
+}
+
+/// A numeric constant as the old compiler folds it: numbers joined by
+/// arithmetic.
+fn constant(e: &Expr) -> bool {
+    match e {
+        Expr::Num(_) => true,
+        Expr::Unary(UnOp::Neg, e) => constant(e),
+        Expr::Bin(op, a, b) => {
+            matches!(
+                op,
+                BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod | BinOp::Pow
+            ) && constant(a)
+                && constant(b)
+        }
+        _ => false,
+    }
 }
 
 #[cfg(test)]

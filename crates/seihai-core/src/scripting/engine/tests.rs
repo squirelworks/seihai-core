@@ -1554,3 +1554,59 @@ fn offline_callweapon_still_counts_weapon_objects() {
     w.fire(a, "created", &[]);
     assert_eq!(messages(&mut w), vec!["b"]);
 }
+
+/// The 2.05r2 condition-truth cases (Graal_analysis
+/// `gs1-condition-truth-205r2.md`): the old compiler reads a bare number as
+/// a flag name and folds a comparison of two constants to 0. The 2.17
+/// engine does neither.
+#[test]
+fn condition_truth_follows_the_build() {
+    let cases = [
+        ("0.5", false, true),
+        ("1", false, true),
+        ("(0.5+0)", true, true),
+        ("(-0.5)", true, true),
+        ("(0+0)", false, false),
+        ("created", true, true),
+        ("1==1", false, true),
+        ("1!=0", false, true),
+        ("1<2", false, true),
+        ("2>1", false, true),
+        ("1=1", false, true),
+        ("(1+0)==1", false, true),
+        ("playerx==playerx", true, true),
+        ("playerx<=playerx", true, true),
+        ("playerx>=playerx", true, true),
+        ("playerx!=playerx", false, false),
+        ("this.a==1", true, true),
+    ];
+    for (era, col) in [(Era::V205, 1), (Era::V141, 1), (Era::V217, 2)] {
+        for case in cases {
+            let src = format!(
+                "if (created) {{ this.a = 1; if ({}) {{ message T; }} else {{ message F; }} }}",
+                case.0
+            );
+            let (mut w, _) = npc_in(&src, era);
+            w.start_all();
+            let want = if col == 1 { case.1 } else { case.2 };
+            assert_eq!(
+                messages(&mut w),
+                [if want { "T" } else { "F" }],
+                "{} in {}",
+                case.0,
+                era.label()
+            );
+        }
+    }
+}
+
+/// Events, flags and variables are not gated per 1.x build: a 1.21 script
+/// still runs its `created` block and reads `playerx`.
+#[test]
+fn early_builds_keep_the_borrowed_events_and_variables() {
+    for era in [Era::V121, Era::V133, Era::V139] {
+        let (mut w, _) = npc_in("if (created && playerx>=0) { message hi; sleep 1; }", era);
+        w.start_all();
+        assert_eq!(messages(&mut w), ["hi"], "{}", era.label());
+    }
+}

@@ -139,6 +139,13 @@ impl Era {
         }
     }
 
+    /// The 1.x to 2.1 condition compiler: a bare number in a condition is a
+    /// flag name, and a comparison of two constants is 0. Read in 2.05r2 and
+    /// 1.41 rev 1; the 2.17.1 to 2.31 rewrite and 3.04 do not have it.
+    pub fn old_condition_compiler(self) -> bool {
+        self < Era::V217
+    }
+
     /// True when the era's table was not read from a binary.
     pub fn inferred(self) -> bool {
         matches!(self, Era::V21 | Era::V212 | Era::V215 | Era::V216)
@@ -415,8 +422,8 @@ pub static COMMANDS: &[Cmd] = &[
     c("showtext2", "RRRRSSS", V217, Effect),
     c("showani", "RRRRS", V217, Effect),
     c("showani2", "RRRRRS", V217, Effect),
-    c("showpoly", "RS", V217, Effect),
-    c("showpoly2", "RS", V217, Effect),
+    c("showpoly", "RR", V217, Effect),
+    c("showpoly2", "RR", V217, Effect),
     c("changeimgmode", "RR", V217, Effect),
     c("shoot", "RRRRRRSS", V217, Effect),
     c("setshootparams", "S", V217, Effect),
@@ -619,32 +626,37 @@ pub fn named_constant(letter: char, name: &str) -> Option<f64> {
     table.iter().position(|n| *n == name).map(|i| i as f64)
 }
 
+/// Events, status flags, built-in variables and functions below carry
+/// `V121` where the notes give 2.00: there is no per-build table of them for
+/// 1.x, so the 1.x eras borrow the 2.00 set ([`Era::V121`] is "every era").
+/// Only commands and statement words are gated per build before 2.00.
+///
 /// Events (the `if (created)` flags). `action*` names are open ended and
 /// handled by [`event_since`].
 pub static EVENTS: &[(&str, Era)] = &[
-    ("created", V200),
-    ("playerenters", V200),
-    ("playertouchsme", V200),
-    ("playertouchsother", V200),
-    ("playerendsreading", V200),
-    ("playerchats", V200),
-    ("playerlaysitem", V200),
-    ("timeout", V200),
-    ("wasshot", V200),
-    ("wasshooted", V200),
-    ("washit", V200),
-    ("wasthrown", V200),
-    ("waspelt", V200),
+    ("created", V121),
+    ("playerenters", V121),
+    ("playertouchsme", V121),
+    ("playertouchsother", V121),
+    ("playerendsreading", V121),
+    ("playerchats", V121),
+    ("playerlaysitem", V121),
+    ("timeout", V121),
+    ("wasshot", V121),
+    ("wasshooted", V121),
+    ("washit", V121),
+    ("wasthrown", V121),
+    ("waspelt", V121),
     // Moved by a push or a pull (`canbepushed`, `canbepulled`).
-    ("waspushed", V200),
-    ("waspulled", V200),
-    ("exploded", V200),
-    ("compusdied", V200),
-    ("compsdead", V200),
-    ("shotbyplayer", V200),
-    ("shotbybaddy", V200),
-    ("weaponfired", V200),
-    ("weaponselected", V200),
+    ("waspushed", V121),
+    ("waspulled", V121),
+    ("exploded", V121),
+    ("compusdied", V121),
+    ("compsdead", V121),
+    ("shotbyplayer", V121),
+    ("shotbybaddy", V121),
+    ("weaponfired", V121),
+    ("weaponselected", V121),
     ("playerdies", V201),
     ("playerhurt", V201),
     ("movementfinished", V203),
@@ -680,38 +692,38 @@ pub fn event_since(name: &str) -> Option<Era> {
 /// Read-only status flags: true or false, supplied by the host view.
 /// `(name, first era)`.
 pub static STATUS_FLAGS: &[(&str, Era)] = &[
-    ("visible", V200),
-    ("carrying", V200),
-    ("playerismale", V200),
-    ("playerisfemale", V200),
-    ("playeronhorse", V200),
-    ("playerswimming", V200),
+    ("visible", V121),
+    ("carrying", V121),
+    ("playerismale", V121),
+    ("playerisfemale", V121),
+    ("playeronhorse", V121),
+    ("playerswimming", V121),
     ("playerreading", V201),
-    ("isleader", V200),
-    ("isweapon", V200),
-    ("weaponsenabled", V200),
-    ("followsplayer", V200),
+    ("isleader", V121),
+    ("isweapon", V121),
+    ("weaponsenabled", V121),
+    ("followsplayer", V121),
     ("issparringzone", V202),
     ("nopkzone", V202),
-    ("isonmap", V200),
+    ("isonmap", V121),
     ("lighteffectsenabled", V203),
     ("playerattached", V204),
 ];
 
 /// Built-in numeric variables: `(name, first era, writable)`.
 pub static BUILTIN_VARS: &[(&str, Era, bool)] = &[
-    ("x", V200, true),
-    ("y", V200, true),
-    ("timeout", V200, true),
-    ("playerx", V200, true),
-    ("playery", V200, true),
-    ("playerdir", V200, true),
-    ("playerhearts", V200, true),
-    ("playerrupees", V200, true),
-    ("playerbombs", V200, true),
-    ("playerdarts", V200, true),
-    ("playerswordpower", V200, true),
-    ("playershieldpower", V200, true),
+    ("x", V121, true),
+    ("y", V121, true),
+    ("timeout", V121, true),
+    ("playerx", V121, true),
+    ("playery", V121, true),
+    ("playerdir", V121, true),
+    ("playerhearts", V121, true),
+    ("playerrupees", V121, true),
+    ("playerbombs", V121, true),
+    ("playerdarts", V121, true),
+    ("playerswordpower", V121, true),
+    ("playershieldpower", V121, true),
     ("playerfullhearts", V21, false),
     ("playerhp", V21, true),
     ("playermaxhp", V21, false),
@@ -763,37 +775,37 @@ pub static BUILTINS: &[Builtin] = &[
     Builtin {
         name: "abs",
         args: &[N],
-        since: V200,
+        since: V121,
     },
     Builtin {
         name: "int",
         args: &[N],
-        since: V200,
+        since: V121,
     },
     Builtin {
         name: "sin",
         args: &[N],
-        since: V200,
+        since: V121,
     },
     Builtin {
         name: "cos",
         args: &[N],
-        since: V200,
+        since: V121,
     },
     Builtin {
         name: "arctan",
         args: &[N],
-        since: V200,
+        since: V121,
     },
     Builtin {
         name: "random",
         args: &[N, N],
-        since: V200,
+        since: V121,
     },
     Builtin {
         name: "strequals",
         args: &[T, T],
-        since: V200,
+        since: V121,
     },
     Builtin {
         name: "strlen",
@@ -840,62 +852,62 @@ pub static BUILTINS: &[Builtin] = &[
     Builtin {
         name: "arraylen",
         args: &[T],
-        since: V200,
+        since: V121,
     },
     // Level collision at a point in tiles; true off the board.
     Builtin {
         name: "onwall",
         args: &[N, N],
-        since: V200,
+        since: V121,
     },
     // Liquid (water or lava) at a point in tiles; false off the board.
     Builtin {
         name: "onwater",
         args: &[N, N],
-        since: V200,
+        since: V121,
     },
     // -1 on the default tileset, as in 2.05 (see documentation/tile-types.md).
     Builtin {
         name: "tiletype",
         args: &[N, N],
-        since: V200,
+        since: V121,
     },
     // Chat tests, true only during `playerchats`. [inferred: whole line / contained text]
     Builtin {
         name: "playersays",
         args: &[T],
-        since: V200,
+        since: V121,
     },
     Builtin {
         name: "playersays2",
         args: &[T],
-        since: V200,
+        since: V121,
     },
     // Stubs: return a value so scripts do not log every call.
     Builtin {
         name: "strtofloat",
         args: &[T],
-        since: V200,
+        since: V121,
     },
     Builtin {
         name: "hasweapon",
         args: &[T],
-        since: V200,
+        since: V121,
     },
     Builtin {
         name: "keydown",
         args: &[N],
-        since: V200,
+        since: V121,
     },
     Builtin {
         name: "keydown2",
         args: &[N],
-        since: V200,
+        since: V121,
     },
     Builtin {
         name: "sarraylen",
         args: &[T],
-        since: V200,
+        since: V121,
     },
     // `with (getnpc(name))`, `with (getplayer(account))`: the targets of
     // `with` (2.17 and later). Seihai does not switch objects; they read 0.
