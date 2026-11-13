@@ -334,7 +334,7 @@ impl<'a> Parser<'a> {
                     self.recover();
                     return Some(Stmt::Block(Vec::new()));
                 }
-                let cond = self.cond();
+                let cond = self.expr();
                 self.expect_op(")");
                 let body = Box::new(self.stmt().unwrap_or(Stmt::Block(Vec::new())));
                 Some(Stmt::While { cond, body })
@@ -694,15 +694,14 @@ impl<'a> Parser<'a> {
         e
     }
 
-    /// A condition after `if (`, `while (` or `elseif (`. The 1.x to 2.1
-    /// clients compile a bare number there through the flag-name path, so
-    /// `if (1)` tests a flag named `1` and is false (2.05r2 and 1.41 rev 1
-    /// [bin], 2.05r2 [lab]; Graal_analysis `gs1-condition-truth-205r2.md`).
-    /// The 2.17 engine has its own condition compiler.
+    /// A condition after `if (` or `elseif (`. A bare number
+    /// there goes through the flag-name path, so `if (1)` tests a flag named
+    /// `1` and is false: read in 2.05r2 and 1.41 rev 1, and run false on
+    /// 1.41 rev 1, 2.05r2, 2.17.1, 2.22 and 2.31 [lab]. 3.04 does the same
+    /// (Graal_analysis `linux-304-gs1-runtime.md`). `while (1)` was not
+    /// run, so loops keep the plain number.
     fn cond(&mut self) -> Expr {
-        let bare = self.era.old_condition_compiler()
-            && matches!(self.peek().tok, Tok::Num(_))
-            && self.second_is_op(")");
+        let bare = matches!(self.peek().tok, Tok::Num(_)) && self.second_is_op(")");
         let e = self.expr();
         if bare {
             Expr::Num(0.0)
@@ -770,15 +769,11 @@ impl<'a> Parser<'a> {
                 Tok::Op("--") => Expr::Unary(UnOp::Neg, Box::new(rhs)),
                 _ => rhs,
             };
-            lhs = if self.era.old_condition_compiler()
-                && op.compares()
-                && constant(&lhs)
-                && constant(&rhs)
-            {
+            lhs = if self.era.old_engine() && op.compares() && constant(&lhs) && constant(&rhs) {
                 // The old compiler turns a comparison of two constants into
                 // a numeric leaf before evaluating it, so it keeps the leaf's
                 // initial 0: `1==1` and `(1+0)==1` are 0 (2.05r2 and 1.41
-                // rev 1 [bin], 2.05r2 [lab]).
+                // rev 1 [bin][lab]). 2.17.1 to 2.31 give 1 [lab].
                 Expr::Num(0.0)
             } else {
                 Expr::Bin(op, Box::new(lhs), Box::new(rhs))

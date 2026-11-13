@@ -969,8 +969,8 @@ fn string_functions_appear_in_2_02() {
     let (mut w, id) = npc_in(src, Era::V201);
     w.fire(id, "created", &[]);
     assert_eq!(var(&w, id, "this.n"), Val::Num(0.0));
-    // `#e` is not a code before 2.02: it stays as written.
-    assert_eq!(messages(&mut w), vec!["#e(0,2,hello)"]);
+    // `#e` is not a code before 2.02: the old expander drops the `#`.
+    assert_eq!(messages(&mut w), vec!["e(0,2,hello)"]);
     let (mut w, id) = npc_in(src, Era::V202);
     w.fire(id, "created", &[]);
     assert_eq!(var(&w, id, "this.n"), Val::Num(5.0));
@@ -1555,15 +1555,15 @@ fn offline_callweapon_still_counts_weapon_objects() {
     assert_eq!(messages(&mut w), vec!["b"]);
 }
 
-/// The 2.05r2 condition-truth cases (Graal_analysis
-/// `gs1-condition-truth-205r2.md`): the old compiler reads a bare number as
-/// a flag name and folds a comparison of two constants to 0. The 2.17
-/// engine does neither.
+/// The condition-truth cases as run on the real clients: 1.41 rev 1 and
+/// 2.05r2 read a bare number as a flag name and fold a comparison of two
+/// constants to 0; 2.17.1, 2.22 and 2.31 still read the bare number as a
+/// flag but compare constants properly.
 #[test]
 fn condition_truth_follows_the_build() {
     let cases = [
-        ("0.5", false, true),
-        ("1", false, true),
+        ("0.5", false, false),
+        ("1", false, false),
         ("(0.5+0)", true, true),
         ("(-0.5)", true, true),
         ("(0+0)", false, false),
@@ -1608,5 +1608,34 @@ fn early_builds_keep_the_borrowed_events_and_variables() {
         let (mut w, _) = npc_in("if (created && playerx>=0) { message hi; sleep 1; }", era);
         w.start_all();
         assert_eq!(messages(&mut w), ["hi"], "{}", era.label());
+    }
+}
+
+/// Message codes as the real clients showed them (1.41 rev 1, 2.05r2,
+/// 2.17.1, 2.22, 2.31).
+#[test]
+fn message_codes_follow_the_build() {
+    let cases = [
+        // `##` in the 2.17 engine was not run.
+        ("A##B", "A#B", "A#B", ""),
+        ("A#?B", "A?B", "A?B", "A#?B"),
+        ("A#", "A#", "A#", "A#"),
+        ("A#vB", "AB", "AB", "A#vB"),
+        ("A##v(2)", "A#v(2)", "A#v(2)", ""),
+        ("#v(0.5)", "0.5", "0.5", "0.5"),
+        ("#v(2+3)", "5", "5", "5"),
+        ("#e(1,2,ABCD)", "e(1,2,ABCD)", "BC", "BC"),
+        ("#K(65)", "K(65)", "A", "A"),
+        ("A#bB", "AB", "AB", "A#bB"),
+    ];
+    for (src, v141, v205, v217) in cases {
+        for (era, want) in [(Era::V141, v141), (Era::V205, v205), (Era::V217, v217)] {
+            if want.is_empty() {
+                continue;
+            }
+            let (mut w, _) = npc_in(&format!("if (created) {{ message {src}; }}"), era);
+            w.start_all();
+            assert_eq!(messages(&mut w), [want], "{src} in {}", era.label());
+        }
     }
 }
