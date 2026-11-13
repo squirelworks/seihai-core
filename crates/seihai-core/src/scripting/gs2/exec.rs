@@ -367,7 +367,10 @@ impl Machine {
     }
 
     /// Continues after `Outcome::WaitFor`: `waitfor` gives 1 when the event
-    /// came and 0 when the time ran out.
+    /// came and 0 when the time ran out. The clients (read in 5.12 and
+    /// 6.00r2) store 1 as the result when the wait starts, and their timer
+    /// sets it to 0 before it resumes a wait whose time has passed. A wait
+    /// times out once the clock plus 0.0001 is past its end.
     pub fn resume_waitfor(&mut self, caught: bool, host: &mut dyn Host) -> Outcome {
         if !self.running {
             return Outcome::Done;
@@ -467,6 +470,36 @@ impl Machine {
                     .map(|s| Value::Val(Val::Num(self.value(s, host).num())))
                     .collect();
                 self.push(Slot::List(list));
+            }
+            // `obj.(name) = value` in one opcode (5.00r7 on): the object
+            // is converted as `OP_CONV_TO_OBJECT` does, the name taken as
+            // `OP_MEMBER_ACCESS` takes it, and the value stored as
+            // `OP_ASSIGN` stores it. All three are popped.
+            vm::op::MEMBER_STORE => {
+                let (Some(value), Some(name), Some(obj)) = (self.pop(), self.pop(), self.pop())
+                else {
+                    return fault(self, host);
+                };
+                let name = match name {
+                    Slot::Var(_, n) | Slot::Str(n) => n,
+                    _ => String::new(),
+                };
+                let target = match obj {
+                    Slot::Var(root, path) => Some((root.unwrap_or(Root::Global), path)),
+                    Slot::Obj(o) => o,
+                    _ => None,
+                };
+                let value = self.value_full(value, host);
+                if let Some((root, path)) = target {
+                    if !name.is_empty() {
+                        let full = if path.is_empty() {
+                            name
+                        } else {
+                            format!("{path}.{name}")
+                        };
+                        self.write_var(Some(root), &full, value, host);
+                    }
+                }
             }
             // An object literal from name/value pairs (5.00r7). Seihai has
             // no object values: the pairs are dropped and the result is null.

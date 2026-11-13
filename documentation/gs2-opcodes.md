@@ -130,7 +130,7 @@ but nothing in the compiler writes it.
 | 51 | 0x33 | OP_FUNC_PARAMS_END | — | End of a function's parameter list | yes |
 | 52 | 0x34 | OP_INC | — | `++`, and the index step in `for`-each | yes |
 | 53 | 0x35 | OP_DEC | — | `--` | yes |
-| 54 | 0x36 | OP_UNKNOWN_54 | — | Placeholder. 5.00r7 and later have a handler (`gs2-vm-versions.md`) | no |
+| 54 | 0x36 | OP_UNKNOWN_54 | — | `obj.(name) = value` in one step (5.00r7 on; `gs2-vm-versions.md`) | no |
 | 60 | 0x3C | OP_ADD | — | `+`, `+=` | yes |
 | 61 | 0x3D | OP_SUB | — | `-`, `-=` | yes |
 | 62 | 0x3E | OP_MUL | — | `*`, `*=` | yes |
