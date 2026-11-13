@@ -149,7 +149,7 @@ if (timeout) {
 
     #[test]
     fn one_script_reaches_every_profiled_build() {
-        let p = Prepared::gs1(DOOR, Era::V21);
+        let p = Prepared::gs1(DOOR, Era::V217);
         assert!(p.bytecode().is_some(), "{:?}", p.compile_errors());
         for &v in ClientVersion::all_versions() {
             let s = v.profile().scripts;
@@ -173,7 +173,7 @@ if (timeout) {
 
     #[test]
     fn the_engine_follows_the_profile() {
-        let p = Prepared::gs1(DOOR, Era::V21);
+        let p = Prepared::gs1(DOOR, Era::V217);
         for v in [V139, V205, V222, V231] {
             assert!(
                 matches!(p.for_client(v).delivery, Delivery::Gs1Text(_)),
@@ -193,7 +193,7 @@ if (timeout) {
         // `with` is 2.1 GS1: 2.05 cannot read it, 3.153 on runs the
         // bytecode.
         let src = "if (created) { with (getplayer(a)) { hide; } }\n";
-        let p = Prepared::gs1(src, Era::V21);
+        let p = Prepared::gs1(src, Era::V217);
         assert!(p.bytecode().is_some(), "{:?}", p.compile_errors());
         assert_eq!(
             p.for_client(V205).delivery,

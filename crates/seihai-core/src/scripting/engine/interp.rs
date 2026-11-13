@@ -1130,11 +1130,6 @@ impl<'a> Run<'a> {
                     return;
                 }
                 let cur = self.core.flags.get(&k).cloned().unwrap_or_default();
-                // Before 2.1 `addstring` adds text to the string.
-                if name == "addstring" && self.era() < Era::V21 {
-                    self.write_flag(&k, format!("{cur}{}", sv(v, 1)));
-                    return;
-                }
                 let mut items = split_list(&cur);
                 let at = |i: usize| nv(v, i).max(0.0).floor() as usize;
                 match name {
@@ -1243,12 +1238,8 @@ impl<'a> Run<'a> {
             }
             "move" => {
                 let (dx, dy) = (nv(&v, 0), nv(&v, 1));
-                // Before 2.03 `move` takes only the two offsets.
-                let (time, options) = if self.era() >= Era::V203 {
-                    (nv(&v, 2), nv(&v, 3) as i64)
-                } else {
-                    (0.0, 0)
-                };
+                // `move` is first in 2.03's table, with all four arguments.
+                let (time, options) = (nv(&v, 2), nv(&v, 3) as i64);
                 self.obj.x += dx;
                 self.obj.y += dy;
                 self.core.effects.push(Effect::Move {
@@ -1258,7 +1249,7 @@ impl<'a> Run<'a> {
                     time,
                     options,
                 });
-                if options & 8 != 0 && self.era() >= Era::V203 {
+                if options & 8 != 0 {
                     self.core.pending.push_back(Pending {
                         target: Target::Id(id),
                         event: "movementfinished".into(),

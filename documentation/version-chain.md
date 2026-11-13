@@ -14,13 +14,26 @@ that an original early client used a listserver. Older offline-only builds
 also have distinct no-network/relay restrictions; see
 [offline-only-builds.md](offline-only-builds.md).
 
-`Era::for_version` uses the earliest documented 2.00 GS1 vocabulary as a
-compatibility fallback for pre-2.00 profiles, including 1.21–1.32. The exact
-command, function and grammar coverage of each early build remains
-incomplete. This fallback must not be described as native 2.00 vocabulary
-parity, nor may those rows silently inherit the newer 2.1 syntax. The
-connection evidence is catalogued separately in the linked early-client
-research; no native network capability follows from a scripting fallback.
+`Era::for_version` gives each profile the GS1 command table of its own
+build. The tables come from the client binaries
+([gs1-commands-by-version.tsv](https://github.com/squirelworks/Graal_analysis/blob/main/npc-library/gs1-commands-by-version.tsv),
+61 builds from 2nd Graal to 5.00r7): 1.21 has 71 commands, 1.33 has 88,
+1.41 rev 1 has 126, 2.05 has 161, and 2.17.1 to 2.31 have 198. Builds whose
+tables are identical share an era (`Era` in
+`crates/seihai-core/src/scripting/engine/vocab.rs`), and a unit test checks
+every era's count against the build tables. Statement words are in the same
+tables, so `while` (from 1.28 beta 2), `function`, `return`, `break` and
+`continue` (from 1.41 rev 1) and `with` (2.17.1 to 3.04) are gated too.
+Commands that leave a table are listed in `vocab::ABSENT`: `seteffect`
+(gone in 1.34 to 1.41 rev 1), `unseteffect` (1.21 to 1.33 only) and the six
+commands the C++ engine never registered.
+
+What is still borrowed: functions, flags and variables before 2.00 use the
+2.00 set, because no per-build table of them exists for 1.x. The 2.1 to 2.16
+eras have no binary; they are NewWorld beta 2's table plus the commands the
+2.1x release notes date (`play2` in 2.1, `wraptext` in 2.12, `showimg2` in
+2.15, `seteffectmode` in 2.16), and `Era::inferred` says so. No native
+network capability follows from a script era.
 
 Research references: [early profiles](https://github.com/squirelworks/Graal_analysis/blob/main/client-internals/version-profiles/v121-v132.toml)
 and [early-client lineage](https://github.com/squirelworks/Graal_analysis/blob/main/client-internals/early-clients.md).

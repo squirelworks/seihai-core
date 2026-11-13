@@ -565,7 +565,7 @@ impl<'a> Parser<'a> {
             return Ok(None);
         }
         let text = String::from_utf8_lossy(&b[start..=end]).into_owned();
-        let parsed = engine::parse(&text, Era::V21);
+        let parsed = engine::parse(&text, Era::V217);
         if !parsed.diagnostics.is_empty() {
             return Ok(None);
         }
@@ -579,7 +579,7 @@ impl<'a> Parser<'a> {
             *l = line;
         }
         self.quirk(Quirk::Gs1Command(name.to_ascii_lowercase()));
-        let lowered = gs1::lower_embedded(&command, Era::V21)
+        let lowered = gs1::lower_embedded(&command, Era::V217)
             .map_err(|message| CompileError { line, message })?;
         self.lex.reset(end + 1, lines);
         Ok(Some(lowered))
@@ -1059,7 +1059,7 @@ impl<'a> Parser<'a> {
             }
             Tok::Code(code) => {
                 self.quirk(Quirk::Gs1MessageCode);
-                match gs1::message(&code, Era::V21) {
+                match gs1::message(&code, Era::V217) {
                     Ok(parts) => Ok(Expr::Message(parts)),
                     Err(message) => Err(self.error(message)),
                 }
