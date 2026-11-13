@@ -410,10 +410,11 @@ fn classic_head(version: super::ClientVersion, raw: &[u8]) -> Vec<u8> {
     }
 }
 
-/// The nickname props a 6.x build sends when it has no recorded post-login
-/// frame: `PLI_PLAYERPROPS` (2) with `NICKNAME` (0) alone. No 6.x capture
-/// of the real frame exists yet (#441); without this the server keeps its
-/// default nick ("default") and every other client shows that.
+/// The nickname props a 5.x or 6.x build sends when it has no recorded
+/// post-login frame: `PLI_PLAYERPROPS` (2) with `NICKNAME` (0) alone. No
+/// 5.x or 6.x capture of the real frame exists yet (#441); without this the
+/// server keeps its default nick ("default") and every other client shows
+/// that (seen for 5.00r7 and 5.12 in the seihai #400 lab run).
 pub fn nick_props_message(nick: &str) -> Vec<u8> {
     let mut m = vec![PLI_PLAYERPROPS + 0x20, 0x20];
     gstring(&mut m, nick);
@@ -422,12 +423,12 @@ pub fn nick_props_message(nick: &str) -> Vec<u8> {
 }
 
 /// Whether `version` sends [`nick_props_message`] once its first level has
-/// loaded: the 6.x builds, which have neither a [`LoginBurst`] nor a 4.x
-/// lobby frame to carry the nickname.
+/// loaded: the 5.x and 6.x builds, which have neither a [`LoginBurst`] nor a
+/// 4.x lobby frame to carry the nickname.
 pub fn sends_nick_props(version: super::ClientVersion) -> bool {
     let all = super::ClientVersion::all_versions();
     let at = |v| all.iter().position(|&x| x == v);
-    at(version) >= at(super::ClientVersion::V600R2)
+    at(version) >= at(super::ClientVersion::V500R7)
         && version.profile().protocol.pli.contains(PLI_PLAYERPROPS)
         && LoginBurst::for_version(version).is_none()
         && super::lobby::LobbyBurst::for_version(version).is_none()
@@ -1398,12 +1399,23 @@ mod tests {
     }
 
     #[test]
-    fn six_x_sends_the_nick_alone() {
+    fn five_x_and_six_x_send_the_nick_alone() {
         use super::super::ClientVersion::*;
-        for v in [V600R2, V6015, V6034, V603R7, V603R7Linux] {
+        for v in [
+            V500R7,
+            V512,
+            V524R4,
+            V530R3,
+            V531R4,
+            V600R2,
+            V6015,
+            V6034,
+            V603R7,
+            V603R7Linux,
+        ] {
             assert!(sends_nick_props(v), "{v:?}");
         }
-        for v in [V222, V231, V304, V404R2, V531R4] {
+        for v in [V222, V231, V304, V3153, V404R2, V420R8] {
             assert!(!sends_nick_props(v), "{v:?}");
         }
         let mut want = vec![PLI_PLAYERPROPS + 0x20, 0x20, 4 + 0x20];

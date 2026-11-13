@@ -1086,7 +1086,7 @@ pub fn run_hooked(
         }
         let mut login_burst = LoginBurst::for_version(version);
         let mut lobby_burst = LobbyBurst::for_version(version);
-        // 6.x: the nickname, once the first level is in (no recorded frame
+        // 5.x and 6.x: the nickname, once the first level is in (no recorded frame
         // carries it).
         let mut nick_owed = sends_nick_props(version);
         let title = version.profile().window_title(server_name.as_deref());
