@@ -578,7 +578,7 @@ impl<'a> Run<'a> {
 
     fn set_timeout(&mut self, secs: f64) {
         self.obj.resume = None;
-        self.obj.due = if secs > 0.0 {
+        self.obj.due = if secs > 0.0 && !timeout_too_short(self.core.era, secs) {
             Some(self.core.tick + secs_to_ticks(secs))
         } else {
             None
@@ -1415,4 +1415,13 @@ pub fn tokenize(s: &str, extra: &str) -> Vec<String> {
         out.push(cur);
     }
     out
+}
+
+/// The real 4.20 rev 6 (lab 2026-11-13, `documentation/update-cadence.md`)
+/// never fired a GS1 `timeout` set below one 50 ms step: `timeout = 0.01`
+/// and `timeout = 0.025` stayed silent, where `0.05` fired 19.97 times a
+/// second. Only the 3.153 to 4.20 engine was measured; the older engines
+/// keep Seihai's round-up to one tick.
+fn timeout_too_short(era: Era, secs: f64) -> bool {
+    era == Era::V3153 && secs * 1000.0 < TICK_MS as f64 - 1e-6
 }

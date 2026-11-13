@@ -781,6 +781,28 @@ fn partial_ticks_accumulate() {
     assert_eq!(w.now_ms(), 50);
 }
 
+/// Lab 2026-11-13, real 4.20r6: `timeout = 0.01` and `0.025` never fire,
+/// `0.05` fires every 50 ms step. Engines that were not measured keep the
+/// round-up to one tick.
+#[test]
+fn a_timeout_below_one_step_is_dropped_by_the_4x_engine() {
+    let src = "if (created) { timeout = T; }\nif (timeout) { message t; timeout = T; }";
+    for (t, fires) in [("0.01", 0), ("0.025", 0), ("0.05", 20)] {
+        let (mut w, id) = npc_in(&src.replace('T', t), Era::V3153);
+        w.fire(id, "created", &[]);
+        for _ in 0..20 {
+            w.tick(50);
+        }
+        assert_eq!(messages(&mut w).len(), fires, "timeout = {t}");
+    }
+    let (mut w, id) = npc_in(&src.replace('T', "0.01"), Era::V217);
+    w.fire(id, "created", &[]);
+    for _ in 0..20 {
+        w.tick(50);
+    }
+    assert_eq!(messages(&mut w).len(), 20, "2.17 keeps one tick");
+}
+
 // ---- touch and cross-object calls ----
 
 #[test]
