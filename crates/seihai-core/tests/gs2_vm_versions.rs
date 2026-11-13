@@ -70,7 +70,10 @@ fn each_version_names_the_vm_it_follows() {
     assert_eq!(label(ClientVersion::V231), "3.153");
     assert_eq!(label(ClientVersion::V420R6), "4.20r6");
     assert_eq!(label(ClientVersion::V420R8), "4.20r8");
-    assert_eq!(label(ClientVersion::V531R4), "5.00r7");
+    assert_eq!(label(ClientVersion::V404R2), "4.04r2");
+    assert_eq!(label(ClientVersion::V512), "5.00r7");
+    assert_eq!(label(ClientVersion::V531R4), "5.24r4");
+    assert_eq!(label(ClientVersion::V600R4), "5.24r4");
     assert_eq!(label(ClientVersion::V603R7), "6.03r7");
 }
 
@@ -89,6 +92,8 @@ fn modulo_adds_the_tolerance_only_in_4x() {
 fn square_root_is_single_precision_in_6x() {
     let v = [I::Num(2.0), I::Num(0.5), I::Op(65)];
     assert_eq!(r(ClientVersion::V500R7, &v), Val::Num(2f64.sqrt()));
+    // 5.24r4 to 6.00r4 still take the double-precision root.
+    assert_eq!(r(ClientVersion::V600R2, &v), Val::Num(2f64.sqrt()));
     assert_eq!(r(ClientVersion::V603R7, &v), Val::Num((2f32).sqrt() as f64));
     // 3.153 has no 0.5 case: it is pow.
     assert_eq!(r(ClientVersion::V3153, &v), Val::Num(2f64.powf(0.5)));
@@ -99,6 +104,9 @@ fn shifts_wrap_at_32_on_x86_builds_only() {
     let v = [I::Num(1.0), I::Num(33.0), I::Op(101)];
     assert_eq!(r(ClientVersion::V3153, &v), Val::Num(0.0));
     assert_eq!(r(ClientVersion::V420R8, &v), Val::Num(2.0));
+    // The Windows 4.04r2 build shifts as x86 does.
+    assert_eq!(r(ClientVersion::V404R2, &v), Val::Num(2.0));
+    assert_eq!(r(ClientVersion::V404R2Mac, &v), Val::Num(0.0));
 }
 
 #[test]
@@ -216,4 +224,76 @@ fn stack_limit_follows_the_version() {
     assert!(matches!(m.run_top_level(&mut h), Outcome::Stopped(_)));
     assert_eq!(r(ClientVersion::V420R8, &v), Val::Num(300.0));
     assert_eq!(r(ClientVersion::V603R7, &v), Val::Num(300.0));
+}
+
+#[test]
+fn the_stack_limit_lasts_until_6_00r4() {
+    // 10 001 pushes: past the 10 000 limit 4.x to 6.00r4 keep.
+    let mut v: Vec<I> = (0..10_001).map(|_| I::Num(1.0)).collect();
+    v.extend((0..10_000).map(|_| I::Op(60)));
+    for ver in [
+        ClientVersion::V512,
+        ClientVersion::V524R4,
+        ClientVersion::V600R4,
+    ] {
+        let mut m = Machine::for_version(script(&v), ver);
+        let mut h = EffectHost::new(Era::V21, 1);
+        assert!(
+            matches!(m.run_top_level(&mut h), Outcome::Stopped(_)),
+            "{ver:?}"
+        );
+    }
+    assert_eq!(r(ClientVersion::V603R7, &v), Val::Num(10_001.0));
+}
+
+#[test]
+fn number_lists_stop_after_5_12() {
+    let v = [I::Num(1.0), I::Num(2.0), I::OpInt(49, 2)];
+    let mut m = Machine::for_version(script(&v), ClientVersion::V512);
+    let mut h = EffectHost::new(Era::V21, 1);
+    assert_eq!(m.run_top_level(&mut h), Outcome::Done);
+    assert_eq!(m.list(Root::This, "r").map(<[_]>::len), Some(2));
+    let (_, log) = run(ClientVersion::V524R4, &[I::Num(5.0), I::OpInt(49, 1)]);
+    assert!(
+        log.iter().any(|l| l.contains("not in the 5.24r4 VM")),
+        "{log:?}"
+    );
+}
+
+#[test]
+fn waitfor_gives_zero_when_its_time_runs_out() {
+    let v = [I::Op(180), I::Str("onPing"), I::Num(1.0), I::Op(11)];
+    for ver in [
+        ClientVersion::V420R8,
+        ClientVersion::V512,
+        ClientVersion::V600R2,
+    ] {
+        let mut m = Machine::for_version(script(&v), ver);
+        let mut h = EffectHost::new(Era::V21, 1);
+        assert!(matches!(m.run_top_level(&mut h), Outcome::WaitFor { .. }));
+        assert_eq!(m.resume_waitfor(false, &mut h), Outcome::Done);
+        assert_eq!(m.var(Root::This, "r"), Some(&Val::Num(0.0)), "{ver:?}");
+    }
+}
+
+#[test]
+fn member_store_assigns_a_named_member_from_5x() {
+    // `this.("q") = 7` as opcode 54: object, name, value, all popped.
+    let v = [I::Op(180), I::Str("q"), I::Num(7.0), I::Op(54), I::Num(1.0)];
+    for ver in [
+        ClientVersion::V500R7,
+        ClientVersion::V512,
+        ClientVersion::V603R7,
+    ] {
+        let mut m = Machine::for_version(script(&v), ver);
+        let mut h = EffectHost::new(Era::V21, 1);
+        assert_eq!(m.run_top_level(&mut h), Outcome::Done, "{:?}", h.log);
+        assert_eq!(m.var(Root::This, "q"), Some(&Val::Num(7.0)), "{ver:?}");
+        assert_eq!(m.var(Root::This, "r"), Some(&Val::Num(1.0)));
+    }
+    // 4.20r8 has no handler: it is skipped and leaves the three values.
+    let mut m = Machine::for_version(script(&v), ClientVersion::V420R8);
+    let mut h = EffectHost::new(Era::V21, 1);
+    m.run_top_level(&mut h);
+    assert_eq!(m.var(Root::This, "q"), None);
 }
