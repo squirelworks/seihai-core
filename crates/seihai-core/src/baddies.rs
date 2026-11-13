@@ -1,8 +1,8 @@
 //! Baddies: the classic level enemies (`BADDY` records, `PLO_BADDYPROPS`).
 //!
 //! Everything here is read from the 2.05 rev 2 client, where a baddy is a
-//! `TComputer` (functions `0x4d5e0c` to `0x4d9588`, the tables at
-//! `0x54a7a4` to `0x54aa30` and `arrays.dat` arrays 20, 22 and 23). See
+//! `TComputer` (its methods, its tables and `arrays.dat` arrays 20, 22
+//! and 23). See
 //! `documentation/baddies.md` for the read and what is still open.
 //!
 //! * A baddy is a 2 x 2 tile box at `(x, y)`; its centre is `(x + 1,
@@ -21,7 +21,8 @@
 //!   (the 2.22 capture: a walking baddy sends 43 then 42, the hare 2 then 3,
 //!   100 ms apart).
 
-use crate::items::DelphiRandom;
+use crate::items::{self, DelphiRandom};
+use crate::protocol::SwampSword;
 
 /// One baddy tick.
 pub const TICK_MS: u64 = 100;
@@ -43,7 +44,7 @@ pub const IMAGES: [&str; KINDS] = [
     "baddylizardon",
     "baddydragon",
 ];
-/// Starting power of each type (`0x5482cc`), in sword-power units.
+/// Starting power of each type, in sword-power units.
 pub const POWER: [i32; KINDS] = [2, 3, 4, 3, 2, 1, 1, 6, 12, 8];
 /// The archer's and the swamp soldier's bow.
 pub const BOW_IMAGE: &str = "wbow1";
@@ -61,27 +62,26 @@ pub mod mode {
     pub const DEAD: u8 = 9;
 }
 
-/// One step along each facing (`0x54a924`): up, left, down, right.
+/// One step along each facing: up, left, down, right.
 const STEP: [(f64, f64); 4] = [(0.0, -0.25), (-0.25, 0.0), (0.0, 0.25), (0.25, 0.0)];
-/// The three points ahead of the box that must be free to move (`0x54a7a4`).
+/// The three points ahead of the box that must be free to move.
 const AHEAD: [[(f64, f64); 3]; 4] = [
     [(0.1, -0.5), (1.0, -0.5), (1.9, -0.5)],
     [(-0.5, 0.1), (-0.5, 1.0), (-0.5, 1.9)],
     [(0.1, 2.5), (1.0, 2.5), (1.9, 2.5)],
     [(2.5, 0.1), (2.5, 1.0), (2.5, 1.9)],
 ];
-/// Head turns while looking round, by `counter / 4` (`0x54a964`).
+/// Head turns while looking round, by `counter / 4`.
 const LOOK_TURN: [i32; 12] = [1, 1, 0, -1, -1, 0, 1, 1, 0, -1, -1, 0];
-/// Where the octopus's rock starts, in eighths of a tile (`0x54a990`).
+/// Where the octopus's rock starts, in eighths of a tile.
 const ROCK_FROM: [(f64, f64); 4] = [(4.0, -3.0), (-8.0, 5.0), (4.0, 12.0), (17.0, 5.0)];
-/// Where an arrow starts, in eighths of a tile (`0x54a9f0`).
+/// Where an arrow starts, in eighths of a tile.
 const ARROW_FROM: [(f64, f64); 4] = [(12.0, -12.0), (-10.0, 0.0), (4.0, 3.0), (11.0, 0.0)];
-/// Where a shooter wants to stand, from the target (`0x54a9d0`,
-/// `0x54a9e0`). Facing right it is 11 to the target's right, as in the
-/// program.
+/// Where a shooter wants to stand, from the target. Facing right it is 11
+/// to the target's right, as in the program.
 const AIM_X: [f64; 4] = [-1.0, 11.0, 0.0, 11.0];
 const AIM_Y: [f64; 4] = [11.0, 1.0, -11.0, 1.0];
-/// The hare's height over its 21 jump ticks (`0x547da8`).
+/// The hare's height over its 21 jump ticks.
 const HARE_HEIGHT: [f64; 11] = [0.0, 1.2, 2.4, 3.6, 4.5, 5.4, 6.2, 6.9, 7.4, 7.8, 8.0];
 /// Ticks a verse stays over the baddy.
 const VERSE_TICKS: i32 = 20;
@@ -126,6 +126,78 @@ pub trait World {
     /// The baddy touched the local player: `half` half hearts, pushed
     /// along `(dx, dy)`.
     fn touch_player(&mut self, half: i32, dx: f64, dy: f64);
+    /// Whether a baddy that starts dying rolls an item: the client does
+    /// in 1.21 to 1.41 ([`crate::protocol::ItemDrops::client_roll`]).
+    fn rolls_drops(&self) -> bool {
+        false
+    }
+    /// A dying baddy left `item` with its top-left at `(x, y)`.
+    fn drop_item(&mut self, _item: u8, _x: f64, _y: f64) {}
+    /// The local player's sword met this baddy's sword: the client starts
+    /// the spark on the player's sword ([`SwordSpark`]).
+    fn sword_spark(&mut self) {}
+}
+
+/// The spark drawn on the local player's sword when it hits a baddy's
+/// sword. The client keeps a counter on the player: 4 at the clash, one
+/// less each 50 ms player tick, drawn while it is 0 or more (five ticks).
+/// Each tick it draws one piece of `arrays.dat` array 21, picked by the
+/// player's facing now and frame `3 - min(3, counter)`, placed from where
+/// the player stood at the clash. Every build from 1.28 beta 2 to 2.31
+/// does the same with the same table (read in 1.39 and 2.05 rev 2).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SwordSpark {
+    /// The player's `(x, y)` at the clash, in tiles.
+    pub x: f64,
+    pub y: f64,
+    /// The counter: 4 down to 0.
+    pub left: i32,
+}
+
+impl SwordSpark {
+    pub fn new(x: f64, y: f64) -> SwordSpark {
+        SwordSpark { x, y, left: 4 }
+    }
+
+    /// One player tick. False once the spark is over.
+    pub fn tick(&mut self) -> bool {
+        self.left -= 1;
+        self.left >= 0
+    }
+
+    /// The piece to draw now for a player facing `dir`; its place is in
+    /// pixels from `(x, y)`.
+    pub fn pieces(&self, t: &DrawTables, dir: u8) -> Vec<Piece> {
+        let frame = 3 - self.left.clamp(0, 3);
+        t.spark
+            .get(usize::from(dir & 3))
+            .and_then(|l| l.get(frame as usize))
+            .map(|&v| {
+                let (sprite, ox, oy) = unpack(v);
+                vec![Piece {
+                    sprite,
+                    dx: ox * 2,
+                    dy: oy * 2,
+                    sheet: PieceSheet::Sprites,
+                }]
+            })
+            .unwrap_or_default()
+    }
+}
+
+/// What a baddy of type `kind` leaves when it starts dying in 1.21 to 1.41,
+/// from one `Random(100)` (read in every build from 1.21 to 1.41; NewMain
+/// 1.42 and 2.x leave it to the server): 0 to 9 a green rupee, 10 to 14 a
+/// blue rupee, 15 to 29 a heart, and 30 to 74 arrows from an archer
+/// (types 3 and 9) or type 4.
+pub fn death_drop(kind: u8, roll: i32) -> Option<u8> {
+    match roll {
+        ..=9 => Some(items::GREENRUPEE),
+        10..=14 => Some(items::BLUERUPEE),
+        15..=29 => Some(items::HEART),
+        30..=74 if matches!(kind, 3 | 4 | 9) => Some(items::DARTS),
+        _ => None,
+    }
 }
 
 /// One baddy.
@@ -180,7 +252,7 @@ fn mod4(v: i32) -> u8 {
 }
 
 impl Baddy {
-    /// A new baddy (`0x4d5e0c`). `player` is the local player's `(x, y,
+    /// A new baddy. `player` is the local player's `(x, y,
     /// dir)`: a baddy within 30 tiles of it (or a blue one anywhere) starts
     /// facing it, else up or down towards it.
     pub fn new(
@@ -286,7 +358,7 @@ impl Baddy {
         Baddy::new(id, 0, 0.0, 0.0, Default::default(), player, rng)
     }
 
-    /// The centre (`0x4d6a44`, `0x4d6a60`): the hare's is raised while it
+    /// The centre: the hare's is raised while it
     /// is up.
     pub fn centre(&self) -> (f64, f64) {
         (self.x + 1.0, self.y + 1.0 - self.hare_height())
@@ -301,15 +373,40 @@ impl Baddy {
         }
     }
 
-    /// Whether a hit can land now (`0x4d6218`): not while hurt, bumped or
+    /// Whether a hit can land now: not while hurt, bumped or
     /// dying, the swamp soldier only while it is up and not just hurt or
     /// shooting, the hare only in the air.
     pub fn hittable(&self) -> bool {
+        self.hittable_by(SwampSword::From22To36)
+    }
+
+    /// [`Self::hittable`] for the local player's sword, whose swamp-soldier
+    /// window depends on the build ([`SwampSword`]).
+    pub fn hittable_by(&self, swamp: SwampSword) -> bool {
         match self.mode {
             mode::HURT | mode::BUMPED | mode::DIE => false,
-            mode::SWAMPSHOT => self.aux < 1 && (22..=36).contains(&self.counter),
+            mode::SWAMPSHOT => {
+                self.aux < 1
+                    && match swamp {
+                        SwampSword::From17 => self.counter >= 17,
+                        SwampSword::From22To36 => (22..=36).contains(&self.counter),
+                    }
+            }
             mode::HAREJUMP => (17..=37).contains(&self.counter),
             _ => true,
+        }
+    }
+
+    /// Start dying with `counter` ticks to go; in 1.x the client rolls the
+    /// baddy's item here ([`death_drop`]).
+    fn start_dying(&mut self, w: &mut dyn World, counter: i32) {
+        self.mode = mode::DIE;
+        self.counter = counter;
+        if w.rolls_drops() {
+            let roll = w.random(100);
+            if let Some(item) = death_drop(self.kind, roll) {
+                w.drop_item(item, self.x, self.y);
+            }
         }
     }
 
@@ -324,7 +421,7 @@ impl Baddy {
             .any(|&(dx, dy)| w.blocked(self.x + dx, self.y + dy))
     }
 
-    /// One baddy tick (`0x4d6bd8`). `think` runs the AI: offline, or online
+    /// One baddy tick. `think` runs the AI: offline, or online
     /// as the level leader. Returns true when the baddy died and is gone.
     pub fn tick(&mut self, w: &mut dyn World, think: bool) -> bool {
         if think {
@@ -354,7 +451,7 @@ impl Baddy {
         self.removed = true;
     }
 
-    /// The baddy touches the local player (`0x4d6ab0`): half a heart, a
+    /// The baddy touches the local player: half a heart, a
     /// whole one from the golden warrior (Graal_analysis
     /// `damage-sources.md`), and its attack verse after its sight verse.
     fn touch(&mut self, w: &mut dyn World) {
@@ -522,7 +619,7 @@ impl Baddy {
         Some((x + 1.5, y + 2.0))
     }
 
-    /// Whether the baddy facing `dir` sees `to` from `from` (`0x4f7b64`):
+    /// Whether the baddy facing `dir` sees `to` from `from`:
     /// in the quarter it faces, at most 20 tiles off, with no wall on the
     /// line between. The points the program tests along the line are not
     /// legible; Seihai tests one a tile.
@@ -555,7 +652,7 @@ impl Baddy {
         true
     }
 
-    /// Pick the nearest player (`0x4d8278`) and the way to it. The first
+    /// Pick the nearest player and the way to it. The first
     /// candidate is taken without the sight test, as in the program.
     fn choose_target(&mut self, w: &dyn World) -> u8 {
         let c = (self.x + 1.0, self.y + 1.0);
@@ -596,7 +693,7 @@ impl Baddy {
         best
     }
 
-    /// Look for a player while walking or looking round (`0x4d73e4`).
+    /// Look for a player while walking or looking round.
     fn look(&mut self, w: &mut dyn World) {
         let d = self.choose_target(w);
         let Some(at) = self.target_at(w, self.target) else {
@@ -632,7 +729,7 @@ impl Baddy {
         }
     }
 
-    /// Run at the target (`0x4d7538`).
+    /// Run at the target.
     fn chase(&mut self, w: &mut dyn World) {
         self.counter = (self.counter + 3).rem_euclid(4);
         self.ani = self.counter / 2;
@@ -708,7 +805,7 @@ impl Baddy {
         }
     }
 
-    /// The archer and the dragon (`0x4d7bd0`): get in line with the target
+    /// The archer and the dragon: get in line with the target
     /// 11 tiles off, then shoot.
     fn shooter(&mut self, w: &mut dyn World) {
         if self.kind == 9 {
@@ -777,7 +874,7 @@ impl Baddy {
         }
     }
 
-    /// Fire along the facing (`0x4d81f0`): an arrow, the dragon a fire shot.
+    /// Fire along the facing: an arrow, the dragon a fire shot.
     fn shoot(&mut self, w: &mut dyn World) {
         self.aux = 15;
         self.shot_out = true;
@@ -793,7 +890,7 @@ impl Baddy {
         self.aux2 = 0;
     }
 
-    /// The swamp soldier's 43-tick round (`0x4d6c70` mode 6): up at 17, faces
+    /// The swamp soldier's 43-tick round (mode 6): up at 17, faces
     /// the target at 22, shoots at 25, down from 33.
     fn swamp(&mut self, w: &mut dyn World) {
         self.counter = (self.counter + 1) % 43;
@@ -814,14 +911,13 @@ impl Baddy {
             if self.aux < 1 {
                 self.blink = false;
                 if self.power < 1 {
-                    self.mode = mode::DIE;
-                    self.counter = 14;
+                    self.start_dying(w, 14);
                 }
             }
         }
     }
 
-    /// Thrown back after a hit or a sword clash (`0x4d8594`).
+    /// Thrown back after a hit or a sword clash.
     fn knocked(&mut self, w: &mut dyn World) {
         if self.counter > 2 {
             self.x += self.knock.0;
@@ -834,8 +930,7 @@ impl Baddy {
         self.counter -= 1;
         if self.counter < 1 {
             if self.power < 1 {
-                self.mode = mode::DIE;
-                self.counter = 14;
+                self.start_dying(w, 14);
             } else {
                 if self.mode == mode::HURT && self.say_hurt {
                     self.say_hurt = false;
@@ -848,12 +943,11 @@ impl Baddy {
                 self.aux = 0;
             }
         } else if self.counter < 4 && self.kind == 6 {
-            self.mode = mode::DIE;
-            self.counter = 9;
+            self.start_dying(w, 9);
         }
     }
 
-    /// A hit (`0x4d6810`): `clash` when the sword met the baddy's sword
+    /// A hit: `clash` when the sword met the baddy's sword
     /// (it is bumped, no damage), else `power` is taken and the baddy is
     /// thrown away from `(dx, dy)`, the hitter's centre less its own. A
     /// client that is online but not the leader only takes the power and
@@ -885,8 +979,8 @@ impl Baddy {
             }
             if self.kind == 5 {
                 self.mode = mode::DIE;
-                self.counter = 9;
                 self.y = self.centre().1 - 1.0;
+                self.start_dying(w, 9);
                 return;
             }
             self.mode = mode::HURT;
@@ -895,6 +989,7 @@ impl Baddy {
             self.mode = mode::BUMPED;
             speed = 0.8;
             w.sound("swordon.wav", self.x + 1.0, self.y + 1.0);
+            w.sword_spark();
             self.blink = false;
         }
         self.counter = 8;
@@ -907,12 +1002,13 @@ impl Baddy {
         };
     }
 
-    /// The local player's sword against this baddy (`0x4d6268`), during
+    /// The local player's sword against this baddy, during
     /// swing ticks 1 to 3. `None` if it misses, else whether it was a clash.
     /// A soldier (types 0, 1, 2, 7) facing the player blocks with its own
-    /// sword from 2 to 5 tiles ahead.
-    pub fn sword_test(&self, px: f64, py: f64, pdir: u8) -> Option<bool> {
-        if !self.hittable() {
+    /// sword from 2 to 5 tiles ahead. `swamp` is the build's swamp-soldier
+    /// window.
+    pub fn sword_test(&self, px: f64, py: f64, pdir: u8, swamp: SwampSword) -> Option<bool> {
+        if !self.hittable_by(swamp) {
             return None;
         }
         let (cx, cy) = self.centre();
@@ -939,9 +1035,9 @@ impl Baddy {
         hit.then_some(false)
     }
 
-    /// A thrown object, bomb piece or shot at `(x, y)` flying along `dir`
-    /// (`0x4d668c`): it hits within a tile of the centre across and from 2
-    /// above to 1 below, takes `2 * power` and throws the baddy along the
+    /// A thrown object, bomb piece or shot at `(x, y)` flying along `dir`:
+    /// it hits within a tile of the centre across and from 2 above to 1
+    /// below, takes `2 * power` and throws the baddy along the
     /// flight.
     pub fn object_test(&self, x: f64, y: f64) -> bool {
         let (cx, cy) = self.centre();
@@ -959,7 +1055,7 @@ impl Baddy {
         }
     }
 
-    /// Prop `i` as the leader sends it (`0x4d86fc`). `ext` is the build's
+    /// Prop `i` as the leader sends it. `ext` is the build's
     /// picture extension.
     pub fn prop(&self, i: u8, ext: &str) -> Vec<u8> {
         let g = |v: i32| (v + 32) as u8;
@@ -1000,7 +1096,7 @@ impl Baddy {
         (0..=10).map(|i| self.prop(i, ext)).collect()
     }
 
-    /// Take a prop stream from the server (`0x4d8940`). True when it
+    /// Take a prop stream from the server. True when it
     /// killed the baddy (mode 9).
     pub fn apply_props(&mut self, data: &[u8], w: &mut dyn World) -> bool {
         let mut d = data;
@@ -1098,7 +1194,7 @@ impl Baddy {
 }
 
 /// The `PLI_BADDYPROPS` (15) message for the props that changed since
-/// `before` (`0x4d8e38`): the id, then each changed prop. `None` when
+/// `before`: the id, then each changed prop. `None` when
 /// nothing changed.
 pub fn props_message(id: u8, before: &[Vec<u8>], now: &[Vec<u8>]) -> Option<Vec<u8>> {
     let mut changed = Vec::new();
@@ -1117,7 +1213,7 @@ pub fn props_message(id: u8, before: &[Vec<u8>], now: &[Vec<u8>]) -> Option<Vec<
     Some(m)
 }
 
-/// The `PLI_BADDYHURT` (16) message (`0x50c7b8`): the id, the hitter's
+/// The `PLI_BADDYHURT` (16) message: the id, the hitter's
 /// centre less the baddy's on each axis (limited to 4 tiles, in sixteenths
 /// from -4) and the power. A real 2.22 follower sent `21 28 60 21`
 /// (`lan-222hurt`).
@@ -1201,6 +1297,8 @@ pub struct DrawTables {
     pub poses: Vec<Vec<u32>>,
     pub puff: Vec<Vec<u32>>,
     pub swamp: Vec<Vec<u32>>,
+    /// Array 21: the sword spark, four frames per facing.
+    pub spark: Vec<Vec<u32>>,
 }
 
 fn unpack(v: u32) -> (u16, i32, i32) {
@@ -1300,11 +1398,17 @@ impl DrawTables {
     /// The tables of a loaded `arrays.dat`, else the built-in copy of the
     /// 2.22 file's.
     pub fn from_tables(t: Option<&crate::assets::ObjectTables>) -> DrawTables {
+        let own = |l: &[&[u32]]| l.iter().map(|e| e.to_vec()).collect();
         match t.filter(|t| !t.baddy_poses.is_empty()) {
             Some(t) => DrawTables {
                 poses: t.baddy_poses.clone(),
                 puff: t.baddy_puff.clone(),
                 swamp: t.baddy_swamp.clone(),
+                spark: if t.sword_spark.is_empty() {
+                    own(BUILTIN_SPARK)
+                } else {
+                    t.sword_spark.clone()
+                },
             },
             None => DrawTables::builtin(),
         }
@@ -1317,11 +1421,20 @@ impl DrawTables {
             poses: own(BUILTIN_POSES),
             puff: own(BUILTIN_PUFF),
             swamp: own(BUILTIN_SWAMP),
+            spark: own(BUILTIN_SPARK),
         }
     }
 }
 
 // From the 2.22 `arrays.dat` (Graal Reborn copy); 2.05 reads the same arrays.
+// Array 21 is the same in the 1.28 beta 2, 1.39 and NewMain 24 files.
+const BUILTIN_SPARK: &[&[u32]] = &[
+    &[0x1b08f6, 0x1c06f4, 0x1d05f3, 0x1e04f2],
+    &[0x1bf408, 0x1cf206, 0x1df105, 0x1ef004],
+    &[0x1b081a, 0x1c0618, 0x1d0517, 0x1e0416],
+    &[0x1b1c08, 0x1c1a06, 0x1d1905, 0x1e1804],
+];
+
 const BUILTIN_POSES: &[&[u32]] = &[
     &[0x00020a, 0x3c0df0, 0x68fdfd, 0x34fdff, 0x3000f7],
     &[0x00020a, 0x6afefe, 0x350203, 0x3100f6, 0x3df507],
@@ -1376,6 +1489,11 @@ pub fn builtin_rect(id: u16) -> Option<(i32, i32, i32, i32)> {
         0 => (0, 0, 24, 12),
         22 => (0, 274, 32, 16),
         23 => (0, 290, 32, 16),
+        // The sword spark (array 21).
+        27 => (24, 8, 10, 10),
+        28 => (0, 18, 24, 24),
+        29 => (24, 18, 28, 28),
+        30 => (52, 18, 32, 32),
         31 => (0, 50, 32, 32),
         32 => (32, 50, 32, 32),
         33 => (64, 50, 32, 30),
@@ -1447,6 +1565,9 @@ mod tests {
         sounds: Vec<String>,
         shots: Vec<Shot>,
         touched: Vec<i32>,
+        rolls: bool,
+        dropped: Vec<(u8, f64, f64)>,
+        sparks: u32,
     }
 
     impl Field {
@@ -1458,6 +1579,9 @@ mod tests {
                 sounds: Vec::new(),
                 shots: Vec::new(),
                 touched: Vec::new(),
+                rolls: false,
+                dropped: Vec::new(),
+                sparks: 0,
             }
         }
     }
@@ -1485,6 +1609,15 @@ mod tests {
         }
         fn touch_player(&mut self, half: i32, _: f64, _: f64) {
             self.touched.push(half);
+        }
+        fn rolls_drops(&self) -> bool {
+            self.rolls
+        }
+        fn drop_item(&mut self, item: u8, x: f64, y: f64) {
+            self.dropped.push((item, x, y));
+        }
+        fn sword_spark(&mut self) {
+            self.sparks += 1;
         }
     }
 
@@ -1601,9 +1734,15 @@ mod tests {
         b.head = 2;
         // player below facing up, centre (21, 24), baddy centre (21, 21):
         // a soldier facing the player clashes
-        assert_eq!(b.sword_test(19.5, 22.0, 0), Some(true));
+        assert_eq!(
+            b.sword_test(19.5, 22.0, 0, SwampSword::From22To36),
+            Some(true)
+        );
         b.dir = 1;
-        assert_eq!(b.sword_test(19.5, 22.0, 0), Some(false));
+        assert_eq!(
+            b.sword_test(19.5, 22.0, 0, SwampSword::From22To36),
+            Some(false)
+        );
         b.hurt(&mut w, false, 1, 0.0, 3.0, false);
         assert_eq!((b.mode, b.power, b.counter), (mode::HURT, 1, 8));
         assert!(!b.hittable());
@@ -1633,6 +1772,101 @@ mod tests {
         let mut g = baddy(7, 20.0, 20.0);
         g.tick(&mut w, false);
         assert_eq!(w.touched, vec![1, 2]);
+    }
+
+    /// Read in every build from 1.21 to 1.41 (`Random(100)` against 10, 15,
+    /// 30 and 75).
+    #[test]
+    fn a_dying_baddy_rolls_its_item_in_1_x() {
+        assert_eq!(death_drop(0, 9), Some(items::GREENRUPEE));
+        assert_eq!(death_drop(0, 10), Some(items::BLUERUPEE));
+        assert_eq!(death_drop(0, 15), Some(items::HEART));
+        assert_eq!(death_drop(0, 30), None);
+        assert_eq!(death_drop(3, 74), Some(items::DARTS));
+        assert_eq!(death_drop(9, 30), Some(items::DARTS));
+        assert_eq!(death_drop(4, 50), Some(items::DARTS));
+        assert_eq!(death_drop(3, 75), None);
+        // One kill with the roll on and one with it off.
+        for rolls in [true, false] {
+            let mut w = Field::new(Some((19.5, 22.0)));
+            w.rolls = rolls;
+            let mut b = baddy(0, 20.0, 20.0);
+            b.power = 1;
+            b.hurt(&mut w, false, 1, 0.0, 3.0, false);
+            while b.mode == mode::HURT {
+                b.tick(&mut w, true);
+            }
+            assert_eq!(b.mode, mode::DIE);
+            // DelphiRandom seed 1: the first Random(100) is 0, a green rupee.
+            let want = if rolls {
+                vec![(items::GREENRUPEE, b.x, b.y)]
+            } else {
+                vec![]
+            };
+            assert_eq!(w.dropped, want, "rolls {rolls}");
+        }
+    }
+
+    /// 1.21 to 2.00 let the sword reach a surfacing swamp soldier from
+    /// counter 17 to the end of its round; 2.01 on only at 22 to 36.
+    #[test]
+    fn the_swamp_soldier_sword_window_follows_the_build() {
+        let mut b = baddy(6, 20.0, 20.0);
+        b.mode = mode::SWAMPSHOT;
+        b.aux = 0;
+        for (counter, old, new) in [
+            (16, false, false),
+            (17, true, false),
+            (22, true, true),
+            (36, true, true),
+            (40, true, false),
+        ] {
+            b.counter = counter;
+            assert_eq!(b.hittable_by(SwampSword::From17), old, "1.x at {counter}");
+            assert_eq!(
+                b.hittable_by(SwampSword::From22To36),
+                new,
+                "2.01 at {counter}"
+            );
+            assert_eq!(b.hittable(), new, "touch and objects at {counter}");
+        }
+    }
+
+    /// A clash clinks, bumps the baddy without damage and starts the spark;
+    /// the spark runs five ticks through array 21 by the player's facing.
+    #[test]
+    fn a_sword_clash_sparks() {
+        let mut w = Field::new(Some((19.5, 22.0)));
+        let mut b = baddy(0, 20.0, 20.0);
+        let power = b.power;
+        b.hurt(&mut w, true, 1, 0.0, 3.0, false);
+        assert_eq!((b.mode, b.power, w.sparks), (mode::BUMPED, power, 1));
+        assert!(w.sounds.contains(&"swordon.wav".to_string()));
+        b.hurt(&mut w, false, 1, 0.0, 3.0, false);
+        assert_eq!(w.sparks, 1, "a plain hit makes no spark");
+
+        let t = DrawTables::builtin();
+        let mut sp = SwordSpark::new(19.5, 22.0);
+        let mut seen = Vec::new();
+        loop {
+            let p = sp.pieces(&t, 0);
+            seen.push((p[0].sprite, p[0].dx, p[0].dy));
+            if !sp.tick() {
+                break;
+            }
+        }
+        // Facing up: 4 and 3 both show frame 0, then 1, 2, 3.
+        assert_eq!(
+            seen,
+            vec![
+                (27, 16, -20),
+                (27, 16, -20),
+                (28, 12, -24),
+                (29, 10, -26),
+                (30, 8, -28)
+            ]
+        );
+        assert_eq!(sp.pieces(&t, 3)[0].sprite, 30);
     }
 
     #[test]

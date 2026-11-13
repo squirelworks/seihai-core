@@ -93,19 +93,18 @@ impl OfflineSession {
         }
         match kind {
             LIFT_BUSH => self.roll_drop(x, y),
-            LIFT_POT => self.put_rolled(items::HEART, x, y),
+            LIFT_POT => self.put_rolled(items::HEART, x as f32, y as f32),
             _ => {}
         }
     }
 
     fn roll_drop(&mut self, x: i32, y: i32) {
         if let Some(item) = items::bush_drop(self.item_rng.next(100)) {
-            self.put_rolled(item, x, y);
+            self.put_rolled(item, x as f32, y as f32);
         }
     }
 
-    fn put_rolled(&mut self, item: u8, x: i32, y: i32) {
-        let (x, y) = (x as f32, y as f32);
+    pub(crate) fn put_rolled(&mut self, item: u8, x: f32, y: f32) {
         self.floor_items.push(FloorItem::new(item, x, y));
         self.item_events.push(ItemEvent::Rolled { item, x, y });
     }

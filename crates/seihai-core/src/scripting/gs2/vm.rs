@@ -134,6 +134,14 @@ pub const V500R7: VmProfile = VmProfile {
     ..V420R8
 };
 
+/// 5.00r7's rules on a PowerPC build (Mac 5.12), whose shifts follow the
+/// CPU as 3.153's and 4.20r6's do.
+pub const V500R7_PPC: VmProfile = VmProfile {
+    label: "5.00r7 (PowerPC)",
+    shift: ShiftRule::Ppc,
+    ..V500R7
+};
+
 /// 6.01r1 and 6.03r7 (Linux x64, the same handler set): no stack limit,
 /// `x ^ 0.5` in single precision, and 48 and 49 gone.
 pub const V6: VmProfile = VmProfile {
@@ -151,10 +159,13 @@ impl VmProfile {
         use ClientVersion as C;
         match v {
             // 4.04r2's VM was not read; 4.20r6 is the closest read build.
-            C::V404R2 | C::V420R6 => &V420R6,
+            C::V404R2 | C::V404R2Mac | C::V420R6 => &V420R6,
             C::V420R8 => &V420R8,
             // 5.12 to 5.31r4 were not read; 5.00r7 is the closest.
             C::V500R7 | C::V512 | C::V524R4 | C::V530R3 | C::V531R4 => &V500R7,
+            // The Mac 5.12 build runs on PowerPC: 5.00r7's VM with the
+            // PowerPC shift rule (assumed; its VM was not read).
+            C::V512Mac => &V500R7_PPC,
             // 6.00r2, 6.00r4, 6.015 and 6.034 were not read; they take
             // 6.01r1/6.03r7's.
             C::V600R2 | C::V600R4 | C::V6015 | C::V6034 | C::V603R7 | C::V603R7Linux => &V6,
@@ -320,6 +331,8 @@ mod tests {
         assert_eq!(label(C::V3153), "3.153");
         assert_eq!(label(C::V231), "3.153");
         assert_eq!(label(C::V404R2), "4.20r6");
+        assert_eq!(label(C::V404R2Mac), "4.20r6");
+        assert_eq!(label(C::V512Mac), "5.00r7 (PowerPC)");
         assert_eq!(label(C::V420R8), "4.20r8");
         assert_eq!(label(C::V524R4), "5.00r7");
         assert_eq!(label(C::V600R2), "6.03r7");

@@ -305,6 +305,10 @@ pub struct ObjectTables {
     pub baddy_poses: Vec<Vec<u32>>,
     pub baddy_puff: Vec<Vec<u32>>,
     pub baddy_swamp: Vec<Vec<u32>>,
+    /// Array 21: the spark on a sword that hits a baddy's sword, one list
+    /// of four frames per sword (power 0 to 3), each a packed piece (see
+    /// [`crate::baddies::SwordSpark`]).
+    pub sword_spark: Vec<Vec<u32>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -444,6 +448,7 @@ impl ObjectTables {
             baddy_poses: lists_from(nodes.get(20)),
             baddy_puff: lists_from(nodes.get(22)),
             baddy_swamp: lists_from(nodes.get(23)),
+            sword_spark: lists_from(nodes.get(21)),
         };
         (!t.cut.is_empty() || !t.lift.is_empty()).then_some(t)
     }

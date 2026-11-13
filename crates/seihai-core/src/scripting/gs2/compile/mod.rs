@@ -292,8 +292,8 @@ fn gs1_script(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors
         })
     };
     match compiled(era) {
-        Err(e) if mode == Mode::Legacy && era < Era::V21 => {
-            let mut c = compiled(Era::V21).map_err(|_| e)?;
+        Err(e) if mode == Mode::Legacy && era < Era::V217 => {
+            let mut c = compiled(Era::V217).map_err(|_| e)?;
             c.warnings.push(Warning {
                 line: 0,
                 quirk: Quirk::LaterGs1(era),

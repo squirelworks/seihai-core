@@ -14,13 +14,26 @@ that an original early client used a listserver. Older offline-only builds
 also have distinct no-network/relay restrictions; see
 [offline-only-builds.md](offline-only-builds.md).
 
-`Era::for_version` uses the earliest documented 2.00 GS1 vocabulary as a
-compatibility fallback for pre-2.00 profiles, including 1.21–1.32. The exact
-command, function and grammar coverage of each early build remains
-incomplete. This fallback must not be described as native 2.00 vocabulary
-parity, nor may those rows silently inherit the newer 2.1 syntax. The
-connection evidence is catalogued separately in the linked early-client
-research; no native network capability follows from a scripting fallback.
+`Era::for_version` gives each profile the GS1 command table of its own
+build. The tables come from the client binaries
+([gs1-commands-by-version.tsv](https://github.com/squirelworks/Graal_analysis/blob/main/npc-library/gs1-commands-by-version.tsv),
+61 builds from 2nd Graal to 5.00r7): 1.21 has 71 commands, 1.33 has 88,
+1.41 rev 1 has 126, 2.05 has 161, and 2.17.1 to 2.31 have 198. Builds whose
+tables are identical share an era (`Era` in
+`crates/seihai-core/src/scripting/engine/vocab.rs`), and a unit test checks
+every era's count against the build tables. Statement words are in the same
+tables, so `while` (from 1.28 beta 2), `function`, `return`, `break` and
+`continue` (from 1.41 rev 1) and `with` (2.17.1 to 3.04) are gated too.
+Commands that leave a table are listed in `vocab::ABSENT`: `seteffect`
+(gone in 1.34 to 1.41 rev 1), `unseteffect` (1.21 to 1.33 only) and the six
+commands the C++ engine never registered.
+
+What is still borrowed: functions, flags and variables before 2.00 use the
+2.00 set, because no per-build table of them exists for 1.x. The 2.1 to 2.16
+eras have no binary; they are NewWorld beta 2's table plus the commands the
+2.1x release notes date (`play2` in 2.1, `wraptext` in 2.12, `showimg2` in
+2.15, `seteffectmode` in 2.16), and `Era::inferred` says so. No native
+network capability follows from a script era.
 
 Research references: [early profiles](https://github.com/squirelworks/Graal_analysis/blob/main/client-internals/version-profiles/v121-v132.toml)
 and [early-client lineage](https://github.com/squirelworks/Graal_analysis/blob/main/client-internals/early-clients.md).
@@ -134,7 +147,8 @@ Generated; do not edit between the markers.
 - props: **npc_max**: 17 -> 32
 - ui: **window**: 648×509 -> 648×508
 - ui: **gs1_commands**: 71 -> 84
-- source: binary: PLO 30 and 35-38, send ids to 29, player props to 31, NPC props to 32, direct data packages (UDP ids 0, 10-22), language files, GS1 table 71 to 84, main form 648×508
+- world: **world**: 1.21 (no lava burn, sword hits a swamp soldier from 17) -> 1.28 (lava burns, sword hits a swamp soldier from 17)
+- source: binary: PLO 30 and 35-38, send ids to 29, player props to 31, NPC props to 32, direct data packages (UDP ids 0, 10-22), language files, GS1 table 71 to 84, main form 648×508; lava burns (half a heart every 101 ticks)
 
 #### 1.3 test (`GSERV014`, binary, linked 1999-11-29)
 
@@ -165,8 +179,10 @@ Generated; do not edit between the markers.
 #### 1.34 (`GNW22030`, binary, linked 2000-03-23)
 
 - props: **other-player props**: +34 ACCOUNTNAME (21 -> 22 ids)
+- life: **combat**: 1.21 rules (as 1.34, no AP immunity) -> 1.34 rules (one swing step a tick, raw sword power, no packet hits traced)
 - ui: **gs1_commands**: 88 -> 93
-- source: binary: other-player prop 34 (ACCOUNTNAME), GS1 table 88 to 93 (cross-version-timeline)
+- unknown (life): 1.34 to 1.41 also pass over a victim in player mode 7 in the sword judge; what mode 7 is was not traced, so Seihai does not test it
+- source: binary: other-player prop 34 (ACCOUNTNAME), GS1 table 88 to 93 (cross-version-timeline); the sword judge gains the AP 100 immunity and the attacker's hidden flag, and gates on the animation step
 
 #### 1.35 (`GNW13040`, binary, linked 2000-04-13)
 
@@ -201,11 +217,10 @@ Generated; do not edit between the markers.
 - props: **own-player props**: +34 ACCOUNTNAME (34 -> 35 ids)
 - props: **other-player props**: +33 ADDITFLAGS (22 -> 23 ids)
 - life: **death**: none -> 1.39 rules (respawn to max hearts, no AP bands)
-- life: **combat**: none -> 1.39 rules (one swing step a tick, the rest 2.05)
 - ui: **chat_recall**: no -> yes
 - ui: **chat_text**: ChatText { face: Dialog, height: 28 } -> ChatText { face: Helvetica, height: 24 }
 - ui: **gs1_commands**: 109 -> 111
-- unknown (life): sword power, AP immunity and the hurt sprite are still the 2.05 template; the six walk-probe and twelve knockback-probe offset tables are not profile fields; 1.33 to 1.38 keep no combat or death row of their own and copy the 1.39 mannerisms
+- unknown (life): the hurt sprite and the hurt-packet gates are the 2.00 values, no 1.x hurt-packet handler was traced; the six walk-probe and twelve knockback-probe offset tables are not profile fields; 1.33 to 1.38 keep no death row of their own and copy the 1.39 mannerisms
 - source: binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111; sword swing S 6 to 10 one per tick, sword box 0 to 4 tiles ahead and under 2 sideways, 40-tick hurt lock-out, five knockback steps, death timer 30 with the dead bit after 27, respawn hearts to max (no AP bands)
 
 #### 1.41 (`GNW13110`, binary)
@@ -218,14 +233,13 @@ Generated; do not edit between the markers.
 - props: **npc_max**: 34 -> 35
 - levels: **nw**: no -> yes
 - life: **death**: 1.39 rules (respawn to max hearts, no AP bands) -> 2.05 rules (name-group test)
-- life: **combat**: 1.39 rules (one swing step a tick, the rest 2.05) -> 2.05 rules
 - ui: **server_list**: direct -> one list
 - ui: **window**: 648×508 -> 648×514
 - ui: **gs1_commands**: 111 -> 126
 - unknown (drops): the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced
 - unknown (listserver): original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured
 - unknown (listserver): the real 1.41 rev 1 sent nothing to the lab listserver, which spoke first (shape S, 2026-10-30); whether the public service speaks first to a silent client is not known, so after 3 s with no reply Seihai sends shape B (id 0 `newmain`, then id 1 with the account), which 14923 answered on 2026-10-25
-- unknown (life): death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)
+- unknown (life): death rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them); combat was read in the 1.41 binary and is the 1.39 row
 - unknown (levels): the .nw loader was found by a string and function scan of the binary; no .nw level was loaded in a real 1.41
 - source: binary: gen 3 (key byte + LCG insertion), server-list window, PLI 31 gone, props to 36, GS1 111 to 126, .nw (GLEVNW01) loader, main form 648×514
 
@@ -235,7 +249,7 @@ Generated; do not edit between the markers.
 - protocol: **plo (server ids handled)**: +42 NEWWORLDTIME, +44 HASNPCSERVER, +45 FILEUPTODATE, +150 NPCDEL2, +151 HIDENPCS, +153 SAY2 (45 -> 51 ids)
 - protocol: **pli (client ids sent)**: +34 UPDATEFILE (34 -> 35 ids)
 - life: **death**: 2.05 rules (name-group test) -> none
-- life: **combat**: 2.05 rules -> none
+- life: **combat**: 1.34 rules (one swing step a tick, raw sword power, no packet hits traced) -> 1.42 rules (2.00 sword judge, no packet hits traced)
 - ui: **ganis**: no -> yes
 - ui: **chat_text**: ChatText { face: Helvetica, height: 24 } -> ChatText { face: TempusSans, height: 24 }
 - ui: **window**: 648×514 -> 648×507
@@ -244,14 +258,14 @@ Generated; do not edit between the markers.
 - drops: **drops**: client rolls, tells the server (PLI_ITEMADD), pickups go through PLI_ITEMTAKE -> server drops (PLO_ITEMADD), pickups go through PLI_ITEMTAKE
 - unknown (listserver): built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured
 - unknown (listserver): the real NewMain 26 sent shape A (id 0 `newmain` only) to the lab listserver (2026-10-30), which Seihai sends; no run on the public service has used shape A, so the port is assumed
-- source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, main form 648×507, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)
+- source: binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, main form 648×507, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt, and no item roll for a dying baddy); sword judge as 2.00 (raw sword power, no judge stamp, read in NewMain 24 and 26)
 
 #### 2.00 (`GNW24011`, binary, linked 2001-02-01)
 
 - protocol: **plo (server ids handled)**: +154 FREEZEPLAYER2, +155 UNFREEZEPLAYER (51 -> 53 ids)
 - levels: **nw**: yes -> no
 - life: **death**: none -> 2.05 rules (name-group test)
-- life: **combat**: none -> 2.00 rules (raw sword power, fewer packet gates)
+- life: **combat**: 1.42 rules (2.00 sword judge, no packet hits traced) -> 2.00 rules (raw sword power, fewer packet gates)
 - ui: **gs1_commands**: 134 -> 142
 - unknown (life): combat read in 2.00 r0 only (Graal_analysis client-internals/combat-200-204.md); r1 to r3 assumed the same. Not run against a real client
 - unknown (login): props sent at login (verified for 2.05 only)
@@ -268,8 +282,9 @@ Generated; do not edit between the markers.
 - life: **combat**: 2.00 rules (raw sword power, fewer packet gates) -> 2.01 rules (raw sword power)
 - ui: **window**: 648×507 -> 648×514
 - ui: **gs1_commands**: 142 -> 144
+- world: **world**: 1.28 (lava burns, sword hits a swamp soldier from 17) -> 2.01 (lava burns, sword hits a swamp soldier at 22 to 36)
 - unknown (listserver): 2.01 to 2.04 (and 2.02 rev 2): login frame inferred, not captured. Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; no real client of these builds was captured and no run on the public service has used shape A, so the port is assumed. The 2026-10-25 matrix used Seihai's older shape B: a legacy list on 14923, nothing on 14922. 14921, the port the build carries, is dead
-- source: binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144, main form 648×514; the hurt packet gains the AP 100, no-kill and once-a-second gates
+- source: binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144, main form 648×514; the hurt packet gains the AP 100, no-kill and once-a-second gates; the sword reaches a surfacing swamp soldier only at counter 22 to 36
 
 #### 2.02 (`GNW15041`, binary, linked 2001-04-15)
 
@@ -507,15 +522,27 @@ Generated; do not edit between the markers.
 - unknown (3d): Graal3DEngine.dll (Torque protocol 19, UDP on listed port + 1) is not modelled; seihai-ato::torque has its profile
 - source: binary (stock engine DLL unpacked from the Thinstall installer) and one live lab run (live-behaviour-404): 98 PLO ids, login id 5 with G3D17026 and win,<3 md5> in the plain zlib frame, then 37; Login mode while the server name starts with login, until 178
 
+#### 4.04r2 Mac (`G3D18026`, binary)
+
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252 -> first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0
+- protocol: **gen5_round_down**: no -> yes
+- unknown (plo): the PLO set is taken from the Windows 4.04r2; the Mac binary's switch was not read
+- unknown (pli): the Windows 4.04r2 set is kept; the lab saw 2, 18, 23, 24, 37, 38, 46 and 157
+- unknown (login): Seihai sends the three machine fields as empty quoted strings; the real client sent the MAC and /etc stat MD5s and an empty fourth field
+- unknown (3d): the Torque 3D mode is not modelled
+- source: binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32; the frame cipher steps raw bodies (len + 3) >> 2 times, at most 12, and zlib/bz2 bodies len >> 2, at most 4, as 5.12; short C->S bodies under 48 bytes go raw), login id 5 with G3D18026 and mac,<md5>,<md5>,"" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38
+
 #### 4.20r6 (`G3D27076`, binary, linked 2006-09)
 
 - protocol: **plo (server ids handled)**: +107 BOARDLAYER, +108 UNKNOWN108; -41 STARTMESSAGE (98 -> 99 ids)
 - protocol: **pli (client ids sent)**: +162 RC_UNKNOWN162 (58 -> 59 ids)
-- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252 -> first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS mac and code page 0
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0 -> first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS mac and code page 0
+- protocol: **gen5_round_down**: yes -> no
 - unknown (pli): 162 (the answer to 108) is from the Mac binary and 2, 23, 24, 34, 37, 44, 46 and 157 were seen in the lab; the rest of 4.20r8's set is taken
 - unknown (login): the real client sent mac,"",<md5 hex of the /etc stat>,"" in the lab (the MAC field empty under qemu's NIC); Seihai sends all three machine fields as empty quoted strings
 - unknown (flags): the real client sent no 18 for the lab level's gr.x/gr.y clientside setstring; Seihai's flat path does
 - unknown (3d): Torque protocol 21 is not modelled here; seihai-ato::torque has its profile
+- unknown (framing): the gen-5 step count was not read in this binary; round-up is kept, while the Mac 4.04r2 and 5.12 round down
 - source: binary (Mac OS X PPC) and one lab run on Mac OS X 10.4 in qemu (Graal_analysis version-profiles/lab-mac-tiger-2026-10-31.md): 4.20r8's PLO set without 41 and 196 (a 97-case switch plus 100 and 108 before it; 108 subtype 0 answers with 162), login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty> (captured as mac,"",<32 hex>,""), first props with OSTYPE mac and code page 0 (in both lab runs), sends 2, 23, 24, 34, 37, 44, 46 and 157 seen
 
 #### 4.20r8 (`G3D20126`, binary, linked 2007-01)
@@ -545,13 +572,25 @@ Generated; do not edit between the markers.
 
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - protocol: **gen5_round_down**: no -> yes
+- protocol: **gen5_compress_all**: no -> yes
 - unknown (pli): not read; 5.00r7's set is kept
 - unknown (framing): a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
 - source: unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed
 
+#### 5.12 Mac (`G3D15097`, binary)
+
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends mac,"","","","8.0.0  Darwin Kernel Version 8.0.0: Sat Mar 26 14:15:22 PST 2005; root:xnu-792.obj~1/RELEASE_PPC"; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0
+- protocol: **gen5_compress_all**: yes -> no
+- unknown (plo): the PLO set is taken from the Windows 5.12; the Mac binary's switch was not read
+- unknown (pli): the Windows 5.12 set is kept; the lab saw 2, 23, 24, 37, 46 and 157
+- unknown (login): the kernel string is the one Mac OS X 10.4.0 gave in the lab; a real Mac sends its own
+- unknown (render): on a modern gserver world the level stayed black even with the lab's render shim; the cause was not found
+- source: binary (Mac OS X PPC Mach-O, main exe sha256 a76dc557...2d206f10; the "Unknown" v5 Mac builds are byte-identical copies) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways with 5.12's round-down step, login id 5 with G3D15097 and mac,<md5>,<md5>,"",<quoted Darwin kernel string> in the plain zlib frame; auto-login as guest with a client-made password; first props as 4.04r2 Mac; asked arial.ttf, chest.png, state.png and steps.wav; sent no 18
+
 #### 5.24r4 (`G3D15010`, binary, linked 2010-02-01)
 
 - protocol: **plo (server ids handled)**: +109 UNKNOWN109, +198 SERVEROPTIONS; -75 PROFILE, -132 UNKNOWN132, -133 UNKNOWN133, -171 BIGMAP, -193 UNKNOWN193 (100 -> 97 ids)
+- protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends mac,"","","","8.0.0  Darwin Kernel Version 8.0.0: Sat Mar 26 14:15:22 PST 2005; root:xnu-792.obj~1/RELEASE_PPC"; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0 -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - protocol: **gen5_round_down**: yes -> no
 - unknown (pli): not read; 5.00r7's set is kept
 - unknown (files): stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md

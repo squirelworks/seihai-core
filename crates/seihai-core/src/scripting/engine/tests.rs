@@ -4,7 +4,7 @@ use super::world::*;
 use super::{Era, Val};
 
 fn npc(src: &str) -> (ScriptWorld, ObjId) {
-    npc_in(src, Era::V21)
+    npc_in(src, Era::V217)
 }
 
 fn npc_in(src: &str, era: Era) -> (ScriptWorld, ObjId) {
@@ -278,7 +278,7 @@ fn parse_errors_become_log_lines_and_the_rest_runs() {
 
 #[test]
 fn scopes_are_separate_and_this_persists_across_events() {
-    let mut w = ScriptWorld::new(Era::V21);
+    let mut w = ScriptWorld::new(Era::V217);
     let a = w.add(ObjSpec::npc("a.png", 0.0, 0.0, "if (created) { this.hp = 3; level.shared = 7; server.s = 9; local.l = 5; client.c = 1; }\nif (playerenters) { this.hp += 1; }"));
     let b = w.add(ObjSpec::npc(
         "b.png",
@@ -489,7 +489,7 @@ fn builtin_functions() {
 #[test]
 fn random_is_in_range_and_deterministic_per_seed() {
     let run = |seed| {
-        let mut w = ScriptWorld::with_seed(Era::V21, seed);
+        let mut w = ScriptWorld::with_seed(Era::V217, seed);
         let id = w.add(ObjSpec::npc(
             "a.png",
             0.0,
@@ -739,7 +739,7 @@ fn sleep_zero_does_not_end_the_run() {
 #[test]
 fn timeouts_fire_in_tick_order_then_creation_order_and_are_repeatable() {
     let run = |slices: &[u64]| {
-        let mut w = ScriptWorld::new(Era::V21);
+        let mut w = ScriptWorld::new(Era::V217);
         let mk = |w: &mut ScriptWorld, name: &str, t: f64| {
             w.add(ObjSpec::npc(
                 "a.png",
@@ -821,7 +821,7 @@ fn hidden_npcs_are_not_touched() {
 
 #[test]
 fn weapons_are_not_touched() {
-    let mut w = ScriptWorld::new(Era::V21);
+    let mut w = ScriptWorld::new(Era::V217);
     let id = w.add(ObjSpec::weapon(
         "Bow",
         "bow.png",
@@ -833,7 +833,7 @@ fn weapons_are_not_touched() {
 
 #[test]
 fn weaponfired_runs_on_the_named_weapon() {
-    let mut w = ScriptWorld::new(Era::V21);
+    let mut w = ScriptWorld::new(Era::V217);
     w.add(ObjSpec::weapon(
         "Bow",
         "bow.png",
@@ -851,7 +851,7 @@ fn weaponfired_runs_on_the_named_weapon() {
 
 #[test]
 fn callnpc_runs_after_the_caller_finishes() {
-    let mut w = ScriptWorld::new(Era::V21);
+    let mut w = ScriptWorld::new(Era::V217);
     let a = w.add(ObjSpec::npc(
         "a.png",
         0.0,
@@ -870,7 +870,7 @@ fn callnpc_runs_after_the_caller_finishes() {
 
 #[test]
 fn mutual_calls_are_bounded() {
-    let mut w = ScriptWorld::new(Era::V21);
+    let mut w = ScriptWorld::new(Era::V217);
     let a = w.add(ObjSpec::npc(
         "a.png",
         0.0,
@@ -889,7 +889,7 @@ fn mutual_calls_are_bounded() {
 
 #[test]
 fn triggeraction_reaches_the_object_under_the_point_and_the_server() {
-    let mut w = ScriptWorld::new(Era::V21);
+    let mut w = ScriptWorld::new(Era::V217);
     let a = w.add(ObjSpec::npc(
         "a.png",
         0.0,
@@ -933,17 +933,14 @@ fn move_applies_the_offset_and_can_signal_the_end() {
     w.fire(id, "created", &[]);
     assert_eq!(w.obj(id).unwrap().x, 12.0);
     assert_eq!(messages(&mut w), vec!["arrived"]);
-    // Before 2.03: two arguments only, and no end event.
+    // Before 2.03 `move` is not in the table: the statement is skipped.
     let (mut w, id) = npc_in("if (created) { move 2,0,1,8; }", Era::V202);
     w.fire(id, "created", &[]);
-    assert_eq!(w.obj(id).unwrap().x, 12.0);
-    assert!(w.take_effects().contains(&Effect::Move {
-        obj: id,
-        dx: 2.0,
-        dy: 0.0,
-        time: 0.0,
-        options: 0
-    }));
+    assert_eq!(w.obj(id).unwrap().x, 10.0);
+    assert!(!w
+        .take_effects()
+        .iter()
+        .any(|e| matches!(e, Effect::Move { .. })));
 }
 
 // ---- version gating ----
@@ -972,8 +969,8 @@ fn string_functions_appear_in_2_02() {
     let (mut w, id) = npc_in(src, Era::V201);
     w.fire(id, "created", &[]);
     assert_eq!(var(&w, id, "this.n"), Val::Num(0.0));
-    // `#e` is not a code before 2.02: it stays as written.
-    assert_eq!(messages(&mut w), vec!["#e(0,2,hello)"]);
+    // `#e` is not a code before 2.02: the old expander drops the `#`.
+    assert_eq!(messages(&mut w), vec!["e(0,2,hello)"]);
     let (mut w, id) = npc_in(src, Era::V202);
     w.fire(id, "created", &[]);
     assert_eq!(var(&w, id, "this.n"), Val::Num(5.0));
@@ -1173,7 +1170,7 @@ fn corpus_parses_and_runs_without_panicking() {
 
 #[test]
 fn diagnostic_names_the_object_and_shows_the_line() {
-    let mut w = ScriptWorld::new(Era::V21);
+    let mut w = ScriptWorld::new(Era::V217);
     w.add(ObjSpec::weapon("w1", "a.png", "hide;\nsay 2 3\n"));
     w.add(ObjSpec::npc(
         "block.png",
@@ -1209,7 +1206,7 @@ fn weapon_script_with_section_signs_keeps_its_lines() {
     ] {
         let text = crate::protocol::script_text(&bytes);
         assert_eq!(text.lines().count(), 5, "{text:?}");
-        let mut w = ScriptWorld::new(Era::V21);
+        let mut w = ScriptWorld::new(Era::V217);
         w.add(ObjSpec::weapon("w", "", &text));
         assert!(w.take_log().is_empty());
     }
@@ -1306,7 +1303,7 @@ fn the_2_1_forms_are_not_read_by_2_05() {
             !super::parse(src, Era::V205).diagnostics.is_empty(),
             "{src}"
         );
-        assert!(super::parse(src, Era::V21).diagnostics.is_empty(), "{src}");
+        assert!(super::parse(src, Era::V217).diagnostics.is_empty(), "{src}");
     }
 }
 
@@ -1329,13 +1326,15 @@ fn string_lists_add_insert_replace_remove_delete() {
 }
 
 #[test]
-fn addstring_before_2_1_adds_text() {
+fn addstring_is_not_a_command_before_2_1() {
+    // 2.05's table has no `addstring` (it is first in NewWorld beta 2), so
+    // the statement is skipped and the string keeps its text.
     let (mut w, _) = npc_in(
         "if (created) { setstring client.s,ab; addstring client.s,cd; message #s(client.s); }",
         Era::V205,
     );
     w.start_all();
-    assert_eq!(messages(&mut w), ["abcd"]);
+    assert_eq!(messages(&mut w), ["ab"]);
 }
 
 #[test]
@@ -1436,7 +1435,7 @@ fn a_flag_set_to_its_value_again_is_not_sent() {
 /// The client's list: a built-in weapon with no script, a hidden system
 /// weapon, then two server weapons, as 2gta sends them.
 fn weapon_list_world() -> ScriptWorld {
-    let mut w = ScriptWorld::new(Era::V21);
+    let mut w = ScriptWorld::new(Era::V217);
     w.add(ObjSpec::weapon(
         "-System3",
         "",
@@ -1545,7 +1544,7 @@ fn selectedweapon_is_a_plain_variable_before_2_04() {
 
 #[test]
 fn offline_callweapon_still_counts_weapon_objects() {
-    let mut w = ScriptWorld::new(Era::V21);
+    let mut w = ScriptWorld::new(Era::V217);
     let a = w.add(ObjSpec::weapon(
         "A",
         "",
@@ -1554,4 +1553,89 @@ fn offline_callweapon_still_counts_weapon_objects() {
     w.add(ObjSpec::weapon("B", "", "if (weaponfired) { message b; }"));
     w.fire(a, "created", &[]);
     assert_eq!(messages(&mut w), vec!["b"]);
+}
+
+/// The condition-truth cases as run on the real clients: 1.41 rev 1 and
+/// 2.05r2 read a bare number as a flag name and fold a comparison of two
+/// constants to 0; 2.17.1, 2.22 and 2.31 still read the bare number as a
+/// flag but compare constants properly.
+#[test]
+fn condition_truth_follows_the_build() {
+    let cases = [
+        ("0.5", false, false),
+        ("1", false, false),
+        ("(0.5+0)", true, true),
+        ("(-0.5)", true, true),
+        ("(0+0)", false, false),
+        ("created", true, true),
+        ("1==1", false, true),
+        ("1!=0", false, true),
+        ("1<2", false, true),
+        ("2>1", false, true),
+        ("1=1", false, true),
+        ("(1+0)==1", false, true),
+        ("playerx==playerx", true, true),
+        ("playerx<=playerx", true, true),
+        ("playerx>=playerx", true, true),
+        ("playerx!=playerx", false, false),
+        ("this.a==1", true, true),
+    ];
+    for (era, col) in [(Era::V205, 1), (Era::V141, 1), (Era::V217, 2)] {
+        for case in cases {
+            let src = format!(
+                "if (created) {{ this.a = 1; if ({}) {{ message T; }} else {{ message F; }} }}",
+                case.0
+            );
+            let (mut w, _) = npc_in(&src, era);
+            w.start_all();
+            let want = if col == 1 { case.1 } else { case.2 };
+            assert_eq!(
+                messages(&mut w),
+                [if want { "T" } else { "F" }],
+                "{} in {}",
+                case.0,
+                era.label()
+            );
+        }
+    }
+}
+
+/// Events, flags and variables are not gated per 1.x build: a 1.21 script
+/// still runs its `created` block and reads `playerx`.
+#[test]
+fn early_builds_keep_the_borrowed_events_and_variables() {
+    for era in [Era::V121, Era::V133, Era::V139] {
+        let (mut w, _) = npc_in("if (created && playerx>=0) { message hi; sleep 1; }", era);
+        w.start_all();
+        assert_eq!(messages(&mut w), ["hi"], "{}", era.label());
+    }
+}
+
+/// Message codes as the real clients showed them (1.41 rev 1, 2.05r2,
+/// 2.17.1, 2.22, 2.31).
+#[test]
+fn message_codes_follow_the_build() {
+    let cases = [
+        // `##` in the 2.17 engine was not run.
+        ("A##B", "A#B", "A#B", ""),
+        ("A#?B", "A?B", "A?B", "A#?B"),
+        ("A#", "A#", "A#", "A#"),
+        ("A#vB", "AB", "AB", "A#vB"),
+        ("A##v(2)", "A#v(2)", "A#v(2)", ""),
+        ("#v(0.5)", "0.5", "0.5", "0.5"),
+        ("#v(2+3)", "5", "5", "5"),
+        ("#e(1,2,ABCD)", "e(1,2,ABCD)", "BC", "BC"),
+        ("#K(65)", "K(65)", "A", "A"),
+        ("A#bB", "AB", "AB", "A#bB"),
+    ];
+    for (src, v141, v205, v217) in cases {
+        for (era, want) in [(Era::V141, v141), (Era::V205, v205), (Era::V217, v217)] {
+            if want.is_empty() {
+                continue;
+            }
+            let (mut w, _) = npc_in(&format!("if (created) {{ message {src}; }}"), era);
+            w.start_all();
+            assert_eq!(messages(&mut w), [want], "{src} in {}", era.label());
+        }
+    }
 }

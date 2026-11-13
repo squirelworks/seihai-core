@@ -94,6 +94,9 @@ pub enum ClientVersion {
     /// logs in to a game server named `Login` and plays only after a server
     /// warp (178).
     V404R2,
+    /// Graal 4.04 rev 2 (`G3D18026`), the Mac OS X PowerPC build. Gen 5.
+    /// Its own token; the Windows 4.04r2 login and lobby with a `mac` list.
+    V404R2Mac,
     /// Graal 4.20 rev 6 (`G3D27076`), the Mac OS X build. Gen 5.
     V420R6,
     /// Graal 4.20 rev 8 (`G3D20126`), Windows. Gen 5.
@@ -104,6 +107,9 @@ pub enum ClientVersion {
     /// Graal 5.12 (`G3D14097`), Windows. Gen 5, with its own round-down
     /// cipher step count on compressed frames.
     V512,
+    /// Graal 5.12 (`G3D15097`), the Mac OS X PowerPC build. Gen 5. Its own
+    /// token; a `mac` list with the Darwin kernel string as the fifth field.
+    V512Mac,
     /// Graal 5.24 rev 4 (`G3D15010`), Windows. Gen 5.
     V524R4,
     /// Graal 5.30 rev 3 (`G3D26090`), Windows. Gen 5.
@@ -306,8 +312,9 @@ impl ClientVersion {
     /// - 1.39, 1.41, 2.05, 2.17, 2.22 and 2.31 for the 1.x and 2.x line.
     /// - 3.04 (gs2lib `3.041`) for 3.x. 3.153's `G3D28015` is not in stock
     ///   gs2lib.
-    /// - 4.04r2 (`4.042`) and 4.20r8 (`4.208`). 4.20r6's `G3D27076` is not
-    ///   in stock gs2lib.
+    /// - 4.04r2 (`4.042`) and 4.20r8 (`4.208`). The Mac builds' tokens
+    ///   (4.04r2 `G3D18026`, 4.20r6 `G3D27076`, 5.12 `G3D15097`) are not in
+    ///   stock gs2lib.
     /// - 5.00r7 (`5.07`), 5.12, and 5.31r4 for `G3D26090` (gs2lib `5.31x`,
     ///   shared with 5.30r3 and 6.00r2). 5.24r4's `G3D15010` is not in
     ///   stock gs2lib.
@@ -381,10 +388,12 @@ impl ClientVersion {
             Self::V304,
             Self::V3153,
             Self::V404R2,
+            Self::V404R2Mac,
             Self::V420R6,
             Self::V420R8,
             Self::V500R7,
             Self::V512,
+            Self::V512Mac,
             Self::V524R4,
             Self::V530R3,
             Self::V531R4,
@@ -499,7 +508,9 @@ mod tests {
             V216,
             V230,
             V3153,
+            V404R2Mac,
             V420R6,
+            V512Mac,
             V524R4,
             V530R3,
             V600R2,

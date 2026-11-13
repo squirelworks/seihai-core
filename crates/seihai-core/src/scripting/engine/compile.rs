@@ -295,7 +295,7 @@ mod tests {
     use crate::scripting::engine::{parser::parse, vocab::Era};
 
     fn c(src: &str) -> Compiled {
-        compile(&parse(src, Era::V21))
+        compile(&parse(src, Era::V217))
     }
 
     #[test]

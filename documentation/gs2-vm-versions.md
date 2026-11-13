@@ -25,9 +25,10 @@ Builds that were not read take the closest earlier VM that was:
 | Versions | Profile |
 |---|---|
 | everything before 4.04r2 | 3.153 |
-| 4.04r2, 4.20r6 | 4.20r6 |
+| 4.04r2 (Windows and Mac), 4.20r6 | 4.20r6 |
 | 4.20r8 | 4.20r8 |
 | 5.00r7, 5.12, 5.24r4, 5.30r3, 5.31r4 | 5.00r7 |
+| 5.12 (Mac) | 5.00r7 with the PowerPC shift rule (assumed) |
 | 6.00r2, 6.00r4, 6.015, 6.034, 6.03r7 (both) | 6.03r7 (6.01r1 has the same handler set) |
 
 The 7.x client (Unity) was not read.
@@ -126,4 +127,4 @@ so Seihai gives 6.x the 5.00r7 name.
 - What 54 stores, and in which order 48 and 49 take their operands.
 - The value `waitfor` gives when its timeout runs out.
 - The 6.x name for the loop-limit property.
-- 4.04r2, 5.12–5.31r4, 6.00r2 and 6.00r4 were not read.
+- 4.04r2 (both builds), 5.12–5.31r4 (both 5.12 builds), 6.00r2 and 6.00r4 were not read.
