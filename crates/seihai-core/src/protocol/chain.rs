@@ -28,10 +28,11 @@ use super::login::{LoginInfo, LOGIN_217, LOGIN_222, LOGIN_231, LOGIN_304, LOGIN_
 use super::profile::{
     Basis, ChatFace, ChatText, DeathRules, Files, Health, HudArt, IdSet, ItemDrops, Levels,
     ListKind, Listserver, LoginShape, Mannerisms, PortStatus, Props, Protocol, Runs, Scripts,
-    ServerList, ShapeBasis, Ui, VersionProfile, WindowPx, COMBAT_139, COMBAT_200, COMBAT_201,
-    COMBAT_205, DEATH_139, DEATH_205, DEATH_21, DROPS_133, DROPS_138, DROPS_142, LEGACY_LIST_PORT,
-    MANNER_139, MANNER_141, MANNER_205, MANNER_222, SHOWIMG_217, SHOWIMG_222, SHOWIMG_231,
-    SHOWIMG_404, TAMPER_217, TAMPER_222, TAMPER_230, TAMPER_231,
+    ServerList, ShapeBasis, Ui, VersionProfile, WindowPx, WorldRules, COMBAT_121, COMBAT_139,
+    COMBAT_142, COMBAT_200, COMBAT_201, COMBAT_205, DEATH_139, DEATH_205, DEATH_21, DROPS_133,
+    DROPS_138, DROPS_142, LEGACY_LIST_PORT, MANNER_139, MANNER_141, MANNER_205, MANNER_222,
+    SHOWIMG_217, SHOWIMG_222, SHOWIMG_231, SHOWIMG_404, TAMPER_217, TAMPER_222, TAMPER_230,
+    TAMPER_231, WORLD_121, WORLD_128, WORLD_201,
 };
 use super::showimg::ShowImgInfo;
 use super::tampercheck::TamperInfo;
@@ -180,6 +181,8 @@ pub struct Delta {
     pub mannerisms: Option<Mannerisms>,
     // Who drops bush and pot items.
     pub drops: Option<ItemDrops>,
+    // Baddy and tile rules.
+    pub world: Option<WorldRules>,
     // Script engines.
     pub scripts: Option<Scripts>,
 }
@@ -236,6 +239,7 @@ impl Delta {
         gs1_commands: None,
         mannerisms: None,
         drops: None,
+        world: None,
         scripts: None,
     };
 }
@@ -340,6 +344,7 @@ pub const fn apply(prev: VersionProfile, s: &Step) -> VersionProfile {
     p.ui.gs1_commands = pick(p.ui.gs1_commands, d.gs1_commands);
     p.mannerisms = pick(p.mannerisms, d.mannerisms);
     p.drops = pick(p.drops, d.drops);
+    p.world = pick(p.world, d.world);
     p.scripts = pick(p.scripts, d.scripts);
     p
 }
@@ -408,7 +413,8 @@ pub const ORIGIN: VersionProfile = VersionProfile {
     },
     life: Health {
         death: None,
-        combat: None,
+        // Read in every build from 1.21 to 1.33 (gap-2 research).
+        combat: Some(COMBAT_121),
     },
     ui: Ui {
         server_list: ServerList::Direct,
@@ -436,6 +442,8 @@ pub const ORIGIN: VersionProfile = VersionProfile {
     mannerisms: MANNER_139,
     // The roll is in every build from the 4th alpha; 1.3 read.
     drops: DROPS_133,
+    // No lava burn yet; read in every build (gap-2 research).
+    world: WORLD_121,
     // The GS1 command table is read from 1.21 (`gs1_commands`); no 131.
     scripts: Scripts::GS1,
 };
@@ -474,9 +482,10 @@ pub const CHAIN: &[Step] = &[
             npc_max: Some(32),
             window: Some(WindowPx { width: 648, height: 508 }),
             gs1_commands: Some(84),
+            world: Some(WORLD_128),
             ..Delta::NONE
         },
-        source: "binary: PLO 30 and 35-38, send ids to 29, player props to 31, NPC props to 32, direct data packages (UDP ids 0, 10-22), language files, GS1 table 71 to 84, main form 648×508",
+        source: "binary: PLO 30 and 35-38, send ids to 29, player props to 31, NPC props to 32, direct data packages (UDP ids 0, 10-22), language files, GS1 table 71 to 84, main form 648×508; lava burns (half a heart every 101 ticks)",
         unknown: &[],
     },
     Step {
@@ -535,9 +544,16 @@ pub const CHAIN: &[Step] = &[
         token: "GNW22030",
         date: "2000-03-23",
         basis: Basis::Binary,
-        delta: Delta { other_props: IdDelta::plus(&[34]), gs1_commands: Some(93), ..Delta::NONE },
-        source: "binary: other-player prop 34 (ACCOUNTNAME), GS1 table 88 to 93 (cross-version-timeline)",
-        unknown: &[],
+        delta: Delta {
+            other_props: IdDelta::plus(&[34]),
+            gs1_commands: Some(93),
+            combat: Some(Some(COMBAT_139)),
+            ..Delta::NONE
+        },
+        source: "binary: other-player prop 34 (ACCOUNTNAME), GS1 table 88 to 93 (cross-version-timeline); the sword judge gains the AP 100 immunity and the attacker's hidden flag, and gates on the animation step",
+        unknown: &[
+            Unknown { area: "life", what: "1.34 to 1.41 also pass over a victim in player mode 7 in the sword judge; what mode 7 is was not traced, so Seihai does not test it" },
+        ],
     },
     Step {
         version: ClientVersion::V135,
@@ -602,18 +618,18 @@ pub const CHAIN: &[Step] = &[
             chat_recall: Some(true),
             chat_text: Some(ChatText { face: ChatFace::Helvetica, height: 24 }),
             gs1_commands: Some(111),
-            combat: Some(Some(COMBAT_139)),
             death: Some(Some(DEATH_139)),
             ..Delta::NONE
         },
         source: "binary (lab-verified as gen 2): PLO 75, PLI PROFILEGET/SET (80, 81), own prop 34, other prop 33, chat recall, chat font Helvetica 24, GS1 109 to 111; sword swing S 6 to 10 one per tick, sword box 0 to 4 tiles ahead and under 2 sideways, 40-tick hurt lock-out, five knockback steps, death timer 30 with the dead bit after 27, respawn hearts to max (no AP bands)",
         unknown: &[
-            Unknown { area: "life", what: "sword power, AP immunity and the hurt sprite are still the 2.05 template; the six walk-probe and twelve knockback-probe offset tables are not profile fields; 1.33 to 1.38 keep no combat or death row of their own and copy the 1.39 mannerisms" },
+            Unknown { area: "life", what: "the hurt sprite and the hurt-packet gates are the 2.00 values, no 1.x hurt-packet handler was traced; the six walk-probe and twelve knockback-probe offset tables are not profile fields; 1.33 to 1.38 keep no death row of their own and copy the 1.39 mannerisms" },
         ],
     },
     // 1.41 is the first gen 3 build. Its row was built on the 2.05 template,
     // so everything not listed here is the 2.05 value; that includes the
-    // death and combat rules, which no 1.41 handler was traced for.
+    // death rules, which no 1.41 handler was traced for. Its combat is the
+    // 1.39 row, read in the 1.41 binary.
     Step {
         version: ClientVersion::V141,
         label: "1.41",
@@ -635,7 +651,6 @@ pub const CHAIN: &[Step] = &[
             other_props: IdDelta::plus(&[35, 36]),
             npc_max: Some(35),
             death: Some(Some(DEATH_205)),
-            combat: Some(Some(COMBAT_205)),
             server_list: Some(ServerList::Single),
             window: Some(WindowPx { width: 648, height: 514 }),
             gs1_commands: Some(126),
@@ -650,7 +665,7 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "drops", what: "the roll and PLI_ITEMADD were read in the 1.41 binary; that its pickup and timeout go through ITEMTAKE and ITEMDEL as in 1.39 is assumed, not traced" },
             Unknown { area: "listserver", what: "original host and port; the only surviving 1.41 copy is patched for listserver.graal.in and carries 14923. Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.41 client was not captured" },
             Unknown { area: "listserver", what: "the real 1.41 rev 1 sent nothing to the lab listserver, which spoke first (shape S, 2026-10-30); whether the public service speaks first to a silent client is not known, so after 3 s with no reply Seihai sends shape B (id 0 `newmain`, then id 1 with the account), which 14923 answered on 2026-10-25" },
-            Unknown { area: "life", what: "death and combat rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them)" },
+            Unknown { area: "life", what: "death rules come from the 2.05 template, no 1.41 handler was traced (1.42 clears them); combat was read in the 1.41 binary and is the 1.39 row" },
             Unknown { area: "levels", what: "the .nw loader was found by a string and function scan of the binary; no .nw level was loaded in a real 1.41" },
         ],
     },
@@ -669,7 +684,7 @@ pub const CHAIN: &[Step] = &[
             plo: IdDelta::plus(&[42, 44, 45, 150, 151, 153]),
             pli: IdDelta::plus(&[34]),
             death: Some(None),
-            combat: Some(None),
+            combat: Some(Some(COMBAT_142)),
             ganis: Some(true),
             chat_text: Some(ChatText { face: ChatFace::TempusSans, height: 24 }),
             window: Some(WindowPx { width: 648, height: 507 }),
@@ -678,7 +693,7 @@ pub const CHAIN: &[Step] = &[
             drops: Some(DROPS_142),
             ..Delta::NONE
         },
-        source: "binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, main form 648×507, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt)",
+        source: "binary (NewMain 1.42): ganis, PLO 42/44/45/150/151/153, UPDATEFILE (34) sent, chat font Tempus Sans ITC 24, main form 648×507, GS1 126 to 134; no client drop roll (bush rupees and pot hearts are server-side, newfeatures142.txt, and no item roll for a dying baddy); sword judge as 2.00 (raw sword power, no judge stamp, read in NewMain 24 and 26)",
         unknown: &[
             Unknown { area: "listserver", what: "built-in port 14921 is dead; Seihai's classic login got a legacy list on 14923 on 2026-10-25 (14922 stayed silent); a real 1.42 client was not captured" },
             Unknown { area: "listserver", what: "the real NewMain 26 sent shape A (id 0 `newmain` only) to the lab listserver (2026-10-30), which Seihai sends; no run on the public service has used shape A, so the port is assumed" },
@@ -730,9 +745,10 @@ pub const CHAIN: &[Step] = &[
             combat: Some(Some(COMBAT_201)),
             window: Some(WindowPx { width: 648, height: 514 }),
             gs1_commands: Some(144),
+            world: Some(WORLD_201),
             ..Delta::NONE
         },
-        source: "binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144, main form 648×514; the hurt packet gains the AP 100, no-kill and once-a-second gates",
+        source: "binary: ADJACENTLEVEL (35) and HITOBJECTS (36) sent, PLO 46 and 156, GS1 142 to 144, main form 648×514; the hurt packet gains the AP 100, no-kill and once-a-second gates; the sword reaches a surfacing swamp soldier only at counter 22 to 36",
         unknown: &[Unknown { area: "listserver", what: "2.01 to 2.04 (and 2.02 rev 2): login frame inferred, not captured. Seihai sends shape A (id 0 `newmain` only), the shape of the real 2.00 and 2.05, as a best guess; no real client of these builds was captured and no run on the public service has used shape A, so the port is assumed. The 2026-10-25 matrix used Seihai's older shape B: a legacy list on 14923, nothing on 14922. 14921, the port the build carries, is dead" }],
     },
     Step {
@@ -1694,7 +1710,13 @@ fn combat_text(c: &Option<super::profile::CombatRules>) -> String {
     match c {
         None => "none".into(),
         Some(c) if *c == COMBAT_205 => "2.05 rules".into(),
-        Some(c) if *c == COMBAT_139 => "1.39 rules (one swing step a tick, the rest 2.05)".into(),
+        Some(c) if *c == COMBAT_139 => {
+            "1.34 rules (one swing step a tick, raw sword power, no packet hits traced)".into()
+        }
+        Some(c) if *c == COMBAT_121 => "1.21 rules (as 1.34, no AP immunity)".into(),
+        Some(c) if *c == COMBAT_142 => {
+            "1.42 rules (2.00 sword judge, no packet hits traced)".into()
+        }
         Some(c) if *c == COMBAT_201 => "2.01 rules (raw sword power)".into(),
         Some(c) if *c == COMBAT_200 => "2.00 rules (raw sword power, fewer packet gates)".into(),
         Some(_) => "custom".into(),
@@ -2016,6 +2038,7 @@ pub fn diff(a: &VersionProfile, b: &VersionProfile) -> Vec<Change> {
         manner_text,
     );
     value_change(&mut o, "drops", "drops", &a.drops, &b.drops, drops_text);
+    value_change(&mut o, "world", "world", &a.world, &b.world, world_text);
     value_change(
         &mut o,
         "scripts",
@@ -2055,6 +2078,15 @@ fn drops_text(d: &ItemDrops) -> String {
         }
         DROPS_142 => "server drops (PLO_ITEMADD), pickups go through PLI_ITEMTAKE".into(),
         _ => format!("{d:?}"),
+    }
+}
+
+fn world_text(w: &WorldRules) -> String {
+    match *w {
+        WORLD_121 => "1.21 (no lava burn, sword hits a swamp soldier from 17)".into(),
+        WORLD_128 => "1.28 (lava burns, sword hits a swamp soldier from 17)".into(),
+        WORLD_201 => "2.01 (lava burns, sword hits a swamp soldier at 22 to 36)".into(),
+        _ => format!("{w:?}"),
     }
 }
 
@@ -2214,7 +2246,10 @@ mod tests {
     /// and 1.42 then got `.nw` levels (the GLEVNW01 loader is in both
     /// binaries; Graal_analysis `client-internals/build-catalogue.md`).
     /// 1.39 then got its death row (`DEATH_139`): the same timer as 2.05,
-    /// respawn hearts to the maximum, no AP bands.
+    /// respawn hearts to the maximum, no AP bands. Then every build's combat
+    /// was read in its own binary (gap-2 research, 2026-11-13): 1.21 to 1.42
+    /// got combat rows, the side limit became inclusive (`lateral_max_half`)
+    /// and every row says whether packet hits are decoded (`packet_hits`).
     #[test]
     fn chain_equals_the_hand_written_rows() {
         let mut seen = 0;

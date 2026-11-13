@@ -18,6 +18,7 @@ struct Around<'a> {
     sounds: Vec<SoundEvent>,
     shots: Vec<Shot>,
     touches: Vec<(i32, f64, f64)>,
+    drops: Vec<(u8, f64, f64)>,
 }
 
 impl World for Around<'_> {
@@ -45,6 +46,12 @@ impl World for Around<'_> {
     }
     fn touch_player(&mut self, half: i32, dx: f64, dy: f64) {
         self.touches.push((half, dx, dy));
+    }
+    fn rolls_drops(&self) -> bool {
+        self.s.drops.client_roll
+    }
+    fn drop_item(&mut self, item: u8, x: f64, y: f64) {
+        self.drops.push((item, x, y));
     }
 }
 
@@ -184,8 +191,10 @@ impl OfflineSession {
         if let Some(bd) = baddies.iter_mut().find(|bd| bd.id == h.id) {
             let mut w = self.around(Vec::new());
             bd.hurt(&mut w, false, h.power, h.dx, h.dy, false);
-            let sounds = std::mem::take(&mut w.sounds);
-            self.sound_events.extend(sounds);
+            let Around {
+                rng, sounds, drops, ..
+            } = w;
+            self.after_hits(rng, sounds, drops);
         }
         self.baddies = baddies;
     }
@@ -202,6 +211,22 @@ impl OfflineSession {
             sounds: Vec::new(),
             shots: Vec::new(),
             touches: Vec::new(),
+            drops: Vec::new(),
+        }
+    }
+
+    /// Take back what a hit left behind: the `Random` state, the sounds and
+    /// any item a dying baddy rolled.
+    fn after_hits(
+        &mut self,
+        rng: crate::items::DelphiRandom,
+        sounds: Vec<SoundEvent>,
+        drops: Vec<(u8, f64, f64)>,
+    ) {
+        self.item_rng = rng;
+        self.sound_events.extend(sounds);
+        for (item, x, y) in drops {
+            self.put_rolled(item, x as f32, y as f32);
         }
     }
 
@@ -243,11 +268,12 @@ impl OfflineSession {
         }
         let (px, py, pdir) = self.player_seed();
         let power = i32::from(self.sword_power);
+        let swamp = self.world.swamp_sword;
         let mut baddies = std::mem::take(&mut self.baddies);
         let mut w = self.around(Vec::new());
         let mut sends = Vec::new();
         for bd in baddies.iter_mut() {
-            let Some(clash) = bd.sword_test(px, py, pdir) else {
+            let Some(clash) = bd.sword_test(px, py, pdir, swamp) else {
                 continue;
             };
             let (cx, cy) = bd.centre();
@@ -258,8 +284,10 @@ impl OfflineSession {
                 sends.push(b::follower_hurt_props(bd));
             }
         }
-        let sounds = std::mem::take(&mut w.sounds);
-        self.sound_events.extend(sounds);
+        let Around {
+            rng, sounds, drops, ..
+        } = w;
+        self.after_hits(rng, sounds, drops);
         self.baddy_sends.extend(sends);
         self.baddies = baddies;
     }
@@ -291,9 +319,13 @@ impl OfflineSession {
             sounds,
             shots,
             touches,
+            drops,
             ..
         } = w;
         self.item_rng = rng;
+        for (item, x, y) in drops {
+            self.put_rolled(item, x as f32, y as f32);
+        }
         baddies.retain(|bd| !bd.removed);
         self.baddies = baddies;
         self.sound_events.extend(sounds);
