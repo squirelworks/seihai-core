@@ -138,6 +138,7 @@ pub struct Delta {
     pub login: Option<Option<LoginInfo>>,
     pub lobby: Option<Option<Lobby>>,
     pub gen5_round_down: Option<bool>,
+    pub gen5_compress_all: Option<bool>,
     pub gen5_long_frames: Option<bool>,
     pub udp: Option<bool>,
     pub udp_off_by_default: Option<bool>,
@@ -203,6 +204,7 @@ impl Delta {
         login: None,
         lobby: None,
         gen5_round_down: None,
+        gen5_compress_all: None,
         gen5_long_frames: None,
         udp: None,
         udp_off_by_default: None,
@@ -303,6 +305,7 @@ pub const fn apply(prev: VersionProfile, s: &Step) -> VersionProfile {
     p.protocol.login = pick(p.protocol.login, d.login);
     p.protocol.lobby = pick(p.protocol.lobby, d.lobby);
     p.protocol.gen5_round_down = pick(p.protocol.gen5_round_down, d.gen5_round_down);
+    p.protocol.gen5_compress_all = pick(p.protocol.gen5_compress_all, d.gen5_compress_all);
     p.protocol.gen5_long_frames = pick(p.protocol.gen5_long_frames, d.gen5_long_frames);
     p.protocol.udp = pick(p.protocol.udp, d.udp);
     p.protocol.udp_off_by_default = pick(p.protocol.udp_off_by_default, d.udp_off_by_default);
@@ -376,6 +379,7 @@ pub const ORIGIN: VersionProfile = VersionProfile {
         login: None,
         lobby: None,
         gen5_round_down: false,
+        gen5_compress_all: false,
         gen5_long_frames: false,
         // No direct data packages before 1.28 beta 2.
         udp: false,
@@ -1195,9 +1199,11 @@ pub const CHAIN: &[Step] = &[
         basis: Basis::Binary,
         delta: Delta {
             lobby: Some(Some(LOBBY_404_MAC)),
+            // Its frame cipher steps a zlib or bz2 body len >> 2 times, as 5.12.
+            gen5_round_down: Some(true),
             ..Delta::NONE
         },
-        source: "binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32), login id 5 with G3D18026 and mac,<md5>,<md5>,\"\" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38",
+        source: "binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32; the frame cipher at 0x3f73b4/0x3f7940 steps raw bodies (len + 3) >> 2 times, at most 12, and zlib/bz2 bodies len >> 2, at most 4, as 5.12; short C->S bodies under 48 bytes go raw), login id 5 with G3D18026 and mac,<md5>,<md5>,\"\" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38",
         unknown: &[
             Unknown { area: "plo", what: "the PLO set is taken from the Windows 4.04r2; the Mac binary's switch was not read" },
             Unknown { area: "pli", what: "the Windows 4.04r2 set is kept; the lab saw 2, 18, 23, 24, 37, 38, 46 and 157" },
@@ -1218,6 +1224,8 @@ pub const CHAIN: &[Step] = &[
             plo: IdDelta::plus_minus(&[107, 108], &[41]),
             pli: IdDelta::plus(&[162]),
             lobby: Some(Some(LOBBY_420_MAC)),
+            // Back to round-up after the Mac 4.04r2 row; 4.20r6's cipher was not read.
+            gen5_round_down: Some(false),
             ..Delta::NONE
         },
         source: "binary (Mac OS X PPC) and one lab run on Mac OS X 10.4 in qemu (Graal_analysis version-profiles/lab-mac-tiger-2026-10-31.md): 4.20r8's PLO set without 41 and 196 (a 97-case switch plus 100 and 108 before it; 108 subtype 0 answers with 162), login id 5 with G3D27076 and mac,<MAC hash>,<stat hash>,<empty> (captured as mac,\"\",<32 hex>,\"\"), first props with OSTYPE mac and code page 0 (in both lab runs), sends 2, 23, 24, 34, 37, 44, 46 and 157 seen",
@@ -1226,6 +1234,7 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "login", what: "the real client sent mac,\"\",<md5 hex of the /etc stat>,\"\" in the lab (the MAC field empty under qemu's NIC); Seihai sends all three machine fields as empty quoted strings" },
             Unknown { area: "flags", what: "the real client sent no 18 for the lab level's gr.x/gr.y clientside setstring; Seihai's flat path does" },
             Unknown { area: "3d", what: "Torque protocol 21 is not modelled here; seihai-ato::torque has its profile" },
+            Unknown { area: "framing", what: "the gen-5 step count was not read in this binary; round-up is kept, while the Mac 4.04r2 and 5.12 round down" },
         ],
     },
     Step {
@@ -1291,6 +1300,7 @@ pub const CHAIN: &[Step] = &[
         delta: Delta {
             lobby: Some(Some(LOBBY_512)),
             gen5_round_down: Some(true),
+            gen5_compress_all: Some(true),
             ..Delta::NONE
         },
         source: "unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed",
@@ -1307,9 +1317,11 @@ pub const CHAIN: &[Step] = &[
         basis: Basis::Binary,
         delta: Delta {
             lobby: Some(Some(LOBBY_512_MAC)),
+            // Rounds down as the Windows 5.12, but sends short bodies raw.
+            gen5_compress_all: Some(false),
             ..Delta::NONE
         },
-        source: "binary (Mac OS X PPC Mach-O, main exe sha256 a76dc557...2d206f10; the \"Unknown\" v5 Mac builds are byte-identical copies) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways, login id 5 with G3D15097 and mac,<md5>,<md5>,\"\",<quoted Darwin kernel string> in the plain zlib frame; auto-login as guest with a client-made password; first props as 4.04r2 Mac; asked arial.ttf, chest.png, state.png and steps.wav; sent no 18",
+        source: "binary (Mac OS X PPC Mach-O, main exe sha256 a76dc557...2d206f10; the \"Unknown\" v5 Mac builds are byte-identical copies) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways with 5.12's round-down step (frame cipher at 0x2690d8/0x26974c), login id 5 with G3D15097 and mac,<md5>,<md5>,\"\",<quoted Darwin kernel string> in the plain zlib frame; auto-login as guest with a client-made password; first props as 4.04r2 Mac; asked arial.ttf, chest.png, state.png and steps.wav; sent no 18",
         unknown: &[
             Unknown { area: "plo", what: "the PLO set is taken from the Windows 5.12; the Mac binary's switch was not read" },
             Unknown { area: "pli", what: "the Windows 5.12 set is kept; the lab saw 2, 23, 24, 37, 46 and 157" },
@@ -1326,6 +1338,7 @@ pub const CHAIN: &[Step] = &[
         delta: Delta {
             plo: IdDelta::plus_minus(&[109, 198], &[75, 132, 133, 171, 193]),
             gen5_round_down: Some(false),
+            gen5_compress_all: Some(false),
             // The Windows 5.12 lobby again, after the Mac 5.12 row.
             lobby: Some(Some(LOBBY_512)),
             ..Delta::NONE
@@ -1883,6 +1896,14 @@ pub fn diff(a: &VersionProfile, b: &VersionProfile) -> Vec<Change> {
         "gen5_round_down",
         &pa.gen5_round_down,
         &pb.gen5_round_down,
+        yes_no,
+    );
+    value_change(
+        &mut o,
+        "protocol",
+        "gen5_compress_all",
+        &pa.gen5_compress_all,
+        &pb.gen5_compress_all,
         yes_no,
     );
     value_change(
