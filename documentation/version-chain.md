@@ -14,13 +14,26 @@ that an original early client used a listserver. Older offline-only builds
 also have distinct no-network/relay restrictions; see
 [offline-only-builds.md](offline-only-builds.md).
 
-`Era::for_version` uses the earliest documented 2.00 GS1 vocabulary as a
-compatibility fallback for pre-2.00 profiles, including 1.21–1.32. The exact
-command, function and grammar coverage of each early build remains
-incomplete. This fallback must not be described as native 2.00 vocabulary
-parity, nor may those rows silently inherit the newer 2.1 syntax. The
-connection evidence is catalogued separately in the linked early-client
-research; no native network capability follows from a scripting fallback.
+`Era::for_version` gives each profile the GS1 command table of its own
+build. The tables come from the client binaries
+([gs1-commands-by-version.tsv](https://github.com/squirelworks/Graal_analysis/blob/main/npc-library/gs1-commands-by-version.tsv),
+61 builds from 2nd Graal to 5.00r7): 1.21 has 71 commands, 1.33 has 88,
+1.41 rev 1 has 126, 2.05 has 161, and 2.17.1 to 2.31 have 198. Builds whose
+tables are identical share an era (`Era` in
+`crates/seihai-core/src/scripting/engine/vocab.rs`), and a unit test checks
+every era's count against the build tables. Statement words are in the same
+tables, so `while` (from 1.28 beta 2), `function`, `return`, `break` and
+`continue` (from 1.41 rev 1) and `with` (2.17.1 to 3.04) are gated too.
+Commands that leave a table are listed in `vocab::ABSENT`: `seteffect`
+(gone in 1.34 to 1.41 rev 1), `unseteffect` (1.21 to 1.33 only) and the six
+commands the C++ engine never registered.
+
+What is still borrowed: functions, flags and variables before 2.00 use the
+2.00 set, because no per-build table of them exists for 1.x. The 2.1 to 2.16
+eras have no binary; they are NewWorld beta 2's table plus the commands the
+2.1x release notes date (`play2` in 2.1, `wraptext` in 2.12, `showimg2` in
+2.15, `seteffectmode` in 2.16), and `Era::inferred` says so. No native
+network capability follows from a script era.
 
 Research references: [early profiles](https://github.com/squirelworks/Graal_analysis/blob/main/client-internals/version-profiles/v121-v132.toml)
 and [early-client lineage](https://github.com/squirelworks/Graal_analysis/blob/main/client-internals/early-clients.md).
@@ -517,7 +530,7 @@ Generated; do not edit between the markers.
 - unknown (pli): the Windows 4.04r2 set is kept; the lab saw 2, 18, 23, 24, 37, 38, 46 and 157
 - unknown (login): Seihai sends the three machine fields as empty quoted strings; the real client sent the MAC and /etc stat MD5s and an empty fourth field
 - unknown (3d): the Torque 3D mode is not modelled
-- source: binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32; its frame cipher steps raw bodies (len + 3) >> 2 times, at most 12, and zlib/bz2 bodies len >> 2, at most 4, as 5.12; short C->S bodies under 48 bytes go raw), login id 5 with G3D18026 and mac,<md5>,<md5>,"" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38
+- source: binary (Mac OS X PPC Mach-O, main exe sha256 01dbf094...a44dc847) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways (seed 0x04A80B38, key = login byte 1 - 32; the frame cipher steps raw bodies (len + 3) >> 2 times, at most 12, and zlib/bz2 bodies len >> 2, at most 4, as 5.12; short C->S bodies under 48 bytes go raw), login id 5 with G3D18026 and mac,<md5>,<md5>,"" in the plain zlib frame, then 37 and 23 basepackage.gupd twice and bigmap.txt; first props nickname unknown, STATUS 20, OSTYPE mac, code page 0; X2/Y2 walking; also sent 18 and 38
 
 #### 4.20r6 (`G3D27076`, binary, linked 2006-09)
 
@@ -572,7 +585,7 @@ Generated; do not edit between the markers.
 - unknown (pli): the Windows 5.12 set is kept; the lab saw 2, 23, 24, 37, 46 and 157
 - unknown (login): the kernel string is the one Mac OS X 10.4.0 gave in the lab; a real Mac sends its own
 - unknown (render): on a modern gserver world the level stayed black even with the lab's render shim; the cause was not found
-- source: binary (Mac OS X PPC Mach-O, main exe sha256 a76dc557...2d206f10; the "Unknown" v5 Mac builds are byte-identical copies) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways with 5.12's round-down step (read in its frame cipher), login id 5 with G3D15097 and mac,<md5>,<md5>,"",<quoted Darwin kernel string> in the plain zlib frame; auto-login as guest with a client-made password; first props as 4.04r2 Mac; asked arial.ttf, chest.png, state.png and steps.wav; sent no 18
+- source: binary (Mac OS X PPC Mach-O, main exe sha256 a76dc557...2d206f10; the "Unknown" v5 Mac builds are byte-identical copies) and one unchanged-client lab run on Mac OS X 10.4 in qemu (Tiger lab 2026-11-13): gen 5 both ways with 5.12's round-down step, login id 5 with G3D15097 and mac,<md5>,<md5>,"",<quoted Darwin kernel string> in the plain zlib frame; auto-login as guest with a client-made password; first props as 4.04r2 Mac; asked arial.ttf, chest.png, state.png and steps.wav; sent no 18
 
 #### 5.24r4 (`G3D15010`, binary, linked 2010-02-01)
 
