@@ -42,6 +42,9 @@ fn suffix_function_calls_follow_the_event_body_without_replaying_direct_calls() 
         22.0,
         "direct calls execute only their function"
     );
+    let (mut control, mut control_host) = machine("if (created) { this.n = 10; } this.n += 1;");
+    fire(&mut control, &mut control_host, "onCreated");
+    assert_eq!(num(&control, "n"), 11.0, "suffix assignment control");
 }
 
 #[test]
