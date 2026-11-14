@@ -29,11 +29,21 @@ Commands that leave a table are listed in `vocab::ABSENT`: `seteffect`
 commands the C++ engine never registered.
 
 What is still borrowed: functions, flags and variables before 2.00 use the
-2.00 set, because no per-build table of them exists for 1.x. The 2.1 to 2.16
-eras have no binary; they are NewWorld beta 2's table plus the commands the
+2.00 set, because no per-build table of them exists for 1.x. The generic 2.1 to 2.16
+eras remain inferred; they are NewWorld beta 2's table plus the commands the
 2.1x release notes date (`play2` in 2.1, `wraptext` in 2.12, `showimg2` in
-2.15, `seteffectmode` in 2.16), and `Era::inferred` says so. No native
-network capability follows from a script era.
+2.15, `seteffectmode` in 2.16), and `Era::inferred` says so. They do not
+select an exact Graal 2002 world-build table. No native network capability
+follows from a script era.
+
+The [Graal 2002 static identity study](https://github.com/squirelworks/Graal_analysis/blob/main/client-internals/graal2002-and-140-builds.md)
+does cover six world binaries: ver7–ver9 share `GNW03081` with 2.05 and the
+2.1 tests; ver10, ver13 and v22 carry `GNW31101`. Ver7 and ver9 also share
+FileVersion `2.1.0.0` despite different command tables; ver13 and v22 share
+FileVersion `2.1.0.4` and likewise differ. Neither field alone identifies a
+capability set. These binary-read identities do not turn the generic
+`V210` profile into an exact-build profile or establish its inferred
+login, packet layouts or script-engine status.
 
 Research references: [early profiles](https://github.com/squirelworks/Graal_analysis/blob/main/client-internals/version-profiles/v121-v132.toml)
 and [early-client lineage](https://github.com/squirelworks/Graal_analysis/blob/main/client-internals/early-clients.md).
@@ -77,11 +87,13 @@ in the chain only from evidence, and a unit test
 
 | Field | `yes` | `no` | `unknown` |
 |---|---|---|---|
-| `gs2` | the binary handles `PLO_NPCBYTECODE` (131), the packet that carries a compiled GS2 script: 3.153 (whose GS2 VM was also read, `gs2-executor.md`) and every binary build after it | the binary's server-id set has no 131: every classic binary from 1.21 to 2.31, and 3.04 | builds with no binary: 2.1 to 2.16, 2.3, 6.015, 6.034 |
+| `gs2` | the binary handles `PLO_NPCBYTECODE` (131), the packet that carries a compiled GS2 script: 3.153 (whose GS2 VM was also read, `gs2-executor.md`) and every binary build after it | the binary's server-id set has no 131: every classic binary from 1.21 to 2.31, and 3.04 | generic inferred 2.1 profile (no exact world build selected); builds with no binary: 2.12 to 2.16, 2.3, 6.015, 6.034 |
 | `gs1` | the GS1 command table was read from the binary (1.21 to 2.05, `gs1_commands`), or the per-build vocabulary notes cover it (2.17, 2.22, 2.31) | none | 3.04 and later (nothing read about GS1 there yet), and builds with no binary |
 
-When a capture or a binary read settles an `unknown`, set it on that step with
-the source in the step's comment.
+The observed world builds' GS1 tables do not by themselves select which
+table the generic 2.1 profile should use. Its `Scripts::UNKNOWN` stays
+unchanged. When a capture or a binary read settles an `unknown` for an
+identified profile, set it on that step with the source in the step's comment.
 
 ## The handler-change table
 
@@ -120,7 +132,7 @@ If the new build lands between two existing ones, the step after it must be re-c
 
 ## What the chain does not decide
 
-- It does not say a value is true; it says what Seihai's row holds and how well it is backed. Rows marked inferred are the builds with no binary (2.1 to 2.16, 2.3).
+- It does not say a value is true; it says what Seihai's row holds and how well it is backed. A row remains inferred when no binary backs it (2.12 to 2.16, 2.3), or when it does not identify one exact observed build (generic 2.1).
 - The table lists changes in Seihai's profile fields only. Behaviour of a build that is not a profile field (payload layouts, timings) lives in `protocol.md` and the notes.
 - Found while building it (left as it was, so behaviour is unchanged): the 1.41 row carries the 2.05 death and combat rules, because it was built from the 2.05 template; 1.42 clears them. No 1.41 handler was traced. (The rows of 1.33 to 2.04 also had `.graal` only, though the 1.41 and 1.42 binaries carry the GLEVNW01 loader; 1.41 and 1.42 now read `.nw`.)
 
@@ -349,10 +361,10 @@ Generated; do not edit between the markers.
 - ui: **ghost_mode**: no -> yes
 - scripts: **gs1**: yes -> unknown
 - scripts: **gs2**: no -> unknown
-- unknown (binary): no 2.1 release binary; every value of this step is inferred
-- unknown (token): the 2.1 test builds still send the 2.05 token, so GNW31101 is from gs2lib only
+- unknown (binary): this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+- unknown (token): GNW31101 is binary-read in Graal 2002 ver10, ver13 and v22 (not wire-captured); ver7 to ver9 share GNW03081 with 2.05 and the 2.1 tests. A shared token does not select an exact build's capabilities
 - unknown (protocol): PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169
-- unknown (listserver): 2.1 to 2.16 have no client binary: login frame inferred, not captured. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
+- unknown (listserver): the generic 2.1 to 2.16 rows' login frame is inferred, not captured; the Graal 2002 static identity study does not establish it. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
 - unknown (pli): client send set is carried from 2.05
 - unknown (props): player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
 - unknown (life): death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)

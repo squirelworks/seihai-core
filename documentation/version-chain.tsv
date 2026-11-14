@@ -154,10 +154,10 @@ step	label	token	basis	kind	area	field	detail
 21	2.1	GNW31101	inferred	changed	ui	ghost_mode	no -> yes
 21	2.1	GNW31101	inferred	changed	scripts	gs1	yes -> unknown
 21	2.1	GNW31101	inferred	changed	scripts	gs2	no -> unknown
-21	2.1	GNW31101	inferred	unknown	binary	-	no 2.1 release binary; every value of this step is inferred
-21	2.1	GNW31101	inferred	unknown	token	-	the 2.1 test builds still send the 2.05 token, so GNW31101 is from gs2lib only
+21	2.1	GNW31101	inferred	unknown	binary	-	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+21	2.1	GNW31101	inferred	unknown	token	-	GNW31101 is binary-read in Graal 2002 ver10, ver13 and v22 (not wire-captured); ver7 to ver9 share GNW03081 with 2.05 and the 2.1 tests. A shared token does not select an exact build's capabilities
 21	2.1	GNW31101	inferred	unknown	protocol	-	PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169
-21	2.1	GNW31101	inferred	unknown	listserver	-	2.1 to 2.16 have no client binary: login frame inferred, not captured. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
+21	2.1	GNW31101	inferred	unknown	listserver	-	the generic 2.1 to 2.16 rows' login frame is inferred, not captured; the Graal 2002 static identity study does not establish it. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
 21	2.1	GNW31101	inferred	unknown	pli	-	client send set is carried from 2.05
 21	2.1	GNW31101	inferred	unknown	props	-	player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
 21	2.1	GNW31101	inferred	unknown	life	-	death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
