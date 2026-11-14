@@ -206,3 +206,29 @@ fn direct_gs2_public_calls_do_not_replay_top_level_code() {
     fire(&mut m, &mut host, "bump");
     assert_eq!((num(&m, "loads"), num(&m, "calls")), (1.0, 2.0));
 }
+
+#[test]
+fn suffix_commands_follow_each_event_with_dispatch_and_event_only_controls() {
+    for (src, expected) in [
+        (
+            "if (created) { setcharprop #c,event; } setcharprop #c,suffix;",
+            "suffix",
+        ),
+        (
+            "if (created) { setcharprop #c,event; } setcharprop #c,suffix; this.control = 1;",
+            "suffix",
+        ),
+        ("if (created) { setcharprop #c,event; }", "event"),
+    ] {
+        let (mut m, mut host) = machine(src);
+        assert_eq!(m.var(Root::This, "chat"), None, "load: {src}");
+        for _ in 0..2 {
+            fire(&mut m, &mut host, "onCreated");
+            assert_eq!(
+                m.var(Root::This, "chat"),
+                Some(&Val::Str(expected.into())),
+                "{src}"
+            );
+        }
+    }
+}

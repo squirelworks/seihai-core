@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.2.x
 
+- **0.2.16**: GS1 suffix commands use the whole-script dispatcher to retain per-event source order.
 - **0.2.15**: GS1 unconditional prefixes run once per named event through the existing dispatcher, preserving eventless load and direct GS2 calls.
 - **0.2.14**: GS1 function calls after event tests retain source order through the existing whole-script dispatcher; direct GS2 calls stay unchanged.
 - **0.2.13**: GS1 `setplayerprop` compiles to `player.*` and `playerscount` to `players.size()`, from the first 6.03r7 run of Seihai's bytecode.
