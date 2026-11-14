@@ -428,7 +428,7 @@ fn stmt_calls(s: &g::Stmt, gs1: bool) -> bool {
         g::Stmt::Assign { target, value, .. } => index(target) || e(value),
         g::Stmt::Call { name, args, .. } => name_is_call(name, gs1) || args.iter().any(e),
         g::Stmt::Command { name, args, .. } => {
-            command_is_call(name, args, gs1)
+            command_is_call(name, gs1)
                 || args
                     .iter()
                     .any(|a| matches!(a, g::Arg::Num(x) if expr_calls(x, gs1)))
@@ -443,7 +443,7 @@ fn stmt_calls(s: &g::Stmt, gs1: bool) -> bool {
 /// what it is lowered to: `setstring this.a,1;` and `setcharprop` become
 /// assignments, which do not; a flag `setstring` is a `set` call, and the
 /// list and `tokenize` forms are method calls, which do.
-fn command_is_call(name: &str, args: &[g::Arg], gs1: bool) -> bool {
+fn command_is_call(name: &str, gs1: bool) -> bool {
     match name {
         // Lowered to an assignment to a `client.` (or `this.`) variable.
         "setstring" | "set" | "unset" => false,
