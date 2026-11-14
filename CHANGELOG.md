@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.2.x
 
+- **0.2.4**: `read_gif_frames` reads every frame of an animated GIF as palette indices on the logical screen (disposal, delays, the `NETSCAPE2.0` loop count), for gif2mng in seihai-servertools.
 - **0.2.3**: Binary level writer: `encode_binary` writes `GR-V1.03` (`.graal`) and `Z3-V1.04` (`.zelda`) and reports what each format cannot hold; `encode_board` and `encode_sign_text`; `write_mng` and `write_indexed_png` for gif2mng-style animations.
 - **0.2.2**: Whole-script GS1 runs from one dispatcher (1,204 of the 1,765 level scripts we hold now compile, from 957); GS1 `board[i]` lowers to `tiles[x, y]`; `#I` and `#L`; the `gs1c` example and a lab kit for original clients; the profile audit, connection capabilities and an id-108 check from the roadmap (#7).
 - **0.2.1**: GS1 lowering of `players[i].x` / `.y` / `.dir` and `npcs[i]` reads, `tiles[x, y]`, lists inside literals and a list into an element, from four new compiler fixtures; GS2 no longer converts an array element before a member read.
