@@ -36,26 +36,28 @@ namespace with loopback only, so nothing reached the internet.
 
 ## Payloads (final pass, compiler e08d4d3)
 
-| Script | bytes | sha256 of the bytecode the client received |
+| Script | bytes | SHA-256 prefix (8 hex) of the bytecode the client received |
 |---|---|---|
-| 01-chat-and-timer | 190 | `52364e51e889df63149801e64bca84a5645315c03ea721e58490abbaaa633315` |
-| 02-touch-and-image | 202 | `a8faee9edcfe98bf17dc0ea12d58daf01c585b377ae0e9b7665a19d83638e71d` |
-| 03-showimg-and-vars | 278 | `6b24bd2a742013e2aeb4a6e947993e647a58bbbb8061fc5eae63c18af1828b31` |
-| 04-players-array | 191 | `099829119f9b0c89d18b6bd1e9757ad984c961aa3ba1204d83062f1625683b4a` |
-| 05-tiles | 207 | `1da4eb6f3af86f110c7b73eb7b5c120990bbfd9244230db886493e027eca3494` |
-| 05e-tile632 (05 with tile 632) | 207 | `624ce59ee6227c92fc5f3356a60c826c287c7608fb4baac82230719139096cff` |
-| 05d-readback (diagnostic) | 229 | `5f02f5faf807bd4d4447c0b33fde779ca4ff6f66139e7d8248e0dc7323cec6e1` |
-| 06-dispatch | 444 | `d95c57c1cc289ff20bb84feda583150746aaab8e8197d0fd4f26efb2b84657dc` |
+| 01-chat-and-timer | 190 | `52364e51` |
+| 02-touch-and-image | 202 | `a8faee9e` |
+| 03-showimg-and-vars | 278 | `6b24bd2a` |
+| 04-players-array | 191 | `09982911` |
+| 05-tiles | 207 | `1da4eb6f` |
+| 05e-tile632 (05 with tile 632) | 207 | `624ce59e` |
+| 05d-readback (diagnostic) | 229 | `5f02f5fa` |
+| 06-dispatch | 444 | `d95c57c1` |
 
 Notes on these hashes:
+- Public references use eight-character SHA-256 prefixes. Full digests
+  are retained with the private lab receipts for exact artifact matching.
 - Pass-1 hashes, before the fixes:
 
-  | Script | bytes | sha256 (pass 1) |
+  | Script | bytes | SHA-256 prefix (8 hex, pass 1) |
   |---|---|---|
-  | 01 | 206 | `b3a71bec…` |
-  | 02 | 217 | `3b4b5aa5…` |
-  | 04 | 201 | `b5919cdc…` |
-  | 06 | 459 | `f8b70ffc…` |
+  | 01 | 206 | `b3a71bec` |
+  | 02 | 217 | `3b4b5aa5` |
+  | 04 | 201 | `b5919cdc` |
+  | 06 | 459 | `f8b70ffc` |
 
 - 03 and 05 did not change between passes.
 - The final 02 bytes are byte-identical to what GServer-v2's own GS1→GS2
