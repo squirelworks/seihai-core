@@ -54,8 +54,42 @@ pub(super) fn program(src: &str, era: Era) -> Result<Program, CompileErrors> {
     }
     let mut flags = Vec::new();
     parsed.body.iter().for_each(|s| player_flags(s, &mut flags));
-    let raw = lift(parsed.body, era)?;
+    let own_fns: Vec<String> = parsed
+        .body
+        .iter()
+        .filter_map(|s| match s {
+            g::Stmt::Function { name, .. } => Some(name.to_ascii_lowercase()),
+            _ => None,
+        })
+        .collect();
+    // The structured lift gives one GS2 function per event. A script it
+    // cannot split that way (code between event tests, an event in a
+    // larger condition, an event test with `else`, an event flag read
+    // inside a block) runs whole, as GS1 runs it, from one dispatcher (see
+    // [`dispatch`]).
+    let lowered = |raw: Vec<Raw>, dispatched: bool| {
+        lower_items(raw, dispatched, flags.clone(), &own_fns, era)
+    };
+    match lift(parsed.body.clone(), era) {
+        Ok(raw) => match lowered(raw, false) {
+            Ok(p) => Ok(p),
+            Err(e) => lowered(dispatch(parsed.body, era), true).map_err(|_| e),
+        },
+        Err(_) => lowered(dispatch(parsed.body, era), true),
+    }
+}
+
+fn lower_items(
+    raw: Vec<Raw>,
+    dispatched: bool,
+    flags: Vec<String>,
+    own_fns: &[String],
+    era: Era,
+) -> Result<Program, CompileErrors> {
     let mut lower = Lower {
+        event_param: false,
+        loops: 0,
+        run_body: false,
         flags,
         era,
         line: 0,
@@ -73,12 +107,19 @@ pub(super) fn program(src: &str, era: Era) -> Result<Program, CompileErrors> {
     let items = raw
         .into_iter()
         .map(|item| match item {
-            Raw::Function { name, params, body } => Item::Function(Function {
-                cmd_call: Some(body.iter().any(|s| stmt_calls(s, true))),
-                name,
-                params,
-                body: lower.stmts(&body),
-            }),
+            Raw::Function { name, params, body } => {
+                lower.event_param = dispatched && name == DISPATCH;
+                lower.run_body = !own_fns.contains(&name.to_ascii_lowercase());
+                let lowered = lower.stmts(&body);
+                lower.event_param = false;
+                lower.run_body = false;
+                Item::Function(Function {
+                    cmd_call: Some(body.iter().any(|s| stmt_calls(s, true))),
+                    name,
+                    params,
+                    body: lowered,
+                })
+            }
             Raw::Code(body) => Item::Code(lower.stmts(&body)),
         })
         .collect();
@@ -97,6 +138,9 @@ pub(super) fn program(src: &str, era: Era) -> Result<Program, CompileErrors> {
 /// Lower one GS1 command written inside a GS2 script.
 pub(super) fn lower_embedded(command: &g::Stmt, era: Era) -> Result<Stmt, String> {
     let mut lower = Lower {
+        event_param: false,
+        loops: 0,
+        run_body: false,
         era,
         line: 0,
         errors: Vec::new(),
@@ -119,6 +163,9 @@ pub(super) fn lower_embedded(command: &g::Stmt, era: Era) -> Result<Stmt, String
 /// its parts.
 pub(super) fn message(text: &str, era: Era) -> Result<Vec<MsgPart>, String> {
     let mut lower = Lower {
+        event_param: false,
+        loops: 0,
+        run_body: false,
         era,
         line: 0,
         errors: Vec::new(),
@@ -224,6 +271,139 @@ fn lift(body: Vec<g::Stmt>, era: Era) -> Result<Vec<Raw>, CompileErrors> {
         return Err(CompileErrors { errors });
     }
     Ok(items)
+}
+
+/// The GS2 function a dispatched GS1 script runs in, and its parameter.
+pub(super) const DISPATCH: &str = "__gs1run";
+pub(super) const DISPATCH_PARAM: &str = "__gs1event";
+
+/// A GS1 script as GS1 runs it: the whole script, top to bottom, once per
+/// event, with the event flags telling which event this is. For each event
+/// the script tests anywhere, `onEvent()` calls `__gs1run("event")`, and
+/// `__gs1run(__gs1event)` holds every statement outside the script's own
+/// functions, in source order, with each event flag read as
+/// `__gs1event == "event"`. Nothing is left as GS2 top-level code, so no
+/// statement runs before or after where GS1 runs it.
+///
+/// One difference stays: GS1 runs the script for every event the NPC gets,
+/// and here it runs for the events the script names. Code outside every
+/// event test therefore runs on those events only.
+fn dispatch(body: Vec<g::Stmt>, era: Era) -> Vec<Raw> {
+    let mut events: Vec<String> = Vec::new();
+    for st in &body {
+        stmt_events(st, era, &mut events);
+    }
+    let mut items = Vec::new();
+    let mut code = Vec::new();
+    for st in body {
+        match st {
+            g::Stmt::Function { name, params, body } => {
+                items.push(Raw::Function { name, params, body })
+            }
+            other => code.push(other),
+        }
+    }
+    for ev in &events {
+        items.push(Raw::Function {
+            name: gs2_event_function(ev),
+            params: Vec::new(),
+            body: vec![g::Stmt::Call {
+                name: DISPATCH.into(),
+                args: vec![g::Expr::Str(ev.clone())],
+                line: 0,
+            }],
+        });
+    }
+    items.push(Raw::Function {
+        name: DISPATCH.into(),
+        params: vec![DISPATCH_PARAM.into()],
+        body: code,
+    });
+    items
+}
+
+/// Every event flag a statement reads, lower case, first use first.
+fn stmt_events(s: &g::Stmt, era: Era, out: &mut Vec<String>) {
+    let mut e = |x: &g::Expr| expr_events(x, era, out);
+    match s {
+        g::Stmt::Block(v) => v.iter().for_each(|s| stmt_events(s, era, out)),
+        g::Stmt::If { cond, then, els } => {
+            e(cond);
+            stmt_events(then, era, out);
+            if let Some(x) = els {
+                stmt_events(x, era, out);
+            }
+        }
+        g::Stmt::While { cond, body } => {
+            e(cond);
+            stmt_events(body, era, out);
+        }
+        g::Stmt::For {
+            init,
+            cond,
+            step,
+            body,
+        } => {
+            if let Some(c) = cond {
+                e(c);
+            }
+            for x in [init, step].into_iter().flatten() {
+                stmt_events(x, era, out);
+            }
+            stmt_events(body, era, out);
+        }
+        g::Stmt::With { target, body, .. } => {
+            e(target);
+            stmt_events(body, era, out);
+        }
+        g::Stmt::Return(Some(x)) => e(x),
+        g::Stmt::Assign { value, .. } => e(value),
+        g::Stmt::Call { args, .. } => args.iter().for_each(e),
+        g::Stmt::Command { args, .. } => {
+            for a in args {
+                if let g::Arg::Num(x) = a {
+                    e(x);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn expr_events(x: &g::Expr, era: Era, out: &mut Vec<String>) {
+    let mut f = |y: &g::Expr| expr_events(y, era, out);
+    match x {
+        g::Expr::Var(v) => {
+            if v.index.is_empty() && !v.name.contains('.') && is_event(&v.name, era) {
+                let n = v.name.to_ascii_lowercase();
+                if !out.contains(&n) {
+                    out.push(n);
+                }
+            }
+        }
+        g::Expr::Unary(_, a) | g::Expr::InArray { e: a, .. } => f(a),
+        g::Expr::Bin(_, a, b) => {
+            f(a);
+            f(b);
+        }
+        g::Expr::Call { args, .. } => args.iter().for_each(f),
+        g::Expr::InRange { e, lo, hi } => {
+            f(e);
+            f(lo);
+            f(hi);
+        }
+        g::Expr::InList { e, list } => {
+            f(e);
+            list.iter().for_each(f);
+        }
+        g::Expr::List(list) => list.iter().for_each(f),
+        g::Expr::Cond { cond, then, els } => {
+            f(cond);
+            f(then);
+            f(els);
+        }
+        g::Expr::Num(_) | g::Expr::Str(_) => {}
+    }
 }
 
 /// A GS1 statement outside every event test. GS1 runs it in every event,
@@ -771,6 +951,14 @@ struct Lower {
     /// Plain names the script sets as player flags, lower case (see
     /// [`player_flags`]).
     flags: Vec<String>,
+    /// Lowering the body of [`DISPATCH`]: an event flag reads as
+    /// `__gs1event == "<event>"`.
+    event_param: bool,
+    /// Loops around the statement being lowered.
+    loops: u32,
+    /// Lowering an event function or the dispatcher, not one of the
+    /// script's own functions.
+    run_body: bool,
 }
 
 fn bin_op(op: g::BinOp) -> BinOp {
@@ -935,6 +1123,8 @@ fn no_lowering(code: char) -> String {
 /// One message code as GS1 text holds it, before lowering.
 enum Code {
     Value(g::Expr),
+    /// `#s(this.a#v(i))`: a variable whose name is built at run time.
+    DynVar(String),
     Trim(String),
     Sub(g::Expr, g::Expr, String),
 }
@@ -963,26 +1153,44 @@ impl Lower {
                 then: self.boxed(then),
                 els: els.as_deref().map(|e| self.boxed(e)),
             },
-            g::Stmt::While { cond, body } => Stmt::While {
-                cond: self.expr(cond),
-                body: self.boxed(body),
-            },
+            g::Stmt::While { cond, body } => {
+                let cond = self.expr(cond);
+                self.loops += 1;
+                let body = self.boxed(body);
+                self.loops -= 1;
+                Stmt::While { cond, body }
+            }
             g::Stmt::For {
                 init,
                 cond,
                 step,
                 body,
-            } => Stmt::For {
-                init: init.as_deref().map(|s| self.boxed(s)),
-                cond: cond.as_ref().map(|c| self.expr(c)),
-                step: step.as_deref().map(|s| self.boxed(s)),
-                body: self.boxed(body),
-            },
+            } => {
+                let init = init.as_deref().map(|s| self.boxed(s));
+                let cond = cond.as_ref().map(|c| self.expr(c));
+                self.loops += 1;
+                let step = step.as_deref().map(|s| self.boxed(s));
+                let body = self.boxed(body);
+                self.loops -= 1;
+                Stmt::For {
+                    init,
+                    cond,
+                    step,
+                    body,
+                }
+            }
             g::Stmt::Function { .. } => {
                 self.err("a function inside a block is not lowered");
                 Stmt::empty()
             }
             g::Stmt::Return(v) => Stmt::Return(v.as_ref().map(|e| self.expr(e))),
+            // GS1 ends the run at a `break` or `continue` outside a loop
+            // (`engine::compile`). In an event function or the dispatcher
+            // that is a `return`; in the script's own functions it would
+            // end the caller's run too, which GS2 has no form for.
+            g::Stmt::Break | g::Stmt::Continue if self.loops == 0 && self.run_body => {
+                Stmt::Return(None)
+            }
             g::Stmt::Break => Stmt::Break,
             g::Stmt::Continue => Stmt::Continue,
             g::Stmt::Assign {
@@ -1084,7 +1292,9 @@ impl Lower {
         Some(e)
     }
 
-    /// `players[i].x`, `.y`, `.dir` and `npcs[i].x`, `.y`, `.dir` read:
+    /// `players[i].x`, `.y`, `.dir` (and `.id`, `.hearts`, `.rupees`,
+    /// `.bombs`, `.darts`, `.nick`, `.account`) and `npcs[i].x`, `.y`,
+    /// `.dir` (and `.id`, `.width`, `.height`, `.image`) read:
     /// the element, then the member, with no conversion between
     /// (`members.gs2bc`). Other fields after an index stay errors.
     fn element_member(&mut self, v: &g::VarRef) -> Option<Expr> {
@@ -1093,10 +1303,28 @@ impl Lower {
         }
         let (base, field) = v.name.split_once('.')?;
         let field = field.to_ascii_lowercase();
-        if !matches!(base, "players" | "npcs")
-            || !matches!(field.as_str(), "x" | "y" | "dir")
-            || self.with_depth > 0
-        {
+        // The encoding is the one `members.gs2bc` shows for `.x`; the other
+        // fields are the GS2 properties of the same name (Seihai's reading).
+        let known = match base {
+            "players" => matches!(
+                field.as_str(),
+                "x" | "y"
+                    | "dir"
+                    | "id"
+                    | "hearts"
+                    | "rupees"
+                    | "bombs"
+                    | "darts"
+                    | "nick"
+                    | "account"
+            ),
+            "npcs" => matches!(
+                field.as_str(),
+                "x" | "y" | "dir" | "id" | "width" | "height" | "image"
+            ),
+            _ => false,
+        };
+        if !known || self.with_depth > 0 {
             return None;
         }
         Some(Expr::Member {
@@ -1108,8 +1336,49 @@ impl Lower {
         })
     }
 
+    /// GS1's `board[i]` as GS2's `tiles[x, y]`: the condition that `i` is
+    /// on the 64 by 64 board, and the tile. GS1 takes the index as
+    /// `floor(i + 0.0001)` (`documentation/board-reads.md`), so with
+    /// `k = i + 0.0001` the tile is `tiles[int(k) % 64, int(k / 64)]` when
+    /// `0 <= k < 4096`. `i` is read up to four times, so it must not call
+    /// anything; `None` (and an error) if it does, or if this is not a
+    /// plain `board[i]`.
+    fn board_cell(&mut self, v: &g::VarRef) -> Option<(Expr, Var)> {
+        if v.name != "board" || v.index.len() != 1 || v.field_after_index {
+            return None;
+        }
+        if expr_calls(&v.index[0], true) {
+            self.err(
+                "`board[..]` whose index calls a function is not lowered; put the index in a \
+                 variable first"
+                    .to_string(),
+            );
+            return None;
+        }
+        let i = self.expr(&v.index[0]);
+        let k = Expr::bin(BinOp::Add, i, Expr::Num(0.0001));
+        let int = |e: Expr| Expr::Call {
+            name: "int".into(),
+            args: vec![e],
+        };
+        let in_level = Expr::bin(
+            BinOp::And,
+            Expr::bin(BinOp::Ge, k.clone(), Expr::Num(0.0)),
+            Expr::bin(BinOp::Lt, k.clone(), Expr::Num(4096.0)),
+        );
+        let x = Expr::bin(BinOp::Mod, int(k.clone()), Expr::Num(64.0));
+        let y = int(Expr::bin(BinOp::Div, k, Expr::Num(64.0)));
+        Some((
+            in_level,
+            Var {
+                name: "tiles".into(),
+                index: vec![x, y],
+            },
+        ))
+    }
+
     /// A variable as GS2 names it. An element must have no field after its
-    /// index (`npcs[i].x`), and GS1's level board is not lowered.
+    /// index (`npcs[i].x`).
     fn var(&mut self, v: &g::VarRef) -> Var {
         if v.index.is_empty()
             && is_script_var(&v.name, self.era)
@@ -1134,10 +1403,7 @@ impl Lower {
             if v.field_after_index {
                 self.err(format!("a field after an index (`{v}`) is not lowered"));
             } else if v.name == "board" {
-                self.err(
-                    "`board[..]` has no GS2 form (GS2 has `tiles[x, y]`); it is not lowered"
-                        .to_string(),
-                );
+                self.err("`board` takes one index, `board[x + 64 * y]`".to_string());
             } else if v.name == "tiles" && v.index.len() != 2 {
                 self.err("`tiles` takes two indexes, `tiles[x, y]`".to_string());
             }
@@ -1163,6 +1429,39 @@ impl Lower {
     /// number out and stores it. The index is pushed twice, so it must not
     /// call anything.
     fn assign(&mut self, target: &g::VarRef, op: AssignOp, value: &g::Expr) -> Stmt {
+        if let Some((in_level, cell)) = self.board_cell(target) {
+            // GS1 works the value out even off the board, so a value that
+            // calls something is read into a temporary first.
+            let mut body = Vec::new();
+            let mut v = self.expr(value);
+            if expr_calls(value, true) {
+                let temp = format!("temp.__gs1board{}", self.temps);
+                self.temps += 1;
+                body.push(Stmt::Assign {
+                    target: Var::plain(temp.clone()),
+                    op: AssignOp::Set,
+                    value: v,
+                });
+                v = Expr::var(temp);
+            }
+            if op != AssignOp::Set {
+                v = op.expand(Expr::Var(cell.clone()), v);
+            }
+            body.push(Stmt::If {
+                cond: in_level,
+                then: Box::new(Stmt::Assign {
+                    target: cell,
+                    op: AssignOp::Set,
+                    value: v,
+                }),
+                els: None,
+            });
+            return if body.len() == 1 {
+                body.pop().unwrap()
+            } else {
+                Stmt::Block(body)
+            };
+        }
         if target.index.is_empty() {
             return Stmt::Assign {
                 target: self.var(target),
@@ -1581,6 +1880,17 @@ impl Lower {
             g::Expr::Num(n) => Expr::Num(*n),
             g::Expr::Str(s) => self.text(s),
             g::Expr::Var(v) => {
+                if v.index.is_empty()
+                    && !v.name.contains('.')
+                    && is_event(&v.name, self.era)
+                    && self.event_param
+                {
+                    return Expr::bin(
+                        BinOp::Eq,
+                        Expr::var(DISPATCH_PARAM),
+                        Expr::Str(v.name.to_ascii_lowercase()),
+                    );
+                }
                 if v.index.is_empty() && !v.name.contains('.') && is_event(&v.name, self.era) {
                     self.err(format!(
                         "`{}` is an event flag and has no GS2 value; the handler is {}",
@@ -1601,6 +1911,14 @@ impl Lower {
                 }
                 if let Some(e) = self.element_member(v) {
                     return e;
+                }
+                if let Some((in_level, cell)) = self.board_cell(v) {
+                    // Off the board GS1 reads 0; GS2's `tiles` does not.
+                    return Expr::Cond {
+                        cond: Box::new(in_level),
+                        then: Box::new(Expr::Var(cell)),
+                        els: Box::new(Expr::Num(0.0)),
+                    };
                 }
                 Expr::Var(self.var(v))
             }
@@ -1659,6 +1977,10 @@ impl Lower {
             parts.push(match c {
                 Ok(lit) => MsgPart::Lit(lit),
                 Err(Code::Value(e)) => MsgPart::Value(self.expr(&e)),
+                Err(Code::DynVar(t)) => MsgPart::Value(Expr::Call {
+                    name: "makevar".into(),
+                    args: vec![Expr::Message(self.message(&t)?)],
+                }),
                 Err(Code::Trim(t)) => MsgPart::Trim(self.message(&t)?),
                 Err(Code::Sub(start, len, t)) => {
                     let start = self.expr(&start);
@@ -1769,6 +2091,10 @@ fn split_codes(s: &str, era: Era) -> Result<Vec<Result<String, Code>>, String> {
                 let readable = ["this.", "client.", "clientr.", "serverr."];
                 if readable.iter().any(|p| n.starts_with(p)) && is_plain_name(&n) {
                     Some(var(&n, None))
+                } else if readable.iter().any(|p| n.starts_with(p)) && n.contains("#v(") {
+                    // The name is text with codes: GS2 builds it and reads
+                    // the variable of that name with `makevar`.
+                    Some(Code::DynVar(x.trim().to_string()))
                 } else {
                     return Err(format!(
                         "`#s({x})`: only `this.`, `client.`, `clientr.` and `serverr.` strings are lowered (a plain GS1 string is a player flag)"
@@ -1785,9 +2111,37 @@ fn split_codes(s: &str, era: Era) -> Result<Vec<Result<String, Code>>, String> {
                 }
                 Some(Code::Sub(num(p[0]), num(p[1]), p[2].to_string()))
             }
-            ('w' | 'L' | 'F', None) => return Err(no_lowering(code)),
+            // `#L`: the level's name. GS2 reads it as `level.name`
+            // (`OP_LEVEL`); Seihai's reading, checked in the client lab.
+            ('L', None) => Some(var("level.name", None)),
+            ('w' | 'F', None) => return Err(no_lowering(code)),
             ('w' | 'W', Some(_)) if era >= Era::V204 => return Err(no_lowering(code)),
-            ('I', Some(_)) if era >= Era::V21 => return Err(no_lowering(code)),
+            // `#I(list,index)`: entry `index` of the string list `list`
+            // (the GS1 engine splits it at commas). For a `this.` /
+            // `client.` list that is the GS2 element `list[index]`, the
+            // lists `addstring` and its kin lower to.
+            ('I', Some(x)) if era >= Era::V21 => {
+                let (list, index) = x.rsplit_once(',').unwrap_or((x, "0"));
+                let n = list.trim().to_ascii_lowercase();
+                let readable = ["this.", "client.", "clientr.", "serverr."];
+                let index = index.trim();
+                let index = match index.strip_prefix("#v(").and_then(|r| r.strip_suffix(')')) {
+                    Some(inner) => engine::parser::parse_expr(inner, era),
+                    None if !index.contains('#') => engine::parser::parse_expr(index, era),
+                    None => None,
+                };
+                match index {
+                    Some(i) if readable.iter().any(|p| n.starts_with(p)) && is_plain_name(&n) => {
+                        Some(var(&n, Some(i)))
+                    }
+                    _ => {
+                        return Err(format!(
+                            "`#I({x})`: only a `this.`, `client.`, `clientr.` or `serverr.` list \
+                             with a number or `#v(..)` index is lowered"
+                        ))
+                    }
+                }
+            }
             ('P', _) if digits > 0 && era >= Era::V21 => return Err(no_lowering(code)),
             _ => None,
         };

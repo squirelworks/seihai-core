@@ -181,3 +181,39 @@ fn parse_all_unique_npc_scripts() {
     // Informational: do not fail the build. The count is the point.
     assert!(total > 1000, "expected the full corpus");
 }
+
+/// seihai-core#6: how much of the corpus the GS1 to GS2 lowering takes.
+/// Of the unique scripts that parse as 2.17, the share that compiles to
+/// GS2 bytecode in strict mode. `STRESS_LOWER=1` lists the first error of
+/// each script that does not. The floor guards against a regression; the
+/// rest are GS1 commands with no GS2 counterpart in the client tables,
+/// server-side commands, and dynamic flag names.
+#[test]
+fn lower_unique_npc_scripts_to_gs2() {
+    use seihai_core::scripting::gs2::compile;
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/npc-scripts");
+    let (mut total, mut ok) = (0, 0);
+    let mut seen = std::collections::HashSet::new();
+    for entry in fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|e| e != "txt") {
+            continue;
+        }
+        for (name, body) in scripts_in(&path) {
+            if !seen.insert(body.clone()) || !parse(&body, Era::V217).diagnostics.is_empty() {
+                continue;
+            }
+            total += 1;
+            match compile::compile_gs1(&body, Era::V217) {
+                Ok(_) => ok += 1,
+                Err(e) if std::env::var("STRESS_LOWER").is_ok() => {
+                    eprintln!("{name}: {}", e.to_string().lines().next().unwrap_or(""))
+                }
+                Err(_) => {}
+            }
+        }
+    }
+    eprintln!("lowered {ok} of {total} scripts that parse as 2.17");
+    assert!(total > 1500, "expected the full corpus");
+    assert!(ok >= 1200, "lowering coverage fell to {ok} of {total}");
+}
