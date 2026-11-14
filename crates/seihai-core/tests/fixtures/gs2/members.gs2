@@ -1,0 +1,7 @@
+function onCreated() {
+  temp.a = players[0].x;
+  temp.b = players[1].y;
+  temp.c = players[temp.a].dir;
+  temp.d = npcs[2].x;
+  this.e = players[0].account;
+}

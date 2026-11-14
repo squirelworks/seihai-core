@@ -1,0 +1,10 @@
+// Visible: touching the NPC writes a 2x2 block of tile 0x7FF (black)
+// next to it and sends the change (tiles[x, y], seihai-core#56).
+if (playertouchsme) {
+  for (i = 0; i < 2; i++) {
+    for (j = 0; j < 2; j++) {
+      tiles[x + 3 + i, y + j] = 2047;
+    }
+  }
+  updateboard x + 3, y, 2, 2;
+}

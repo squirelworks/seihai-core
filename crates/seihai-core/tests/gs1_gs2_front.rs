@@ -267,16 +267,30 @@ fn commands_and_functions_without_gs2_are_errors() {
     .unwrap_err();
     assert!(err.to_string().contains("duplicate"), "{err}");
     // Code outside every event test becomes GS2 code outside functions; after
-    // an event test only a command or call is taken.
+    // an event test only a command or call is taken that way. Anything else
+    // runs the whole script from the GS1 dispatcher.
     compile::compile_gs1("x = 1;\nif (created) { hide; }\n", Era::V205).unwrap();
     compile::compile_gs1("if (created) { hide; }\ndontblock;\n", Era::V205).unwrap();
-    let err = compile::compile_gs1("if (created) { hide; }\nx = 1;\n", Era::V205).unwrap_err();
-    assert!(err.to_string().contains("top-level"), "{err}");
+    let got = compile::compile_gs1("if (created) { hide; }\nx = 1;\n", Era::V205).unwrap();
+    assert_eq!(names(&got), ["onCreated", "__gs1run"]);
+}
+
+fn names(s: &seihai_core::scripting::gs2::Script) -> Vec<&str> {
+    s.functions.iter().map(|f| f.name.as_str()).collect()
 }
 
 #[test]
-fn reading_an_event_flag_is_an_error() {
-    let err = compile::compile_gs1("if (created) { this.a = timeout; }\n", Era::V205).unwrap_err();
+fn reading_an_event_flag_inside_a_block_dispatches() {
+    // `timeout` read as a value inside `created`: the script runs whole,
+    // and the flag is `__gs1event == "timeout"`.
+    let got = compile::compile_gs1("if (created) { this.a = timeout; }\n", Era::V205).unwrap();
+    assert_eq!(names(&got), ["onCreated", "onTimeout", "__gs1run"]);
+    // Outside the dispatcher (in the script's own function) it stays an error.
+    let err = compile::compile_gs1(
+        "function f() { this.a = timeout; }\nif (created) f();\n",
+        Era::V217,
+    )
+    .unwrap_err();
     assert!(err.to_string().contains("event flag"), "{err}");
     let got = compile::compile_gs1("if (timeout) { timeout = 0.05; }\n", Era::V205).unwrap();
     assert_eq!(got.functions[0].name, "onTimeout");
@@ -497,7 +511,7 @@ fn malformed_and_unsupported_array_forms_fail_clearly() {
         ("{next(), next()}", "one element calls"),
         ("{next(), this.v}", "one element calls"),
         ("{random(0, 1), random(0, 1)}", "one element calls"),
-        ("{{1}, 2}", "that are lists"),
+        ("{{next()}, 2}", "that are lists"),
     ] {
         let source = format!(
             "function next() {{ return 1; }}\nfunction keep(v) {{ this.k = v; }}\nif (created) {{ keep({literal}); }}"
@@ -509,7 +523,8 @@ fn malformed_and_unsupported_array_forms_fail_clearly() {
     }
     assert!(compile::compile_gs1("if (created) { this.a = {1, 2}; }", Era::V205).is_err());
     assert!(compile_gs2("function onCreated() { this.a[0] = {1}; }").is_ok());
-    assert!(compile::compile_gs1("if (created) { this.a[0] = {1}; }", Era::V217).is_err());
+    // A list into an element lowers as GS2 writes it (`elemlist.gs2bc`).
+    assert!(compile::compile_gs1("if (created) { this.a[0] = {1}; }", Era::V217).is_ok());
 }
 
 /// Instructions `from..=to` with string operands written out, so two scripts
@@ -646,9 +661,11 @@ fn a_call_in_an_index_marks_the_function_as_calling() {
 fn element_forms_without_a_fixture_stay_errors() {
     let cases = [
         ("this.a[0, 1, 2] = 1;", "GS2 array opcodes take one or two"),
-        ("this.x = npcs[0].x;", "a field after an index"),
-        ("this.x = board[5];", "`board[..]`"),
-        ("this.x = tiles[1, 2];", "`tiles[..]`"),
+        ("this.x = npcs[0].save;", "a field after an index"),
+        ("players[0].x = 5;", "a field after an index"),
+        ("this.x = board[pick()];", "put the index in a variable"),
+        ("this.x = board[1, 2];", "one index"),
+        ("this.x = tiles[1];", "two indexes"),
     ];
     for (stmt, want) in cases {
         let source = format!("if (created) {{ {stmt} }}");
@@ -991,12 +1008,14 @@ fn repeated_event_tests_merge_into_one_function_in_source_order() {
     assert_eq!(ops(&merged), ops(&want));
     assert_eq!(merged.write(), want.write());
 
-    let err = compile::compile_gs1(
+    // A block that can return is not merged: the script dispatches whole,
+    // so the return still skips the blocks after it, as in GS1.
+    let got = compile::compile_gs1(
         "if (created) { if (x) return; hide; }\nif (created) show;\n",
         Era::V217,
     )
-    .unwrap_err();
-    assert!(err.to_string().contains("not merged"), "{err}");
+    .unwrap();
+    assert_eq!(names(&got), ["onCreated", "__gs1run"]);
 }
 
 #[test]
@@ -1019,8 +1038,11 @@ fn fixture_source(name: &str) -> String {
 }
 
 #[test]
-fn gs2_front_end_matches_six_fixtures() {
-    for name in ["shared", "timers", "strings", "lists", "rest", "objects"] {
+fn gs2_front_end_matches_ten_fixtures() {
+    for name in [
+        "shared", "timers", "strings", "lists", "rest", "objects", "members", "nested", "tiles",
+        "elemlist",
+    ] {
         let got = compile_gs2(&fixture_source(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
         let bytes = fixture(&format!("{name}.gs2bc"));
         let want = Script::parse(&bytes).unwrap();
@@ -1089,10 +1111,10 @@ fn gs1_top_level_join_and_guard_chains_lower() {
     assert!(dis.starts_with("    0  OP_TYPE_ARRAY"), "{dis}");
     assert!(dis.contains("\"join\""), "{dis}");
     assert_eq!(got.functions[0].name, "onPlayerTouchsMe");
-    // A call before the event would run in every GS1 event: not taken.
-    let err =
-        compile::compile_gs1("if (f() && playertouchsme) { hide; }\n", Era::V217).unwrap_err();
-    assert!(err.to_string().contains("too complex"), "{err}");
+    // A call before the event runs in every GS1 event, so the event is not
+    // lifted on its own: the script dispatches and calls `f()` first.
+    let got = compile::compile_gs1("if (f() && playertouchsme) { hide; }\n", Era::V217).unwrap();
+    assert_eq!(names(&got), ["onPlayerTouchsMe", "__gs1run"]);
 }
 
 #[test]
@@ -1157,4 +1179,72 @@ fn gs1_with_bodies_keep_commands_and_calls() {
         names[w + 1..end].iter().filter(|n| *n == "OP_CALL").count(),
         2
     );
+}
+
+/// #6: the forms the four 2026-11-14 fixtures settle lower to the same
+/// bytecode as the GS2 source: `players[i].x` / `.y` / `.dir` and
+/// `npcs[i].x` reads (`members.gs2bc`), lists inside literals
+/// (`nested.gs2bc`), a list stored into an element (`elemlist.gs2bc`) and
+/// `tiles[x, y]` read and written (`tiles.gs2bc`).
+#[test]
+fn gs1_element_members_nested_lists_and_tiles_match_gs2() {
+    for (gs1, gs2) in [
+        (
+            "this.a = players[0].x; this.b = players[1].y; this.c = players[this.a].dir; \
+             this.d = npcs[2].x;",
+            "this.a = players[0].x; this.b = players[1].y; this.c = players[this.a].dir; \
+             this.d = npcs[2].x;",
+        ),
+        (
+            "this.l = {1, {2, 3}, 4}; this.m = {{\"a\", \"b\"}, {\"c\"}};",
+            "this.l = {1, {2, 3}, 4}; this.m = {{\"a\", \"b\"}, {\"c\"}};",
+        ),
+        ("this.a[0] = {1, 2};", "this.a[0] = {1, 2};"),
+        (
+            "this.t = tiles[3, 4]; tiles[3, 4] = 5; updateboard 3, 4, 1, 1;",
+            "this.t = tiles[3, 4]; tiles[3, 4] = 5; updateboard(3, 4, 1, 1);",
+        ),
+    ] {
+        let got = compile::compile_gs1(&format!("if (created) {{ {gs1} }}"), Era::V217)
+            .unwrap_or_else(|e| panic!("{gs1}: {e}"));
+        let want = compile_gs2(&format!("function onCreated() {{ {gs2} }}")).unwrap();
+        assert_eq!(ops(&got), ops(&want), "{gs1}");
+        assert_eq!(got.strings, want.strings, "{gs1}");
+    }
+}
+
+/// #6: GS1's `board[i]` is GS2's `tiles[x, y]` with `k = i + 0.0001`
+/// (GS1 rounds the index down with that margin, `board-reads.md`): the
+/// tile at `int(k) % 64, int(k / 64)` while `0 <= k < 4096`, and 0 (a read)
+/// or nothing (a write) off the board.
+#[test]
+fn gs1_board_is_tiles_with_the_board_guard() {
+    let k = "this.i + 0.0001";
+    let cell = format!("tiles[int({k}) % 64, int(({k}) / 64)]");
+    let guard = format!("({k} >= 0 && {k} < 4096)");
+    for (gs1, gs2) in [
+        (
+            "this.t = board[this.i];".to_string(),
+            format!("this.t = {guard} ? {cell} : 0;"),
+        ),
+        (
+            "board[this.i] = 5;".to_string(),
+            format!("if {guard} {cell} = 5;"),
+        ),
+        (
+            "board[this.i] += 2;".to_string(),
+            format!("if {guard} {cell} = {cell} + 2;"),
+        ),
+        (
+            "board[this.i] = format(\"%d\", 3);".to_string(),
+            format!("temp.__gs1board0 = format(\"%d\", 3); if {guard} {cell} = temp.__gs1board0;"),
+        ),
+    ] {
+        let got = compile::compile_gs1(&format!("if (created) {{ {gs1} }}"), Era::V217)
+            .unwrap_or_else(|e| panic!("{gs1}: {e}"));
+        let want = compile_gs2(&format!("function onCreated() {{ {gs2} }}"))
+            .unwrap_or_else(|e| panic!("{gs2}: {e}"));
+        assert_eq!(ops(&got), ops(&want), "{gs1}");
+        assert_eq!(got.strings, want.strings, "{gs1}");
+    }
 }

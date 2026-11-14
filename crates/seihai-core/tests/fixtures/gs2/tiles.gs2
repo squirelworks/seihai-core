@@ -1,0 +1,5 @@
+function onCreated() {
+  temp.t = tiles[3, 4];
+  tiles[3, 4] = 5;
+  updateboard(3, 4, 1, 1);
+}
