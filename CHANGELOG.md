@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.2.x
 
+- **0.2.17**: A dispatched GS1 script runs its outside code for every event in that era's closed list, not only the events the script names.
 - **0.2.16**: GS1 suffix commands use the whole-script dispatcher to retain per-event source order.
 - **0.2.15**: GS1 unconditional prefixes run once per named event through the existing dispatcher, preserving eventless load and direct GS2 calls.
 - **0.2.14**: GS1 function calls after event tests retain source order through the existing whole-script dispatcher; direct GS2 calls stay unchanged.
