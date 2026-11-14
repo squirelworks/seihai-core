@@ -4,6 +4,10 @@ One line per release. The full notes for each version from 0.0.14 on are
 in [`release-notes/`](release-notes/) and on the GitHub release; the
 versioning rule is in the README.
 
+## 0.3.x
+
+- **0.3.0**: Breaking GANI placement-reference API preserves observed PARAM1 distinctly from numeric sprite zero; unresolved symbolic drawing is skipped.
+
 ## 0.2.x
 
 - **0.2.18**: Explicit Graal 2002 build descriptors and static GS1 word membership distinguish six builds sharing login tokens; generic eras and online profiles stay unchanged.

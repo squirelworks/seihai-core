@@ -14,10 +14,25 @@ pub struct GaniSprite {
     pub desc: String,
 }
 
+/// A placement source. PARAM1 is retained without claiming native resolution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GaniPlacementReference {
+    Sprite(u32),
+    Param1,
+}
+
+impl std::fmt::Display for GaniPlacementReference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Sprite(id) => write!(f, "{id}"),
+            Self::Param1 => f.write_str("PARAM1"),
+        }
+    }
+}
 /// One placed sprite inside an animation frame.
 #[derive(Debug, Clone)]
 pub struct GaniPlacement {
-    pub sprite_id: u32,
+    pub reference: GaniPlacementReference,
     pub x: i32,
     pub y: i32,
 }
@@ -96,7 +111,11 @@ fn parse_row(line: &str) -> Vec<GaniPlacement> {
         let parts: Vec<&str> = chunk.split_whitespace().collect();
         if parts.len() >= 3 {
             row.push(GaniPlacement {
-                sprite_id: parts[0].parse().unwrap_or(0),
+                reference: if parts[0] == "PARAM1" {
+                    GaniPlacementReference::Param1
+                } else {
+                    GaniPlacementReference::Sprite(parts[0].parse().unwrap_or(0))
+                },
                 x: parts[1].parse().unwrap_or(0),
                 y: parts[2].parse().unwrap_or(0),
             });
@@ -369,6 +388,22 @@ impl GaniPlayer {
 mod tests {
     use super::*;
 
+    #[test]
+    fn param1_is_distinct_from_numeric_zero_in_either_group() {
+        for row in ["PARAM1 3 5, 0 7 9", "0 7 9, PARAM1 3 5"] {
+            let g = Gani::parse(&format!("SINGLEDIRECTION\nANI\n{row}\nANIEND\n")).unwrap();
+            let placements = &g.frames[0].rows[0];
+            let symbolic = placements
+                .iter()
+                .find(|p| p.reference == GaniPlacementReference::Param1)
+                .unwrap();
+            assert_eq!((symbolic.x, symbolic.y), (3, 5));
+            assert_eq!(symbolic.reference.to_string(), "PARAM1");
+            assert!(placements
+                .iter()
+                .any(|p| p.reference == GaniPlacementReference::Sprite(0)));
+        }
+    }
     #[test]
     fn defaultattr_lines_fill_their_slots() {
         let g = Gani::parse("DEFAULTATTR1 hat0.png\nDEFAULTATTR3 star.png\nANI\n1 0 0\n1 0 0\n1 0 0\n1 0 0\nANIEND\n").unwrap();
