@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.2.x
 
+- **0.2.8**: the iPhone `KNOWN_TOKENS` labels list five more builds read from IPAs (Cocoto Kart Online 1.0 and 1.3, Cocoto Magic Circus 1.0, Ace Tennis 1.3); no new token.
 - **0.2.7**: `G3D18010` becomes a binary-read token (the 2010 iPhone engine: Cocoto Kart HD, Ace Tennis HD, Bomber Online 1.40, Dino Smash 1.4), and `G3D04048` is relabelled as the 2008 iPhone engine shared by 14 builds.
 - **0.2.6**: GS1 `set`, `unset` and `setstring` on a plain flag lower to an assignment to `client.gs1_<flag>`, which real 5.24r4 and 4.20r8 clients send and seihai-gserver keeps as `<flag>` (#30).
 - **0.2.5**: `read_gif_frames` reads every frame of an animated GIF as palette indices on the logical screen (disposal, delays, the `NETSCAPE2.0` loop count), for gif2mng in seihai-servertools.
