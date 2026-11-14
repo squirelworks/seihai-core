@@ -7,13 +7,20 @@
 //! `seihai_core::assets::read_png_rgb` or `read_png_rgba` already returns.
 //!
 //! The camera, chests and HUD stay with each client. This crate only
-//! composites tiles, sprites, gani frames and plain rectangles; the flat
+//! composites tiles, sprites, gani frames, text in a caller's font and
+//! plain rectangles; the flat
 //! view Ato and Issho share (`seihai-play`) draws through it.
 
 mod sprite;
+mod text;
 mod tiles;
 
+/// The font types [`draw_text`] takes, so a caller needs no direct
+/// dependency: `ab_glyph::FontArc::try_from_vec(bytes)`.
+pub use ab_glyph;
+
 pub use sprite::{draw_gani_frame, draw_sprite, SpriteSheets};
+pub use text::{draw_text, measure_text, Align, TextStyle};
 pub use tiles::{
     draw_level_tiles, draw_tile, tile_cell, BOARD_TILES, SHEET_COLS, SHEET_ROWS, TILE_PX,
 };
