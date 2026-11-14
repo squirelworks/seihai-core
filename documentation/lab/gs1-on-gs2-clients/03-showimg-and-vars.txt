@@ -1,0 +1,10 @@
+// Visible: a text showimg follows the player; client. vars round-trip.
+if (playerenters) {
+  client.seen = client.seen + 1;
+  timeout = 0.1;
+}
+if (timeout) {
+  showimg 1,@Arial@b@seen #v(client.seen) x=#v(int(playerx)),playerx,playery - 2;
+  changeimgcolors 1,1,1,0,1;
+  timeout = 0.1;
+}

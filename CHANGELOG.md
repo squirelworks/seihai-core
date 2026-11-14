@@ -6,7 +6,9 @@ versioning rule is in the README.
 
 ## 0.2.x
 
-- **0.2.2**: `KNOWN_TOKENS` gains the iPhone login tokens: Belote 1.2/1.50 `G3D04048` and Classic+ 1.13 `G3D0208A`, read from the IPAs, and three gs2lib-only iPhone tokens (83 rows).
+- **0.2.4**: `KNOWN_TOKENS` gains the iPhone login tokens: Belote 1.2/1.50 `G3D04048` and Classic+ 1.13 `G3D0208A`, read from the IPAs, and three gs2lib-only iPhone tokens (83 rows).
+- **0.2.3**: Binary level writer: `encode_binary` writes `GR-V1.03` (`.graal`) and `Z3-V1.04` (`.zelda`) and reports what each format cannot hold; `encode_board` and `encode_sign_text`; `write_mng` and `write_indexed_png` for gif2mng-style animations.
+- **0.2.2**: Whole-script GS1 runs from one dispatcher (1,204 of the 1,765 level scripts we hold now compile, from 957); GS1 `board[i]` lowers to `tiles[x, y]`; `#I` and `#L`; the `gs1c` example and a lab kit for original clients; the profile audit, connection capabilities and an id-108 check from the roadmap (#7).
 - **0.2.1**: GS1 lowering of `players[i].x` / `.y` / `.dir` and `npcs[i]` reads, `tiles[x, y]`, lists inside literals and a list into an element, from four new compiler fixtures; GS2 no longer converts an array element before a member read.
 - **0.2.0**: GS2 weapon and class scripts from `PLO_NPCWEAPONSCRIPT` (140), NPC scripts sent after their level or for a gmap neighbour handed to the game, `player.*` reads and writes in GS2 (`player.chat` included), and `.mid` music from a small built-in synthesizer. Breaking: new fields in `OwnWeapons` and `EffectHost`, and `.mid` now plays.
 

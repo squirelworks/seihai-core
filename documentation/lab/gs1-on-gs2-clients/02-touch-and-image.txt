@@ -1,0 +1,10 @@
+// Visible: touching the NPC swaps its image and the player says the count.
+if (playerenters) {
+  setimg block.png;
+  this.hits = 0;
+}
+if (playertouchsme) {
+  this.hits += 1;
+  setimg bush.png;
+  setplayerprop #c,touched #v(this.hits);
+}
