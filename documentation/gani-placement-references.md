@@ -1,6 +1,6 @@
 # GANI PARAM1 placement preservation
 
-Shipped-resource structural research reports uppercase PARAM1 as the first token of a three-field ANI placement group in Classic+1.13 and Era+1.0. The observed forms use SINGLEDIRECTION, two comma groups and positive integer coordinates. This is file-structure evidence, not a native playback observation. No original resource contents are included here.
+Primary evidence receipt IOS-GANI-PARAM1-20261115-04 (static shipped-file structural observation, reviewed by the corpus lead) reports uppercase PARAM1 as the first token of a three-field ANI placement group in Classic+1.13 and Era+1.0. The observed forms use SINGLEDIRECTION, two comma groups and positive integer coordinates. This is file-structure evidence, not a native playback observation. No original resource contents are included here.
 
 GaniPlacement now stores GaniPlacementReference rather than a numeric-only sprite_id. Sprite(0) and Param1 are distinct. The reference implements Display for downstream serializers. The drawing helper resolves only Sprite references; Param1 is skipped until its native resolution contract is established. Other slots, ATTR placement syntax, case variants and native coordinate acceptance are not established by this change. Existing numeric parsing remains unchanged.
 
