@@ -28,6 +28,26 @@ fn num(m: &Machine, name: &str) -> f64 {
 }
 
 #[test]
+fn suffix_function_calls_follow_the_event_body_without_replaying_direct_calls() {
+    let src = "if (created) { this.n = 10; } if (timeout) { this.n = 20; } bump(); function bump() { this.n += 1; }";
+    let (mut m, mut host) = machine(src);
+    assert_eq!(num(&m, "n"), 0.0, "the suffix must not run during load");
+    fire(&mut m, &mut host, "onCreated");
+    assert_eq!(num(&m, "n"), 11.0);
+    fire(&mut m, &mut host, "onTimeout");
+    assert_eq!(num(&m, "n"), 21.0);
+    fire(&mut m, &mut host, "bump");
+    assert_eq!(
+        num(&m, "n"),
+        22.0,
+        "direct calls execute only their function"
+    );
+    let (mut control, mut control_host) = machine("if (created) { this.n = 10; } this.n += 1;");
+    fire(&mut control, &mut control_host, "onCreated");
+    assert_eq!(num(&control, "n"), 11.0, "suffix assignment control");
+}
+
+#[test]
 fn code_between_event_tests_runs_in_source_order_on_each_event() {
     let src = "\
 if (created) { this.order = 1; }
