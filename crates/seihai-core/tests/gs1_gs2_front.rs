@@ -1113,8 +1113,8 @@ fn gs1_top_level_join_and_guard_chains_lower() {
     )
     .unwrap();
     let dis = got.disassemble();
-    assert!(dis.starts_with("    0  OP_TYPE_ARRAY"), "{dis}");
     assert!(dis.contains("\"join\""), "{dis}");
+    assert_eq!(names(&got), ["onPlayerTouchsMe", "__gs1run"]);
     assert_eq!(got.functions[0].name, "onPlayerTouchsMe");
     // A call before the event runs in every GS1 event, so the event is not
     // lifted on its own: the script dispatches and calls `f()` first.
