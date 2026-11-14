@@ -1,0 +1,9 @@
+# GANI PARAM1 placement preservation
+
+Shipped-resource structural research reports uppercase PARAM1 as the first token of a three-field ANI placement group in Classic+1.13 and Era+1.0. The observed forms use SINGLEDIRECTION, two comma groups and positive integer coordinates. This is file-structure evidence, not a native playback observation. No original resource contents are included here.
+
+GaniPlacement now stores GaniPlacementReference rather than a numeric-only sprite_id. Sprite(0) and Param1 are distinct. The reference implements Display for downstream serializers. The drawing helper resolves only Sprite references; Param1 is skipped until its native resolution contract is established. Other slots, ATTR placement syntax, case variants and native coordinate acceptance are not established by this change. Existing numeric parsing remains unchanged.
+
+Known consumer migration: seihai-draw matches the reference explicitly. Servertools lat-core gani encoder must serialize reference instead of sprite_id, and numeric assertions must use Sprite variants. Its existing pinned dependency is unaffected; migrate the encoder and paired dependency pins in a separate PR after an owner-approved core release/tag. No tag is created here. This inventory is bounded, not an assertion that every downstream caller has been located.
+
+Independent synthetic parser fixtures distinguish PARAM1 from numeric zero in either comma-group position. A synthetic drawing control draws numeric zero from a one-pixel sheet while unresolved PARAM1 remains transparent. These tests establish this implementation's preservation and fallback only, not native rendering, slot resolution, timing or GANI0002 units.

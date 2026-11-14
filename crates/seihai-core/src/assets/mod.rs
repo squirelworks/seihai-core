@@ -27,7 +27,8 @@ pub use tiledefs::{load_tiledefs, parse_tiledefs, TileDef};
 pub use chr::{Character, CHR_MAGIC};
 pub use crc32::{crc32, crc32_update};
 pub use gani::{
-    Gani, GaniFrame, GaniPlacement, GaniPlayer, GaniSound, GaniSprite, LISTENER_DX, LISTENER_DY,
+    Gani, GaniFrame, GaniPlacement, GaniPlacementReference, GaniPlayer, GaniSound, GaniSprite,
+    LISTENER_DX, LISTENER_DY,
 };
 pub use gani_movie::{Actor, ActorKind, GaniMovie, Keyframe};
 pub use gif::{read_gif_frames, GifFrames};

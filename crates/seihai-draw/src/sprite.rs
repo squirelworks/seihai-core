@@ -1,6 +1,6 @@
 //! One sprite rectangle, and one frame of a gani.
 
-use seihai_core::assets::Gani;
+use seihai_core::assets::{Gani, GaniPlacementReference};
 
 use crate::{blit, CopyMode, Image, PixelBuffer};
 
@@ -68,7 +68,10 @@ pub fn draw_gani_frame(
         return;
     };
     for place in row {
-        let Some(sprite) = gani.sprites.iter().find(|s| s.id == place.sprite_id) else {
+        let GaniPlacementReference::Sprite(id) = place.reference else {
+            continue;
+        };
+        let Some(sprite) = gani.sprites.iter().find(|s| s.id == id) else {
             continue;
         };
         let Some(image) = sheet_named(sheets, &sprite.sheet) else {
@@ -112,6 +115,29 @@ mod tests {
         Gani::parse(text).unwrap()
     }
 
+    #[test]
+    fn unresolved_param1_never_draws_numeric_zero() {
+        let sheets_data = [19, 37, 53];
+        let sheets = SpriteSheets {
+            head: Some(Image::rgb(&sheets_data, 1, 1)),
+            ..Default::default()
+        };
+        for token in ["PARAM1", "0"] {
+            let g = gani(&format!(
+                "SPRITE 0 HEAD 0 0 1 1\nSINGLEDIRECTION\nANI\n{token} 1 1\nANIEND\n"
+            ));
+            let mut buf = PixelBuffer::filled(3, 3, [0, 0, 0, 0]);
+            draw_gani_frame(&mut buf, &g, 0, 0, &sheets, 0, 0);
+            assert_eq!(
+                buf.pixel(1, 1),
+                Some(if token == "0" {
+                    [19, 37, 53, 255]
+                } else {
+                    [0, 0, 0, 0]
+                })
+            );
+        }
+    }
     #[test]
     fn a_sprite_skips_clear_and_magenta_and_writes_the_rest() {
         let rgba = [
