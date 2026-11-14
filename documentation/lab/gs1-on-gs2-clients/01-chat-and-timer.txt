@@ -1,0 +1,11 @@
+// Visible: the NPC says "gs1 ok" on creation, then counts every second.
+if (created) {
+  this.n = 0;
+  setplayerprop #c,gs1 ok;
+  timeout = 1;
+}
+if (timeout) {
+  this.n = this.n + 1;
+  message n=#v(this.n);
+  timeout = 1;
+}
