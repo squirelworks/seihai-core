@@ -1,0 +1,3 @@
+if (playertouchsme) {
+  message x=#v(x) y=#v(y) t=#v(tiles[x + 3, y]);
+}

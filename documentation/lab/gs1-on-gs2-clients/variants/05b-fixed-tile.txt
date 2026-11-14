@@ -1,0 +1,4 @@
+if (playertouchsme) {
+  tiles[33, 27] = 2047;
+  updateboard 33, 27, 1, 1;
+}
