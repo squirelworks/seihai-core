@@ -277,11 +277,34 @@ fn commands_and_functions_without_gs2_are_errors() {
     compile::compile_gs1("x = 1;\nif (created) { hide; }\n", Era::V205).unwrap();
     compile::compile_gs1("if (created) { hide; }\ndontblock;\n", Era::V205).unwrap();
     let got = compile::compile_gs1("if (created) { hide; }\nx = 1;\n", Era::V205).unwrap();
-    assert_eq!(names(&got), ["onCreated", "__gs1run"]);
+    assert_dispatched(&got, Era::V205, &["onCreated"]);
 }
 
 fn names(s: &seihai_core::scripting::gs2::Script) -> Vec<&str> {
     s.functions.iter().map(|f| f.name.as_str()).collect()
+}
+
+/// A dispatched script lists the events it names first, then every other
+/// event in the era's closed list, then `__gs1run`.
+fn assert_dispatched(script: &Script, era: Era, named: &[&str]) {
+    let got = names(script);
+    assert!(got.starts_with(named), "named events stay first: {got:?}");
+    assert_eq!(got.last().copied(), Some("__gs1run"));
+    let mut expect: Vec<String> = named.iter().map(|s| (*s).to_string()).collect();
+    for &(event, since) in seihai_core::scripting::engine::vocab::EVENTS {
+        if since <= era {
+            let function = gs2_event_function(event);
+            if !expect.iter().any(|name| name == &function) {
+                expect.push(function);
+            }
+        }
+    }
+    expect.push("__gs1run".into());
+    assert_eq!(
+        got,
+        expect.iter().map(String::as_str).collect::<Vec<_>>(),
+        "era {era:?}"
+    );
 }
 
 #[test]
@@ -289,7 +312,7 @@ fn reading_an_event_flag_inside_a_block_dispatches() {
     // `timeout` read as a value inside `created`: the script runs whole,
     // and the flag is `__gs1event == "timeout"`.
     let got = compile::compile_gs1("if (created) { this.a = timeout; }\n", Era::V205).unwrap();
-    assert_eq!(names(&got), ["onCreated", "onTimeout", "__gs1run"]);
+    assert_dispatched(&got, Era::V205, &["onCreated", "onTimeout"]);
     // Outside the dispatcher (in the script's own function) it stays an error.
     let err = compile::compile_gs1(
         "function f() { this.a = timeout; }\nif (created) f();\n",
@@ -1020,7 +1043,7 @@ fn repeated_event_tests_merge_into_one_function_in_source_order() {
         Era::V217,
     )
     .unwrap();
-    assert_eq!(names(&got), ["onCreated", "__gs1run"]);
+    assert_dispatched(&got, Era::V217, &["onCreated"]);
 }
 
 #[test]
@@ -1114,12 +1137,12 @@ fn gs1_top_level_join_and_guard_chains_lower() {
     .unwrap();
     let dis = got.disassemble();
     assert!(dis.contains("\"join\""), "{dis}");
-    assert_eq!(names(&got), ["onPlayerTouchsMe", "__gs1run"]);
+    assert_dispatched(&got, Era::V217, &["onPlayerTouchsMe"]);
     assert_eq!(got.functions[0].name, "onPlayerTouchsMe");
     // A call before the event runs in every GS1 event, so the event is not
     // lifted on its own: the script dispatches and calls `f()` first.
     let got = compile::compile_gs1("if (f() && playertouchsme) { hide; }\n", Era::V217).unwrap();
-    assert_eq!(names(&got), ["onPlayerTouchsMe", "__gs1run"]);
+    assert_dispatched(&got, Era::V217, &["onPlayerTouchsMe"]);
 }
 
 #[test]
