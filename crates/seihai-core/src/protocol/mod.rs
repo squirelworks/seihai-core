@@ -15,6 +15,7 @@ pub mod flagset;
 mod frame;
 mod gen3;
 mod gen5;
+pub mod graal2002;
 pub mod layouts;
 pub mod levelcache;
 mod list;
