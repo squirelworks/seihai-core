@@ -179,7 +179,10 @@ fn sleeping_dispatch_resumes_without_replaying_prefix_or_skipping_suffix() {
     let (mut m, mut host) = machine(
         "function bump() { this.order += 1; } this.runs += 1; if (created) { this.order = 10; sleep 0.1; this.order *= 10; } bump();",
     );
-    assert_eq!(m.call_event("onCreated", &[], &mut host), Outcome::Sleep(0.1));
+    assert_eq!(
+        m.call_event("onCreated", &[], &mut host),
+        Outcome::Sleep(0.1)
+    );
     assert_eq!((num(&m, "runs"), num(&m, "order")), (1.0, 10.0));
     assert_eq!(m.resume(&mut host), Outcome::Done);
     assert_eq!((num(&m, "runs"), num(&m, "order")), (1.0, 101.0));
@@ -193,10 +196,9 @@ fn eventless_scripts_keep_top_level_execution() {
 
 #[test]
 fn direct_gs2_public_calls_do_not_replay_top_level_code() {
-    let script = compile::compile_gs2(
-        "this.loads += 1; public function bump() { this.calls += 1; }",
-    )
-    .unwrap();
+    let script =
+        compile::compile_gs2("this.loads += 1; public function bump() { this.calls += 1; }")
+            .unwrap();
     let mut m = Machine::new(script);
     let mut host = EffectHost::new(Era::V217, 3);
     assert_eq!(m.run_top_level(&mut host), Outcome::Done);
