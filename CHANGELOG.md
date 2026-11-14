@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.2.x
 
+- **0.2.15**: GS1 unconditional prefixes run once per named event through the existing dispatcher, preserving eventless load and direct GS2 calls.
 - **0.2.14**: GS1 function calls after event tests retain source order through the existing whole-script dispatcher; direct GS2 calls stay unchanged.
 - **0.2.13**: GS1 `setplayerprop` compiles to `player.*` and `playerscount` to `players.size()`, from the first 6.03r7 run of Seihai's bytecode.
 - **0.2.12**: `assets::chr`: classic character files (`.chr`, `.chi`, `CHR:1.00name=head,sex,five colours`) read and written, as Graal Character Designer and GChar wrote them; `Character::looks` for drawing.

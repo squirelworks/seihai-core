@@ -220,6 +220,14 @@ fn lift(body: Vec<g::Stmt>, era: Era) -> Result<Vec<Raw>, CompileErrors> {
                     "event test is too complex to lower; split it into one if per event",
                 )),
                 Arms::Events(arms) => {
+                    // A prefix belongs to every named GS1 event run, not
+                    // the GS2 load pass. Use the existing dispatcher rather
+                    // than leaving it as one-time top-level code.
+                    if !seen_event && items.iter().any(|item| matches!(item, Raw::Code(_))) {
+                        errors.push(err(
+                            "a prefix before event tests needs the whole-script dispatcher",
+                        ));
+                    }
                     seen_event = true;
                     if els.is_some() {
                         errors.push(err("an event test with else has no single GS2 function"));
@@ -409,8 +417,9 @@ fn expr_events(x: &g::Expr, era: Era, out: &mut Vec<String>) {
 /// A GS1 statement outside every event test. GS1 runs it in every event,
 /// in source order. It becomes GS2 code outside functions, which the Linux
 /// 4.04r2 experiment saw run before each event's handler (Graal_analysis
-/// `client-internals/linux-404r2-events.md`). Before the first event test
-/// the order is the same. After one, only commands are taken
+/// `client-internals/linux-404r2-events.md`). A prefix before named event
+/// tests instead selects the dispatcher, so callers need not replay the
+/// GS2 load pass on each event. After one, only commands are taken
 /// (`join`, `dontblock`, `setshape` and the like, which set state); an
 /// assignment, call, `if` or loop there could see a different order, so
 /// this lift rejects it and lets the whole-script dispatcher preserve it.

@@ -161,3 +161,48 @@ fn a_string_name_built_at_run_time_is_makevar() {
     // A plain flag name built at run time is still a player flag: refused.
     assert!(compile::compile_gs1("if (created) { message #s(w#v(1)); }\n", Era::V217).is_err());
 }
+
+#[test]
+fn unconditional_prefix_repeats_before_each_named_event() {
+    let (mut m, mut host) = machine(
+        "this.runs += 1; if (created) { this.created = this.runs; } if (timeout) { this.timed = this.runs; }",
+    );
+    assert_eq!(num(&m, "runs"), 0.0, "loading must not run the prefix");
+    fire(&mut m, &mut host, "onCreated");
+    assert_eq!((num(&m, "runs"), num(&m, "created")), (1.0, 1.0));
+    fire(&mut m, &mut host, "onTimeout");
+    assert_eq!((num(&m, "runs"), num(&m, "timed")), (2.0, 2.0));
+}
+
+#[test]
+fn sleeping_dispatch_resumes_without_replaying_prefix_or_skipping_suffix() {
+    let (mut m, mut host) = machine(
+        "function bump() { this.order += 1; } this.runs += 1; if (created) { this.order = 10; sleep 0.1; this.order *= 10; } bump();",
+    );
+    assert_eq!(
+        m.call_event("onCreated", &[], &mut host),
+        Outcome::Sleep(0.1)
+    );
+    assert_eq!((num(&m, "runs"), num(&m, "order")), (1.0, 10.0));
+    assert_eq!(m.resume(&mut host), Outcome::Done);
+    assert_eq!((num(&m, "runs"), num(&m, "order")), (1.0, 101.0));
+}
+
+#[test]
+fn eventless_scripts_keep_top_level_execution() {
+    let (m, _) = machine("this.loaded += 1;");
+    assert_eq!(num(&m, "loaded"), 1.0);
+}
+
+#[test]
+fn direct_gs2_public_calls_do_not_replay_top_level_code() {
+    let script =
+        compile::compile_gs2("this.loads += 1; public function bump() { this.calls += 1; }")
+            .unwrap();
+    let mut m = Machine::new(script);
+    let mut host = EffectHost::new(Era::V217, 3);
+    assert_eq!(m.run_top_level(&mut host), Outcome::Done);
+    fire(&mut m, &mut host, "bump");
+    fire(&mut m, &mut host, "bump");
+    assert_eq!((num(&m, "loads"), num(&m, "calls")), (1.0, 2.0));
+}
