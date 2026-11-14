@@ -287,33 +287,51 @@ pub(super) const DISPATCH_PARAM: &str = "__gs1event";
 
 /// A GS1 script as GS1 runs it: the whole script, top to bottom, once per
 /// event, with the event flags telling which event this is. For each event
-/// the script tests anywhere, `onEvent()` calls `__gs1run("event")`, and
-/// `__gs1run(__gs1event)` holds every statement outside the script's own
-/// functions, in source order, with each event flag read as
-/// `__gs1event == "event"`. Nothing is left as GS2 top-level code, so no
-/// statement runs before or after where GS1 runs it.
+/// in the era's closed list, and for each `action…` name the script tests,
+/// `onEvent()` calls `__gs1run("event")`. `__gs1run` holds every statement
+/// outside the script's own functions, in source order, with each event
+/// flag read as `__gs1event == "event"`. Nothing is left as GS2 top-level
+/// code, so no statement runs before or after where GS1 runs it.
 ///
-/// One difference stays: GS1 runs the script for every event the NPC gets,
-/// and here it runs for the events the script names. Code outside every
-/// event test therefore runs on those events only.
+/// Events the script names stay first, in first-use order, so a handler the
+/// script tests is still the function a caller finds under that name.
+/// `action…` names are open ended, so an action the script never tests has
+/// no wrapper. A script function whose name is already that event's GS2
+/// name is left as written; a second wrapper would be a duplicate function.
 fn dispatch(body: Vec<g::Stmt>, era: Era) -> Vec<Raw> {
     let mut events: Vec<String> = Vec::new();
     for st in &body {
         stmt_events(st, era, &mut events);
     }
+    // GS1 runs the body for every event the host gives the NPC, including
+    // events the script never tests. The closed list is [`vocab::EVENTS`];
+    // it is the same list [`crate::scripting::engine::world`] will fire.
+    for &(name, since) in vocab::EVENTS {
+        if since <= era && !events.iter().any(|event| event == name) {
+            events.push(name.to_string());
+        }
+    }
     let mut items = Vec::new();
     let mut code = Vec::new();
+    let mut own = Vec::new();
     for st in body {
         match st {
             g::Stmt::Function { name, params, body } => {
+                own.push(name.clone());
                 items.push(Raw::Function { name, params, body })
             }
             other => code.push(other),
         }
     }
+    let mut wrapped = Vec::new();
     for ev in &events {
+        let name = gs2_event_function(ev);
+        if own.iter().any(|n| n == &name) || wrapped.iter().any(|n| n == &name) {
+            continue;
+        }
+        wrapped.push(name.clone());
         items.push(Raw::Function {
-            name: gs2_event_function(ev),
+            name,
             params: Vec::new(),
             body: vec![g::Stmt::Call {
                 name: DISPATCH.into(),
