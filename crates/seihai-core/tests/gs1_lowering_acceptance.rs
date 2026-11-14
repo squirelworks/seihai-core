@@ -44,11 +44,14 @@ fn created(script: Script) -> (Machine, EffectHost) {
 }
 
 #[test]
-fn flag_writes_are_the_gs2_set_and_unset_calls() {
-    // `set` and `unset` by name: `shared.gs2` and `calls.gs2`.
+fn flag_writes_are_client_variable_assignments() {
+    // A real 5.24r4 and 4.20r8 have no GS2 `set()`/`unset()` and send
+    // PLI 18/19 for an assignment to a `client.` variable: `= true` as
+    // `name=1`, `= ""` as a clear (lab, 2026-11-14, #30). A plain name is
+    // sent as `client.gs1_<flag>`, which seihai-gserver keeps as `<flag>`.
     let s = same(
-        "if (created) {\n  set gotkey;\n  setstring door,open;\n  unset gotkey;\n  setstring door,;\n}\n",
-        "function onCreated() {\n  set(\"gotkey\");\n  set(\"door=open\");\n  unset(\"gotkey\");\n  unset(\"door\");\n}\n",
+        "if (created) {\n  set gotkey;\n  setstring door,open;\n  unset gotkey;\n  setstring door,;\n  set client.seen;\n  set quest.started;\n  set mood=calm;\n}\n",
+        "function onCreated() {\n  client.gs1_gotkey = true;\n  client.gs1_door = \"open\";\n  client.gs1_gotkey = \"\";\n  client.gs1_door = \"\";\n  client.seen = true;\n  client.gs1_quest.started = true;\n  client.gs1_mood = \"calm\";\n}\n",
     );
     let (_, host) = created(s);
     let flags: Vec<_> = host
@@ -63,12 +66,25 @@ fn flag_writes_are_the_gs2_set_and_unset_calls() {
     assert_eq!(
         flags,
         [
-            "set gotkey=Some(\"\")",
-            "set door=Some(\"open\")",
-            "unset gotkey",
-            "unset door"
+            "set client.gs1_gotkey=Some(\"1\")",
+            "set client.gs1_door=Some(\"open\")",
+            "unset client.gs1_gotkey",
+            "unset client.gs1_door",
+            "set client.seen=Some(\"1\")",
+            "set client.gs1_quest.started=Some(\"1\")",
+            "set client.gs1_mood=Some(\"calm\")"
         ]
     );
+    // Flags a client script cannot send, and names made at run time.
+    for src in ["set local.x;", "unset server.x;", "set #s(a);"] {
+        let err = compile::compile_gs1(&format!("if (created) {{ {src} }}\n"), Era::V217)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("not lowered") || err.contains("plain flag"),
+            "{src}: {err}"
+        );
+    }
 }
 
 #[test]
@@ -77,7 +93,7 @@ fn reading_a_flag_by_its_plain_name_reads_the_player_flag() {
     // flag as `player.gotkey` (lab probe, 2026-11-13).
     same(
         "if (playerenters) { set gotkey; }\nif (playertouchsme && gotkey) { hide; }\n",
-        "function onPlayerEnters() { set(\"gotkey\"); }\nfunction onPlayerTouchsMe() { if (player.gotkey) { hide(); } }\n",
+        "function onPlayerEnters() { client.gs1_gotkey = true; }\nfunction onPlayerTouchsMe() { if (player.gotkey) { hide(); } }\n",
     );
     // Writing it by its plain name is still refused.
     let err = compile::compile_gs1("if (created) { set gotkey; gotkey = 2; }\n", Era::V217)

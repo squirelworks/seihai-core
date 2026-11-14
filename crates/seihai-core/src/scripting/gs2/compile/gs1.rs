@@ -608,7 +608,7 @@ fn stmt_calls(s: &g::Stmt, gs1: bool) -> bool {
         g::Stmt::Assign { target, value, .. } => index(target) || e(value),
         g::Stmt::Call { name, args, .. } => name_is_call(name, gs1) || args.iter().any(e),
         g::Stmt::Command { name, args, .. } => {
-            command_is_call(name, args, gs1)
+            command_is_call(name, gs1)
                 || args
                     .iter()
                     .any(|a| matches!(a, g::Arg::Num(x) if expr_calls(x, gs1)))
@@ -623,15 +623,10 @@ fn stmt_calls(s: &g::Stmt, gs1: bool) -> bool {
 /// what it is lowered to: `setstring this.a,1;` and `setcharprop` become
 /// assignments, which do not; a flag `setstring` is a `set` call, and the
 /// list and `tokenize` forms are method calls, which do.
-fn command_is_call(name: &str, args: &[g::Arg], gs1: bool) -> bool {
+fn command_is_call(name: &str, gs1: bool) -> bool {
     match name {
-        "setstring" => !matches!(
-            args.first(),
-            Some(g::Arg::Text(t)) if {
-                let t = t.trim().to_ascii_lowercase();
-                t.starts_with("this.") || t.starts_with("client.")
-            }
-        ),
+        // Lowered to an assignment to a `client.` (or `this.`) variable.
+        "setstring" | "set" | "unset" => false,
         "setcharprop" => false,
         _ => name_is_call(name, gs1),
     }
@@ -1077,6 +1072,15 @@ fn player_flags(s: &g::Stmt, out: &mut Vec<String>) {
     }
 }
 
+/// The prefix a GS1 player flag written by its plain name gets in GS2.
+/// A GS2 client sends only `client.` flags to the server (the real 2.31
+/// and 4.04r2, lab 2026-10-31; a 5.24r4 sends nothing for
+/// `player.<flag> = ...`, lab 2026-11-13), so `set gotkey;` becomes
+/// `set("client.gs1_gotkey")` and seihai-gserver keeps it as `gotkey` and
+/// sends it straight back, where `player.gotkey` reads it (seihai-core#30,
+/// seihai-gserver#129).
+pub const GS1_FLAG_PREFIX: &str = "client.gs1_";
+
 /// A GS1 value whose reading cannot depend on when it is read.
 fn is_constant(e: &g::Expr) -> bool {
     match e {
@@ -1385,9 +1389,9 @@ impl Lower {
             && self.flags.contains(&v.name.to_ascii_lowercase())
         {
             self.err(format!(
-                "`{}` is a player flag the script sets; writing a GS1 flag by its plain name, or \
+                "`{}` is a player flag the script sets; assigning to it by its plain name, or \
                  reading it inside `with`, has no client-checked GS2 form (a 5.x client sends \
-                 no flag for `player.{}` = ...)",
+                 no flag for `player.{}` = ...); use `set` or `setstring`",
                 v.name, v.name
             ));
         }
@@ -1707,20 +1711,42 @@ impl Lower {
                         op: AssignOp::Set,
                         value: self.expr(&v),
                     }
-                } else if matches!(&v, g::Expr::Str(s) if s.is_empty()) {
-                    Stmt::Call {
-                        name: "unset".into(),
-                        args: vec![Expr::Str(var)],
-                    }
                 } else {
-                    let text = match &v {
-                        g::Expr::Str(s) if !s.contains('#') => Expr::Str(format!("{var}={s}")),
-                        _ => Expr::bin(BinOp::Cat, Expr::Str(format!("{var}=")), self.expr(&v)),
+                    let Some(flag) = self.sent_flag(name, &var) else {
+                        return Some(Stmt::empty());
                     };
-                    Stmt::Call {
-                        name: "set".into(),
-                        args: vec![text],
+                    Stmt::Assign {
+                        target: Var::plain(flag),
+                        op: AssignOp::Set,
+                        value: self.expr(&v),
                     }
+                }
+            }
+            // `set x;` is `client.gs1_x = true;` and `unset x;` is
+            // `client.gs1_x = "";`: a real 5.24r4 and 4.20r8 have no GS2
+            // `set()`/`unset()` ("Function set not found", nothing sent), and
+            // send PLI 18 or 19 for an assignment to a `client.` variable
+            // (lab, 2026-11-14, #30).
+            "set" | "unset" => {
+                let Some(g::Arg::Text(t)) = args.first() else {
+                    return None;
+                };
+                // `set door=open;` carries a value, as `setstring` does.
+                let (t, value) = match t.trim().split_once('=') {
+                    Some((n, v)) if name == "set" => (n.trim(), Some(v.trim())),
+                    _ => (t.trim(), None),
+                };
+                let Some(flag) = self.sent_flag(name, t) else {
+                    return Some(Stmt::empty());
+                };
+                Stmt::Assign {
+                    target: Var::plain(flag),
+                    op: AssignOp::Set,
+                    value: match value {
+                        Some(v) => self.text(v),
+                        None if name == "set" => Expr::var("true"),
+                        None => Expr::Str(String::new()),
+                    },
                 }
             }
             "addstring" | "insertstring" | "replacestring" | "removestring" | "deletestring" => {
@@ -1860,6 +1886,34 @@ impl Lower {
                 args: lowered,
             }
         }
+    }
+
+    /// The `client.` variable a GS1 `set`, `unset` or `setstring` on
+    /// `flag` writes: a `client.` or `this.` name as written, any other
+    /// plain name (dots allowed) with [`GS1_FLAG_PREFIX`]. A name made at
+    /// run time and the `local.`, `clientr.`, `server.` and `serverr.`
+    /// prefixes, which a client script cannot send, are errors.
+    fn sent_flag(&mut self, cmd: &str, flag: &str) -> Option<String> {
+        let lower = flag.to_ascii_lowercase();
+        if lower.starts_with("client.") || lower.starts_with("this.") {
+            return Some(self.name(flag));
+        }
+        if flag.is_empty() || flag.contains('#') || !is_plain_name(&lower) {
+            self.err(format!(
+                "`{cmd} {flag}`: only a plain flag name is lowered (GS2 has no `set()`)"
+            ));
+            return None;
+        }
+        if ["local.", "clientr.", "server.", "serverr."]
+            .iter()
+            .any(|p| lower.starts_with(p))
+        {
+            self.err(format!(
+                "`{cmd} {flag}`: a GS2 client script cannot send this flag; it is not lowered"
+            ));
+            return None;
+        }
+        Some(format!("{GS1_FLAG_PREFIX}{flag}"))
     }
 
     fn text(&mut self, s: &str) -> Expr {
