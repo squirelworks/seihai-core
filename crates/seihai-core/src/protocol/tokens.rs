@@ -341,7 +341,7 @@ pub const KNOWN_TOKENS: &[KnownToken] = {
             "G3D04048",
             G::Binary,
             K::Game,
-            "iPhone Belote 1.2 and 1.50 (gs2lib names it iPhone 1.1)",
+            "iPhone 2008 engine: Belote 1.2/1.50 and 12 more builds, 2008-2010 (gs2lib iPhone 1.1)",
             &[],
         ),
         KnownToken::new(
@@ -353,9 +353,9 @@ pub const KNOWN_TOKENS: &[KnownToken] = {
         ),
         KnownToken::new(
             "G3D18010",
-            G::ListOnly,
+            G::Binary,
             K::Game,
-            "iPhone 1.5 (gs2lib name; app not identified)",
+            "iPhone 2010 engine: Cocoto Kart HD 1.1, Ace Tennis HD 1.0, Bomber Online 1.40, Dino Smash 1.4 (gs2lib iPhone 1.5)",
             &[],
         ),
         KnownToken::new(
