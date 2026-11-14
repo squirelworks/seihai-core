@@ -414,22 +414,18 @@ fn expr_events(x: &g::Expr, era: Era, out: &mut Vec<String>) {
     }
 }
 
-/// A GS1 statement outside every event test. GS1 runs it in every event,
-/// in source order. It becomes GS2 code outside functions, which the Linux
-/// 4.04r2 experiment saw run before each event's handler (Graal_analysis
-/// `client-internals/linux-404r2-events.md`). A prefix before named event
-/// tests instead selects the dispatcher, so callers need not replay the
-/// GS2 load pass on each event. After one, only commands are taken
-/// (`join`, `dontblock`, `setshape` and the like, which set state); an
-/// assignment, call, `if` or loop there could see a different order, so
-/// this lift rejects it and lets the whole-script dispatcher preserve it.
+/// Collect a statement outside event tests for a possible structured lift.
+/// A suffix, including a command, must stay after the event body. Reject
+/// that lift and let the existing whole-script dispatcher retain source
+/// order. Prefixes before named events also select the dispatcher in
+/// `lift`; eventless scripts retain their load-time execution.
 fn top_level(
     items: &mut Vec<Raw>,
     errors: &mut Vec<CompileError>,
     stmt: g::Stmt,
     seen_event: bool,
 ) {
-    if seen_event && !matches!(stmt, g::Stmt::Command { .. }) {
+    if seen_event {
         errors.push(CompileError {
             line: 0,
             message: "a top-level statement after an event test is not lowered \
