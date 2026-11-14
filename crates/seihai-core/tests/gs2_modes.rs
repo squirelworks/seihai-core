@@ -357,15 +357,17 @@ fn a_gs1_error_names_the_line_of_the_statement() {
 fn gs1_flag_and_player_builtin_reads_take_their_client_checked_gs2_names() {
     // A real 5.24r4 client reads these (lab probe).
     let gs1 = "if (created) {\n  set gotkey;\n  if (gotkey) hide;\n  this.a = playerhp + playermaxhp + weaponscount + selectedweapon;\n}";
-    let gs2 = "function onCreated() {\n  set(\"gotkey\");\n  if (player.gotkey) hide();\n  this.a = player.hearts + player.fullhearts + player.weapons.size() + selectedweapon;\n}";
+    let gs2 = "function onCreated() {\n  set(\"client.gs1_gotkey\");\n  if (player.gotkey) hide();\n  this.a = player.hearts + player.fullhearts + player.weapons.size() + selectedweapon;\n}";
     assert_eq!(
         compile_gs1(gs1, Era::V205)
             .unwrap_or_else(|e| panic!("{e}"))
             .write(),
         compile_gs2(gs2).unwrap().write()
     );
-    // Flag writes stay refused: on 5.24r4 `player.f = ...` sends no flag
-    // packet and does not outlive the session (lab write probe).
+    // `set` and `unset` go out as `client.gs1_<flag>` (seihai-core#30); an
+    // assignment to a flag's plain name stays refused: on 5.24r4
+    // `player.f = ...` sends no flag packet and does not outlive the
+    // session (lab write probe).
     assert!(compile_gs1("if (created) { set a; a = 2; }", Era::V205).is_err());
     assert!(compile_gs1("if (created) { playerhp = 1; }", Era::V205).is_err());
 }

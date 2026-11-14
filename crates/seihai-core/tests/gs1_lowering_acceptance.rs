@@ -45,10 +45,13 @@ fn created(script: Script) -> (Machine, EffectHost) {
 
 #[test]
 fn flag_writes_are_the_gs2_set_and_unset_calls() {
-    // `set` and `unset` by name: `shared.gs2` and `calls.gs2`.
+    // `set` and `unset` by name: `shared.gs2` and `calls.gs2`. A plain name
+    // is sent as `client.gs1_<flag>`, the one kind a GS2 client sends, and
+    // seihai-gserver keeps it as `<flag>` (seihai-core#30). A name with a
+    // GS1 prefix is sent as written.
     let s = same(
-        "if (created) {\n  set gotkey;\n  setstring door,open;\n  unset gotkey;\n  setstring door,;\n}\n",
-        "function onCreated() {\n  set(\"gotkey\");\n  set(\"door=open\");\n  unset(\"gotkey\");\n  unset(\"door\");\n}\n",
+        "if (created) {\n  set gotkey;\n  setstring door,open;\n  unset gotkey;\n  setstring door,;\n  set client.seen;\n  set quest.started;\n}\n",
+        "function onCreated() {\n  set(\"client.gs1_gotkey\");\n  set(\"client.gs1_door=open\");\n  unset(\"client.gs1_gotkey\");\n  unset(\"client.gs1_door\");\n  set(\"client.seen\");\n  set(\"client.gs1_quest.started\");\n}\n",
     );
     let (_, host) = created(s);
     let flags: Vec<_> = host
@@ -63,10 +66,12 @@ fn flag_writes_are_the_gs2_set_and_unset_calls() {
     assert_eq!(
         flags,
         [
-            "set gotkey=Some(\"\")",
-            "set door=Some(\"open\")",
-            "unset gotkey",
-            "unset door"
+            "set client.gs1_gotkey=Some(\"\")",
+            "set client.gs1_door=Some(\"open\")",
+            "unset client.gs1_gotkey",
+            "unset client.gs1_door",
+            "set client.seen=Some(\"\")",
+            "set client.gs1_quest.started=Some(\"\")"
         ]
     );
 }
@@ -77,7 +82,7 @@ fn reading_a_flag_by_its_plain_name_reads_the_player_flag() {
     // flag as `player.gotkey` (lab probe, 2026-11-13).
     same(
         "if (playerenters) { set gotkey; }\nif (playertouchsme && gotkey) { hide; }\n",
-        "function onPlayerEnters() { set(\"gotkey\"); }\nfunction onPlayerTouchsMe() { if (player.gotkey) { hide(); } }\n",
+        "function onPlayerEnters() { set(\"client.gs1_gotkey\"); }\nfunction onPlayerTouchsMe() { if (player.gotkey) { hide(); } }\n",
     );
     // Writing it by its plain name is still refused.
     let err = compile::compile_gs1("if (created) { set gotkey; gotkey = 2; }\n", Era::V217)

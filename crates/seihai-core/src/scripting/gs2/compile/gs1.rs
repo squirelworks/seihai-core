@@ -889,6 +889,31 @@ fn player_flags(s: &g::Stmt, out: &mut Vec<String>) {
     }
 }
 
+/// The prefix a GS1 player flag written by its plain name gets in GS2.
+/// A GS2 client sends only `client.` flags to the server (the real 2.31
+/// and 4.04r2, lab 2026-10-31; a 5.24r4 sends nothing for
+/// `player.<flag> = ...`, lab 2026-11-13), so `set gotkey;` becomes
+/// `set("client.gs1_gotkey")` and seihai-gserver keeps it as `gotkey` and
+/// sends it straight back, where `player.gotkey` reads it (seihai-core#30,
+/// seihai-gserver#129).
+pub const GS1_FLAG_PREFIX: &str = "client.gs1_";
+
+/// The flag a GS1 `set`, `unset` or `setstring` sends: a name with a GS1
+/// prefix the client keeps or sends itself (`client.`, `clientr.`,
+/// `local.`, `server.`, `serverr.`, `this.`) as written, any other name
+/// with [`GS1_FLAG_PREFIX`].
+fn sent_flag(text: &str) -> String {
+    let lower = text.to_ascii_lowercase();
+    let kept = [
+        "client.", "clientr.", "local.", "server.", "serverr.", "this.",
+    ];
+    if kept.iter().any(|p| lower.starts_with(p)) {
+        text.to_string()
+    } else {
+        format!("{GS1_FLAG_PREFIX}{text}")
+    }
+}
+
 /// A GS1 value whose reading cannot depend on when it is read.
 fn is_constant(e: &g::Expr) -> bool {
     match e {
@@ -1116,9 +1141,9 @@ impl Lower {
             && self.flags.contains(&v.name.to_ascii_lowercase())
         {
             self.err(format!(
-                "`{}` is a player flag the script sets; writing a GS1 flag by its plain name, or \
+                "`{}` is a player flag the script sets; assigning to it by its plain name, or \
                  reading it inside `with`, has no client-checked GS2 form (a 5.x client sends \
-                 no flag for `player.{}` = ...)",
+                 no flag for `player.{}` = ...); use `set` or `setstring`",
                 v.name, v.name
             ));
         }
@@ -1411,9 +1436,10 @@ impl Lower {
                 } else if matches!(&v, g::Expr::Str(s) if s.is_empty()) {
                     Stmt::Call {
                         name: "unset".into(),
-                        args: vec![Expr::Str(var)],
+                        args: vec![Expr::Str(sent_flag(&var))],
                     }
                 } else {
+                    let var = sent_flag(&var);
                     let text = match &v {
                         g::Expr::Str(s) if !s.contains('#') => Expr::Str(format!("{var}={s}")),
                         _ => Expr::bin(BinOp::Cat, Expr::Str(format!("{var}=")), self.expr(&v)),
@@ -1423,6 +1449,22 @@ impl Lower {
                         args: vec![text],
                     }
                 }
+            }
+            "set" | "unset" => {
+                let Some(g::Arg::Text(t)) = args.first() else {
+                    return None;
+                };
+                let t = t.trim();
+                // A name made at run time (`set #s(x);`) is sent as made.
+                let flag = if t.starts_with('#') {
+                    t.to_string()
+                } else {
+                    sent_flag(t)
+                };
+                Stmt::Eval(Expr::HostCall {
+                    name: name.into(),
+                    args: vec![self.text(&flag)],
+                })
             }
             "addstring" | "insertstring" | "replacestring" | "removestring" | "deletestring" => {
                 let Some(var) = text_name(args.first()) else {
