@@ -410,17 +410,17 @@ fn expr_events(x: &g::Expr, era: Era, out: &mut Vec<String>) {
 /// in source order. It becomes GS2 code outside functions, which the Linux
 /// 4.04r2 experiment saw run before each event's handler (Graal_analysis
 /// `client-internals/linux-404r2-events.md`). Before the first event test
-/// the order is the same. After one, only commands and calls are taken
+/// the order is the same. After one, only commands are taken
 /// (`join`, `dontblock`, `setshape` and the like, which set state); an
-/// assignment, `if` or loop there could see a different order, so it stays
-/// an error.
+/// assignment, call, `if` or loop there could see a different order, so
+/// this lift rejects it and lets the whole-script dispatcher preserve it.
 fn top_level(
     items: &mut Vec<Raw>,
     errors: &mut Vec<CompileError>,
     stmt: g::Stmt,
     seen_event: bool,
 ) {
-    if seen_event && !matches!(stmt, g::Stmt::Command { .. } | g::Stmt::Call { .. }) {
+    if seen_event && !matches!(stmt, g::Stmt::Command { .. }) {
         errors.push(CompileError {
             line: 0,
             message: "a top-level statement after an event test is not lowered \
