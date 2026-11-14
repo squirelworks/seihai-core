@@ -1,0 +1,5 @@
+if (playertouchsme) {
+  tiles[x + 3, y] = 2047;
+  updateboard x + 3, y, 1, 1;
+  message x=#v(x) y=#v(y) t=#v(tiles[x + 3, y]) u=#v(tiles[x + 4, y]);
+}

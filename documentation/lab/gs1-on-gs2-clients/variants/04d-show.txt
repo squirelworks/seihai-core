@@ -1,0 +1,5 @@
+if (playerenters) timeout = 1;
+if (timeout) {
+  message pc=#v(playerscount) p0x=#v(players[0].x) x=#v(x);
+  timeout = 1;
+}

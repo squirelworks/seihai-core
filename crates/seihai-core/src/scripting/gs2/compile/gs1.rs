@@ -608,7 +608,7 @@ fn stmt_calls(s: &g::Stmt, gs1: bool) -> bool {
         g::Stmt::Assign { target, value, .. } => index(target) || e(value),
         g::Stmt::Call { name, args, .. } => name_is_call(name, gs1) || args.iter().any(e),
         g::Stmt::Command { name, args, .. } => {
-            command_is_call(name, gs1)
+            command_is_call(name, args, gs1)
                 || args
                     .iter()
                     .any(|a| matches!(a, g::Arg::Num(x) if expr_calls(x, gs1)))
@@ -623,11 +623,18 @@ fn stmt_calls(s: &g::Stmt, gs1: bool) -> bool {
 /// what it is lowered to: `setstring this.a,1;` and `setcharprop` become
 /// assignments, which do not; a flag `setstring` is a `set` call, and the
 /// list and `tokenize` forms are method calls, which do.
-fn command_is_call(name: &str, gs1: bool) -> bool {
+fn command_is_call(name: &str, args: &[g::Arg], gs1: bool) -> bool {
     match name {
         // Lowered to an assignment to a `client.` (or `this.`) variable.
         "setstring" | "set" | "unset" => false,
         "setcharprop" => false,
+        "setplayerprop" => !matches!(
+            args.first(),
+            Some(g::Arg::Text(t)) if {
+                let t = t.trim();
+                char_prop(t).is_some() && !matches!(t, "#1" | "#2")
+            }
+        ),
         _ => name_is_call(name, gs1),
     }
 }
@@ -1035,6 +1042,10 @@ fn counted_list(name: &str) -> Option<&'static str> {
     match name {
         "tokenscount" => Some("tokens"),
         "paramscount" => Some("params"),
+        // Left as a plain name, 6.03r7 reads `playerscount` as 0 (isolated
+        // lab, 2026-11-14: the follow script never moved).
+        "playerscount" => Some("players"),
+        "npcscount" => Some("npcs"),
         _ => None,
     }
 }
@@ -1790,6 +1801,29 @@ impl Lower {
                         name: "tokenize".into(),
                         args: seps,
                     },
+                }
+            }
+            // `setplayerprop #c,text`: the player's own property. The
+            // 6.03r7 client has no `setplayerprop` function ("Function
+            // setplayerprop not found", isolated lab 2026-11-14), so the
+            // properties GS2 names are assignments to `player.*`; any other
+            // code stays the call by name.
+            "setplayerprop" => {
+                let code = match args.first() {
+                    Some(g::Arg::Text(t)) => t.trim().to_string(),
+                    _ => String::new(),
+                };
+                let target = char_prop(&code)
+                    .filter(|_| !matches!(code.as_str(), "#1" | "#2"))
+                    .map(|v| Var {
+                        name: v.name.replacen("this.", "player.", 1),
+                        index: v.index,
+                    })?;
+                let value = raw_value(args.get(1));
+                Stmt::Assign {
+                    target,
+                    op: AssignOp::Set,
+                    value: self.expr(&value),
                 }
             }
             "setcharprop" => {

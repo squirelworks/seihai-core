@@ -1,0 +1,6 @@
+if (playerenters) timeout = 0.05;
+if (timeout) {
+  x = players[0].x + 2;
+  y = players[0].y;
+  timeout = 0.05;
+}
