@@ -28,6 +28,7 @@ pub mod dev;
 pub mod difftest;
 pub mod filecache;
 pub mod gmap;
+pub mod graaldes;
 pub mod items;
 pub mod life;
 pub mod looks;
