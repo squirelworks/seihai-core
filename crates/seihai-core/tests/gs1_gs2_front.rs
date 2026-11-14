@@ -649,7 +649,8 @@ fn element_forms_without_a_fixture_stay_errors() {
         ("this.a[0, 1, 2] = 1;", "GS2 array opcodes take one or two"),
         ("this.x = npcs[0].save;", "a field after an index"),
         ("players[0].x = 5;", "a field after an index"),
-        ("this.x = board[5];", "`board[..]`"),
+        ("this.x = board[pick()];", "put the index in a variable"),
+        ("this.x = board[1, 2];", "one index"),
         ("this.x = tiles[1];", "two indexes"),
     ];
     for (stmt, want) in cases {
@@ -1191,6 +1192,42 @@ fn gs1_element_members_nested_lists_and_tiles_match_gs2() {
         let got = compile::compile_gs1(&format!("if (created) {{ {gs1} }}"), Era::V217)
             .unwrap_or_else(|e| panic!("{gs1}: {e}"));
         let want = compile_gs2(&format!("function onCreated() {{ {gs2} }}")).unwrap();
+        assert_eq!(ops(&got), ops(&want), "{gs1}");
+        assert_eq!(got.strings, want.strings, "{gs1}");
+    }
+}
+
+/// #6: GS1's `board[i]` is GS2's `tiles[x, y]` with `k = i + 0.0001`
+/// (GS1 rounds the index down with that margin, `board-reads.md`): the
+/// tile at `int(k) % 64, int(k / 64)` while `0 <= k < 4096`, and 0 (a read)
+/// or nothing (a write) off the board.
+#[test]
+fn gs1_board_is_tiles_with_the_board_guard() {
+    let k = "this.i + 0.0001";
+    let cell = format!("tiles[int({k}) % 64, int(({k}) / 64)]");
+    let guard = format!("({k} >= 0 && {k} < 4096)");
+    for (gs1, gs2) in [
+        (
+            "this.t = board[this.i];".to_string(),
+            format!("this.t = {guard} ? {cell} : 0;"),
+        ),
+        (
+            "board[this.i] = 5;".to_string(),
+            format!("if {guard} {cell} = 5;"),
+        ),
+        (
+            "board[this.i] += 2;".to_string(),
+            format!("if {guard} {cell} = {cell} + 2;"),
+        ),
+        (
+            "board[this.i] = format(\"%d\", 3);".to_string(),
+            format!("temp.__gs1board0 = format(\"%d\", 3); if {guard} {cell} = temp.__gs1board0;"),
+        ),
+    ] {
+        let got = compile::compile_gs1(&format!("if (created) {{ {gs1} }}"), Era::V217)
+            .unwrap_or_else(|e| panic!("{gs1}: {e}"));
+        let want = compile_gs2(&format!("function onCreated() {{ {gs2} }}"))
+            .unwrap_or_else(|e| panic!("{gs2}: {e}"));
         assert_eq!(ops(&got), ops(&want), "{gs1}");
         assert_eq!(got.strings, want.strings, "{gs1}");
     }

@@ -1108,8 +1108,49 @@ impl Lower {
         })
     }
 
+    /// GS1's `board[i]` as GS2's `tiles[x, y]`: the condition that `i` is
+    /// on the 64 by 64 board, and the tile. GS1 takes the index as
+    /// `floor(i + 0.0001)` (`documentation/board-reads.md`), so with
+    /// `k = i + 0.0001` the tile is `tiles[int(k) % 64, int(k / 64)]` when
+    /// `0 <= k < 4096`. `i` is read up to four times, so it must not call
+    /// anything; `None` (and an error) if it does, or if this is not a
+    /// plain `board[i]`.
+    fn board_cell(&mut self, v: &g::VarRef) -> Option<(Expr, Var)> {
+        if v.name != "board" || v.index.len() != 1 || v.field_after_index {
+            return None;
+        }
+        if expr_calls(&v.index[0], true) {
+            self.err(
+                "`board[..]` whose index calls a function is not lowered; put the index in a \
+                 variable first"
+                    .to_string(),
+            );
+            return None;
+        }
+        let i = self.expr(&v.index[0]);
+        let k = Expr::bin(BinOp::Add, i, Expr::Num(0.0001));
+        let int = |e: Expr| Expr::Call {
+            name: "int".into(),
+            args: vec![e],
+        };
+        let in_level = Expr::bin(
+            BinOp::And,
+            Expr::bin(BinOp::Ge, k.clone(), Expr::Num(0.0)),
+            Expr::bin(BinOp::Lt, k.clone(), Expr::Num(4096.0)),
+        );
+        let x = Expr::bin(BinOp::Mod, int(k.clone()), Expr::Num(64.0));
+        let y = int(Expr::bin(BinOp::Div, k, Expr::Num(64.0)));
+        Some((
+            in_level,
+            Var {
+                name: "tiles".into(),
+                index: vec![x, y],
+            },
+        ))
+    }
+
     /// A variable as GS2 names it. An element must have no field after its
-    /// index (`npcs[i].x`), and GS1's level board is not lowered.
+    /// index (`npcs[i].x`).
     fn var(&mut self, v: &g::VarRef) -> Var {
         if v.index.is_empty()
             && is_script_var(&v.name, self.era)
@@ -1134,10 +1175,7 @@ impl Lower {
             if v.field_after_index {
                 self.err(format!("a field after an index (`{v}`) is not lowered"));
             } else if v.name == "board" {
-                self.err(
-                    "`board[..]` has no GS2 form (GS2 has `tiles[x, y]`); it is not lowered"
-                        .to_string(),
-                );
+                self.err("`board` takes one index, `board[x + 64 * y]`".to_string());
             } else if v.name == "tiles" && v.index.len() != 2 {
                 self.err("`tiles` takes two indexes, `tiles[x, y]`".to_string());
             }
@@ -1163,6 +1201,39 @@ impl Lower {
     /// number out and stores it. The index is pushed twice, so it must not
     /// call anything.
     fn assign(&mut self, target: &g::VarRef, op: AssignOp, value: &g::Expr) -> Stmt {
+        if let Some((in_level, cell)) = self.board_cell(target) {
+            // GS1 works the value out even off the board, so a value that
+            // calls something is read into a temporary first.
+            let mut body = Vec::new();
+            let mut v = self.expr(value);
+            if expr_calls(value, true) {
+                let temp = format!("temp.__gs1board{}", self.temps);
+                self.temps += 1;
+                body.push(Stmt::Assign {
+                    target: Var::plain(temp.clone()),
+                    op: AssignOp::Set,
+                    value: v,
+                });
+                v = Expr::var(temp);
+            }
+            if op != AssignOp::Set {
+                v = op.expand(Expr::Var(cell.clone()), v);
+            }
+            body.push(Stmt::If {
+                cond: in_level,
+                then: Box::new(Stmt::Assign {
+                    target: cell,
+                    op: AssignOp::Set,
+                    value: v,
+                }),
+                els: None,
+            });
+            return if body.len() == 1 {
+                body.pop().unwrap()
+            } else {
+                Stmt::Block(body)
+            };
+        }
         if target.index.is_empty() {
             return Stmt::Assign {
                 target: self.var(target),
@@ -1601,6 +1672,14 @@ impl Lower {
                 }
                 if let Some(e) = self.element_member(v) {
                     return e;
+                }
+                if let Some((in_level, cell)) = self.board_cell(v) {
+                    // Off the board GS1 reads 0; GS2's `tiles` does not.
+                    return Expr::Cond {
+                        cond: Box::new(in_level),
+                        then: Box::new(Expr::Var(cell)),
+                        els: Box::new(Expr::Num(0.0)),
+                    };
                 }
                 Expr::Var(self.var(v))
             }

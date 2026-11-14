@@ -1293,6 +1293,36 @@ mod tests {
         assert!(!profile(ClientVersion::V139).protocol.plo.contains(42));
     }
 
+    /// seihai-core#7 / seihai-gserver#95: `PLO_PING`-like 108 is handled
+    /// by the 4.20r6 (Mac), 4.20r8 and Mac 5.12 reads only. The PLO
+    /// switches of 4.04r2 (both), 5.00r7, Windows 5.12, 5.24r4 and later (Linux 6.01r1 and
+    /// 6.03r7 read, Graal_analysis `v5v6/6x-findings.md`) have no case for
+    /// it, though 6.x still sends 162, the 4.x answer to 108. A server must
+    /// not count on a 6.x client answering 108 until a lab shows one does.
+    #[test]
+    fn id_108_follows_the_binary_reads() {
+        use ClientVersion::*;
+        for v in [V420R6, V420R8, V512Mac] {
+            assert!(profile(v).protocol.plo.contains(108), "{v:?}");
+        }
+        for v in [
+            V404R2,
+            V404R2Mac,
+            V500R7,
+            V512,
+            V524R4,
+            V531R4,
+            V600R2,
+            V603R7,
+            V603R7Linux,
+        ] {
+            assert!(!profile(v).protocol.plo.contains(108), "{v:?}");
+        }
+        for v in [V600R2, V603R7] {
+            assert!(profile(v).protocol.pli.contains(162), "{v:?}");
+        }
+    }
+
     #[test]
     fn other_prop_sets() {
         let o = profile(ClientVersion::V205).props.other;
