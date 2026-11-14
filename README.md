@@ -61,12 +61,15 @@ Before 0.1.0 every release was a 0.0.x bump and any of them could break.
 ## Known gaps
 
 - **GS1 flag writes.** GS1 lowered to GS2 reads player flags as
-  `player.<flag>` and sends `set`, `unset` and `setstring` on a plain name
-  as `client.gs1_<flag>`, the one kind of flag a GS2 client sends;
-  seihai-gserver keeps it as `<flag>` and sends it straight back
-  (`GS1_FLAG_PREFIX`, #30). Other servers keep it as `client.gs1_<flag>`.
-  Assigning to a flag's plain name (`gotkey = 2`) and reading a flag inside
-  `with` are still refused.
+  `player.<flag>` and writes `set`, `unset` and `setstring` on a plain name
+  as an assignment to `client.gs1_<flag>` (`= true`, `= "value"`, `= ""`
+  to clear): real 5.24r4 and 4.20r8 clients have no GS2 `set()` and send
+  only `client.` flags. seihai-gserver keeps it as `<flag>` and sends it
+  straight back, so `player.<flag>` reads it in the same session and after
+  a relogin (`GS1_FLAG_PREFIX`, #30). Other servers keep
+  `client.gs1_<flag>`. A bare `set x;` is stored as `x=1`. Assigning to a
+  flag's plain name (`gotkey = 2`), reading a flag inside `with`, and
+  `set` on `local.`, `clientr.`, `server.` or `serverr.` names are refused.
 - **GS2 VM coverage.** The 7.x client and the Mac 4.04r2 and 5.12 VMs have
   not been read (`documentation/gs2-vm-versions.md`).
 - **Profile audit and lab checks** listed in the roadmap (#7).

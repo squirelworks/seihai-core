@@ -58,14 +58,12 @@ if (created) {
 }
 ";
     let got = compile::compile_gs1(src, Era::V205).unwrap();
-    // The plain flag is sent as `client.gs1_gs2seen` (seihai-core#30); the
-    // rest is the fixture's bytecode, which the GS2 front end matches.
+    // The plain flag is sent as `client.gs1_gs2seen = true` (seihai-core#30;
+    // GS2 clients have no `set()`); the rest is the fixture's bytecode,
+    // which the GS2 front end matches.
     let shared = fixture_source("shared");
-    let want = compile_gs2(&shared.replace("\"gs2seen\"", "\"client.gs1_gs2seen\"")).unwrap();
-    assert_eq!(
-        ops(&want),
-        ops(&Script::parse(&fixture("shared.gs2bc")).unwrap())
-    );
+    let want =
+        compile_gs2(&shared.replace("set(\"gs2seen\");", "client.gs1_gs2seen = true;")).unwrap();
     assert_eq!(got.functions, want.functions);
     assert_eq!(got.strings, want.strings);
     assert_eq!(ops(&got), ops(&want));
@@ -251,10 +249,10 @@ fn commands_and_functions_without_gs2_are_errors() {
     ] {
         assert!(!lacking.contains(&name), "{name} is a GS2 command");
     }
-    // `setstring` on a plain name is a player flag: `set("client.gs1_a=b")`.
+    // `setstring` on a plain name is a player flag: `client.gs1_a = "b"`.
     let got = compile::compile_gs1("if (created) { setstring a,b; }\n", Era::V205).unwrap();
     assert!(
-        got.strings.contains(&"client.gs1_a=b".to_string()),
+        got.strings.contains(&"gs1_a".to_string()) && got.strings.contains(&"b".to_string()),
         "{:?}",
         got.strings
     );
@@ -993,7 +991,7 @@ fn repeated_event_tests_merge_into_one_function_in_source_order() {
     )
     .unwrap();
     let want = compile_gs2(
-        "function onCreated() { hide(); set(\"client.gs1_a\"); }\nfunction onPlayerEnters() { show(); }\n",
+        "function onCreated() { hide(); client.gs1_a = true; }\nfunction onPlayerEnters() { show(); }\n",
     )
     .unwrap();
     assert_eq!(merged.functions, want.functions);

@@ -1978,6 +1978,30 @@ impl Host for EffectHost {
         if matches!(root, Root::Player | Root::PlayerO) {
             return self.set_player(name, value);
         }
+        // A write to a `client.` variable is a flag the client sends: PLI 18
+        // with `name=value` (`true` as `1`), or PLI 19 for `""` or `false`,
+        // as a real 5.24r4 and 4.20r8 do (lab, 2026-11-14, seihai-core#30).
+        // The variable is kept as well.
+        let lower = name.to_ascii_lowercase();
+        if lower.starts_with("client.") && lower.len() > "client.".len() {
+            let text = match value {
+                Val::Str(s) => s.clone(),
+                Val::Num(n) if *n == 0.0 => String::new(),
+                v => v.text(),
+            };
+            if text.is_empty() {
+                if self.flags.remove(&lower).is_some() {
+                    self.effects.push(Effect::UnsetFlag { name: lower });
+                }
+            } else if self.flags.get(&lower) != Some(&text) {
+                self.flags.insert(lower.clone(), text.clone());
+                self.effects.push(Effect::SetFlag {
+                    name: lower,
+                    value: Some(text),
+                });
+            }
+            return false;
+        }
         match (root, name) {
             (Root::This | Root::ThisO, "x" | "y") => {
                 if name == "x" {
