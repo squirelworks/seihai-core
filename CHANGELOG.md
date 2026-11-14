@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.2.x
 
+- **0.2.12**: GS1 `setplayerprop` compiles to `player.*` and `playerscount` to `players.size()`, from the first 6.03r7 run of Seihai's bytecode.
 - **0.2.11**: seihai-draw `draw_text` and `measure_text`: text in a caller's TrueType/OpenType font with size, colour, bold, italic, underline, strikeout, shadow, alignment and wrapping (`ab_glyph`), for GraalShop TEXT actors (servertools #78).
 - **0.2.10**: `graaldes`: the classic clients' DES variant (bit-reversed key bytes), the 48-character string form of RC passwords and list hosts, and the 1999 Guildmaker `.code` files (`guildname.code`, `reg.code`) read and written (#63).
 - **0.2.9**: `assets::gani_movie` reads and writes GraalShop's `GANI0002` movie mode (`FRAMES`, `MOVIE`, `ACTOR CHAR|SPRITE|SOUND|TEXT`, `FRAME n key=value,…`) and answers an actor's state at a frame, with `dx` / `dy` moving between keyframes (servertools #78).
