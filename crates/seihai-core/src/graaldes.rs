@@ -38,14 +38,14 @@ impl GraalDes {
 
     /// Encrypt whole 8-byte blocks in place; a short tail is left as is.
     pub fn encrypt(&self, data: &mut [u8]) {
-        for block in data.chunks_exact_mut(8) {
+        for block in data.as_chunks_mut::<8>().0 {
             self.0.encrypt_block(GenericArray::from_mut_slice(block));
         }
     }
 
     /// Decrypt whole 8-byte blocks in place; a short tail is left as is.
     pub fn decrypt(&self, data: &mut [u8]) {
-        for block in data.chunks_exact_mut(8) {
+        for block in data.as_chunks_mut::<8>().0 {
             self.0.decrypt_block(GenericArray::from_mut_slice(block));
         }
     }
@@ -101,7 +101,7 @@ pub fn string_decrypt(text: &str, key: &[u8; 8]) -> Option<String> {
 pub fn code_write(text: &[u8], pad: impl FnMut() -> u8) -> [u8; 48] {
     let plain = block(text, pad);
     let mut out = [0u8; 48];
-    for (half, key) in out.chunks_exact_mut(24).zip(GUILD_KEYS) {
+    for (half, key) in out.as_chunks_mut::<24>().0.iter_mut().zip(GUILD_KEYS) {
         half.copy_from_slice(&plain);
         GraalDes::new(key).encrypt(half);
     }
@@ -118,7 +118,7 @@ pub fn code_read(bytes: &[u8]) -> Result<Vec<u8>, String> {
     let mut halves = [[0u8; 24]; 2];
     for ((h, src), key) in halves
         .iter_mut()
-        .zip(bytes.chunks_exact(24))
+        .zip(bytes.as_chunks::<24>().0)
         .zip(GUILD_KEYS)
     {
         h.copy_from_slice(src);
