@@ -27,6 +27,19 @@ byte for byte. No byte here was written by hand.
   `@`/`SPC`, string methods, `new[3][2]`, `new TStaticVar()`, `with`, and
   some maths built-ins.
 
+The four below were added on 2026-11-14 for seihai-core#6, compiled the
+same way with gs2-parser commit `4fa0a26` (2026-02-22), a build that also
+reproduces `01_arithmetic.bytecode` byte for byte (`gs2test <name>.gs2`):
+
+- `members.gs2`: a member read on an array element (`players[i].x`,
+  `.y`, `.dir`, `.account`, `npcs[i].x`): the element, then the member,
+  with no `OP_CONV_TO_OBJECT` between them.
+- `nested.gs2`: lists inside a list literal, pushed right to left at
+  every level.
+- `tiles.gs2`: `tiles[x, y]` read and written (`OP_ARRAY_MULTIDIM`,
+  `OP_ARRAY_MULTIDIM_ASSIGN` on `tiles`) and `updateboard(...)`.
+- `elemlist.gs2`: a list literal stored into an array element.
+
 The layout and opcodes are in `documentation/gs2-opcodes.md`;
 `tests/gs2_opcodes.rs` checks these files against it, and
 `tests/gs2_exec.rs` runs them (`documentation/gs2-executor.md`).

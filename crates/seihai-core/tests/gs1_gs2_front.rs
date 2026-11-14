@@ -497,7 +497,7 @@ fn malformed_and_unsupported_array_forms_fail_clearly() {
         ("{next(), next()}", "one element calls"),
         ("{next(), this.v}", "one element calls"),
         ("{random(0, 1), random(0, 1)}", "one element calls"),
-        ("{{1}, 2}", "that are lists"),
+        ("{{next()}, 2}", "that are lists"),
     ] {
         let source = format!(
             "function next() {{ return 1; }}\nfunction keep(v) {{ this.k = v; }}\nif (created) {{ keep({literal}); }}"
@@ -509,7 +509,8 @@ fn malformed_and_unsupported_array_forms_fail_clearly() {
     }
     assert!(compile::compile_gs1("if (created) { this.a = {1, 2}; }", Era::V205).is_err());
     assert!(compile_gs2("function onCreated() { this.a[0] = {1}; }").is_ok());
-    assert!(compile::compile_gs1("if (created) { this.a[0] = {1}; }", Era::V217).is_err());
+    // A list into an element lowers as GS2 writes it (`elemlist.gs2bc`).
+    assert!(compile::compile_gs1("if (created) { this.a[0] = {1}; }", Era::V217).is_ok());
 }
 
 /// Instructions `from..=to` with string operands written out, so two scripts
@@ -646,9 +647,10 @@ fn a_call_in_an_index_marks_the_function_as_calling() {
 fn element_forms_without_a_fixture_stay_errors() {
     let cases = [
         ("this.a[0, 1, 2] = 1;", "GS2 array opcodes take one or two"),
-        ("this.x = npcs[0].x;", "a field after an index"),
+        ("this.x = npcs[0].save;", "a field after an index"),
+        ("players[0].x = 5;", "a field after an index"),
         ("this.x = board[5];", "`board[..]`"),
-        ("this.x = tiles[1, 2];", "`tiles[..]`"),
+        ("this.x = tiles[1];", "two indexes"),
     ];
     for (stmt, want) in cases {
         let source = format!("if (created) {{ {stmt} }}");
@@ -1019,8 +1021,11 @@ fn fixture_source(name: &str) -> String {
 }
 
 #[test]
-fn gs2_front_end_matches_six_fixtures() {
-    for name in ["shared", "timers", "strings", "lists", "rest", "objects"] {
+fn gs2_front_end_matches_ten_fixtures() {
+    for name in [
+        "shared", "timers", "strings", "lists", "rest", "objects", "members", "nested", "tiles",
+        "elemlist",
+    ] {
         let got = compile_gs2(&fixture_source(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
         let bytes = fixture(&format!("{name}.gs2bc"));
         let want = Script::parse(&bytes).unwrap();
@@ -1157,4 +1162,36 @@ fn gs1_with_bodies_keep_commands_and_calls() {
         names[w + 1..end].iter().filter(|n| *n == "OP_CALL").count(),
         2
     );
+}
+
+/// #6: the forms the four 2026-11-14 fixtures settle lower to the same
+/// bytecode as the GS2 source: `players[i].x` / `.y` / `.dir` and
+/// `npcs[i].x` reads (`members.gs2bc`), lists inside literals
+/// (`nested.gs2bc`), a list stored into an element (`elemlist.gs2bc`) and
+/// `tiles[x, y]` read and written (`tiles.gs2bc`).
+#[test]
+fn gs1_element_members_nested_lists_and_tiles_match_gs2() {
+    for (gs1, gs2) in [
+        (
+            "this.a = players[0].x; this.b = players[1].y; this.c = players[this.a].dir; \
+             this.d = npcs[2].x;",
+            "this.a = players[0].x; this.b = players[1].y; this.c = players[this.a].dir; \
+             this.d = npcs[2].x;",
+        ),
+        (
+            "this.l = {1, {2, 3}, 4}; this.m = {{\"a\", \"b\"}, {\"c\"}};",
+            "this.l = {1, {2, 3}, 4}; this.m = {{\"a\", \"b\"}, {\"c\"}};",
+        ),
+        ("this.a[0] = {1, 2};", "this.a[0] = {1, 2};"),
+        (
+            "this.t = tiles[3, 4]; tiles[3, 4] = 5; updateboard 3, 4, 1, 1;",
+            "this.t = tiles[3, 4]; tiles[3, 4] = 5; updateboard(3, 4, 1, 1);",
+        ),
+    ] {
+        let got = compile::compile_gs1(&format!("if (created) {{ {gs1} }}"), Era::V217)
+            .unwrap_or_else(|e| panic!("{gs1}: {e}"));
+        let want = compile_gs2(&format!("function onCreated() {{ {gs2} }}")).unwrap();
+        assert_eq!(ops(&got), ops(&want), "{gs1}");
+        assert_eq!(got.strings, want.strings, "{gs1}");
+    }
 }
