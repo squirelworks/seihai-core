@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.2.x
 
+- **0.2.1**: Binary level writer: `encode_binary` writes `GR-V1.03` (`.graal`) and `Z3-V1.04` (`.zelda`) and reports what each format cannot hold; `encode_board` and `encode_sign_text`.
 - **0.2.0**: GS2 weapon and class scripts from `PLO_NPCWEAPONSCRIPT` (140), NPC scripts sent after their level or for a gmap neighbour handed to the game, `player.*` reads and writes in GS2 (`player.chat` included), and `.mid` music from a small built-in synthesizer. Breaking: new fields in `OwnWeapons` and `EffectHost`, and `.mid` now plays.
 
 ## 0.1.x

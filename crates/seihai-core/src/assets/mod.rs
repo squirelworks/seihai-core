@@ -6,6 +6,7 @@ pub mod crc32;
 mod gani;
 pub mod gif;
 mod level;
+mod level_write;
 pub mod mng;
 mod objects;
 mod png;
@@ -31,6 +32,7 @@ pub use level::{
     Npc, NpcImage, Object2x2, ObjectTables, Sign, Tile, TileKind, TileTypes, CHEST_ITEMS,
     SCREEN_HEIGHT, TYPE_BED_BOTTOM, TYPE_CHAIR, TYPE_THROW_THROUGH, TYPE_WATER,
 };
+pub use level_write::{encode_binary, encode_board, encode_sign_text, BinaryLevel, Written};
 pub use mng::{is_mng, read_mng, ImageAnimations, MngAnimation};
 pub use png::{
     read_png_rgb, read_png_rgba, read_png_rgba_recolored, write_png_indexed, write_png_rgb,
