@@ -1,6 +1,7 @@
 //! Asset loading and export (levels, GANIs, images).
 
 pub mod builtin;
+pub mod chr;
 pub(crate) mod coverage;
 pub mod crc32;
 mod gani;
@@ -23,6 +24,7 @@ pub use resolve::{AssetResolver, Layer, TileTypesFile, IMAGE_CATEGORIES};
 pub use root::AssetRoot;
 pub use tiledefs::{load_tiledefs, parse_tiledefs, TileDef};
 
+pub use chr::{Character, CHR_MAGIC};
 pub use crc32::{crc32, crc32_update};
 pub use gani::{
     Gani, GaniFrame, GaniPlacement, GaniPlayer, GaniSound, GaniSprite, LISTENER_DX, LISTENER_DY,
