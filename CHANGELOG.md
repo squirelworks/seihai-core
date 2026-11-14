@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.2.x
 
+- **0.2.5**: `read_gif_frames` reads every frame of an animated GIF as palette indices on the logical screen (disposal, delays, the `NETSCAPE2.0` loop count), for gif2mng in seihai-servertools.
 - **0.2.4**: `KNOWN_TOKENS` gains the iPhone login tokens: Belote 1.2/1.50 `G3D04048` and Classic+ 1.13 `G3D0208A`, read from the IPAs, and three gs2lib-only iPhone tokens (83 rows).
 - **0.2.3**: Binary level writer: `encode_binary` writes `GR-V1.03` (`.graal`) and `Z3-V1.04` (`.zelda`) and reports what each format cannot hold; `encode_board` and `encode_sign_text`; `write_mng` and `write_indexed_png` for gif2mng-style animations.
 - **0.2.2**: Whole-script GS1 runs from one dispatcher (1,204 of the 1,765 level scripts we hold now compile, from 957); GS1 `board[i]` lowers to `tiles[x, y]`; `#I` and `#L`; the `gs1c` example and a lab kit for original clients; the profile audit, connection capabilities and an id-108 check from the roadmap (#7).

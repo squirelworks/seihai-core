@@ -26,6 +26,7 @@ pub use crc32::{crc32, crc32_update};
 pub use gani::{
     Gani, GaniFrame, GaniPlacement, GaniPlayer, GaniSound, GaniSprite, LISTENER_DX, LISTENER_DY,
 };
+pub use gif::{read_gif_frames, GifFrames};
 pub use level::{
     decode_sign_record, decode_sign_text, graal_code_bits, image_vis_height, new_world_tile_type,
     tile_code, tile_id, Baddy, BoardRun, Chest, DrawLayer, GraalLayout, ImageEffect, Level, Link,
