@@ -1084,6 +1084,30 @@ impl Lower {
         Some(e)
     }
 
+    /// `players[i].x`, `.y`, `.dir` and `npcs[i].x`, `.y`, `.dir` read:
+    /// the element, then the member, with no conversion between
+    /// (`members.gs2bc`). Other fields after an index stay errors.
+    fn element_member(&mut self, v: &g::VarRef) -> Option<Expr> {
+        if !v.field_after_index || v.index.len() != 1 {
+            return None;
+        }
+        let (base, field) = v.name.split_once('.')?;
+        let field = field.to_ascii_lowercase();
+        if !matches!(base, "players" | "npcs")
+            || !matches!(field.as_str(), "x" | "y" | "dir")
+            || self.with_depth > 0
+        {
+            return None;
+        }
+        Some(Expr::Member {
+            obj: Box::new(Expr::Var(Var {
+                name: base.to_string(),
+                index: v.index.iter().map(|e| self.expr(e)).collect(),
+            })),
+            name: field,
+        })
+    }
+
     /// A variable as GS2 names it. An element must have no field after its
     /// index (`npcs[i].x`), and GS1's level board is not lowered.
     fn var(&mut self, v: &g::VarRef) -> Var {
@@ -1109,11 +1133,13 @@ impl Lower {
         if !v.index.is_empty() {
             if v.field_after_index {
                 self.err(format!("a field after an index (`{v}`) is not lowered"));
-            } else if v.index.len() <= 2 && matches!(v.name.as_str(), "board" | "tiles") {
-                self.err(format!(
-                    "`{}[..]` has no fixture-checked GS2 encoding; it is not lowered",
-                    v.name
-                ));
+            } else if v.name == "board" {
+                self.err(
+                    "`board[..]` has no GS2 form (GS2 has `tiles[x, y]`); it is not lowered"
+                        .to_string(),
+                );
+            } else if v.name == "tiles" && v.index.len() != 2 {
+                self.err("`tiles` takes two indexes, `tiles[x, y]`".to_string());
             }
         }
         Var {
@@ -1161,10 +1187,8 @@ impl Lower {
                 op: AssignOp::Set,
             };
         }
-        if matches!(value, g::Expr::List(_)) {
-            self.err("a list stored into an array element is not lowered");
-            return Stmt::empty();
-        }
+        // `a[i] = {1, 2}` is `OP_ARRAY_ASSIGN` with the literal as the
+        // value (`elemlist.gs2bc`); the literal goes through `expr`.
         Stmt::Assign {
             target: self.var(target),
             op,
@@ -1453,10 +1477,6 @@ impl Lower {
                     return Some(Stmt::empty());
                 };
                 let value = raw_value(args.get(1));
-                if !target.index.is_empty() && matches!(value, g::Expr::List(_)) {
-                    self.err("a list stored into an array element is not lowered");
-                    return Some(Stmt::empty());
-                }
                 Stmt::Assign {
                     target,
                     op: AssignOp::Set,
@@ -1579,6 +1599,9 @@ impl Lower {
                 if let Some(e) = self.read_name(v) {
                     return e;
                 }
+                if let Some(e) = self.element_member(v) {
+                    return e;
+                }
                 Expr::Var(self.var(v))
             }
             g::Expr::Unary(g::UnOp::Neg, a) => Expr::Neg(Box::new(self.expr(a))),
@@ -1651,8 +1674,17 @@ impl Lower {
 /// Why a GS1 array literal cannot be pushed in GS2's right-to-left order,
 /// or `None` when it can.
 fn list_problem(values: &[g::Expr]) -> Option<&'static str> {
+    // Lists inside a literal are pushed right to left at every level
+    // (`nested.gs2bc`), so they are lowered when nothing in them can see
+    // the order: no element anywhere calls script or host code or `random`.
     if values.iter().any(has_nested_list) {
-        return Some("GS1 array elements that are lists are not lowered");
+        let effects = values
+            .iter()
+            .any(|v| expr_calls(v, true) || mentions_call(v, "random"));
+        return effects.then_some(
+            "GS1 array elements that are lists are lowered only when no element calls \
+             anything; put the values in variables first",
+        );
     }
     let effects = values
         .iter()

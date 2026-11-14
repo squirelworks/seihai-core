@@ -870,11 +870,14 @@ impl Builder {
 
     /// A value used as the object of a member or method: converted with
     /// `OP_CONV_TO_OBJECT` unless it is a root (`this`, `player`, …), as
-    /// the Preagonal baselines do for dotted names, calls and members.
+    /// the Preagonal baselines do for dotted names, calls and members. An
+    /// array element (`players[i].x`) is used as `OP_ARRAY` left it, with
+    /// no conversion (`members.gs2bc`).
     fn object(&mut self, obj: &Expr) {
         self.value(obj);
         let root = matches!(obj, Expr::Var(v) if v.index.is_empty() && root_op(&v.name).is_some());
-        if !root {
+        let element = matches!(obj, Expr::Var(v) if !v.index.is_empty());
+        if !root && !element {
             self.op(Op::ConvToObject);
         }
     }
