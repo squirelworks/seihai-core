@@ -1042,6 +1042,10 @@ fn counted_list(name: &str) -> Option<&'static str> {
     match name {
         "tokenscount" => Some("tokens"),
         "paramscount" => Some("params"),
+        // Left as a plain name, 6.03r7 reads `playerscount` as 0 (Mirae
+        // lab, 2026-11-14: the follow script never moved).
+        "playerscount" => Some("players"),
+        "npcscount" => Some("npcs"),
         _ => None,
     }
 }
