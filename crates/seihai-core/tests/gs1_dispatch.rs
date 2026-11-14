@@ -125,3 +125,19 @@ fn hash_i_reads_a_string_list_entry_and_hash_l_the_level() {
         compile::compile_gs1("if (created) { message #I(list,0); }\n", Era::V217).unwrap_err();
     assert!(err.to_string().contains("#I(list,0)"), "{err}");
 }
+
+#[test]
+fn a_string_name_built_at_run_time_is_makevar() {
+    let got = compile::compile_gs1(
+        "if (created) { message #s(this.weapon#v(this.i)); }\n",
+        Era::V217,
+    )
+    .unwrap();
+    assert!(
+        got.disassemble().contains("OP_MAKEVAR"),
+        "{}",
+        got.disassemble()
+    );
+    // A plain flag name built at run time is still a player flag: refused.
+    assert!(compile::compile_gs1("if (created) { message #s(w#v(1)); }\n", Era::V217).is_err());
+}

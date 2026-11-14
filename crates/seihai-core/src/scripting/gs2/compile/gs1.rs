@@ -1123,6 +1123,8 @@ fn no_lowering(code: char) -> String {
 /// One message code as GS1 text holds it, before lowering.
 enum Code {
     Value(g::Expr),
+    /// `#s(this.a#v(i))`: a variable whose name is built at run time.
+    DynVar(String),
     Trim(String),
     Sub(g::Expr, g::Expr, String),
 }
@@ -1975,6 +1977,10 @@ impl Lower {
             parts.push(match c {
                 Ok(lit) => MsgPart::Lit(lit),
                 Err(Code::Value(e)) => MsgPart::Value(self.expr(&e)),
+                Err(Code::DynVar(t)) => MsgPart::Value(Expr::Call {
+                    name: "makevar".into(),
+                    args: vec![Expr::Message(self.message(&t)?)],
+                }),
                 Err(Code::Trim(t)) => MsgPart::Trim(self.message(&t)?),
                 Err(Code::Sub(start, len, t)) => {
                     let start = self.expr(&start);
@@ -2085,6 +2091,10 @@ fn split_codes(s: &str, era: Era) -> Result<Vec<Result<String, Code>>, String> {
                 let readable = ["this.", "client.", "clientr.", "serverr."];
                 if readable.iter().any(|p| n.starts_with(p)) && is_plain_name(&n) {
                     Some(var(&n, None))
+                } else if readable.iter().any(|p| n.starts_with(p)) && n.contains("#v(") {
+                    // The name is text with codes: GS2 builds it and reads
+                    // the variable of that name with `makevar`.
+                    Some(Code::DynVar(x.trim().to_string()))
                 } else {
                     return Err(format!(
                         "`#s({x})`: only `this.`, `client.`, `clientr.` and `serverr.` strings are lowered (a plain GS1 string is a player flag)"
