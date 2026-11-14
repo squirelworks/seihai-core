@@ -4,6 +4,10 @@ One line per release. The full notes for each version from 0.0.14 on are
 in [`release-notes/`](release-notes/) and on the GitHub release; the
 versioning rule is in the README.
 
+## 0.2.x
+
+- **0.2.0**: GS2 weapon and class scripts from `PLO_NPCWEAPONSCRIPT` (140), NPC scripts sent after their level or for a gmap neighbour handed to the game, `player.*` reads and writes in GS2 (`player.chat` included), and `.mid` music from a small built-in synthesizer. Breaking: new fields in `OwnWeapons` and `EffectHost`, and `.mid` now plays.
+
 ## 0.1.x
 
 - **0.1.9**: The built-in player is a squirrel (head, body and bushy tail), with an acorn for the money icon and on the shield. Graal files in the user's asset folder still replace it file by file.

@@ -36,6 +36,7 @@ pub use dispatch::{
     ChatLine, IncomingFile, LevelObject, Message, NpcDelete, OtherLooks, OtherPlayer, ServerItem,
     SessionState, Splitter, Weapon,
 };
+pub use dispatch::{parse_script_delivery, ScriptDelivery};
 pub use extras::MapSpec;
 pub use frame::{
     read_zlib_frame, write_zlib_frame, write_zlib_frame_best, zlib_compress, zlib_compress_best,

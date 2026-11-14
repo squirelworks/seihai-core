@@ -246,6 +246,68 @@ pub struct Live {
     /// items the server rolls), in the order they came, for the game to
     /// add to or take from the level.
     pub items: SharedItems,
+    /// GS2 scripts of server NPCs (`PLO_NPCBYTECODE`) that did not come
+    /// with their level's [`Arrival`]: a script sent after the level had
+    /// settled (an NPC that came later, or a script the server sent
+    /// again), and the scripts of the gmap neighbours' NPCs, each with its
+    /// level, for the view to start when that level is on screen.
+    pub npc_scripts: SharedNpcScripts,
+}
+
+/// One server NPC's GS2 script, sent apart from its level's [`Arrival`].
+#[derive(Debug, Clone)]
+pub struct NpcScript {
+    /// The NPC's level, lower-cased.
+    pub level: String,
+    pub id: u32,
+    pub script: Result<crate::scripting::gs2::Script, String>,
+}
+
+/// [`Live::npc_scripts`].
+pub type SharedNpcScripts = Arc<Mutex<Vec<NpcScript>>>;
+
+/// Which NPC scripts the view has been handed on this connection, so each
+/// goes to it once: in its level's [`Arrival`], or later through
+/// [`Live::npc_scripts`]. A script the server sends again with other bytes
+/// goes again.
+#[derive(Debug, Default)]
+struct ScriptFeed {
+    sent: std::collections::HashMap<u32, Vec<u8>>,
+}
+
+impl ScriptFeed {
+    /// The arrival of the player's level carried its NPCs' scripts.
+    fn arrived(&mut self, st: &SessionState, a: &Arrival) {
+        for (id, _) in &a.scripts {
+            if let Some(code) = st.npc_bytecode.get(id) {
+                self.sent.insert(*id, code.clone());
+            }
+        }
+    }
+
+    /// The scripts `st` holds that have not been handed yet, for NPCs
+    /// whose level is known.
+    fn take_new(&mut self, st: &SessionState) -> Vec<NpcScript> {
+        let mut out = Vec::new();
+        for (id, code) in &st.npc_bytecode {
+            if self.sent.get(id) == Some(code) {
+                continue;
+            }
+            let Some(level) = st.server_npcs.get(id).and_then(|(l, _)| l.as_ref()) else {
+                continue;
+            };
+            self.sent.insert(*id, code.clone());
+            out.push(NpcScript {
+                level: level.to_ascii_lowercase(),
+                id: *id,
+                script: crate::scripting::gs2::Script::parse(code),
+            });
+        }
+        // A deleted NPC's script is forgotten, so a new one with its id
+        // goes again.
+        self.sent.retain(|id, _| st.npc_bytecode.contains_key(id));
+        out
+    }
 }
 
 /// [`Live::items`].
@@ -456,6 +518,10 @@ impl OwnStats {
 pub struct OwnWeapons {
     pub defaults: Vec<u8>,
     pub named: Vec<crate::protocol::Weapon>,
+    /// The compiled GS2 scripts of the server's weapons
+    /// (`PLO_NPCWEAPONSCRIPT`, 140), by weapon name, as sent. The 6.x
+    /// weapons come with no GS1 text; this is their script.
+    pub bytecode: std::collections::BTreeMap<String, Vec<u8>>,
 }
 
 impl OwnWeapons {
@@ -464,6 +530,7 @@ impl OwnWeapons {
         OwnWeapons {
             defaults: st.default_weapons.clone(),
             named: st.weapons.clone(),
+            bytecode: st.weapon_bytecode.clone(),
         }
     }
 
@@ -1027,6 +1094,7 @@ pub fn run_hooked(
     let hits = live.as_ref().map(|l| l.hits.clone());
     let items = live.as_ref().map(|l| l.items.clone());
     let leader = live.as_ref().map(|l| l.leader.clone());
+    let npc_scripts = live.as_ref().map(|l| l.npc_scripts.clone());
     let say = live.as_ref().map(|l| l.say.clone());
     let chat = live.as_ref().map(|l| l.chat.clone());
     let outbox = live.as_ref().map(|l| l.send.clone());
@@ -1101,6 +1169,7 @@ pub fn run_hooked(
         let mut last_link: Option<LinkAsk> = None;
         let mut walk_clock = Instant::now();
         let mut store = LevelStore::default();
+        let mut feed = ScriptFeed::default();
         // A level was stored and has not been logged yet.
         let mut owed = false;
         let mut owed_at: Option<Instant> = None;
@@ -1145,7 +1214,10 @@ pub fn run_hooked(
                     }
                     if let Some(w) = weapons.as_ref() {
                         let mut slot = w.lock().unwrap_or_else(|e| e.into_inner());
-                        if slot.defaults != st.default_weapons || slot.named != st.weapons {
+                        if slot.defaults != st.default_weapons
+                            || slot.named != st.weapons
+                            || slot.bytecode != st.weapon_bytecode
+                        {
                             *slot = OwnWeapons::of(&st);
                         }
                     }
@@ -1160,7 +1232,7 @@ pub fn run_hooked(
                     }
                     if let Some(w) = st.server_warp.take() {
                         if owed {
-                            log_level(level_lines, &store, &st, out, shown);
+                            log_level(level_lines, &store, &st, out, shown, &mut feed);
                         }
                         let _ = s.conn.shutdown();
                         let name = w.display_name();
@@ -1185,7 +1257,7 @@ pub fn run_hooked(
                             before.as_deref().is_none_or(|b| !b.eq_ignore_ascii_case(n))
                         })
                     {
-                        log_level(level_lines, &store, &st, out, shown);
+                        log_level(level_lines, &store, &st, out, shown, &mut feed);
                         owed = false;
                     }
                     if store.update(&mut st, local) {
@@ -1248,6 +1320,11 @@ pub fn run_hooked(
                     if let (Some(n), false) = (npc_changes.as_ref(), changes.is_empty()) {
                         n.lock().unwrap_or_else(|e| e.into_inner()).extend(changes);
                     }
+                    // Scripts the arrival did not carry. While a level is
+                    // owed its scripts wait for its arrival.
+                    if !owed {
+                        hand_scripts(&mut feed, &st, npc_scripts.as_ref());
+                    }
                     // The gmap: the grid, the cell, the neighbours, and a
                     // request for what the server still has to send.
                     if world.is_some() {
@@ -1279,7 +1356,7 @@ pub fn run_hooked(
                 }
                 Ok(Err(e)) => {
                     if owed {
-                        log_level(level_lines, &store, &st, out, shown);
+                        log_level(level_lines, &store, &st, out, shown, &mut feed);
                     }
                     let why = st
                         .disconnect_message
@@ -1290,9 +1367,10 @@ pub fn run_hooked(
                 }
                 Err(RecvTimeoutError::Timeout) => {
                     if owed && settle_until.is_some_and(|t| Instant::now() >= t) {
-                        log_level(level_lines, &store, &st, out, shown);
+                        log_level(level_lines, &store, &st, out, shown, &mut feed);
                         owed = false;
                         owed_at = None;
+                        hand_scripts(&mut feed, &st, npc_scripts.as_ref());
                         // Hang up once the post-login frames due by now
                         // have gone (below), as a client would have sent
                         // them before the level settled.
@@ -1477,14 +1555,25 @@ pub fn run_hooked(
     }
 }
 
+/// Hand the view the NPC scripts its arrivals did not carry.
+fn hand_scripts(feed: &mut ScriptFeed, st: &SessionState, to: Option<&SharedNpcScripts>) {
+    let Some(to) = to else { return };
+    let new = feed.take_new(st);
+    if !new.is_empty() {
+        to.lock().unwrap_or_else(|e| e.into_inner()).extend(new);
+    }
+}
+
 fn log_level(
     level_lines: LevelLines,
     store: &LevelStore,
     st: &SessionState,
     out: &mut impl Write,
     shown: &mut dyn FnMut(&Level, &Arrival),
+    feed: &mut ScriptFeed,
 ) {
     if let (Some(a), Some(level)) = (store.arrival(st), store.level.as_ref()) {
+        feed.arrived(st, &a);
         let _ = writeln!(out, "{}", a.line());
         for l in level_lines(level, &a.name, st) {
             let _ = writeln!(out, "{l}");
@@ -1848,6 +1937,7 @@ mod others_tests {
         let o = OwnWeapons {
             defaults: vec![8, 3, 7],
             named: vec![w("Lamp"), w("-hidden"), w("Bow"), w("")],
+            bytecode: Default::default(),
         };
         assert_eq!(o.names(), vec!["Bomb", "Bow", "Lamp"]);
         assert_eq!(default_weapon_name(23).as_deref(), Some("Joltbomb"));
@@ -1897,6 +1987,51 @@ mod others_tests {
         assert_eq!((got[0].level.as_str(), got[0].id), ("start.nw", 5));
         assert_eq!(got[0].props.as_ref().and_then(|p| p.x), Some(30.0));
         assert!(npc_changes_of(&mut st).is_empty());
+    }
+
+    /// Each NPC script goes to the view once: the arrival's, then later
+    /// ones and the neighbours' through the feed, with their level; a
+    /// script sent again with other bytes goes again.
+    #[test]
+    fn scripts_the_arrival_did_not_carry_go_through_the_feed() {
+        let mut st = SessionState::for_version(ClientVersion::V600R2);
+        let p = NpcProps::default();
+        st.server_npcs
+            .insert(5, (Some("Start.nw".into()), p.clone()));
+        st.server_npcs
+            .insert(6, (Some("Next.nw".into()), p.clone()));
+        st.server_npcs.insert(7, (None, p));
+        let code = b"\0\0\0\x01\0\0\0\x04\0\0\0\0".to_vec();
+        for id in [5, 6, 7] {
+            st.npc_bytecode.insert(id, code.clone());
+        }
+        let mut feed = ScriptFeed::default();
+        let arrival = Arrival {
+            name: "start.nw".into(),
+            source: level::Source::Board,
+            start: None,
+            server_npcs: 1,
+            server_npc_props: Vec::new(),
+            file_npcs: 0,
+            scripts: vec![(5, crate::scripting::gs2::Script::parse(&code))],
+        };
+        feed.arrived(&st, &arrival);
+        let got: Vec<_> = feed
+            .take_new(&st)
+            .into_iter()
+            .map(|n| (n.level, n.id))
+            .collect();
+        // 5 came with the arrival; 7 has no level.
+        assert_eq!(got, vec![("next.nw".to_string(), 6)]);
+        assert!(feed.take_new(&st).is_empty());
+        let mut again = code.clone();
+        again[11] = 1;
+        st.npc_bytecode.insert(5, again);
+        assert_eq!(feed.take_new(&st).len(), 1);
+        st.npc_bytecode.remove(&6);
+        feed.take_new(&st);
+        st.npc_bytecode.insert(6, code);
+        assert_eq!(feed.take_new(&st).len(), 1, "a new NPC with an old id");
     }
 
     /// `PLO_NPCDEL2`: GCHAR length, the level, GINT3 id.

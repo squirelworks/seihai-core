@@ -1722,11 +1722,32 @@ fn rand_unit() -> f64 {
 
 /// A [`Host`] that turns the commands GS1 already has into GS1 effects for
 /// one object, and keeps the flags.
+/// The player as a GS2 script reads it (`player.x`, `player.chat`, …):
+/// the owner copies the player in before a run. Positions are in tiles,
+/// in the same coordinates as the object's `x` and `y`.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PlayerSnap {
+    pub x: f64,
+    pub y: f64,
+    pub dir: f64,
+    /// What the player said last (the bubble), `player.chat`.
+    pub chat: String,
+    pub nick: String,
+    pub account: String,
+    pub hearts: f64,
+    pub fullhearts: f64,
+    pub rupees: f64,
+    pub bombs: f64,
+    pub darts: f64,
+}
+
 pub struct EffectHost {
     pub era: Era,
     pub obj: ObjId,
     pub x: f64,
     pub y: f64,
+    /// The player, for `player.*` reads and writes.
+    pub player: PlayerSnap,
     pub flags: HashMap<String, String>,
     pub effects: Vec<Effect>,
     pub log: Vec<String>,
@@ -1742,11 +1763,65 @@ impl EffectHost {
             obj,
             x: 0.0,
             y: 0.0,
+            player: PlayerSnap::default(),
             flags: HashMap::new(),
             effects: Vec::new(),
             log: Vec::new(),
             resolve_host: false,
         }
+    }
+}
+
+impl EffectHost {
+    /// `player.<name> = value`: the player's chat (sent as the GS1
+    /// `setplayerprop #c` is), place, direction and counters, as the GS1
+    /// engine's player variables. `false` for any other name.
+    fn set_player(&mut self, name: &str, value: &Val) -> bool {
+        let lower = name.to_ascii_lowercase();
+        let var = |n: &str| Effect::SetPlayerVar {
+            name: n.to_string(),
+            value: value.num(),
+        };
+        let p = &mut self.player;
+        let effect = match lower.as_str() {
+            "chat" => {
+                p.chat = value.text();
+                Effect::SetPlayerProp {
+                    code: "#c".into(),
+                    value: p.chat.clone(),
+                }
+            }
+            "x" => {
+                p.x = value.num();
+                var("playerx")
+            }
+            "y" => {
+                p.y = value.num();
+                var("playery")
+            }
+            "dir" => {
+                p.dir = value.num().rem_euclid(4.0).floor();
+                Effect::SetPlayerVar {
+                    name: "playerdir".into(),
+                    value: p.dir,
+                }
+            }
+            "rupees" => {
+                p.rupees = value.num();
+                var("playerrupees")
+            }
+            "bombs" => {
+                p.bombs = value.num();
+                var("playerbombs")
+            }
+            "darts" => {
+                p.darts = value.num();
+                var("playerdarts")
+            }
+            _ => return false,
+        };
+        self.effects.push(effect);
+        true
     }
 }
 
@@ -1878,11 +1953,31 @@ impl Host for EffectHost {
         match (root, name) {
             (Root::This | Root::ThisO, "x") => Some(Val::Num(self.x)),
             (Root::This | Root::ThisO, "y") => Some(Val::Num(self.y)),
+            (Root::Player | Root::PlayerO, _) => {
+                let p = &self.player;
+                Some(match name.to_ascii_lowercase().as_str() {
+                    "x" => Val::Num(p.x),
+                    "y" => Val::Num(p.y),
+                    "dir" => Val::Num(p.dir),
+                    "chat" => Val::Str(p.chat.clone()),
+                    "nick" => Val::Str(p.nick.clone()),
+                    "account" => Val::Str(p.account.clone()),
+                    "hearts" => Val::Num(p.hearts),
+                    "fullhearts" => Val::Num(p.fullhearts),
+                    "rupees" => Val::Num(p.rupees),
+                    "bombs" => Val::Num(p.bombs),
+                    "darts" => Val::Num(p.darts),
+                    _ => return None,
+                })
+            }
             _ => None,
         }
     }
 
     fn set_prop(&mut self, root: Root, name: &str, value: &Val) -> bool {
+        if matches!(root, Root::Player | Root::PlayerO) {
+            return self.set_player(name, value);
+        }
         match (root, name) {
             (Root::This | Root::ThisO, "x" | "y") => {
                 if name == "x" {

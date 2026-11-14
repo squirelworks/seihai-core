@@ -8,8 +8,10 @@
 //! - `.wav` is an effect. Any other extension is music, which the 2.05
 //!   client does not play. The 6.x worlds play `.mp3` music through FMOD
 //!   (`#446`); Seihai plays an `.mp3` on one music slot of its own (see
-//!   [`SoundEngine::play`]). MIDI (`.mid`) has no synthesizer here: it is
-//!   logged once and skipped.
+//!   [`SoundEngine::play`]). MIDI (`.mid`, `.midi`) goes on the same slot,
+//!   rendered by Seihai's own small synthesizer (`sound::render_midi`):
+//!   the notes and timing are the file's, the timbre is not the
+//!   original's General MIDI set.
 //! - At most 8 effects play at once. A ninth is dropped.
 //! - Pan is `(sound x - listener x) * 150`, clamped to +/-10000, and
 //!   `reversestereo` negates it.
@@ -54,7 +56,7 @@ pub enum Outcome {
     Missing,
     /// The file is there but is not a WAV this decoder reads.
     Undecodable,
-    /// Music this engine cannot play (MIDI, or an unknown extension).
+    /// Not a sound this engine plays (an unknown extension).
     NotAnEffect,
     /// Eight voices are busy.
     VoiceCap,
@@ -70,7 +72,7 @@ pub fn wanted_name(file: &str) -> String {
 
 /// Whether `name` is a sound effect the engine plays: a `.wav` or an
 /// `.ogg` (6.x worlds ship Ogg effects), in any case, with or without a
-/// path, or `.mp3` music. `.mid` is music this engine does not play.
+/// path, or `.mp3` or `.mid` music.
 pub fn is_sound_name(name: &str) -> bool {
     let lower = name.trim().to_ascii_lowercase();
     is_effect_name(&lower) || is_music_name(&lower)
@@ -80,9 +82,9 @@ fn is_effect_name(lower: &str) -> bool {
     lower.ends_with(".wav") || lower.ends_with(".ogg")
 }
 
-/// Music the engine plays: `.mp3` (the 6.x worlds' music).
+/// Music the engine plays: `.mp3` and `.mid` (the 6.x worlds' music).
 fn is_music_name(lower: &str) -> bool {
-    lower.ends_with(".mp3")
+    lower.ends_with(".mp3") || lower.ends_with(".mid") || lower.ends_with(".midi")
 }
 
 /// Pan for a sound at `sound_x` heard from `listener_x`.
@@ -204,7 +206,7 @@ impl SoundEngine {
 
     /// Play `ev` as heard from `listener` (level tiles) at `now_ms`.
     ///
-    /// An `.mp3` is music: it goes on a slot of its own, centred, outside
+    /// An `.mp3` or `.mid` is music: it goes on a slot of its own, centred, outside
     /// the eight effect voices, and a new piece stops the one playing.
     /// That slot is Seihai's: how FMOD mixes the 6.x client's music was not
     /// read, so the effect rules (pan, the voice cap) are left out of it.
@@ -563,12 +565,36 @@ mod tests {
     }
 
     #[test]
-    fn music_is_skipped_with_one_note() {
+    fn an_unknown_extension_is_skipped_with_one_note() {
         let (mut e, rec, _) = engine("music", &[]);
-        assert_eq!(e.play(&ev("song.mid"), L, 0), Outcome::NotAnEffect);
-        assert_eq!(e.play(&ev("song.mid"), L, 1), Outcome::NotAnEffect);
+        assert_eq!(e.play(&ev("song.xm"), L, 0), Outcome::NotAnEffect);
+        assert_eq!(e.play(&ev("song.xm"), L, 1), Outcome::NotAnEffect);
         assert!(rec.log().is_empty());
-        assert_eq!(e.warnings, vec!["music skipped: song.mid".to_string()]);
+        assert_eq!(e.warnings, vec!["music skipped: song.xm".to_string()]);
+    }
+
+    /// 6.x MIDI music (#446): rendered and played on the music slot, and
+    /// one that arrives from the server plays on the next cue.
+    #[test]
+    fn midi_music_plays_on_the_music_slot() {
+        let song =
+            super::super::midi::tests::smf(500_000, &[(0, &[0x90, 60, 100]), (96, &[0x80, 60, 0])]);
+        let (mut e, rec, tmp) = engine("midi", &[]);
+        std::fs::write(tmp.join("Town.MID"), &song).unwrap();
+        assert_eq!(e.play(&ev("+town.mid"), L, 0), Outcome::Played);
+        assert_eq!(e.music(), Some("town.mid"));
+        assert_eq!(
+            rec.log(),
+            vec![Call::Play {
+                name: "town.mid".into(),
+                pan: 0,
+                looped: true
+            }]
+        );
+        assert_eq!(e.play(&ev("cave.mid"), L, 10), Outcome::Missing);
+        assert!(e.add("cave.mid", &song).is_ok());
+        assert_eq!(e.play(&ev("cave.mid"), L, 20), Outcome::Played);
+        assert_eq!(e.music(), Some("cave.mid"));
     }
 
     /// 6.x: an Ogg effect plays, and so does an MP3 saved as `.wav` (the
@@ -583,7 +609,8 @@ mod tests {
         assert_eq!(e.play(&ev("steps2.wav"), L, 0), Outcome::Played);
         assert_eq!(e.play(&ev("song.mp3"), L, 0), Outcome::Missing);
         assert_eq!(rec.log().len(), 2);
-        assert!(is_sound_name("x.OGG") && is_sound_name("x.mp3") && !is_sound_name("x.mid"));
+        assert!(is_sound_name("x.OGG") && is_sound_name("x.mp3") && is_sound_name("x.mid"));
+        assert!(!is_sound_name("x.xm"));
     }
 
     /// 6.x music (#446): an `.mp3` plays on the music slot, centred and
