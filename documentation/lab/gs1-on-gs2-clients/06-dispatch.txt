@@ -1,0 +1,16 @@
+// Whole-script GS1 (the dispatcher): code between event tests, an event
+// test with else, #L and #I. Visible: touching says "touch N on <level>";
+// each timeout run shows "other runs: N" via the else branch.
+if (created) {
+  addstring this.words,touch;
+  addstring this.words,run;
+  timeout = 1;
+}
+this.runs += 1;
+if (playertouchsme) {
+  this.t += 1;
+  setplayerprop #c,#I(this.words,0) #v(this.t) on #L;
+} else {
+  message other runs: #v(this.runs);
+}
+if (timeout) timeout = 1;
