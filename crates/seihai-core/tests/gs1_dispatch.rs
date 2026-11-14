@@ -208,6 +208,80 @@ fn direct_gs2_public_calls_do_not_replay_top_level_code() {
 }
 
 #[test]
+fn an_unnamed_event_runs_code_outside_the_tests() {
+    let (mut m, mut host) = machine("if (created) { this.c += 1; } this.runs += 1;");
+    assert_eq!(num(&m, "runs"), 0.0, "loading must not run the body");
+    fire(&mut m, &mut host, "onCreated");
+    assert_eq!((num(&m, "c"), num(&m, "runs")), (1.0, 1.0));
+    fire(&mut m, &mut host, "onPlayerEnters");
+    assert_eq!((num(&m, "c"), num(&m, "runs")), (1.0, 2.0));
+}
+
+#[test]
+fn a_lifted_script_does_not_gain_unnamed_event_wrappers() {
+    let script = compile::compile_gs1("if (created) { this.c += 1; }", Era::V217).unwrap();
+    assert_eq!(
+        script
+            .functions
+            .iter()
+            .map(|f| f.name.as_str())
+            .collect::<Vec<_>>(),
+        ["onCreated"]
+    );
+    let mut m = Machine::new(script);
+    let mut host = EffectHost::new(Era::V217, 3);
+    assert_eq!(m.run_top_level(&mut host), Outcome::Done);
+    assert_eq!(
+        m.call_event("onPlayerEnters", &[], &mut host),
+        Outcome::NoSuchEvent
+    );
+}
+
+#[test]
+fn wrappers_follow_the_era_and_leave_unnamed_actions_unwrapped() {
+    let early =
+        compile::compile_gs1("if (created) { this.c += 1; } this.runs += 1;", Era::V141).unwrap();
+    let early_names: Vec<&str> = early.functions.iter().map(|f| f.name.as_str()).collect();
+    assert!(early_names.contains(&"onPlayerEnters"));
+    assert!(!early_names.contains(&"onPlayerDies"));
+    assert!(!early_names.iter().any(|name| name.contains("Action")));
+    let mut m = Machine::new(early);
+    let mut host = EffectHost::new(Era::V141, 3);
+    assert_eq!(m.run_top_level(&mut host), Outcome::Done);
+    assert_eq!(
+        m.call_event("onPlayerDies", &[], &mut host),
+        Outcome::NoSuchEvent
+    );
+    assert_eq!(
+        m.call_event("onPlayerEnters", &[], &mut host),
+        Outcome::Done
+    );
+    assert_eq!(num(&m, "runs"), 1.0);
+    assert_eq!(num(&m, "c"), 0.0, "playerenters is not created");
+
+    let later =
+        compile::compile_gs1("if (created) { this.c += 1; } this.runs += 1;", Era::V217).unwrap();
+    let later_names: Vec<&str> = later.functions.iter().map(|f| f.name.as_str()).collect();
+    assert!(later_names.contains(&"onPlayerDies"));
+    assert!(!later_names
+        .iter()
+        .any(|name| name.eq_ignore_ascii_case("onActionBomb")));
+    let mut m = Machine::new(later);
+    let mut host = EffectHost::new(Era::V217, 3);
+    assert_eq!(m.run_top_level(&mut host), Outcome::Done);
+    assert_eq!(
+        m.call_event("onActionBomb", &[], &mut host),
+        Outcome::NoSuchEvent
+    );
+
+    let (mut named, mut named_host) = machine("if (actionbomb) { this.hit += 1; } this.runs += 1;");
+    fire(&mut named, &mut named_host, "onActionBomb");
+    assert_eq!((num(&named, "hit"), num(&named, "runs")), (1.0, 1.0));
+    fire(&mut named, &mut named_host, "onCreated");
+    assert_eq!((num(&named, "hit"), num(&named, "runs")), (1.0, 2.0));
+}
+
+#[test]
 fn suffix_commands_follow_each_event_with_dispatch_and_event_only_controls() {
     for (src, expected) in [
         (
