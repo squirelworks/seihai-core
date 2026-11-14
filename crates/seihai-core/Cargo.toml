@@ -25,6 +25,9 @@ hkdf = "0.12"
 sha2 = "0.10"
 rand_core = { version = "0.6", features = ["getrandom"] }
 base64 = "0.22"
+# The classic clients' DES variant (`graaldes`: RC passwords, 1.x `.code`
+# files). RustCrypto, MIT OR Apache-2.0.
+des = "0.8"
 # Sound effects beyond WAV (`sound::decode_sound`): 6.x worlds ship Ogg
 # Vorbis effects, MP3 data inside WAV files (format tag 0x55), and MP3
 # files under a `.wav` name. Both pure Rust, MIT OR Apache-2.0.
