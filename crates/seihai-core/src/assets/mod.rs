@@ -4,6 +4,7 @@ pub mod builtin;
 pub(crate) mod coverage;
 pub mod crc32;
 mod gani;
+pub mod gani_movie;
 pub mod gif;
 mod level;
 mod level_write;
@@ -26,6 +27,7 @@ pub use crc32::{crc32, crc32_update};
 pub use gani::{
     Gani, GaniFrame, GaniPlacement, GaniPlayer, GaniSound, GaniSprite, LISTENER_DX, LISTENER_DY,
 };
+pub use gani_movie::{Actor, ActorKind, GaniMovie, Keyframe};
 pub use gif::{read_gif_frames, GifFrames};
 pub use level::{
     decode_sign_record, decode_sign_text, graal_code_bits, image_vis_height, new_world_tile_type,

@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.2.x
 
+- **0.2.8**: `assets::gani_movie` reads and writes GraalShop's `GANI0002` movie mode (`FRAMES`, `MOVIE`, `ACTOR CHAR|SPRITE|SOUND|TEXT`, `FRAME n key=value,…`) and answers an actor's state at a frame, with `dx` / `dy` moving between keyframes (servertools #78).
 - **0.2.7**: `G3D18010` becomes a binary-read token (the 2010 iPhone engine: Cocoto Kart HD, Ace Tennis HD, Bomber Online 1.40, Dino Smash 1.4), and `G3D04048` is relabelled as the 2008 iPhone engine shared by 14 builds.
 - **0.2.6**: GS1 `set`, `unset` and `setstring` on a plain flag lower to an assignment to `client.gs1_<flag>`, which real 5.24r4 and 4.20r8 clients send and seihai-gserver keeps as `<flag>` (#30).
 - **0.2.5**: `read_gif_frames` reads every frame of an animated GIF as palette indices on the logical screen (disposal, delays, the `NETSCAPE2.0` loop count), for gif2mng in seihai-servertools.
