@@ -794,3 +794,146 @@ mod tests {
         );
     }
 }
+
+/// One palette frame to write: indices row by row over a palette, with one
+/// optional transparent index, shown for `delay_ms`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexedFrame {
+    pub width: u32,
+    pub height: u32,
+    pub indices: Vec<u8>,
+    pub palette: Vec<[u8; 3]>,
+    pub transparent: Option<u8>,
+    pub delay_ms: u32,
+}
+
+/// The PNG chunks of a frame (`IHDR`, `PLTE`, `tRNS`, `IDAT`, `IEND`): an
+/// 8-bit palette image, the only kind the client's MNG loader takes.
+fn frame_chunks(out: &mut Vec<u8>, f: &IndexedFrame) -> io::Result<()> {
+    if f.indices.len() != f.width as usize * f.height as usize {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "frame size and index count differ",
+        ));
+    }
+    if f.palette.is_empty() || f.palette.len() > 256 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "a palette has 1 to 256 colours",
+        ));
+    }
+    let mut ihdr = Vec::with_capacity(13);
+    ihdr.extend_from_slice(&f.width.to_be_bytes());
+    ihdr.extend_from_slice(&f.height.to_be_bytes());
+    ihdr.extend_from_slice(&[8, 3, 0, 0, 0]);
+    push_chunk(out, b"IHDR", &ihdr);
+    let plte: Vec<u8> = f.palette.iter().flatten().copied().collect();
+    push_chunk(out, b"PLTE", &plte);
+    if let Some(t) = f.transparent {
+        // Alpha 255 for every entry before the transparent one, then 0.
+        let mut trns = vec![255u8; t as usize];
+        trns.push(0);
+        push_chunk(out, b"tRNS", &trns);
+    }
+    let mut z = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+    for row in f.indices.chunks(f.width.max(1) as usize) {
+        io::Write::write_all(&mut z, &[0])?;
+        io::Write::write_all(&mut z, row)?;
+    }
+    push_chunk(out, b"IDAT", &z.finish()?);
+    push_chunk(out, b"IEND", &[]);
+    Ok(())
+}
+
+/// A frame as a PNG file (gif2mng's output for a one-frame GIF).
+pub fn write_indexed_png(frame: &IndexedFrame) -> io::Result<Vec<u8>> {
+    let mut out = PNG_SIGNATURE.to_vec();
+    frame_chunks(&mut out, frame)?;
+    Ok(out)
+}
+
+/// Frames as an MNG shaped like gif2mng's: `MHDR` at 1000 ticks a second,
+/// a mode 4 `FRAM`, `TERM`, a mode 2 `FRAM` with each frame's delay before
+/// it, a closing `FRAM` and `MEND`. [`read_mng`] gives each frame its
+/// delay (rounded to the client's 50 ms ticks) and the last one tick more.
+/// The canvas is the first frame's size.
+pub fn write_mng(frames: &[IndexedFrame], repeat: MngRepeat) -> io::Result<Vec<u8>> {
+    let first = frames
+        .first()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "no frames"))?;
+    let mut out = SIGNATURE.to_vec();
+    let mut mhdr = Vec::new();
+    for v in [first.width, first.height, 1000, 0, 0, 0, 1] {
+        mhdr.extend_from_slice(&v.to_be_bytes());
+    }
+    push_chunk(&mut out, b"MHDR", &mhdr);
+    push_chunk(&mut out, b"FRAM", &[4, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    let iterations = match repeat {
+        MngRepeat::Forever => u32::MAX,
+        MngRepeat::Times(n) => n.max(1),
+    };
+    let mut term = vec![3, 0, 0, 0, 0, 0];
+    term.extend_from_slice(&iterations.to_be_bytes());
+    push_chunk(&mut out, b"TERM", &term);
+    let fram = |delay: u32| {
+        let mut c = vec![2, 0, 2, 0, 0, 0];
+        c.extend_from_slice(&delay.to_be_bytes());
+        c
+    };
+    for f in frames {
+        push_chunk(&mut out, b"FRAM", &fram(f.delay_ms));
+        frame_chunks(&mut out, f)?;
+    }
+    push_chunk(&mut out, b"FRAM", &fram(0));
+    push_chunk(&mut out, b"MEND", &[]);
+    Ok(out)
+}
+
+#[cfg(test)]
+mod write_tests {
+    use super::*;
+
+    fn frame(colour: u8, delay_ms: u32) -> IndexedFrame {
+        IndexedFrame {
+            width: 2,
+            height: 2,
+            indices: vec![colour, colour, 2, colour],
+            palette: vec![[255, 0, 0], [0, 255, 0], [0, 0, 0]],
+            transparent: Some(2),
+            delay_ms,
+        }
+    }
+
+    #[test]
+    fn written_mngs_read_back_with_the_client_timing() {
+        let data = write_mng(&[frame(0, 200), frame(1, 100)], MngRepeat::Forever).unwrap();
+        let a = read_mng(&data, &[]).unwrap();
+        assert_eq!((a.width, a.height), (2, 2));
+        assert_eq!(a.frames.len(), 2);
+        assert_eq!(a.repeat, MngRepeat::Forever);
+        assert_eq!(a.frames[0].delay_ms, 200);
+        assert_eq!(
+            a.frames[1].delay_ms, 100,
+            "the last frame's extra tick is 1 ms here"
+        );
+        assert_eq!(&a.frames[0].rgba[..4], &[255, 0, 0, 255]);
+        assert_eq!(a.frames[1].rgba[3], 255);
+        assert_eq!(a.frames[0].rgba[8 + 3], 0, "index 2 is transparent");
+        let once = write_mng(&[frame(0, 50)], MngRepeat::Times(3)).unwrap();
+        assert_eq!(read_mng(&once, &[]).unwrap().repeat, MngRepeat::Times(3));
+    }
+
+    #[test]
+    fn a_single_frame_is_a_png() {
+        let png = write_indexed_png(&frame(1, 0)).unwrap();
+        let (w, h, rgba) = super::super::png::read_png_rgba(&png).unwrap();
+        assert_eq!((w, h), (2, 2));
+        assert_eq!(&rgba[..4], &[0, 255, 0, 255]);
+        assert_eq!(rgba[11], 0);
+        assert!(write_indexed_png(&IndexedFrame {
+            indices: vec![0],
+            ..frame(0, 0)
+        })
+        .is_err());
+    }
+}
