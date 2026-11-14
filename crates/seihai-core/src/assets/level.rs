@@ -2090,12 +2090,12 @@ fn parse_chest(line: &str) -> Option<Chest> {
 /// Binary sign alphabet: each byte is `index + 32` into this table. `#`
 /// slots are glyph and escape codes (`formats/sign-text.md`). The same table
 /// serves `.graal` sign sections and `PLO_LEVELSIGN`.
-const SIGN_ALPHABET: &[u8; 97] =
+pub(super) const SIGN_ALPHABET: &[u8; 97] =
     b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?-.,#>()#####\"####':/~&### <####;\n";
 
 /// Glyph codes: one or two alphabet codes for `#` plus a symbol. Two-code
 /// glyphs come first so they win.
-const SIGN_GLYPHS: [(&[u8], &str); 14] = [
+pub(super) const SIGN_GLYPHS: [(&[u8], &str); 14] = [
     (&[74, 75], "#h"),
     (&[87, 88], "#4"),
     (&[91], "#A"),

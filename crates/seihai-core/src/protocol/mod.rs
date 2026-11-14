@@ -4,9 +4,11 @@
 //! cleaned observations of client 2.05 and public sources (GServer-v2,
 //! OpenGS1, captures). No decompile material.
 
+pub mod audit;
 mod board;
 pub mod chain;
 mod compress;
+pub mod connect;
 mod dispatch;
 pub mod extras;
 pub mod flagset;

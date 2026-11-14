@@ -1,0 +1,10 @@
+// Visible: the NPC follows the first player in the level (players[i].x,
+// lowered by seihai-core#56).
+if (playerenters) timeout = 0.05;
+if (timeout) {
+  if (playerscount > 0) {
+    x = players[0].x + 2;
+    y = players[0].y;
+  }
+  timeout = 0.05;
+}
