@@ -14,8 +14,8 @@ namespace with loopback only, so nothing reached the internet.
   - the lab world, `generation = modern`, with no NPC-server.
 - **Lab NPC.** The world's start level holds one `block.png` NPC at 30,27,
   carrying a trivial placeholder client script. The player starts at 30,32.
-- **Delivery.** A gen-5 proxy sits in front of the world (`gen5swap.py`, lab
-  tool). It decrypts each server→client bundle and finds the
+- **Delivery.** A private lab gen-5 proxy sits in front of the world.
+  It decrypts each server→client bundle and finds the
   `PLO_RAWDATA` + `PLO_NPCBYTECODE` (131) pair. It replaces the bytes after the
   GINT3 npc id with the `.gs2bc` from `gs1c`, fixes the RAWDATA length, then
   recompresses and re-encrypts. Each swap is logged with the sha256 of the
@@ -65,8 +65,9 @@ The variant scripts (04b/04c/04d, 05b–05e) are in `variants/` beside this file
 
 ## Results (final compiler)
 
-✓ means the README effect was seen on screen. Screenshots are in `shots/`, named
-`<client>-<script>.png`.
+✓ means the README effect was seen on screen. Screenshots and raw proxy
+tools are retained privately; only behavior summaries and payload hashes
+are published here.
 
 | Script | 6.03r7 | 5.24r4 | 4.20r8 | 2.22 GS1 text (control) |
 |---|---|---|---|---|

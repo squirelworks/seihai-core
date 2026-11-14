@@ -18,8 +18,8 @@ prints the disassembly and what each client build is sent.
 | `02-touch-and-image.txt` | touching the NPC swaps its image and the player says "touched N" |
 | `03-showimg-and-vars.txt` | a text image above the player with a count and x |
 | `04-players-array.txt` | the NPC follows the first player (`players[0].x`) |
-| `05-tiles.txt` | touching the NPC paints a 2x2 black block beside it |
+| `05-tiles.txt` | touching the NPC writes a 2x2 block of tile 2047 beside it; its appearance depends on the tile sheet |
 | `06-dispatch.txt` | whole-script GS1: touching says "touch N on <level>"; between touches a message counts the other runs |
 
-Results go in `lab-results.md` in this folder: the client, the VM, what was
-seen, and a screenshot name for each script.
+Results go in `lab-results.md` in this folder: the client, the isolated
+runtime and what was seen. Screenshots and raw lab tools stay private.

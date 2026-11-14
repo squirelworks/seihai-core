@@ -134,7 +134,7 @@ fn the_timer_is_this_timeout() {
 #[test]
 fn player_properties_lower_to_the_player_object() {
     // `setplayerprop #c` is `player.chat = ...`: the real 6.03r7 has no
-    // `setplayerprop` function (Mirae lab, 2026-11-14). The `player.` names
+    // `setplayerprop` function (isolated lab, 2026-11-14). The `player.` names
     // are Seihai's reading, not a fixture.
     let s = same(
         "if (playerenters) {\n  setplayerprop #c,hello;\n  playerdir = 2;\n  playerrupees += 5;\n  this.h = playerhearts;\n  this.s = playerswordpower + playershieldpower;\n  this.b = playerbombs + playerdarts;\n  this.p = playerx + playery;\n}\n",

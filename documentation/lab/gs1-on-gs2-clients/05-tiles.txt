@@ -1,4 +1,4 @@
-// Visible: touching the NPC writes a 2x2 block of tile 0x7FF (black)
+// Touching the NPC writes a 2x2 block of tile 2047 (appearance depends on the sheet)
 // next to it and sends the change (tiles[x, y], seihai-core#56).
 if (playertouchsme) {
   for (i = 0; i < 2; i++) {
