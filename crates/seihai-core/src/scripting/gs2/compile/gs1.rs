@@ -628,6 +628,13 @@ fn command_is_call(name: &str, gs1: bool) -> bool {
         // Lowered to an assignment to a `client.` (or `this.`) variable.
         "setstring" | "set" | "unset" => false,
         "setcharprop" => false,
+        "setplayerprop" => !matches!(
+            args.first(),
+            Some(g::Arg::Text(t)) if {
+                let t = t.trim();
+                char_prop(t).is_some() && !matches!(t, "#1" | "#2")
+            }
+        ),
         _ => name_is_call(name, gs1),
     }
 }
@@ -1790,6 +1797,29 @@ impl Lower {
                         name: "tokenize".into(),
                         args: seps,
                     },
+                }
+            }
+            // `setplayerprop #c,text`: the player's own property. The
+            // 6.03r7 client has no `setplayerprop` function ("Function
+            // setplayerprop not found", Mirae lab 2026-11-14), so the
+            // properties GS2 names are assignments to `player.*`; any other
+            // code stays the call by name.
+            "setplayerprop" => {
+                let code = match args.first() {
+                    Some(g::Arg::Text(t)) => t.trim().to_string(),
+                    _ => String::new(),
+                };
+                let target = char_prop(&code)
+                    .filter(|_| !matches!(code.as_str(), "#1" | "#2"))
+                    .map(|v| Var {
+                        name: v.name.replacen("this.", "player.", 1),
+                        index: v.index,
+                    })?;
+                let value = raw_value(args.get(1));
+                Stmt::Assign {
+                    target,
+                    op: AssignOp::Set,
+                    value: self.expr(&value),
                 }
             }
             "setcharprop" => {
