@@ -341,7 +341,7 @@ pub const KNOWN_TOKENS: &[KnownToken] = {
             "G3D04048",
             G::Binary,
             K::Game,
-            "iPhone 2008 engine: Belote 1.2/1.50 and 12 more builds, 2008-2010 (gs2lib iPhone 1.1)",
+            "iPhone 2008 engine: Belote 1.2/1.50 and 14 more builds, 2008-2010 (gs2lib iPhone 1.1)",
             &[],
         ),
         KnownToken::new(
@@ -355,7 +355,7 @@ pub const KNOWN_TOKENS: &[KnownToken] = {
             "G3D18010",
             G::Binary,
             K::Game,
-            "iPhone 2010 engine: Cocoto Kart HD 1.1, Ace Tennis HD 1.0, Bomber Online 1.40, Dino Smash 1.4 (gs2lib iPhone 1.5)",
+            "iPhone 2010 engine: Cocoto Kart Online 1.3, Cocoto Kart HD 1.1, Cocoto Magic Circus 1.0, Ace Tennis HD 1.0, Bomber Online 1.40, Dino Smash 1.4 (gs2lib iPhone 1.5)",
             &[],
         ),
         KnownToken::new(
