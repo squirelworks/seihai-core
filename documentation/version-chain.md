@@ -88,7 +88,7 @@ in the chain only from evidence, and a unit test
 | Field | `yes` | `no` | `unknown` |
 |---|---|---|---|
 | `gs2` | the binary handles `PLO_NPCBYTECODE` (131), the packet that carries a compiled GS2 script: 3.153 (whose GS2 VM was also read, `gs2-executor.md`) and every binary build after it | the binary's server-id set has no 131: every classic binary from 1.21 to 2.31, and 3.04 | generic inferred 2.1 profile (no exact world build selected); builds with no binary: 2.12 to 2.16, 2.3, 6.015, 6.034 |
-| `gs1` | the GS1 command table was read from the binary (1.21 to 2.05, `gs1_commands`), or the per-build vocabulary notes cover it (2.17, 2.22, 2.31) | none | 3.04 and later (nothing read about GS1 there yet), and builds with no binary |
+| `gs1` | the GS1 command table was read from the binary (1.21 to 2.05, `gs1_commands`), or the per-build vocabulary notes cover it (2.17, 2.22, 2.31) | none | generic inferred 2.1 profile (no exact world build selected); 3.04 and later (nothing read about GS1 there yet), and builds with no binary |
 
 The observed world builds' GS1 tables do not by themselves select which
 table the generic 2.1 profile should use. Its `Scripts::UNKNOWN` stays
