@@ -268,7 +268,8 @@ fn nul_terminated(b: &[u8], at: usize) -> Result<(String, usize), String> {
 impl Script {
     /// Reads a whole file. Segments may come in any order. A segment type
     /// other than 1 to 4 is skipped. Bytes after the last whole segment
-    /// (the compiler writes one `0x0A`) are ignored.
+    /// (an older third-party compiler wrote one `0x0A`; official bodies and
+    /// this writer leave none) are ignored.
     pub fn parse(data: &[u8]) -> Result<Script, String> {
         let mut script = Script::default();
         let mut code = None;
@@ -387,11 +388,12 @@ impl Script {
         out
     }
 
-    /// Writes the four segments and the trailing `0x0A`, using the operand
+    /// Writes the four segments and nothing after them, using the operand
     /// widths in `documentation/gs2-opcodes.md`: the smallest marker for
     /// integers and string indexes, `F4` for a forward jump (or `F5` when
     /// the target does not fit in 16 bits), and the smallest marker for a
-    /// backward jump.
+    /// backward jump. Official server-compiled bodies end after segment 4;
+    /// a trailing `0x0A` is not part of that shape.
     pub fn write(&self) -> Vec<u8> {
         let mut code = Vec::new();
         for (index, ins) in self.code.iter().enumerate() {
@@ -427,7 +429,6 @@ impl Script {
         }
         write_segment(&mut out, SEGMENT_STRINGS, &strings);
         write_segment(&mut out, SEGMENT_CODE, &code);
-        out.push(0x0A);
         out
     }
 }
@@ -696,7 +697,12 @@ mod tests {
         ] {
             let bytes = std::fs::read(dir.join(format!("{name}.gs2bc"))).unwrap();
             let script = Script::parse(&bytes).unwrap();
-            let again = Script::parse(&script.write()).unwrap();
+            let written = script.write();
+            assert!(
+                !written.ends_with(&[0x0A]),
+                "{name}: writer must not append a trailing 0x0A"
+            );
+            let again = Script::parse(&written).unwrap();
             assert_eq!(again.disassemble(), script.disassemble(), "{name}");
             assert_eq!(
                 (again.functions, again.strings, again.gs1_flags),
@@ -708,5 +714,21 @@ mod tests {
         // shared.gs2bc has only forward jumps, so the widths match the file.
         let shared = std::fs::read(dir.join("shared.gs2bc")).unwrap();
         assert_eq!(Script::parse(&shared).unwrap().write(), shared);
+    }
+
+    #[test]
+    fn writer_omits_trailing_newline_and_parser_still_accepts_one() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/gs2");
+        let bytes = std::fs::read(dir.join("shared.gs2bc")).unwrap();
+        let script = Script::parse(&bytes).unwrap();
+        let written = script.write();
+        assert!(!written.ends_with(&[0x0A]));
+        assert_eq!(written, bytes);
+
+        let mut with_newline = written.clone();
+        with_newline.push(0x0A);
+        let again = Script::parse(&with_newline).unwrap();
+        assert_eq!(again.disassemble(), script.disassemble());
+        assert_eq!(again.write(), written);
     }
 }

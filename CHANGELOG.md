@@ -6,6 +6,8 @@ versioning rule is in the README.
 
 ## 0.4.x
 
+- **0.4.4**: `Script::write` omits the trailing `0x0A` after the four GS2 segments, matching official bodies; the reader still accepts an older leftover newline.
+- **0.4.3**: Explicit-endpoint `relay::Client` for the 1.1.9 relay dialect (separate game/level rooms, pairing, chat and peer updates).
 - **0.4.2**: Explicit Windows 2.1 build metadata selects verified receive bindings and the public 2001 flag/map reader, without changing generic token profiles.
 - **0.4.1**: Correct the native client 2.05 rev 2 GS1 command lookup to all 161 ordered IDs; public signatures and interpreter behavior are unchanged.
 - **0.4.0**: Breaking `Era::V140` addition enables explicit selection of the observed 1.40 GS1 vocabulary; existing online profiles and 1.41 timing gates remain unchanged.

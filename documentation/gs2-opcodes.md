@@ -21,11 +21,13 @@ must start inside it. Unknown instructions retain their operands without a
 guessed schema. These are Seihai validation rules, not claims about how an
 original client handles malformed input.
 
-This is what the open-source compiler **writes**. What the 3.x/4.x clients or
-the official server do with each opcode at run time is not in this source.
-Where the enum has a comment on meaning, it is the compiler author's own
-reading, and it is marked *(enum comment)*. Run-time behaviour is for
-Stages C and D, from GServer-v2 and the client decompiles.
+Opcode and operand shapes below follow the open-source compiler's emit
+list. The container trailer does not: Seihai writes no trailing `0x0A`,
+matching official bodies. What the 3.x/4.x clients or the official server
+do with each opcode at run time is not in that source. Where the enum has
+a comment on meaning, it is the compiler author's own reading, and it is
+marked *(enum comment)*. Run-time behaviour is for Stages C and D, from
+GServer-v2 and the client decompiles.
 
 Tags: **[src]** read from the compiler source · **[fx]** seen in the fixtures.
 
@@ -34,7 +36,9 @@ Tags: **[src]** read from the compiler source · **[fx]** seen in the fixtures.
 All integers are big-endian. **[src][fx]**
 
 The file is four segments, each a `u32 type`, a `u32 length` and `length`
-bytes, in this order, then one `0x0A` byte that is outside every segment.
+bytes, in this order. Seihai's writer stops after segment 4. Official
+server-compiled bodies do the same. An older third-party compiler appended
+one `0x0A` outside every segment; the reader ignores leftover bytes.
 
 | Type | Segment | Body |
 |---|---|---|
