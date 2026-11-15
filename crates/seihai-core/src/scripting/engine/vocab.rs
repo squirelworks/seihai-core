@@ -13,10 +13,10 @@ use crate::protocol::ClientVersion;
 ///
 /// One era per distinct GS1 command table, read from the client binaries
 /// (Graal_analysis `npc-library/gs1-commands-by-version.tsv`, 61 builds).
-/// Builds whose tables are identical share an era. The 2.1 to 2.16 eras
-/// have no binary: they are the NewWorld beta 2 table plus the commands the
-/// 2.1x release notes date (`client-internals/feature-timeline.md`), and
-/// are inferred.
+/// Builds whose tables are identical share an era. The generic 2.1 to 2.16
+/// eras remain inferred: NewWorld beta 2 plus release-note additions
+/// (`client-internals/feature-timeline.md`). They do not select the distinct
+/// observed Graal 2002 world-build tables (`graal2002-and-140-builds.md`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Era {
     /// 1.21: 71 commands.
@@ -56,8 +56,8 @@ pub enum Era {
     V204,
     /// 2.05 to 2.05 rev 2, the 2.1 tests and NewWorld beta 1: 161.
     V205,
-    /// 2.1 (no binary): NewWorld beta 2's 165, with `play2` from the 2.1
-    /// notes. Inferred.
+    /// Generic 2.1: NewWorld beta 2's 165, with `play2` from the 2.1 notes.
+    /// Inferred; not an exact Graal 2002 world-build table.
     V21,
     /// 2.12 to 2.14 (no binary): adds `wraptext`, `wraptext2`. Inferred.
     V212,

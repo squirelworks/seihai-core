@@ -1091,77 +1091,77 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.05	protocol	gen5_compress_all	ORIGIN	origin	carried	
 2.05	protocol	gen5_long_frames	ORIGIN	origin	carried	
 2.05	scripts	resolve_host	ORIGIN	origin	carried	
-2.1	protocol	plo (server ids handled)	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred | PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169
-2.1	protocol	pli (client ids sent)	2.03	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred | PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169 | client send set is carried from 2.05
-2.1	protocol	udp	1.28 beta 2	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	props	own-player props	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
-2.1	props	npc_max	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred
-2.1	ui	window	2.01	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	ui	gs1_commands	2.05	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	world	world	2.01	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	life	combat	2.03	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
-2.1	props	other-player props	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
-2.1	ui	hud	1.38	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	ui	emoticons	1.38	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	ui	key_config	1.38	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	drops	drops	1.42	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	life	death	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
-2.1	ui	chat_recall	1.39	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	ui	chat_text	1.42	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	protocol	encryption	1.41	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	protocol	listserver	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred | 2.1 to 2.16 have no client binary: login frame inferred, not captured. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
-2.1	levels	nw	2.05	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	ui	server_list	1.41	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	ui	ganis	1.42	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	mannerisms	mannerisms	2.05	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	protocol	sends_language	2.02 rev2	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	levels	gmap	2.05	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	levels	cached_links	2.05	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	ui	server_in_title	2.05	binary	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	props	bow_prop10	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred
-2.1	files	modtime	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.1	files	image_ext	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.1	files	download_maps	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.1	ui	minimap	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred
-2.1	ui	log_window	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred
-2.1	ui	ghost_mode	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred
-2.1	scripts	gs1	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred
-2.1	scripts	gs2	2.1	inferred	inferred here	no 2.1 release binary; every value of this step is inferred
-2.1	files	large_files	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.1	protocol	tampercheck	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	protocol	tamper	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	protocol	showimg (id 24)	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	protocol	login frame	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	levels	heights	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	protocol	client_type	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	protocol	udp_off_by_default	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	props	precise_pos	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	files	large_file_size	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.1	ui	editor	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	protocol	login lobby	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	protocol	gen5_round_down	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	protocol	gen5_compress_all	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	protocol	gen5_long_frames	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.1	scripts	resolve_host	ORIGIN	origin	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.12	protocol	plo (server ids handled)	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred | PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169
+2.1	protocol	plo (server ids handled)	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169
+2.1	protocol	pli (client ids sent)	2.03	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169 | client send set is carried from 2.05
+2.1	protocol	udp	1.28 beta 2	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	props	own-player props	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
+2.1	props	npc_max	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	ui	window	2.01	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	ui	gs1_commands	2.05	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	world	world	2.01	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	life	combat	2.03	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+2.1	props	other-player props	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
+2.1	ui	hud	1.38	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	ui	emoticons	1.38	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	ui	key_config	1.38	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	drops	drops	1.42	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	life	death	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+2.1	ui	chat_recall	1.39	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	ui	chat_text	1.42	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	protocol	encryption	1.41	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	protocol	listserver	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the generic 2.1 to 2.16 rows' login frame is inferred, not captured; the Graal 2002 static identity study does not establish it. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
+2.1	levels	nw	2.05	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	ui	server_list	1.41	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	ui	ganis	1.42	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	mannerisms	mannerisms	2.05	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	protocol	sends_language	2.02 rev2	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	levels	gmap	2.05	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	levels	cached_links	2.05	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	ui	server_in_title	2.05	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	props	bow_prop10	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	files	modtime	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.1	files	image_ext	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.1	files	download_maps	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.1	ui	minimap	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	ui	log_window	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	ui	ghost_mode	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	scripts	gs1	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	scripts	gs2	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	files	large_files	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.1	protocol	tampercheck	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	protocol	tamper	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	protocol	showimg (id 24)	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	protocol	login frame	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	levels	heights	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	protocol	client_type	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	protocol	udp_off_by_default	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	props	precise_pos	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	files	large_file_size	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.1	ui	editor	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	protocol	login lobby	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	protocol	gen5_round_down	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	protocol	gen5_compress_all	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	protocol	gen5_long_frames	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	scripts	resolve_host	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.12	protocol	plo (server ids handled)	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169
 2.12	protocol	pli (client ids sent)	2.03	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	protocol	udp	1.28 beta 2	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
-2.12	props	own-player props	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
-2.12	props	npc_max	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred
+2.12	props	own-player props	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
+2.12	props	npc_max	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.12	ui	window	2.01	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	ui	gs1_commands	2.05	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	world	world	2.01	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	life	combat	2.03	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
-2.12	props	other-player props	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
+2.12	props	other-player props	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
 2.12	ui	hud	1.38	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	ui	emoticons	1.38	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	ui	key_config	1.38	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	drops	drops	1.42	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
-2.12	life	death	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+2.12	life	death	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 2.12	ui	chat_recall	1.39	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	ui	chat_text	1.42	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	protocol	encryption	1.41	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
-2.12	protocol	listserver	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred | 2.1 to 2.16 have no client binary: login frame inferred, not captured. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
+2.12	protocol	listserver	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the generic 2.1 to 2.16 rows' login frame is inferred, not captured; the Graal 2002 static identity study does not establish it. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
 2.12	levels	nw	2.05	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	ui	server_list	1.41	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	ui	ganis	1.42	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
@@ -1170,15 +1170,15 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.12	levels	gmap	2.05	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	levels	cached_links	2.05	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	ui	server_in_title	2.05	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
-2.12	props	bow_prop10	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred
-2.12	files	modtime	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.12	files	image_ext	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.12	files	download_maps	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.12	ui	minimap	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred
-2.12	ui	log_window	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred
-2.12	ui	ghost_mode	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred
-2.12	scripts	gs1	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred
-2.12	scripts	gs2	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | no 2.1 release binary; every value of this step is inferred
+2.12	props	bow_prop10	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.12	files	modtime	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.12	files	image_ext	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.12	files	download_maps	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.12	ui	minimap	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.12	ui	log_window	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.12	ui	ghost_mode	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.12	scripts	gs1	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.12	scripts	gs2	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.12	files	large_files	ORIGIN	origin	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	protocol	tampercheck	ORIGIN	origin	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	protocol	tamper	ORIGIN	origin	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
@@ -1195,25 +1195,25 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.12	protocol	gen5_compress_all	ORIGIN	origin	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	protocol	gen5_long_frames	ORIGIN	origin	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	scripts	resolve_host	ORIGIN	origin	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
-2.13	protocol	plo (server ids handled)	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred | PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169
+2.13	protocol	plo (server ids handled)	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169
 2.13	protocol	pli (client ids sent)	2.03	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	protocol	udp	1.28 beta 2	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
-2.13	props	own-player props	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
-2.13	props	npc_max	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred
+2.13	props	own-player props	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
+2.13	props	npc_max	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.13	ui	window	2.01	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	ui	gs1_commands	2.05	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	world	world	2.01	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	life	combat	2.03	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
-2.13	props	other-player props	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
+2.13	props	other-player props	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
 2.13	ui	hud	1.38	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	ui	emoticons	1.38	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	ui	key_config	1.38	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	drops	drops	1.42	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
-2.13	life	death	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+2.13	life	death	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 2.13	ui	chat_recall	1.39	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	ui	chat_text	1.42	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	protocol	encryption	1.41	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
-2.13	protocol	listserver	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred | 2.1 to 2.16 have no client binary: login frame inferred, not captured. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
+2.13	protocol	listserver	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the generic 2.1 to 2.16 rows' login frame is inferred, not captured; the Graal 2002 static identity study does not establish it. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
 2.13	levels	nw	2.05	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	ui	server_list	1.41	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	ui	ganis	1.42	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
@@ -1222,15 +1222,15 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.13	levels	gmap	2.05	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	levels	cached_links	2.05	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	ui	server_in_title	2.05	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
-2.13	props	bow_prop10	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred
-2.13	files	modtime	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.13	files	image_ext	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.13	files	download_maps	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.13	ui	minimap	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred
-2.13	ui	log_window	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred
-2.13	ui	ghost_mode	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred
-2.13	scripts	gs1	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred
-2.13	scripts	gs2	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | no 2.1 release binary; every value of this step is inferred
+2.13	props	bow_prop10	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.13	files	modtime	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.13	files	image_ext	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.13	files	download_maps	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.13	ui	minimap	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.13	ui	log_window	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.13	ui	ghost_mode	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.13	scripts	gs1	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.13	scripts	gs2	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.13	files	large_files	ORIGIN	origin	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	protocol	tampercheck	ORIGIN	origin	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	protocol	tamper	ORIGIN	origin	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
@@ -1250,22 +1250,22 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.14	protocol	plo (server ids handled)	2.14	inferred	inferred here	PLO 178 and 180 and PLI 41 are inferred (the TOML entry is itself inferred); 175 to 185 are first seen in 2.17
 2.14	protocol	pli (client ids sent)	2.14	inferred	inferred here	PLO 178 and 180 and PLI 41 are inferred (the TOML entry is itself inferred); 175 to 185 are first seen in 2.17
 2.14	protocol	udp	1.28 beta 2	binary	carried, no binary	
-2.14	props	own-player props	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
-2.14	props	npc_max	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
+2.14	props	own-player props	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
+2.14	props	npc_max	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.14	ui	window	2.01	binary	carried, no binary	
 2.14	ui	gs1_commands	2.05	binary	carried, no binary	
 2.14	world	world	2.01	binary	carried, no binary	
 2.14	life	combat	2.03	binary	carried, no binary	
-2.14	props	other-player props	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
+2.14	props	other-player props	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
 2.14	ui	hud	1.38	binary	carried, no binary	
 2.14	ui	emoticons	1.38	binary	carried, no binary	
 2.14	ui	key_config	1.38	binary	carried, no binary	
 2.14	drops	drops	1.42	binary	carried, no binary	
-2.14	life	death	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+2.14	life	death	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 2.14	ui	chat_recall	1.39	binary	carried, no binary	
 2.14	ui	chat_text	1.42	binary	carried, no binary	
 2.14	protocol	encryption	1.41	binary	carried, no binary	
-2.14	protocol	listserver	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred | 2.1 to 2.16 have no client binary: login frame inferred, not captured. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
+2.14	protocol	listserver	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the generic 2.1 to 2.16 rows' login frame is inferred, not captured; the Graal 2002 static identity study does not establish it. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
 2.14	levels	nw	2.05	binary	carried, no binary	
 2.14	ui	server_list	2.14	inferred	inferred here	
 2.14	ui	ganis	1.42	binary	carried, no binary	
@@ -1274,15 +1274,15 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.14	levels	gmap	2.05	binary	carried, no binary	
 2.14	levels	cached_links	2.05	binary	carried, no binary	
 2.14	ui	server_in_title	2.05	binary	carried, no binary	
-2.14	props	bow_prop10	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.14	files	modtime	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.14	files	image_ext	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.14	files	download_maps	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.14	ui	minimap	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.14	ui	log_window	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.14	ui	ghost_mode	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.14	scripts	gs1	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.14	scripts	gs2	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
+2.14	props	bow_prop10	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.14	files	modtime	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.14	files	image_ext	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.14	files	download_maps	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.14	ui	minimap	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.14	ui	log_window	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.14	ui	ghost_mode	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.14	scripts	gs1	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.14	scripts	gs2	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.14	files	large_files	2.14	inferred	inferred here	
 2.14	protocol	tampercheck	ORIGIN	origin	carried, no binary	
 2.14	protocol	tamper	ORIGIN	origin	carried, no binary	
@@ -1302,22 +1302,22 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.15	protocol	plo (server ids handled)	2.14	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | PLO 178 and 180 and PLI 41 are inferred (the TOML entry is itself inferred); 175 to 185 are first seen in 2.17
 2.15	protocol	pli (client ids sent)	2.14	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | PLO 178 and 180 and PLI 41 are inferred (the TOML entry is itself inferred); 175 to 185 are first seen in 2.17
 2.15	protocol	udp	1.28 beta 2	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
-2.15	props	own-player props	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
-2.15	props	npc_max	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred
+2.15	props	own-player props	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
+2.15	props	npc_max	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.15	ui	window	2.01	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	ui	gs1_commands	2.05	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	world	world	2.01	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	life	combat	2.03	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
-2.15	props	other-player props	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
+2.15	props	other-player props	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
 2.15	ui	hud	1.38	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	ui	emoticons	1.38	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	ui	key_config	1.38	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	drops	drops	1.42	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
-2.15	life	death	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+2.15	life	death	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 2.15	ui	chat_recall	1.39	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	ui	chat_text	1.42	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	protocol	encryption	1.41	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
-2.15	protocol	listserver	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred | 2.1 to 2.16 have no client binary: login frame inferred, not captured. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
+2.15	protocol	listserver	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the generic 2.1 to 2.16 rows' login frame is inferred, not captured; the Graal 2002 static identity study does not establish it. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
 2.15	levels	nw	2.05	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	ui	server_list	2.14	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	ui	ganis	1.42	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
@@ -1326,15 +1326,15 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.15	levels	gmap	2.05	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	levels	cached_links	2.05	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	ui	server_in_title	2.05	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
-2.15	props	bow_prop10	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred
-2.15	files	modtime	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.15	files	image_ext	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.15	files	download_maps	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.15	ui	minimap	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred
-2.15	ui	log_window	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred
-2.15	ui	ghost_mode	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred
-2.15	scripts	gs1	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred
-2.15	scripts	gs2	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | no 2.1 release binary; every value of this step is inferred
+2.15	props	bow_prop10	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.15	files	modtime	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.15	files	image_ext	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.15	files	download_maps	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.15	ui	minimap	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.15	ui	log_window	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.15	ui	ghost_mode	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.15	scripts	gs1	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.15	scripts	gs2	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.15	files	large_files	2.14	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	protocol	tampercheck	ORIGIN	origin	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	protocol	tamper	ORIGIN	origin	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
@@ -1355,7 +1355,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.16	protocol	pli (client ids sent)	2.14	inferred	carried, no binary	PLO 178 and 180 and PLI 41 are inferred (the TOML entry is itself inferred); 175 to 185 are first seen in 2.17
 2.16	protocol	udp	1.28 beta 2	binary	carried, no binary	
 2.16	props	own-player props	2.16	inferred	inferred here	the version-profile TOML keeps the 2.15 prop limit (45) although its note says 54 to 74 arrive in 2.16; the row follows the note | NPC prop limit is carried from 2.1 (the 2.17 value is 73)
-2.16	props	npc_max	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
+2.16	props	npc_max	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.16	ui	window	2.01	binary	carried, no binary	
 2.16	ui	gs1_commands	2.05	binary	carried, no binary	
 2.16	world	world	2.01	binary	carried, no binary	
@@ -1365,11 +1365,11 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.16	ui	emoticons	1.38	binary	carried, no binary	
 2.16	ui	key_config	1.38	binary	carried, no binary	
 2.16	drops	drops	1.42	binary	carried, no binary	
-2.16	life	death	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+2.16	life	death	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 2.16	ui	chat_recall	1.39	binary	carried, no binary	
 2.16	ui	chat_text	1.42	binary	carried, no binary	
 2.16	protocol	encryption	1.41	binary	carried, no binary	
-2.16	protocol	listserver	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred | 2.1 to 2.16 have no client binary: login frame inferred, not captured. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
+2.16	protocol	listserver	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the generic 2.1 to 2.16 rows' login frame is inferred, not captured; the Graal 2002 static identity study does not establish it. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured
 2.16	levels	nw	2.05	binary	carried, no binary	
 2.16	ui	server_list	2.14	inferred	carried, no binary	
 2.16	ui	ganis	1.42	binary	carried, no binary	
@@ -1378,15 +1378,15 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.16	levels	gmap	2.05	binary	carried, no binary	
 2.16	levels	cached_links	2.05	binary	carried, no binary	
 2.16	ui	server_in_title	2.05	binary	carried, no binary	
-2.16	props	bow_prop10	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.16	files	modtime	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.16	files	image_ext	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.16	files	download_maps	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.16	ui	minimap	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.16	ui	log_window	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.16	ui	ghost_mode	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.16	scripts	gs1	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
-2.16	scripts	gs2	2.1	inferred	carried, no binary	no 2.1 release binary; every value of this step is inferred
+2.16	props	bow_prop10	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.16	files	modtime	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.16	files	image_ext	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.16	files	download_maps	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.16	ui	minimap	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.16	ui	log_window	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.16	ui	ghost_mode	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.16	scripts	gs1	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.16	scripts	gs2	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.16	files	large_files	2.14	inferred	carried, no binary	
 2.16	protocol	tampercheck	ORIGIN	origin	carried, no binary	
 2.16	protocol	tamper	ORIGIN	origin	carried, no binary	
@@ -1417,7 +1417,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.17	ui	emoticons	1.38	binary	carried	
 2.17	ui	key_config	1.38	binary	carried	
 2.17	drops	drops	1.42	binary	carried	
-2.17	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+2.17	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 2.17	ui	chat_recall	1.39	binary	carried	
 2.17	ui	chat_text	1.42	binary	carried, flagged unknown	GS1 command count was not read; 161 is carried
 2.17	protocol	encryption	1.41	binary	carried	
@@ -1430,13 +1430,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.17	levels	gmap	2.05	binary	carried	
 2.17	levels	cached_links	2.05	binary	carried	
 2.17	ui	server_in_title	2.05	binary	carried	
-2.17	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-2.17	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.17	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.17	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.17	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-2.17	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-2.17	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+2.17	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.17	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.17	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.17	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.17	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.17	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.17	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.17	scripts	gs1	2.17	binary	read here	
 2.17	scripts	gs2	2.17	binary	read here	
 2.17	files	large_files	2.14	inferred	carried	
@@ -1469,7 +1469,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.22	ui	emoticons	1.38	binary	carried	
 2.22	ui	key_config	1.38	binary	carried	
 2.22	drops	drops	1.42	binary	carried	
-2.22	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+2.22	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 2.22	ui	chat_recall	1.39	binary	carried	
 2.22	ui	chat_text	1.42	binary	carried	
 2.22	protocol	encryption	2.22	binary	read here	
@@ -1482,13 +1482,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.22	levels	gmap	2.05	binary	carried	
 2.22	levels	cached_links	2.05	binary	carried	
 2.22	ui	server_in_title	2.05	binary	carried	
-2.22	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-2.22	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.22	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.22	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.22	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-2.22	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-2.22	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+2.22	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.22	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.22	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.22	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.22	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.22	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.22	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.22	scripts	gs1	2.17	binary	carried	
 2.22	scripts	gs2	2.17	binary	carried	
 2.22	files	large_files	2.14	inferred	carried	
@@ -1521,7 +1521,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.3	ui	emoticons	1.38	binary	carried, no binary	no 2.3 binary; the whole step is the 2.31 values
 2.3	ui	key_config	1.38	binary	carried, no binary	no 2.3 binary; the whole step is the 2.31 values
 2.3	drops	drops	1.42	binary	carried, no binary	no 2.3 binary; the whole step is the 2.31 values
-2.3	life	death	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+2.3	life	death	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 2.3	ui	chat_recall	1.39	binary	carried, no binary	no 2.3 binary; the whole step is the 2.31 values
 2.3	ui	chat_text	1.42	binary	carried, no binary	no 2.3 binary; the whole step is the 2.31 values
 2.3	protocol	encryption	2.22	binary	carried, no binary	no 2.3 binary; the whole step is the 2.31 values
@@ -1534,13 +1534,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.3	levels	gmap	2.05	binary	carried, no binary	no 2.3 binary; the whole step is the 2.31 values
 2.3	levels	cached_links	2.05	binary	carried, no binary	no 2.3 binary; the whole step is the 2.31 values
 2.3	ui	server_in_title	2.05	binary	carried, no binary	no 2.3 binary; the whole step is the 2.31 values
-2.3	props	bow_prop10	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | no 2.1 release binary; every value of this step is inferred
-2.3	files	modtime	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.3	files	image_ext	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.3	files	download_maps	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.3	ui	minimap	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | no 2.1 release binary; every value of this step is inferred
-2.3	ui	log_window	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | no 2.1 release binary; every value of this step is inferred
-2.3	ui	ghost_mode	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | no 2.1 release binary; every value of this step is inferred
+2.3	props	bow_prop10	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.3	files	modtime	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.3	files	image_ext	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.3	files	download_maps	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.3	ui	minimap	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.3	ui	log_window	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.3	ui	ghost_mode	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.3	scripts	gs1	2.3	inferred	inferred here	no 2.3 binary; the whole step is the 2.31 values
 2.3	scripts	gs2	2.3	inferred	inferred here	no 2.3 binary; the whole step is the 2.31 values
 2.3	files	large_files	2.14	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values
@@ -1573,7 +1573,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.31	ui	emoticons	1.38	binary	carried	
 2.31	ui	key_config	1.38	binary	carried	
 2.31	drops	drops	1.42	binary	carried	
-2.31	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+2.31	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 2.31	ui	chat_recall	1.39	binary	carried	
 2.31	ui	chat_text	1.42	binary	carried	
 2.31	protocol	encryption	2.22	binary	carried	
@@ -1586,13 +1586,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 2.31	levels	gmap	2.05	binary	carried	
 2.31	levels	cached_links	2.05	binary	carried	
 2.31	ui	server_in_title	2.05	binary	carried	
-2.31	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-2.31	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.31	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.31	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.31	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-2.31	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-2.31	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+2.31	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.31	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.31	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.31	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.31	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.31	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.31	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.31	scripts	gs1	2.31	binary	read here	
 2.31	scripts	gs2	2.31	binary	read here	
 2.31	files	large_files	2.14	inferred	carried	
@@ -1625,7 +1625,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 3.04	ui	emoticons	1.38	binary	carried	
 3.04	ui	key_config	1.38	binary	carried	
 3.04	drops	drops	1.42	binary	carried	
-3.04	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+3.04	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 3.04	ui	chat_recall	1.39	binary	carried	
 3.04	ui	chat_text	1.42	binary	carried, flagged unknown	the Torque front end (start window, options, themes, chat as white text with a blue shadow) is not modelled; the 2.31 UI row is kept
 3.04	protocol	encryption	2.22	binary	carried	
@@ -1638,13 +1638,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 3.04	levels	gmap	2.05	binary	carried	
 3.04	levels	cached_links	2.05	binary	carried	
 3.04	ui	server_in_title	2.05	binary	carried	
-3.04	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-3.04	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-3.04	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-3.04	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-3.04	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-3.04	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-3.04	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+3.04	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+3.04	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+3.04	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+3.04	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+3.04	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+3.04	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+3.04	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 3.04	scripts	gs1	3.04	binary	read here	
 3.04	scripts	gs2	2.31	binary	carried	
 3.04	files	large_files	2.14	inferred	carried	
@@ -1677,7 +1677,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 3.153	ui	emoticons	1.38	binary	carried	
 3.153	ui	key_config	1.38	binary	carried	
 3.153	drops	drops	1.42	binary	carried	
-3.153	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+3.153	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 3.153	ui	chat_recall	1.39	binary	carried	
 3.153	ui	chat_text	1.42	binary	carried	
 3.153	protocol	encryption	2.22	binary	carried	
@@ -1690,13 +1690,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 3.153	levels	gmap	2.05	binary	carried	
 3.153	levels	cached_links	2.05	binary	carried	
 3.153	ui	server_in_title	2.05	binary	carried	
-3.153	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-3.153	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-3.153	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-3.153	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-3.153	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-3.153	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-3.153	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+3.153	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+3.153	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+3.153	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+3.153	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+3.153	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+3.153	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+3.153	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 3.153	scripts	gs1	3.04	binary	carried	
 3.153	scripts	gs2	3.153	binary	read here	
 3.153	files	large_files	2.14	inferred	carried	
@@ -1729,7 +1729,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 4.04r2	ui	emoticons	1.38	binary	carried	
 4.04r2	ui	key_config	1.38	binary	carried	
 4.04r2	drops	drops	1.42	binary	carried	
-4.04r2	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+4.04r2	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 4.04r2	ui	chat_recall	1.39	binary	carried	
 4.04r2	ui	chat_text	4.04r2	binary	read here	chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
 4.04r2	protocol	encryption	2.22	binary	carried	
@@ -1742,13 +1742,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 4.04r2	levels	gmap	2.05	binary	carried	
 4.04r2	levels	cached_links	2.05	binary	carried	
 4.04r2	ui	server_in_title	2.05	binary	carried	
-4.04r2	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-4.04r2	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-4.04r2	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-4.04r2	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-4.04r2	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-4.04r2	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-4.04r2	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+4.04r2	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+4.04r2	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.04r2	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.04r2	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.04r2	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+4.04r2	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+4.04r2	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.04r2	scripts	gs1	3.04	binary	carried	
 4.04r2	scripts	gs2	3.153	binary	carried	
 4.04r2	files	large_files	2.14	inferred	carried	
@@ -1781,7 +1781,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 4.04r2 Mac	ui	emoticons	1.38	binary	carried	
 4.04r2 Mac	ui	key_config	1.38	binary	carried	
 4.04r2 Mac	drops	drops	1.42	binary	carried	
-4.04r2 Mac	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+4.04r2 Mac	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 4.04r2 Mac	ui	chat_recall	1.39	binary	carried	
 4.04r2 Mac	ui	chat_text	4.04r2	binary	carried	chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
 4.04r2 Mac	protocol	encryption	2.22	binary	carried	
@@ -1794,13 +1794,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 4.04r2 Mac	levels	gmap	2.05	binary	carried	
 4.04r2 Mac	levels	cached_links	2.05	binary	carried	
 4.04r2 Mac	ui	server_in_title	2.05	binary	carried	
-4.04r2 Mac	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-4.04r2 Mac	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-4.04r2 Mac	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-4.04r2 Mac	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-4.04r2 Mac	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-4.04r2 Mac	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-4.04r2 Mac	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+4.04r2 Mac	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+4.04r2 Mac	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.04r2 Mac	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.04r2 Mac	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.04r2 Mac	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+4.04r2 Mac	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+4.04r2 Mac	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.04r2 Mac	scripts	gs1	3.04	binary	carried	
 4.04r2 Mac	scripts	gs2	3.153	binary	carried	
 4.04r2 Mac	files	large_files	2.14	inferred	carried	
@@ -1833,7 +1833,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 4.20r6	ui	emoticons	1.38	binary	carried	
 4.20r6	ui	key_config	1.38	binary	carried	
 4.20r6	drops	drops	1.42	binary	carried	
-4.20r6	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+4.20r6	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 4.20r6	ui	chat_recall	1.39	binary	carried	
 4.20r6	ui	chat_text	4.04r2	binary	carried	chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
 4.20r6	protocol	encryption	2.22	binary	carried	
@@ -1846,13 +1846,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 4.20r6	levels	gmap	2.05	binary	carried	
 4.20r6	levels	cached_links	2.05	binary	carried	
 4.20r6	ui	server_in_title	2.05	binary	carried	
-4.20r6	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-4.20r6	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-4.20r6	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-4.20r6	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-4.20r6	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-4.20r6	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-4.20r6	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+4.20r6	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+4.20r6	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.20r6	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.20r6	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.20r6	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+4.20r6	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+4.20r6	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.20r6	scripts	gs1	3.04	binary	carried	
 4.20r6	scripts	gs2	3.153	binary	carried	
 4.20r6	files	large_files	2.14	inferred	carried	
@@ -1885,7 +1885,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 4.20r8	ui	emoticons	1.38	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 4.20r8	ui	key_config	1.38	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 4.20r8	drops	drops	1.42	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
-4.20r8	life	death	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+4.20r8	life	death	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 4.20r8	ui	chat_recall	1.39	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 4.20r8	ui	chat_text	4.04r2	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
 4.20r8	protocol	encryption	2.22	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
@@ -1898,13 +1898,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 4.20r8	levels	gmap	2.05	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 4.20r8	levels	cached_links	2.05	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 4.20r8	ui	server_in_title	2.05	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
-4.20r8	props	bow_prop10	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | no 2.1 release binary; every value of this step is inferred
-4.20r8	files	modtime	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-4.20r8	files	image_ext	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-4.20r8	files	download_maps	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-4.20r8	ui	minimap	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | no 2.1 release binary; every value of this step is inferred
-4.20r8	ui	log_window	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | no 2.1 release binary; every value of this step is inferred
-4.20r8	ui	ghost_mode	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | no 2.1 release binary; every value of this step is inferred
+4.20r8	props	bow_prop10	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+4.20r8	files	modtime	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.20r8	files	image_ext	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.20r8	files	download_maps	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.20r8	ui	minimap	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+4.20r8	ui	log_window	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+4.20r8	ui	ghost_mode	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.20r8	scripts	gs1	3.04	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 4.20r8	scripts	gs2	3.153	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 4.20r8	files	large_files	2.14	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
@@ -1937,7 +1937,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.00r7	ui	emoticons	1.38	binary	carried	
 5.00r7	ui	key_config	1.38	binary	carried	
 5.00r7	drops	drops	1.42	binary	carried	
-5.00r7	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+5.00r7	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 5.00r7	ui	chat_recall	1.39	binary	carried	
 5.00r7	ui	chat_text	4.04r2	binary	carried, flagged unknown	chat is a bold sans serif in the lab; its cell height is not known, 24 is kept | chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
 5.00r7	protocol	encryption	2.22	binary	carried	
@@ -1950,13 +1950,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.00r7	levels	gmap	2.05	binary	carried	
 5.00r7	levels	cached_links	2.05	binary	carried	
 5.00r7	ui	server_in_title	2.05	binary	carried	
-5.00r7	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.00r7	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.00r7	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.00r7	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.00r7	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.00r7	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.00r7	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+5.00r7	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.00r7	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.00r7	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.00r7	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.00r7	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.00r7	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.00r7	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.00r7	scripts	gs1	3.04	binary	carried	
 5.00r7	scripts	gs2	3.153	binary	carried	
 5.00r7	files	large_files	2.14	inferred	carried	
@@ -1989,7 +1989,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.12	ui	emoticons	1.38	binary	carried	
 5.12	ui	key_config	1.38	binary	carried	
 5.12	drops	drops	1.42	binary	carried	
-5.12	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+5.12	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 5.12	ui	chat_recall	1.39	binary	carried	
 5.12	ui	chat_text	4.04r2	binary	carried	chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
 5.12	protocol	encryption	2.22	binary	carried	
@@ -2002,13 +2002,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.12	levels	gmap	2.05	binary	carried	
 5.12	levels	cached_links	2.05	binary	carried	
 5.12	ui	server_in_title	2.05	binary	carried	
-5.12	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.12	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.12	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.12	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.12	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.12	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.12	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+5.12	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.12	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.12	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.12	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.12	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.12	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.12	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.12	scripts	gs1	3.04	binary	carried	
 5.12	scripts	gs2	3.153	binary	carried	
 5.12	files	large_files	2.14	inferred	carried	
@@ -2041,7 +2041,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.12 Mac	ui	emoticons	1.38	binary	carried	
 5.12 Mac	ui	key_config	1.38	binary	carried	
 5.12 Mac	drops	drops	1.42	binary	carried	
-5.12 Mac	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+5.12 Mac	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 5.12 Mac	ui	chat_recall	1.39	binary	carried	
 5.12 Mac	ui	chat_text	4.04r2	binary	carried	chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
 5.12 Mac	protocol	encryption	2.22	binary	carried	
@@ -2054,13 +2054,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.12 Mac	levels	gmap	2.05	binary	carried	
 5.12 Mac	levels	cached_links	2.05	binary	carried	
 5.12 Mac	ui	server_in_title	2.05	binary	carried	
-5.12 Mac	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.12 Mac	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.12 Mac	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.12 Mac	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.12 Mac	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.12 Mac	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.12 Mac	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+5.12 Mac	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.12 Mac	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.12 Mac	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.12 Mac	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.12 Mac	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.12 Mac	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.12 Mac	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.12 Mac	scripts	gs1	3.04	binary	carried	
 5.12 Mac	scripts	gs2	3.153	binary	carried	
 5.12 Mac	files	large_files	2.14	inferred	carried	
@@ -2093,7 +2093,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.24r4	ui	emoticons	1.38	binary	carried	
 5.24r4	ui	key_config	1.38	binary	carried	
 5.24r4	drops	drops	1.42	binary	carried	
-5.24r4	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+5.24r4	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 5.24r4	ui	chat_recall	1.39	binary	carried	
 5.24r4	ui	chat_text	4.04r2	binary	carried	chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
 5.24r4	protocol	encryption	2.22	binary	carried	
@@ -2106,13 +2106,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.24r4	levels	gmap	2.05	binary	carried	
 5.24r4	levels	cached_links	2.05	binary	carried	
 5.24r4	ui	server_in_title	2.05	binary	carried	
-5.24r4	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.24r4	files	modtime	2.1	inferred	carried, flagged unknown	stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.24r4	files	image_ext	2.1	inferred	carried, flagged unknown	stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.24r4	files	download_maps	2.1	inferred	carried, flagged unknown	stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.24r4	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.24r4	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.24r4	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+5.24r4	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.24r4	files	modtime	2.1	inferred	carried, flagged unknown	stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.24r4	files	image_ext	2.1	inferred	carried, flagged unknown	stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.24r4	files	download_maps	2.1	inferred	carried, flagged unknown	stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.24r4	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.24r4	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.24r4	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.24r4	scripts	gs1	3.04	binary	carried	
 5.24r4	scripts	gs2	3.153	binary	carried	
 5.24r4	files	large_files	2.14	inferred	carried, flagged unknown	stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md
@@ -2145,7 +2145,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.30r3	ui	emoticons	1.38	binary	carried	
 5.30r3	ui	key_config	1.38	binary	carried	
 5.30r3	drops	drops	1.42	binary	carried	
-5.30r3	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+5.30r3	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 5.30r3	ui	chat_recall	1.39	binary	carried	
 5.30r3	ui	chat_text	4.04r2	binary	carried	chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
 5.30r3	protocol	encryption	2.22	binary	carried	
@@ -2158,13 +2158,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.30r3	levels	gmap	2.05	binary	carried	
 5.30r3	levels	cached_links	2.05	binary	carried	
 5.30r3	ui	server_in_title	2.05	binary	carried	
-5.30r3	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.30r3	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.30r3	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.30r3	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.30r3	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.30r3	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.30r3	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+5.30r3	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.30r3	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.30r3	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.30r3	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.30r3	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.30r3	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.30r3	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.30r3	scripts	gs1	3.04	binary	carried	
 5.30r3	scripts	gs2	3.153	binary	carried	
 5.30r3	files	large_files	2.14	inferred	carried	
@@ -2197,7 +2197,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.31r4	ui	emoticons	1.38	binary	carried	
 5.31r4	ui	key_config	1.38	binary	carried	
 5.31r4	drops	drops	1.42	binary	carried	
-5.31r4	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+5.31r4	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 5.31r4	ui	chat_recall	1.39	binary	carried	
 5.31r4	ui	chat_text	4.04r2	binary	carried, flagged unknown	why it draws no tiles before the warp was not traced in the binary; the lab shows it, and the warp alone brings the tiles back | chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7
 5.31r4	protocol	encryption	2.22	binary	carried	
@@ -2210,13 +2210,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.31r4	levels	gmap	2.05	binary	carried	
 5.31r4	levels	cached_links	2.05	binary	carried	
 5.31r4	ui	server_in_title	2.05	binary	carried	
-5.31r4	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.31r4	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.31r4	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.31r4	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-5.31r4	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.31r4	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-5.31r4	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+5.31r4	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.31r4	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.31r4	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.31r4	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.31r4	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.31r4	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+5.31r4	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.31r4	scripts	gs1	3.04	binary	carried	
 5.31r4	scripts	gs2	3.153	binary	carried	
 5.31r4	files	large_files	2.14	inferred	carried	
@@ -2249,7 +2249,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.00r2	ui	emoticons	1.38	binary	carried	
 6.00r2	ui	key_config	1.38	binary	carried	
 6.00r2	drops	drops	1.42	binary	carried	
-6.00r2	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+6.00r2	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 6.00r2	ui	chat_recall	1.39	binary	carried	
 6.00r2	ui	chat_text	6.00r2	binary	read here	whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
 6.00r2	protocol	encryption	2.22	binary	carried	
@@ -2262,13 +2262,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.00r2	levels	gmap	2.05	binary	carried	
 6.00r2	levels	cached_links	2.05	binary	carried	
 6.00r2	ui	server_in_title	2.05	binary	carried	
-6.00r2	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-6.00r2	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.00r2	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.00r2	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.00r2	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-6.00r2	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-6.00r2	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+6.00r2	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.00r2	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.00r2	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.00r2	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.00r2	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.00r2	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.00r2	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.00r2	scripts	gs1	3.04	binary	carried	
 6.00r2	scripts	gs2	3.153	binary	carried	
 6.00r2	files	large_files	2.14	inferred	carried	
@@ -2301,7 +2301,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.00r4	ui	emoticons	1.38	binary	carried	
 6.00r4	ui	key_config	1.38	binary	carried	
 6.00r4	drops	drops	1.42	binary	carried	
-6.00r4	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+6.00r4	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 6.00r4	ui	chat_recall	1.39	binary	carried	
 6.00r4	ui	chat_text	6.00r2	binary	carried	whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
 6.00r4	protocol	encryption	2.22	binary	carried	
@@ -2314,13 +2314,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.00r4	levels	gmap	2.05	binary	carried	
 6.00r4	levels	cached_links	2.05	binary	carried	
 6.00r4	ui	server_in_title	2.05	binary	carried	
-6.00r4	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-6.00r4	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.00r4	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.00r4	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.00r4	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-6.00r4	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-6.00r4	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+6.00r4	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.00r4	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.00r4	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.00r4	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.00r4	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.00r4	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.00r4	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.00r4	scripts	gs1	3.04	binary	carried	
 6.00r4	scripts	gs2	3.153	binary	carried	
 6.00r4	files	large_files	2.14	inferred	carried	
@@ -2353,7 +2353,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.015	ui	emoticons	1.38	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
 6.015	ui	key_config	1.38	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
 6.015	drops	drops	1.42	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
-6.015	life	death	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+6.015	life	death	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 6.015	ui	chat_recall	1.39	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
 6.015	ui	chat_text	6.00r2	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | Tempus Sans ITC 24 is carried from 6.00r2; Login-mode tile drawing before the warp is not known | whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
 6.015	protocol	encryption	2.22	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
@@ -2366,13 +2366,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.015	levels	gmap	2.05	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
 6.015	levels	cached_links	2.05	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
 6.015	ui	server_in_title	2.05	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
-6.015	props	bow_prop10	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred
-6.015	files	modtime	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.015	files	image_ext	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.015	files	download_maps	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.015	ui	minimap	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred
-6.015	ui	log_window	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred
-6.015	ui	ghost_mode	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred
+6.015	props	bow_prop10	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.015	files	modtime	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.015	files	image_ext	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.015	files	download_maps	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.015	ui	minimap	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.015	ui	log_window	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.015	ui	ghost_mode	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.015	scripts	gs1	3.04	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
 6.015	scripts	gs2	6.015	inferred	inferred here	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
 6.015	files	large_files	2.14	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
@@ -2405,7 +2405,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.034	ui	emoticons	1.38	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
 6.034	ui	key_config	1.38	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
 6.034	drops	drops	1.42	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
-6.034	life	death	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+6.034	life	death	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 6.034	ui	chat_recall	1.39	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
 6.034	ui	chat_text	6.00r2	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred | Tempus Sans ITC 24 is carried; whether 6.03r4 draws tiles before the warp (6.03r7 does not) is not known | whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
 6.034	protocol	encryption	2.22	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
@@ -2418,13 +2418,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.034	levels	gmap	2.05	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
 6.034	levels	cached_links	2.05	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
 6.034	ui	server_in_title	2.05	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
-6.034	props	bow_prop10	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred
-6.034	files	modtime	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.034	files	image_ext	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.034	files	download_maps	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.034	ui	minimap	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred
-6.034	ui	log_window	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred
-6.034	ui	ghost_mode	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | no 2.1 release binary; every value of this step is inferred
+6.034	props	bow_prop10	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.034	files	modtime	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.034	files	image_ext	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.034	files	download_maps	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.034	ui	minimap	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.034	ui	log_window	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.034	ui	ghost_mode	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.034	scripts	gs1	3.04	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
 6.034	scripts	gs2	6.015	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | no 6.00r7 or 6.01r5 binary; every value of this step is inferred
 6.034	files	large_files	2.14	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred
@@ -2457,7 +2457,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.03r7	ui	emoticons	1.38	binary	carried	
 6.03r7	ui	key_config	1.38	binary	carried	
 6.03r7	drops	drops	1.42	binary	carried	
-6.03r7	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+6.03r7	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 6.03r7	ui	chat_recall	1.39	binary	carried	
 6.03r7	ui	chat_text	6.00r2	binary	carried	whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
 6.03r7	protocol	encryption	2.22	binary	carried	
@@ -2470,13 +2470,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.03r7	levels	gmap	2.05	binary	carried	
 6.03r7	levels	cached_links	2.05	binary	carried	
 6.03r7	ui	server_in_title	2.05	binary	carried	
-6.03r7	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-6.03r7	files	modtime	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.03r7	files	image_ext	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.03r7	files	download_maps	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.03r7	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-6.03r7	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-6.03r7	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+6.03r7	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.03r7	files	modtime	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.03r7	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.03r7	files	download_maps	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.03r7	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.03r7	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.03r7	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.03r7	scripts	gs1	3.04	binary	carried	
 6.03r7	scripts	gs2	6.03r7	binary	read here	
 6.03r7	files	large_files	2.14	inferred	carried	
@@ -2509,7 +2509,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.03r7 Linux	ui	emoticons	1.38	binary	carried	
 6.03r7 Linux	ui	key_config	1.38	binary	carried	
 6.03r7 Linux	drops	drops	1.42	binary	carried	
-6.03r7 Linux	life	death	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
+6.03r7 Linux	life	death	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
 6.03r7 Linux	ui	chat_recall	1.39	binary	carried	
 6.03r7 Linux	ui	chat_text	6.00r2	binary	carried	whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
 6.03r7 Linux	protocol	encryption	2.22	binary	carried	
@@ -2522,13 +2522,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.03r7 Linux	levels	gmap	2.05	binary	carried	
 6.03r7 Linux	levels	cached_links	2.05	binary	carried	
 6.03r7 Linux	ui	server_in_title	2.05	binary	carried	
-6.03r7 Linux	props	bow_prop10	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-6.03r7 Linux	files	modtime	2.1	inferred	carried, flagged unknown	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.03r7 Linux	files	image_ext	2.1	inferred	carried, flagged unknown	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.03r7 Linux	files	download_maps	2.1	inferred	carried, flagged unknown	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for | no 2.1 release binary; every value of this step is inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-6.03r7 Linux	ui	minimap	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-6.03r7 Linux	ui	log_window	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
-6.03r7 Linux	ui	ghost_mode	2.1	inferred	carried	no 2.1 release binary; every value of this step is inferred
+6.03r7 Linux	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.03r7 Linux	files	modtime	2.1	inferred	carried, flagged unknown	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.03r7 Linux	files	image_ext	2.1	inferred	carried, flagged unknown	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.03r7 Linux	files	download_maps	2.1	inferred	carried, flagged unknown	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.03r7 Linux	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.03r7 Linux	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+6.03r7 Linux	ui	ghost_mode	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.03r7 Linux	scripts	gs1	3.04	binary	carried	
 6.03r7 Linux	scripts	gs2	6.03r7	binary	carried	
 6.03r7 Linux	files	large_files	2.14	inferred	carried, flagged unknown	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for

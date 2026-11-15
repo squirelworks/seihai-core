@@ -6,6 +6,7 @@ versioning rule is in the README.
 
 ## 0.3.x
 
+- **0.3.1**: Version-chain and audit provenance distinguish binary-read Graal 2002 identities from the still-inferred generic 2.1 profile; profile values and token grades are unchanged.
 - **0.3.0**: Breaking GANI placement-reference API preserves observed PARAM1 distinctly from numeric sprite zero; unresolved symbolic drawing is skipped.
 
 ## 0.2.x
