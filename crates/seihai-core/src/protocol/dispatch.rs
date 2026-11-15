@@ -8,6 +8,7 @@ use super::extras::{
     parse_ghost_icon, parse_level_mod_time, parse_map_spec, parse_signature, parse_start_message,
     parse_text_list, signature_action, MapSpec, SignatureAction,
 };
+use super::graal2002::Graal210ReceiveBuild;
 use super::layouts::{
     parse_board_heights, parse_board_modify, parse_board_modify2, parse_flag, parse_npc_del2,
     parse_npc_id_rest, parse_player_toggle, parse_player_warp2, parse_profile,
@@ -629,7 +630,9 @@ pub struct SessionState {
     pub rpg_window: Vec<String>,
     /// `PLO_STATUSLIST` (180): player status names (Online, Away, ...).
     pub status_list: Vec<String>,
-    /// `PLO_BIGMAP` (171) and `PLO_MINIMAP` (172).
+    /// Parsed `PLO_BIGMAP` (171) and `PLO_MINIMAP` (172) specifications.
+    /// These record wire metadata, not native resource-resolution or
+    /// display-commit success; the session does not load their resources.
     pub bigmap: Option<MapSpec>,
     pub minimap: Option<MapSpec>,
     /// `PLO_ISLEADER` (10) seen.
@@ -716,6 +719,7 @@ pub struct SessionState {
     /// stale copy gets the full data).
     restored: Restored,
     splitter: Splitter,
+    graal210_receive_build: Option<Graal210ReceiveBuild>,
 }
 
 /// See [`SessionState::restored`].
@@ -727,6 +731,18 @@ struct Restored {
 }
 
 impl SessionState {
+    /// Opt into an explicitly identified 2.1 receive dispatcher and, for
+    /// the public 2001 build only, its verified 170–174 reader details.
+    /// Call on a fresh `for_version(ClientVersion::V210)` session. This changes only
+    /// receive bindings/layouts; other base-profile settings remain inferred.
+    /// No token or FileVersion selects this automatically. World-build
+    /// bindings do not establish their unexamined handler-body layouts.
+    /// This does not choose a matching login token or outgoing protocol.
+    pub fn set_graal210_receive_build(&mut self, build: Graal210ReceiveBuild) {
+        self.known_plo = Some(build.bound_ids());
+        self.graal210_receive_build = Some(build);
+    }
+
     /// A session that reads server traffic the way `version` does.
     pub fn for_version(version: ClientVersion) -> Self {
         let p = version.profile();
@@ -772,6 +788,32 @@ impl SessionState {
         if !self.handles(msg.id) {
             *self.ignored.entry(msg.id).or_insert(0) += 1;
             return;
+        }
+        if self.graal210_receive_build == Some(Graal210ReceiveBuild::Public20011113) {
+            match msg.id {
+                170 | 174 => {
+                    if let Some(&byte) = msg.payload.first() {
+                        let on = byte > 0x20;
+                        if msg.id == 170 {
+                            self.ghost_mode = on;
+                        } else {
+                            self.ghost_icon = on;
+                        }
+                    }
+                    return;
+                }
+                171 | 172 => {
+                    if let Some(map) = super::extras::parse_public210_map_spec(&msg.payload) {
+                        if msg.id == 171 {
+                            self.bigmap = Some(map);
+                        } else {
+                            self.minimap = Some(map);
+                        }
+                    }
+                    return;
+                }
+                _ => {}
+            }
         }
         match msg.id {
             0 => {

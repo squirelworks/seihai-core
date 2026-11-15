@@ -4,8 +4,9 @@
 //! What is decoded here is backed by two things: the layouts in gs2lib's
 //! `IEnums.h` and Graal_analysis `protocol/packet-ids.md`, and the payload
 //! shapes seen in the 2026-10-24 public 2.22 captures (four gservers).
-//! Anything that is not backed by both is left out; see the list at the end
-//! of `documentation/protocol.md`.
+//! The private public-2.1 map reader is separately backed by the exact-build
+//! study pinned in `graal2002`; it is selected only by explicit metadata.
+//! See also the list at the end of `documentation/protocol.md`.
 //!
 //! Every parser returns `None` (or an empty list) on a payload it does not
 //! understand and never panics.
@@ -42,6 +43,31 @@ pub fn parse_map_spec(payload: &[u8]) -> Option<MapSpec> {
         png: png.trim().to_string(),
         x: x.trim().parse().ok()?,
         y: y.trim().parse().ok()?,
+    })
+}
+
+/// Public Windows 2.1.0.0 only: two text fields suffice. A third field
+/// alone is ignored; with four fields each coordinate parses independently
+/// with zero as its default. See the pinned exact-build study in graal2002.
+pub(super) fn parse_public210_map_spec(payload: &[u8]) -> Option<MapSpec> {
+    let text = latin1(payload);
+    let fields: Vec<_> = text.split(',').collect();
+    let [txt, png, ..] = fields[..] else {
+        return None;
+    };
+    let (x, y) = if fields.len() >= 4 {
+        (
+            fields[2].trim().parse().unwrap_or(0.0),
+            fields[3].trim().parse().unwrap_or(0.0),
+        )
+    } else {
+        (0.0, 0.0)
+    };
+    Some(MapSpec {
+        txt: txt.to_string(),
+        png: png.to_string(),
+        x,
+        y,
     })
 }
 
