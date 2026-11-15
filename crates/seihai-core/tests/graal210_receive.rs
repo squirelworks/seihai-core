@@ -25,7 +25,14 @@ fn public_short_flags_preserve_state_and_below_bias_is_false() {
         } else {
             s.ghost_icon
         });
-        for (byte, want) in [(32, false), (33, true), (31, false)] {
+        for (byte, want) in [
+            (32, false),
+            (33, true),
+            (34, true),
+            (255, true),
+            (31, false),
+            (0, false),
+        ] {
             apply(&mut s, id, &[byte, 255]);
             assert_eq!(
                 if id == 170 {

@@ -630,7 +630,9 @@ pub struct SessionState {
     pub rpg_window: Vec<String>,
     /// `PLO_STATUSLIST` (180): player status names (Online, Away, ...).
     pub status_list: Vec<String>,
-    /// `PLO_BIGMAP` (171) and `PLO_MINIMAP` (172).
+    /// Parsed `PLO_BIGMAP` (171) and `PLO_MINIMAP` (172) specifications.
+    /// These record wire metadata, not native resource-resolution or
+    /// display-commit success; the session does not load their resources.
     pub bigmap: Option<MapSpec>,
     pub minimap: Option<MapSpec>,
     /// `PLO_ISLEADER` (10) seen.
