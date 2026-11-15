@@ -37,6 +37,7 @@ pub mod npcart;
 pub mod offline;
 pub mod pose;
 pub mod protocol;
+pub mod relay;
 pub mod scripting;
 pub mod servercache;
 pub mod sound;

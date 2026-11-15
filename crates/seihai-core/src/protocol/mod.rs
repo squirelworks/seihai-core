@@ -213,8 +213,8 @@ pub fn write_login<W: Write>(
     password: &str,
 ) -> io::Result<()> {
     // Both are GCHARs: type 0 goes out as 0x20, then the key. Gen 2
-    // (1.33–1.39) has no key: GServer picks gen 2 when the token follows
-    // the type directly.
+    // (1.21–1.39) has no key: GServer picks gen 2 when the token follows
+    // the type directly (Graal_analysis protocol/gserv-1999.md).
     w.write_all(&[version.client_type() + 0x20])?;
     if version.encryption() != EncryptionGen::Gen2 {
         w.write_all(&[(key & 0x7F) + 0x20])?;
