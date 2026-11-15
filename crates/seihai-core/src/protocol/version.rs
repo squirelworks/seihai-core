@@ -66,7 +66,9 @@ pub enum ClientVersion {
     /// Graal 2.05 rev 2 (`GNW03081`). Gen 3.
     #[default]
     V205,
-    /// Graal 2.1 (`GNW31101`). Gen 3. No binary; inferred.
+    /// Generic Graal 2.1 (`GNW31101`). Gen 3; profile inferred. Observed
+    /// Graal 2002 world builds share this token but differ in capabilities;
+    /// this variant does not select an exact world build.
     V210,
     /// Graal 2.12 (`GNW01012`). Gen 3. No binary; inferred.
     V212,

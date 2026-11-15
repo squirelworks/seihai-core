@@ -848,9 +848,10 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "listserver", what: "this profile now sends the real 2.05 frame (shape A, captured in the lab: id 0 `newmain` only). No public run has used it: the 2026-10-25 matrix binary sent the gen-5 login for 2.05 (the saved-version override, since fixed) and both 14922 and 14923 answered that. 14923 answered the older classic login (shape B) of every other classic profile, so 14923 is assumed here" },
         ],
     },
-    // 2.1 to 2.16 have no binary. Their deltas are release notes and server
-    // source, and a value the notes do not change is carried from the step
-    // before.
+    // These generic 2.1 to 2.16 rows remain inferred. Observed Graal 2002
+    // world builds share tokens but have distinct command/dispatch tables;
+    // this row does not select one. Its deltas still come from release notes
+    // and server source, carrying values the notes do not change.
     Step {
         version: ClientVersion::V210,
         label: "2.1",
@@ -858,7 +859,8 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Inferred,
         delta: Delta {
-            // No binary: neither engine is known (version-chain.md, "Script engines").
+            // No exact world build selected: keep the generic engine status
+            // unknown (version-chain.md, "Script engines").
             scripts: Some(Scripts::UNKNOWN),
             // Classic login: 14923 (checked for 2.1 and 2.12 to 2.16 on 2026-10-25; 14922 stayed
             // silent).
@@ -879,10 +881,10 @@ pub const CHAIN: &[Step] = &[
         },
         source: "server source and release notes: gani prop 10, .png defaults, PLO_FILE modtime, gserver minimap, ghost mode; PLO 49 and 169 are in the two 2.1 test builds",
         unknown: &[
-            Unknown { area: "binary", what: "no 2.1 release binary; every value of this step is inferred" },
-            Unknown { area: "token", what: "the 2.1 test builds still send the 2.05 token, so GNW31101 is from gs2lib only" },
+            Unknown { area: "binary", what: "this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred" },
+            Unknown { area: "token", what: "GNW31101 is binary-read in Graal 2002 ver10, ver13 and v22 (not wire-captured); ver7 to ver9 share GNW03081 with 2.05 and the 2.1 tests. A shared token does not select an exact build's capabilities" },
             Unknown { area: "protocol", what: "PLO 170 to 174 are placed here from the notes, the test builds handle only up to 169" },
-            Unknown { area: "listserver", what: "2.1 to 2.16 have no client binary: login frame inferred, not captured. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured" },
+            Unknown { area: "listserver", what: "the generic 2.1 to 2.16 rows' login frame is inferred, not captured; the Graal 2002 static identity study does not establish it. Seihai keeps shape B (id 0 `newmain`, then id 1), what it sent before the lab captures, with no evidence for it. The port was checked with that frame only (list on 14923, silence on 14922, 2026-10-25); no real client of these builds was captured" },
             Unknown { area: "pli", what: "client send set is carried from 2.05" },
             Unknown { area: "props", what: "player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release" },
             Unknown { area: "life", what: "death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)" },
