@@ -207,8 +207,9 @@ impl Drop for Room {
 }
 
 /// Two-channel 1.1.9 relay connection. Call `poll` regularly from the game loop.
-/// Automatic pairing currently covers a sole advertised peer; this is not
-/// the captured original's complete three-client full-mesh implementation.
+/// The client requests its first available peer. A compatible relay merges
+/// whole parties and confirms every resulting membership; the generated
+/// three-client test covers this in both rooms, without claiming world sync.
 pub struct Client {
     lobby: Room,
     level: Room,
