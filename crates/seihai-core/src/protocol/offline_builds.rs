@@ -1,8 +1,8 @@
-//! Old builds Seihai can only play offline.
+//! Early builds outside Seihai's central game-server profile table.
 //!
 //! These are the Zelda Online and Graal clients from before 1.21 (and the
 //! NewWorld betas) that have no row in [`super::profile::PROFILES`]: no
-//! Seihai login reaches a server for them. The launcher lists them under
+//! account/token login is selected for them. The default launcher lists them under
 //! "All versions" with "(offline-only)", and picking one starts the offline
 //! game with the rules of [`OfflineBuild::plays_as`] and that build's own
 //! asset folder.
@@ -10,15 +10,16 @@
 //! Every fact here comes from `graal-decompile/archive-survey/build-catalogue.md`,
 //! Graal_analysis `client-internals/precursors-and-fan-builds.md`, and the
 //! room names read from each build's strings (2026-10-31). No wire bytes
-//! are made up: none of these builds sends anything from Seihai.
-//! See `documentation/offline-only-builds.md`.
+//! are implied by these metadata rows. The separate [`crate::relay::Client`]
+//! implements a partial explicit-endpoint 1.1.9 relay transport; it does not
+//! enable every row or the launcher's online UI.
 
 use super::ClientVersion;
 
 /// Where a build came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Family {
-    /// Stefan Knorr's Java applets (Zelda Online 1 and 2, Java Graal).
+    /// Java precursors (Zelda Online 1 and 2, Java Graal).
     Java,
     /// The 1998 and early 1999 Delphi betas, 1st Graal to 1.1.9 (gen 1).
     DelphiBeta,
@@ -26,14 +27,14 @@ pub enum Family {
     NewWorld,
 }
 
-/// Why a build has no online play in Seihai.
+/// Why a build uses the default launcher's offline route.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Offline {
     /// The build has no networking at all.
     NoNetwork,
     /// The build talks to Knorr's GServ relay lobby (`N<room>#<name>`,
-    /// then `D` lines relayed to the room). Seihai has no relay client, and
-    /// no public relay is left.
+    /// then `D` lines relayed to the room). The default launcher route is
+    /// offline; a dedicated relay transport is a separate capability.
     RelayLobby {
         /// The room players meet in: one per level. `<level>` is the level
         /// file name, `<base>` the name without its extension.
@@ -80,7 +81,7 @@ impl OfflineBuild {
         match self.offline {
             Offline::NoNetwork => "This build has no networking.".to_string(),
             Offline::RelayLobby { room, port, .. } => format!(
-                "This build joins room `{room}` on a GServ relay (port {port}). Seihai has no relay client and no public relay is left, so it plays offline."
+                "This build joins room `{room}` on a GServ relay (port {port}), not an account/token game server. The default launcher route is offline; dedicated relay support is separate."
             ),
             Offline::UnknownToken(t) => {
                 format!("This build logs in as `{t}`, which no Seihai row has and no server check has accepted, so it plays offline.")

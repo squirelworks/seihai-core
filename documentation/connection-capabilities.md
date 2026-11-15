@@ -8,7 +8,7 @@ from how Seihai finds servers for it. Code:
 | Native connection | Builds | What it means |
 |---|---|---|
 | no network | Zelda Online 1 | The build has no networking. |
-| relay lobby | Zelda Online 2 to 1.1, Java Graal | Knorr's GServ relay rooms; Seihai has no relay client ([offline-only-builds.md](offline-only-builds.md)). |
+| relay lobby | Zelda Online 2 through 1.1.9, Java Graal | Knorr's GServ relay rooms; the default launcher route is offline. `relay::Client` separately supports an explicit-endpoint, local-level 1.1.9 player/chat subset, not every relay dialect or full world synchronization. |
 | direct game server | 1.21 to 1.39 | Host and port typed in; no listserver protocol in the binary. |
 | listserver (classic / gen 5) | 1.41 to 2.17 / 2.22 to 3.153 | A list protocol on its own port (14923 or 14922). |
 | Login server | 4.04r2 to 6.03r7 | A game connection to a server named `Login`, whose scripts show the list, then a server warp (178). |
