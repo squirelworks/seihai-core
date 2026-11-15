@@ -86,7 +86,7 @@ fn nul_strings(b: &[u8]) -> Vec<String> {
 }
 
 /// Four segments (`u32 type`, `u32 length`, body), types 1 to 4 in order,
-/// then one `0x0A`.
+/// with nothing after segment 4 (official bodies and this writer's shape).
 fn load(name: &str) -> Script {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/gs2")
@@ -103,11 +103,7 @@ fn load(name: &str) -> Script {
         segs.push((ty, bytes[p + 8..p + 8 + len].to_vec()));
         p += 8 + len;
     }
-    assert_eq!(
-        &bytes[p..],
-        b"\n",
-        "{name}: one 0x0A after the last segment"
-    );
+    assert_eq!(&bytes[p..], b"", "{name}: no bytes after the last segment");
     assert_eq!(
         segs.iter().map(|s| s.0).collect::<Vec<_>>(),
         [1, 2, 3, 4],
