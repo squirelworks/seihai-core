@@ -280,7 +280,7 @@ impl<'a> Parser<'a> {
 
     fn ident_stmt(&mut self, w: String, line: u32, start: usize) -> Option<Stmt> {
         // A statement word this build's table does not have (`while` before
-        // 1.28 beta 2, `function` before 1.41, `with` outside 2.17 to 3.04):
+        // 1.28 beta 2, `function` before 1.40, `with` outside 2.17 to 3.04):
         // the statement is read so parsing stays in step, then skipped.
         let is_with = w == "with" && self.is_op("(");
         let known = vocab::KEYWORDS.iter().any(|(k, _, _)| *k == w);
