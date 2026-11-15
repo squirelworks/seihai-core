@@ -3,6 +3,8 @@
 //! `bytecode` is the OpenGS1-style reimplementation path.
 //! `gs1` is the cleaned 2.05 command table (parse-tree interpreter,
 //! opcode = 600 + index).
+//! `engine` parses and runs GS1 source using Seihai's own nodes; the native
+//! ID/name table is metadata, not its dispatch table or a GS2 opcode table.
 //! `gs2` reads and writes the bytecode of the GS2 compiler; `gs2::exec` runs
 //! the part that GS1 shares. `gs2::compile` compiles GS1 and GS2 to it.
 
