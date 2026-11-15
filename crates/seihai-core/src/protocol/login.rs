@@ -368,7 +368,9 @@ pub fn classic_login_props_message(
 
 /// Whether the gen-2 login props carry `STATUS`: from 1.31. The real 1.28
 /// beta 2 and 1.3 test sent nick, head and colours only (and `UDPPORT`),
-/// lab 2026-10-30; 1.21, which was not run, is taken as 1.28 beta 2.
+/// lab 2026-10-30. The later `live-trace-early.md` records a qualified
+/// original 1.21 Wine run, but does not establish this particular status
+/// choice; 1.21 still follows 1.28 beta 2 here pending that exact evidence.
 fn classic_sends_status(version: super::ClientVersion) -> bool {
     use super::ClientVersion::*;
     !matches!(version, V121 | V128B2 | V13T)
