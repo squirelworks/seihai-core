@@ -85,6 +85,7 @@ struct Room {
     output: VecDeque<u8>,
     own_id: Option<u16>,
     available: BTreeSet<u16>,
+    party: BTreeSet<u16>,
 }
 impl Room {
     fn connect(addr: &[std::net::SocketAddr], room: &str) -> io::Result<Self> {
@@ -107,6 +108,7 @@ impl Room {
             output: VecDeque::new(),
             own_id: None,
             available: BTreeSet::new(),
+            party: BTreeSet::new(),
         };
         r.line(format!("N{room}#def").as_bytes())?;
         Ok(r)
@@ -205,6 +207,8 @@ impl Drop for Room {
 }
 
 /// Two-channel 1.1.9 relay connection. Call `poll` regularly from the game loop.
+/// Automatic pairing currently covers a sole advertised peer; this is not
+/// the captured original's complete three-client full-mesh implementation.
 pub struct Client {
     lobby: Room,
     level: Room,
@@ -242,8 +246,16 @@ impl Client {
     pub fn take_chats(&mut self) -> Vec<(u16, String)> {
         std::mem::take(&mut self.chats)
     }
+    /// Send chat once the level relay has assigned an identity.
+    /// Returns `WouldBlock` before that handshake; poll and retry the message.
     pub fn chat(&mut self, chat: &str) -> io::Result<()> {
         text(chat)?;
+        if self.level.own_id.is_none() {
+            return Err(io::Error::new(
+                io::ErrorKind::WouldBlock,
+                "relay identity pending; poll before retrying chat",
+            ));
+        }
         self.level.data(b'C', chat.as_bytes())?;
         self.level.flush()
     }
@@ -269,6 +281,7 @@ impl Client {
             self.peers.clear();
             self.chats.clear();
             self.level.available.clear();
+            self.level.party.clear();
             self.player.level = level.to_owned();
         }
         self.player.x = x;
@@ -307,13 +320,22 @@ impl Client {
                         }
                     }
                     b'P' => {
-                        if id(body).is_some() {
+                        if let Some(peer) = id(body) {
+                            if !room.party.contains(&peer) && room.party.len() >= MAX_PEERS {
+                                return Err(io::ErrorKind::InvalidData.into());
+                            }
+                            room.party.insert(peer);
                             room.push(&self.player, self.clock)?;
                         }
                     }
-                    b'-' | b'C' => {
+                    b'-' => {
                         if let Some(peer) = id(body) {
                             room.available.remove(&peer);
+                        }
+                    }
+                    b'C' => {
+                        if let Some(peer) = id(body) {
+                            room.party.remove(&peer);
                             if !fixed {
                                 self.peers.remove(&peer);
                             }
@@ -327,7 +349,7 @@ impl Client {
                             continue;
                         };
                         let peer_id = u16::from(a) * 128 + u16::from(b);
-                        if !room.available.contains(&peer_id) {
+                        if !room.party.contains(&peer_id) {
                             continue;
                         }
                         let peer = self

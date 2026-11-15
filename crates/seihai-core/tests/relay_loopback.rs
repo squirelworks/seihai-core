@@ -116,13 +116,13 @@ fn two_clients_pair_exchange_state_and_chat_rejoin_and_disconnect() {
                             }
                         }
                     }
-                    b'-' | b'C' => {
+                    b'-' => {}
+                    b'C' => {
                         links[i].room.clear();
                         links[i].peers.clear();
-                        for j in 0..links.len() {
-                            if j != i && links[j].live && links[j].peers.remove(&i) {
-                                links[j]
-                                    .socket
+                        for (j, link) in links.iter_mut().enumerate() {
+                            if j != i && link.live && link.peers.remove(&i) {
+                                link.socket
                                     .write_all(format!("C{:08}\n-{:08}\n", i + 1, i + 1).as_bytes())
                                     .unwrap();
                             }
@@ -135,7 +135,7 @@ fn two_clients_pair_exchange_state_and_chat_rejoin_and_disconnect() {
                 // Unknown sender 97 must not create a player; a malformed
                 // coordinate from known sender 2 must not mutate its position.
                 // The final valid chat is a processing barrier for assertions.
-                links[3].socket.write_all(b"+00000002def\n+00000098def\n+00000099def\nD \x81NUnknown\nD \x22P\0FF\nD \x22Cbarrier\n").unwrap();
+                links[3].socket.write_all(b"+00000002def\n+00000098def\n+00000099def\n-00000002\nD \x81NUnknown\nD \x22P\0FF\nD \x22Cbarrier\n").unwrap();
             }
             thread::sleep(Duration::from_millis(1));
         }
@@ -149,6 +149,10 @@ fn two_clients_pair_exchange_state_and_chat_rejoin_and_disconnect() {
         colors: [1, 2, 3, 4, 5],
     };
     let mut a = Client::connect(&endpoint, player("Alpha", 12.5)).unwrap();
+    assert_eq!(
+        a.chat("not ready yet").unwrap_err().kind(),
+        std::io::ErrorKind::WouldBlock
+    );
     let mut b = Client::connect(&endpoint, player("Beta", 20.0)).unwrap();
     fn until(a: &mut Client, b: &mut Client, predicate: impl Fn(&Client, &Client) -> bool) {
         let end = Instant::now() + Duration::from_secs(3);
