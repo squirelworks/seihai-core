@@ -1,4 +1,4 @@
-//! Static command registrations of the six Windows Graal 2002 world builds.
+//! Static command registrations and explicit Windows 2.1 receive metadata.
 //!
 //! Source: Graal_analysis `client-internals/graal2002-and-140-builds.md`
 //! (2026-11-13, CLIENT-HUNT-20261113). These are command registrations read
@@ -8,7 +8,66 @@
 //! This module does not create an online [`super::ClientVersion`] profile,
 //! change the inferred GS1 eras, or select parser/interpreter semantics.
 
+use super::IdSet;
 use crate::scripting::engine::vocab::{command_in, keyword_in, Era, Exec};
+
+/// Exact identity for the statically read Windows 2.1 receive dispatcher.
+///
+/// Select from explicit build metadata, never a shared login token or
+/// FileVersion. This is a receive binding override, not a complete online
+/// profile, a sender contract, or a native execution result.
+/// Source: Graal_analysis by squirelworks (CC BY 4.0), pinned study:
+/// https://github.com/squirelworks/Graal_analysis/blob/1880eed52d3cc30dd31ac1892a6d306425e69d68/client-internals/graal2002-and-140-builds.md
+/// https://creativecommons.org/licenses/by/4.0/
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Graal210ReceiveBuild {
+    Public20011113,
+    World(Graal2002Build),
+}
+
+impl Graal210ReceiveBuild {
+    /// Stable explicit-selection label; not inferred from a token.
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Public20011113 => "public-2001-11-13",
+            Self::World(Graal2002Build::Ver7) => "ver7",
+            Self::World(Graal2002Build::Ver8) => "ver8",
+            Self::World(Graal2002Build::Ver9) => "ver9",
+            Self::World(Graal2002Build::Ver10) => "ver10",
+            Self::World(Graal2002Build::Ver13) => "ver13",
+            Self::World(Graal2002Build::V22) => "v22",
+        }
+    }
+
+    /// IDs with non-default receive destinations, not proof of payload
+    /// compatibility, native delivery, or a client send of the same ID.
+    /// Complete sets are checked against the pinned published matrix.
+    pub const fn bound_ids(self) -> IdSet {
+        use Graal2002Build::*;
+        let base = IdSet::range(0, 25)
+            .with_range(27, 49)
+            .with(75)
+            .with(100)
+            .with_range(150, 151)
+            .with_range(153, 156)
+            .with_range(165, 166)
+            .with_range(168, 169);
+        match self {
+            Self::Public20011113 => base.with_range(170, 174),
+            Self::World(V22) => base.with_range(170, 177),
+            Self::World(build) => {
+                let lean = base.without_all(&[2, 4, 17, 18, 154, 155]);
+                match build {
+                    Ver7 => lean,
+                    Ver8 | Ver9 => lean.with(170),
+                    Ver10 | Ver13 => lean.with_range(170, 174),
+                    V22 => unreachable!(),
+                }
+            }
+        }
+    }
+}
 
 /// An explicitly identified Windows Graal 2002 world build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
