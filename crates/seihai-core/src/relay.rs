@@ -312,8 +312,9 @@ impl Client {
                                     "relay peer limit",
                                 ));
                             }
-                            // The documented auto-request is for the sole known
-                            // peer. Duplicate advertisements must not requeue it.
+                            // The client requests its first available peer;
+                            // the relay joins whole parties and confirms all
+                            // resulting members. Deduplicate advertisements.
                             if room.available.insert(peer) && room.available.len() == 1 {
                                 room.line(format!("P{peer:08}").as_bytes())?;
                             }
