@@ -40,4 +40,5 @@ normal regression test plus a fix PR.
 | `gen5_frame` | gen-5 length headers + body decode (key = first byte) |
 
 Seed corpora under `fuzz/corpus/` come from the crate's test fixtures
-(no real hosts or account captures).
+(no real hosts or account captures). Commit only those seeds; leave
+libFuzzer-grown inputs local (they rewrite the same directories).
