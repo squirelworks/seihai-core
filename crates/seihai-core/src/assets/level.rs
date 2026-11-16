@@ -1150,13 +1150,6 @@ impl Level {
             ));
         }
         let codebits = graal_code_bits(magic);
-        let mut tiles = vec![0u16; 4096];
-        let mut boardindex = 0usize;
-        let mut bitsread = 0u32;
-        let mut buffer = 0u32;
-        let mut count = 1u32;
-        let mut firstcode = -1i32;
-        let mut twicerepeat = false;
         let mut pos = 8usize;
         let mut layout = GraalLayout {
             magic: String::from_utf8_lossy(magic).into_owned(),
@@ -1165,67 +1158,33 @@ impl Level {
             ..GraalLayout::default()
         };
 
-        while boardindex < 4096 && pos < data.len() {
-            while bitsread < codebits && pos < data.len() {
-                buffer |= (data[pos] as u32) << bitsread;
-                bitsread += 8;
-                pos += 1;
+        // GR-V1.05: GCHAR layer count, then one 13-bit board per layer, no
+        // pad after the count. Empty cells on layers above 0 are 4095 on
+        // disk (Graal_analysis formats/gr-v105-500r7.md).
+        let mut boards = Vec::new();
+        if magic == b"GR-V1.05" {
+            if pos >= data.len() {
+                return Err("GR-V1.05 missing layer count".into());
             }
-            if bitsread < codebits {
-                break;
+            let layer_count = (data[pos] as i32 - 32).clamp(0, 223) as usize;
+            pos += 1;
+            for layer in 0..layer_count {
+                let (tiles, next) = decode_graal_board(data, pos, codebits, &mut layout)?;
+                pos = next;
+                layout.max_tile = layout
+                    .max_tile
+                    .max(tiles.iter().copied().max().unwrap_or(0));
+                boards.extend(board_runs_on_layer(&tiles, layer as i32));
             }
-            let mask = (1u32 << codebits) - 1;
-            let code = buffer & mask;
-            buffer >>= codebits;
-            bitsread -= codebits;
-            layout.codes += 1;
-
-            if code & (1 << (codebits - 1)) != 0 {
-                twicerepeat = (code & 0x100) != 0;
-                count = code & 0xFF;
-                if twicerepeat {
-                    layout.double_runs += 1;
-                } else {
-                    layout.single_runs += 1;
-                }
-                layout.max_run = layout.max_run.max(count);
-            } else if count == 1 {
-                tiles[boardindex] = code as u16;
-                boardindex += 1;
-            } else if twicerepeat {
-                if firstcode < 0 {
-                    firstcode = code as i32;
-                } else {
-                    for _ in 1..=count {
-                        if boardindex >= 4095 {
-                            break;
-                        }
-                        tiles[boardindex] = firstcode as u16;
-                        tiles[boardindex + 1] = code as u16;
-                        boardindex += 2;
-                    }
-                    firstcode = -1;
-                    twicerepeat = false;
-                    count = 1;
-                }
-            } else {
-                for _ in 1..=count {
-                    if boardindex >= 4096 {
-                        break;
-                    }
-                    tiles[boardindex] = code as u16;
-                    boardindex += 1;
-                }
-                count = 1;
-            }
+        } else {
+            let (tiles, next) = decode_graal_board(data, pos, codebits, &mut layout)?;
+            pos = next;
+            layout.max_tile = tiles.iter().copied().max().unwrap_or(0);
+            boards = board_runs(&tiles);
         }
-        layout.tiles_decoded = boardindex;
         layout.board_end = pos;
-        layout.max_tile = tiles.iter().copied().max().unwrap_or(0);
 
-        let boards = board_runs(&tiles);
-
-        // `pos` is the byte after the last code, so the sections start there.
+        // `pos` is the byte after the last board, so the sections start there.
         let mut level = Level {
             boards,
             npcs: Vec::new(),
@@ -1659,6 +1618,12 @@ pub const CHEST_ITEMS: [&str; 25] = [
 /// is a real tile (the top-left cell of `pics1.png`, grass on the usual
 /// sheets), so it is kept: leaving it out made those places draw black.
 pub(crate) fn board_runs(tiles: &[u16]) -> Vec<BoardRun> {
+    board_runs_on_layer(tiles, 0)
+}
+
+/// A 64×64 board as full-row runs on `layer`. Used for every layer of a
+/// `GR-V1.05` file; upper-layer empty cells arrive as tile id 4095.
+pub(crate) fn board_runs_on_layer(tiles: &[u16], layer: i32) -> Vec<BoardRun> {
     tiles
         .chunks(64)
         .take(64)
@@ -1667,22 +1632,96 @@ pub(crate) fn board_runs(tiles: &[u16]) -> Vec<BoardRun> {
             x: 0,
             y: y as i32,
             width: row.len() as i32,
-            layer: 0,
+            layer,
             tiles: row.iter().map(|&t| tile_code(t)).collect(),
         })
         .collect()
 }
 
-/// Bits per board code for a binary level magic: 13 for GR-V1.02 to 1.04
+/// Bits per board code for a binary level magic: 13 for GR-V1.02 to 1.05
 /// (the 4096-tile sheet needs the top bit free), 11 for Z3-V1.02, else 12.
 pub fn graal_code_bits(magic: &[u8]) -> u32 {
-    if matches!(magic, b"GR-V1.02" | b"GR-V1.03" | b"GR-V1.04") {
+    if matches!(magic, b"GR-V1.02" | b"GR-V1.03" | b"GR-V1.04" | b"GR-V1.05") {
         13
     } else if magic == b"Z3-V1.02" {
         11
     } else {
         12
     }
+}
+
+/// Decode one 64×64 board of `codebits`-wide run-length codes starting at
+/// `pos`. Returns the tiles and the byte index after the board stream.
+fn decode_graal_board(
+    data: &[u8],
+    mut pos: usize,
+    codebits: u32,
+    layout: &mut GraalLayout,
+) -> Result<(Vec<u16>, usize), String> {
+    let mut tiles = vec![0u16; 4096];
+    let mut boardindex = 0usize;
+    let mut bitsread = 0u32;
+    let mut buffer = 0u32;
+    let mut count = 1u32;
+    let mut firstcode = -1i32;
+    let mut twicerepeat = false;
+
+    while boardindex < 4096 && pos < data.len() {
+        while bitsread < codebits && pos < data.len() {
+            buffer |= (data[pos] as u32) << bitsread;
+            bitsread += 8;
+            pos += 1;
+        }
+        if bitsread < codebits {
+            break;
+        }
+        let mask = (1u32 << codebits) - 1;
+        let code = buffer & mask;
+        buffer >>= codebits;
+        bitsread -= codebits;
+        layout.codes += 1;
+
+        if code & (1 << (codebits - 1)) != 0 {
+            twicerepeat = (code & 0x100) != 0;
+            count = code & 0xFF;
+            if twicerepeat {
+                layout.double_runs += 1;
+            } else {
+                layout.single_runs += 1;
+            }
+            layout.max_run = layout.max_run.max(count);
+        } else if count == 1 {
+            tiles[boardindex] = code as u16;
+            boardindex += 1;
+        } else if twicerepeat {
+            if firstcode < 0 {
+                firstcode = code as i32;
+            } else {
+                for _ in 1..=count {
+                    if boardindex >= 4095 {
+                        break;
+                    }
+                    tiles[boardindex] = firstcode as u16;
+                    tiles[boardindex + 1] = code as u16;
+                    boardindex += 2;
+                }
+                firstcode = -1;
+                twicerepeat = false;
+                count = 1;
+            }
+        } else {
+            for _ in 1..=count {
+                if boardindex >= 4096 {
+                    break;
+                }
+                tiles[boardindex] = code as u16;
+                boardindex += 1;
+            }
+            count = 1;
+        }
+    }
+    layout.tiles_decoded += boardindex;
+    Ok((tiles, pos))
 }
 
 /// Where the parts of a binary `.graal` / `.zelda` file sit and how many
@@ -1803,9 +1842,10 @@ impl<'a> Sections<'a> {
 }
 
 /// Read the sections after the board of a GR-V1 or Z3-V1 file: links,
-/// baddies, NPCs, chests, signs, in that order, and skip a GR-V1.04
-/// `HEIGHTS` block. Layout from Graal_analysis `formats/level-binary.md`
-/// and `level-binary-client.md` (2.05, 2.31). A section that is cut short
+/// baddies, NPCs, chests, signs, in that order, and skip a trailing
+/// `HEIGHTS` block when present (`GR-V1.04` / `GR-V1.05`). Layout from
+/// Graal_analysis `formats/level-binary.md` and `level-binary-client.md`
+/// (2.05, 2.31), plus `gr-v105-500r7.md`. A section that is cut short
 /// leaves what was read; nothing here fails the whole level.
 fn parse_binary_sections(
     magic: &[u8],
@@ -1940,7 +1980,8 @@ fn parse_binary_sections(
     }
     layout.signs = (base + start, base + s.pos);
     layout.unread_tail = s.data.len() - s.pos;
-    // A GR-V1.04 `HEIGHTS` block may follow; it is read past and not kept.
+    // A GR-V1.04 / GR-V1.05 `HEIGHTS` block may follow; it is read past and
+    // not kept.
 }
 
 /// A binary level's link line, `dest x y w h newx newy`. Spaces in the
@@ -2604,6 +2645,62 @@ CHEST 8 8 greenrupee 0
             let l = Level::parse_binary(&d).unwrap();
             assert_eq!(board_of(&l), b, "{}", String::from_utf8_lossy(magic));
         }
+    }
+
+    #[test]
+    fn graal_105_reads_layer_count_and_boards_with_no_pad() {
+        assert_eq!(graal_code_bits(b"GR-V1.05"), 13);
+        let layer0 = sample_board();
+        let mut layer1 = vec![4095u16; 4096];
+        layer1[64 * 3 + 2] = 100;
+        layer1[64 * 3 + 3] = 101;
+        let layer2 = vec![4095u16; 4096];
+        let mut d = b"GR-V1.05".to_vec();
+        d.push(3 + 32); // GCHAR layer count; no pad before board 0
+        d.extend(encode_board(&layer0, 13));
+        d.extend(encode_board(&layer1, 13));
+        d.extend(encode_board(&layer2, 13));
+        d.extend_from_slice(b"#\n\xff\xff\xff\n#\n#\n");
+        let (l, layout) = Level::parse_binary_with_layout(&d).unwrap();
+        assert_eq!(layout.magic, "GR-V1.05");
+        assert_eq!(layout.code_bits, 13);
+        assert_eq!(layout.tiles_decoded, 4096 * 3);
+        assert_eq!(board_of(&l), layer0);
+        let upper: Vec<u16> = (0usize..4096)
+            .map(|i| {
+                let x = (i % 64) as i32;
+                let y = (i / 64) as i32;
+                l.boards
+                    .iter()
+                    .find(|r| r.layer == 1 && r.y == y && x >= r.x && x < r.x + r.width)
+                    .map(|r| tile_id(r.tiles[(x - r.x) as usize]))
+                    .unwrap_or(0)
+            })
+            .collect();
+        assert_eq!(upper, layer1);
+        assert!(l.boards.iter().any(|r| r.layer == 2));
+        assert!(l
+            .boards
+            .iter()
+            .filter(|r| r.layer == 2)
+            .all(|r| r.tiles.iter().all(|&t| tile_id(t) == 4095)));
+    }
+
+    #[test]
+    fn graal_105_heights_after_signs_are_skipped() {
+        let mut tail: Vec<u8> = Vec::new();
+        tail.extend_from_slice(b"#\n");
+        tail.extend_from_slice(&[0xFF, 0xFF, 0xFF, b'\n']);
+        tail.extend_from_slice(b"#\n#\n");
+        tail.extend_from_slice(&[32 + 2, 32 + 2, 58, b'\n']);
+        tail.extend_from_slice(b"\nHEIGHTS\n0,0,0,0,0,0,0,0,0\nHEIGHTSEND\n");
+        let mut d = b"GR-V1.05".to_vec();
+        d.push(1 + 32);
+        d.extend(encode_board(&sample_board(), 13));
+        d.extend_from_slice(&tail);
+        let l = Level::parse_binary(&d).unwrap();
+        assert_eq!(l.signs.len(), 1);
+        assert_eq!(board_of(&l), sample_board());
     }
 
     #[test]
