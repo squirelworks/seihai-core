@@ -257,7 +257,9 @@ impl Machine {
     }
 
     /// Calls `event` (for example `onCreated`) with `args`, as a call from
-    /// outside would: `public.` and plain names both match.
+    /// outside would: `public.` and plain names both match, and the match is
+    /// ASCII case-insensitive (so a timer fire of `onTimeout` finds a
+    /// handler spelled `onTimeOut`).
     pub fn call_event(&mut self, event: &str, args: &[Val], host: &mut dyn Host) -> Outcome {
         let Some(start) = self.find_function(event) else {
             return Outcome::NoSuchEvent;
@@ -527,7 +529,7 @@ impl Machine {
         self.script
             .functions
             .iter()
-            .find(|f| f.name == name || f.name == public)
+            .find(|f| f.name.eq_ignore_ascii_case(name) || f.name.eq_ignore_ascii_case(&public))
             .map(|f| f.start)
     }
 
