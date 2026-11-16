@@ -105,7 +105,7 @@ fn setbackpal_and_putobject_are_omitted() {
 }
 
 #[test]
-fn setstring_and_addstring_are_partial_statement_gaps() {
+fn setstring_and_addstring_plain_names_lower() {
     assert!(matches!(
         gs1_command_lowering("setstring"),
         Some(Gs1Lowering::Statements(_))
@@ -114,13 +114,15 @@ fn setstring_and_addstring_are_partial_statement_gaps() {
         gs1_command_lowering("addstring"),
         Some(Gs1Lowering::Statements(_))
     ));
-    // Plain-name setstring still lowers (player flag transport).
     compile::compile_gs1("if (created) { setstring door,open; }\n", Era::V217).unwrap();
-    // Plain-name addstring still refuses (only this./client. lists).
-    let err = compile::compile_gs1("if (created) { addstring a,b; }\n", Era::V217)
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains("addstring"), "{err}");
+    // Plain-name addstring uses the same client.gs1_ transport as setstring.
+    let a = compile::compile_gs1("if (created) { addstring lastweapon,sword; }\n", Era::V217)
+        .unwrap_or_else(|e| panic!("{e}"));
+    let b = compile::compile_gs2(
+        "function onCreated() {\n  client.gs1_lastweapon.add(\"sword\");\n}\n",
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(a.disassemble(), b.disassemble());
 }
 
 #[test]

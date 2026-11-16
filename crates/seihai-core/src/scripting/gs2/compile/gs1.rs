@@ -1798,13 +1798,18 @@ impl Lower {
                     self.err(format!("`{name}` needs a plain string name"));
                     return Some(Stmt::empty());
                 };
-                if !local(&var) {
-                    self.err(format!(
-                        "`{name}` on `{var}`: only `this.` and `client.` lists are lowered (a plain GS1 string is a player flag)"
-                    ));
-                    return Some(Stmt::empty());
-                }
-                let list = Expr::var(self.name(&var));
+                // `this.` / `client.` lists keep their names. A plain GS1
+                // string list is a player flag, so it uses the same
+                // `client.gs1_<flag>` transport as `setstring` (#30).
+                let list_name = if local(&var) {
+                    self.name(&var)
+                } else {
+                    let Some(flag) = self.sent_flag(name, &var) else {
+                        return Some(Stmt::empty());
+                    };
+                    flag
+                };
+                let list = Expr::var(list_name);
                 let method = match name {
                     "addstring" => "add",
                     "insertstring" => "insert",
