@@ -643,9 +643,10 @@ fn stmt_calls(s: &g::Stmt, gs1: bool) -> bool {
 }
 
 /// Whether a GS1 command counts as a call for `OP_CMD_CALL`, judged by
-/// what it is lowered to: `setstring this.a,1;` and `setcharprop` become
-/// assignments, which do not; a flag `setstring` is a `set` call, and the
-/// list and `tokenize` forms are method calls, which do.
+/// what it is lowered to: `setstring`, `setbody` and `setcharprop` become
+/// assignments, which do not; omitted names leave no statement; the list
+/// and `tokenize` forms are method calls, which do; `savelog2` becomes
+/// `savelog(...)`.
 fn command_is_call(name: &str, args: &[g::Arg], gs1: bool) -> bool {
     match name {
         // Lowered to an assignment to a `client.` / `this.` / `player.` var.
@@ -657,6 +658,8 @@ fn command_is_call(name: &str, args: &[g::Arg], gs1: bool) -> bool {
                 char_prop(t).is_some() && !matches!(t, "#1" | "#2")
             }
         ),
+        // Dropped entirely: nothing left in the GS2 body to call.
+        n if omitted_command(n) => false,
         _ => name_is_call(name, gs1),
     }
 }

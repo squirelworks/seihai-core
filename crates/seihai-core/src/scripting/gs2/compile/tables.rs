@@ -152,14 +152,18 @@ fn statement_lowering(name: &str) -> Option<&'static str> {
         // nothing, so GS2 omits it. Names that sit in
         // `GS2_CLIENT_COMMANDS` (`setfocus`, `resetfocus`,
         // `updateterrain`) stay `Same` instead.
-        n if omitted_command(n) => "omitted: the 2.05 client compiles this and does nothing",
+        // `setbackpal` / `putobject` are Effect in 2.05 but gone from every
+        // C++ engine (3.04 onward), so GS2-era clients never had them:
+        // omit like the NoExec warp helpers.
+        n if omitted_command(n) => "omitted: no GS2 form (NoExec on 2.05, or removed from the C++ engine)",
         _ => return None,
     })
 }
 
-/// GS1 `NoExec` names with no GS2 command of their own: the front end
-/// drops the call. `join` is handled separately (it becomes
-/// `join("class")`).
+/// GS1 names with no GS2 command of their own that the front end drops.
+/// Includes 2.05 `NoExec` helpers and commands the C++ engine removed at
+/// 3.04 (`setbackpal`, `putobject`) so every GS2-era client lacks them.
+/// `join` is handled separately (it becomes `join("class")`).
 pub(super) fn omitted_command(name: &str) -> bool {
     matches!(
         name,
@@ -172,6 +176,8 @@ pub(super) fn omitted_command(name: &str) -> bool {
             | "unfreezeplayer"
             | "setbacktile2"
             | "setz"
+            | "setbackpal"
+            | "putobject"
     )
 }
 
@@ -607,6 +613,8 @@ mod tests {
             "seturllevel",
             "setbacktile",
             "setbacktile2",
+            "setbackpal",
+            "putobject",
         ] {
             assert!(omitted_command(name), "{name}");
             assert!(
@@ -618,5 +626,14 @@ mod tests {
         assert!(!omitted_command("setfocus"));
         assert!(!omitted_command("updateterrain"));
         assert_eq!(gs1_command_lowering("setfocus"), Some(Gs1Lowering::Same));
+        // High-hit Effect still Missing until a lab-backed form exists.
+        assert_eq!(
+            gs1_command_lowering("putexplosion"),
+            Some(Gs1Lowering::Missing { inert: false })
+        );
+        assert!(matches!(
+            gs1_command_lowering("setbody"),
+            Some(Gs1Lowering::Statements(_))
+        ));
     }
 }

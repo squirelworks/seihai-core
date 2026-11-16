@@ -84,6 +84,26 @@ fn setbody_lowers_to_player_bodyimg() {
     assert_eq!(a.write(), b.write());
 }
 
+
+#[test]
+fn setbackpal_and_putobject_are_omitted() {
+    // Removed from every C++ engine at 3.04; GS2-era clients never had them.
+    for name in ["setbackpal", "putobject"] {
+        assert!(matches!(
+            gs1_command_lowering(name),
+            Some(Gs1Lowering::Statements(_))
+        ));
+    }
+    let a = compile::compile_gs1(
+        "if (created) { setbackpal tiles.png; putobject bush,1,2; hide; }\n",
+        Era::V217,
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    let b = compile::compile_gs2("function onCreated() {\n  hide();\n}\n")
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(a.disassemble(), b.disassemble());
+}
+
 #[test]
 fn setstring_and_addstring_are_partial_statement_gaps() {
     assert!(matches!(
