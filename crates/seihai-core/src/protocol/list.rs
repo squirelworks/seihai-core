@@ -104,7 +104,7 @@ pub fn parse_svrlist(payload: &[u8]) -> Vec<ServerEntry> {
             version: fields[4].clone(),
             players: fields[5].trim().parse().ok(),
             // Kept exactly as received. A public listserver has been seen
-            // sending a host with a leading dot (".163.252.231.43"); that
+            // sending a host with a leading dot (".192.0.2.43"); that
             // is how the server stored it, not a parse error, so it is
             // not repaired here.
             host: fields[6].clone(),
@@ -246,7 +246,7 @@ mod tests {
             public_row("P Alpha", "10.0.0.1", "14801"),
             public_row("U Beta", "login.example", "14911"),
             public_row("H Jojo???s", "10.0.0.2", "30903"),
-            public_row("Gamma", ".163.252.231.43", "14802"),
+            public_row("Gamma", ".192.0.2.43", "14802"),
         ];
         for i in 0..4 {
             rows.push(public_row(&format!("H Row{i}"), "h.example", "14842"));
@@ -258,7 +258,7 @@ mod tests {
         assert_eq!(reply.servers[2].name, "Jojo???s");
         assert_eq!(reply.servers[2].kind, "H");
         assert_eq!(reply.servers[3].kind, "");
-        assert_eq!(reply.servers[3].host, ".163.252.231.43");
+        assert_eq!(reply.servers[3].host, ".192.0.2.43");
         assert_eq!(reply.servers[3].port, 14802);
         assert_eq!(reply.servers[7].name, "Row3");
         assert!(reply.status.is_none() && reply.error.is_none());

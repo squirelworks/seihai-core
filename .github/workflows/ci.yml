@@ -6,6 +6,17 @@ on:
   pull_request:
 
 jobs:
+  # Public IPv4 literals outside loopback / private / RFC 5737 (issue #81).
+  leak-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: No public IPv4 outside the allow-list
+        run: python .github/scripts/check_public_ipv4.py
+
   test:
     strategy:
       fail-fast: false
