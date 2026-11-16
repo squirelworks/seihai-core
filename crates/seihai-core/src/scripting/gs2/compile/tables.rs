@@ -148,6 +148,7 @@ fn statement_lowering(name: &str) -> Option<&'static str> {
         "tokenize" | "tokenize2" => "`tokens = text.tokenize(seps)`",
         "setcharprop" => "an assignment to the NPC's own property (`this.nick`, `this.colors[i]`, ...)",
         "setbody" => "`player.bodyimg = file` (same as `setplayerprop #8`; GS2 has `sethead` only)",
+        "savelog2" => "`savelog(a @ b)`: GS2 registers `savelog` with one string",
         // NoExec on 2.05: the classic client accepts the call and does
         // nothing, so GS2 omits it. Names that sit in
         // `GS2_CLIENT_COMMANDS` (`setfocus`, `resetfocus`,
@@ -427,8 +428,10 @@ pub(super) fn command_hint(name: &str) -> &'static str {
         "puthorse" => " (no 3.153 GS2 command; takehorse removes a horse by index)",
         "putnpc" | "putnpc2" => " (no 3.153 GS2 command; NPC spawn is GS1-only here)",
         "shoot" => " (no 3.153 GS2 command; use shootarrow / setshootparams forms)",
-        "timershow" => " (no 3.153 GS2 command; timereverywhere is the shared form)",
-        "savelog2" | "sendpm" | "setpm" | "sendtonc" => {
+        // TODO(lab): timershow draws the timeout overlay; timereverywhere is
+        // a different permission bit — do not rename until a GS2 form is known.
+        "timershow" => " (no 3.153 GS2 command; not the same as timereverywhere)",
+        "sendpm" | "setpm" | "sendtonc" => {
             " (server-side in 2.17–3.04; not a 3.153 client command)"
         }
         _ => "",

@@ -125,6 +125,20 @@ fn setstring_and_addstring_plain_names_lower() {
     assert_eq!(a.disassemble(), b.disassemble());
 }
 
+
+#[test]
+fn savelog2_lowers_to_savelog_join() {
+    assert!(matches!(
+        gs1_command_lowering("savelog2"),
+        Some(Gs1Lowering::Statements(_))
+    ));
+    let a = compile::compile_gs1("if (created) { savelog2 a,b; }\n", Era::V217)
+        .unwrap_or_else(|e| panic!("{e}"));
+    let b = compile::compile_gs2("function onCreated() {\n  savelog(\"a\" @ \"b\");\n}\n")
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(a.disassemble(), b.disassemble());
+}
+
 #[test]
 fn inert_noexec_commands_are_omitted() {
     for (src, keep) in [

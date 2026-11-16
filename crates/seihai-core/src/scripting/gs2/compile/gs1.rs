@@ -1728,6 +1728,7 @@ impl Lower {
     ///   `setplayerprop #8` lowers to. GS2 has `sethead` but no `setbody`
     ///   (removed from GS1 tables at 3.04); the body image is the `#8`
     ///   player property.
+    /// - `savelog2 a,b`: `savelog(a @ b)`; GS2 registers `savelog` only.
     fn string_command(&mut self, name: &str, args: &[g::Arg]) -> Option<Stmt> {
         let text_name = |a: Option<&g::Arg>| match a {
             Some(g::Arg::Text(t)) => {
@@ -1888,6 +1889,16 @@ impl Lower {
                     op: AssignOp::Set,
                     value: self.expr(&value),
                 }
+            }
+            // `savelog2 a,b`: GS2 has `savelog` with one string. Join the
+            // two arguments the way a log line would read them.
+            "savelog2" => {
+                let a = self.expr(&raw_value(args.first()));
+                let b = self.expr(&raw_value(args.get(1)));
+                Stmt::Eval(Expr::HostCall {
+                    name: "savelog".into(),
+                    args: vec![Expr::bin(BinOp::Cat, a, b)],
+                })
             }
             _ => return None,
         })
