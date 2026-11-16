@@ -204,15 +204,15 @@ fn every_gs1_command_says_how_it_lowers() {
         gs1_command_lowering("setstring"),
         Some(Gs1Lowering::Statements(_))
     ));
-    assert_eq!(
+    assert!(matches!(
         gs1_command_lowering("setz"),
-        Some(Gs1Lowering::Missing { inert: true })
-    );
+        Some(Gs1Lowering::Statements(_))
+    ));
     assert_eq!(
         gs1_command_lowering("putnpc"),
         Some(Gs1Lowering::Missing { inert: false })
     );
-    assert!(missing.len() >= 30, "{missing:?}");
+    assert!(missing.len() >= 25, "{missing:?}");
     assert_eq!(gs1_command_lowering("notacommand"), None);
 }
 

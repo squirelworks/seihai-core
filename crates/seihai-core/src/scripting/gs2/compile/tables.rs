@@ -36,11 +36,79 @@ pub enum Gs1Lowering {
     /// The text says which.
     Statements(&'static str),
     /// No GS2 counterpart. Compiling it is an error. `inert` is true when
-    /// the 2.05 client compiles the command and does nothing with it, so
-    /// leaving it out would be a possible lowering once a later client is
-    /// checked.
+    /// the 2.05 client compiles the command and does nothing with it.
+    /// Those names are lowered by omitting the call (see
+    /// [`omitted_command`]); a name that is still `Missing { inert: true }`
+    /// has not been wired that way yet.
     Missing { inert: bool },
 }
+
+/// Aggregate failing-unit hits for a GS1 name with no complete GS2 form
+/// (issue #93). Counts only; no script text, paths, or world names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Gs1GapPriority {
+    pub name: &'static str,
+    /// Failing compile units whose error mentioned this name in the
+    /// private corpus run that filed #93.
+    pub failing_units: u32,
+}
+
+/// Highest-hit GS1 names from the #93 corpus aggregates, highest first.
+/// Includes names that already have a partial [`Gs1Lowering::Statements`]
+/// path (`setstring`, `addstring`, …): residual forms still fail.
+/// Use [`gs1_command_lowering`] to see the current class.
+pub fn gs1_gap_priorities() -> &'static [Gs1GapPriority] {
+    GAP_PRIORITIES
+}
+
+/// #93 top failing-unit hits (aggregates only). Keep in sync with the
+/// issue table when a later corpus run updates the ranking.
+const GAP_PRIORITIES: &[Gs1GapPriority] = &[
+    Gs1GapPriority {
+        name: "putexplosion",
+        failing_units: 424,
+    },
+    Gs1GapPriority {
+        name: "puthorse",
+        failing_units: 249,
+    },
+    Gs1GapPriority {
+        name: "setbackpal",
+        failing_units: 239,
+    },
+    Gs1GapPriority {
+        name: "setstring",
+        failing_units: 188,
+    },
+    Gs1GapPriority {
+        name: "putnpc",
+        failing_units: 158,
+    },
+    Gs1GapPriority {
+        name: "setbody",
+        failing_units: 135,
+    },
+    Gs1GapPriority {
+        name: "putbomb",
+        failing_units: 134,
+    },
+    Gs1GapPriority {
+        name: "shoot",
+        failing_units: 126,
+    },
+    Gs1GapPriority {
+        name: "putnpc2",
+        failing_units: 104,
+    },
+    Gs1GapPriority {
+        name: "putexplosion2",
+        failing_units: 86,
+    },
+    Gs1GapPriority {
+        name: "addstring",
+        failing_units: 80,
+    },
+];
 
 /// How the GS1 command `name` is lowered, or `None` for a name that is not
 /// a GS1 command.
@@ -73,14 +141,37 @@ pub(super) fn renamed_command(name: &str) -> Option<&'static str> {
 /// `gs1.rs`, `string_command`).
 fn statement_lowering(name: &str) -> Option<&'static str> {
     Some(match name {
-        "setstring" => "`this.`/`client.` names: an assignment; any other name is a player flag: `set(\"name=value\")` or `unset(\"name\")`",
+        "setstring" => "`this.`/`client.` names: an assignment; any other name is a player flag: `client.gs1_<flag> = …`",
         "addstring" | "insertstring" | "replacestring" | "removestring" | "deletestring" => {
             "the GS2 list method on a `this.`/`client.` list (`add`, `insert`, `replace`, `remove`, `delete`); before 2.1 the builds have no `addstring`"
         }
         "tokenize" | "tokenize2" => "`tokens = text.tokenize(seps)`",
         "setcharprop" => "an assignment to the NPC's own property (`this.nick`, `this.colors[i]`, ...)",
+        // NoExec on 2.05: the classic client accepts the call and does
+        // nothing, so GS2 omits it. Names that sit in
+        // `GS2_CLIENT_COMMANDS` (`setfocus`, `resetfocus`,
+        // `updateterrain`) stay `Same` instead.
+        n if omitted_command(n) => "omitted: the 2.05 client compiles this and does nothing",
         _ => return None,
     })
+}
+
+/// GS1 `NoExec` names with no GS2 command of their own: the front end
+/// drops the call. `join` is handled separately (it becomes
+/// `join("class")`).
+pub(super) fn omitted_command(name: &str) -> bool {
+    matches!(
+        name,
+        "seturllevel"
+            | "setbacktile"
+            | "canwarp"
+            | "canwarp2"
+            | "drawovertrees"
+            | "freezeplayer2"
+            | "unfreezeplayer"
+            | "setbacktile2"
+            | "setz"
+    )
 }
 
 pub(super) fn gs2_has_command(name: &str) -> bool {
@@ -321,6 +412,20 @@ pub(super) fn command_hint(name: &str) -> &'static str {
         "setstring" | "addstring" | "insertstring" | "replacestring" | "removestring"
         | "deletestring" => " (GS2 uses list methods such as add and delete)",
         "tokenize" | "tokenize2" => " (GS2 uses the tokenize method)",
+        // High-hit #93 gaps: point at why there is no Same/Renamed form.
+        "putexplosion" | "putexplosion2" => {
+            " (no 3.153 GS2 command; explodebomb addresses an existing bomb index)"
+        }
+        "putbomb" => " (no 3.153 GS2 command; explodebomb is not a put)",
+        "puthorse" => " (no 3.153 GS2 command; takehorse removes a horse by index)",
+        "putnpc" | "putnpc2" => " (no 3.153 GS2 command; NPC spawn is GS1-only here)",
+        "setbackpal" => " (removed from GS1 tables at 3.04; not in 3.153 GS2)",
+        "setbody" => " (removed from GS1 tables at 3.04; GS2 keeps sethead only)",
+        "shoot" => " (no 3.153 GS2 command; use shootarrow / setshootparams forms)",
+        "timershow" => " (no 3.153 GS2 command; timereverywhere is the shared form)",
+        "savelog2" | "sendpm" | "setpm" | "sendtonc" => {
+            " (server-side in 2.17–3.04; not a 3.153 client command)"
+        }
         _ => "",
     }
 }
@@ -467,5 +572,52 @@ mod tests {
         sorted.sort_unstable();
         sorted.dedup();
         assert_eq!(sorted, GS2_CLIENT_COMMANDS);
+    }
+
+    #[test]
+    fn gap_priorities_are_sorted_and_named() {
+        let gaps = gs1_gap_priorities();
+        assert!(gaps.len() >= 11, "{}", gaps.len());
+        for w in gaps.windows(2) {
+            assert!(
+                w[0].failing_units >= w[1].failing_units,
+                "{} before {}",
+                w[0].name,
+                w[1].name
+            );
+        }
+        assert_eq!(gaps[0].name, "putexplosion");
+        for g in gaps {
+            assert!(
+                gs1_command_lowering(g.name).is_some(),
+                "{} is not a GS1 command",
+                g.name
+            );
+        }
+    }
+
+    #[test]
+    fn omitted_noexec_commands_lower_as_statements() {
+        for name in [
+            "setz",
+            "drawovertrees",
+            "canwarp",
+            "canwarp2",
+            "freezeplayer2",
+            "unfreezeplayer",
+            "seturllevel",
+            "setbacktile",
+            "setbacktile2",
+        ] {
+            assert!(omitted_command(name), "{name}");
+            assert!(
+                matches!(gs1_command_lowering(name), Some(Gs1Lowering::Statements(_))),
+                "{name}"
+            );
+        }
+        // Still in the 3.153 table: Same, not omitted.
+        assert!(!omitted_command("setfocus"));
+        assert!(!omitted_command("updateterrain"));
+        assert_eq!(gs1_command_lowering("setfocus"), Some(Gs1Lowering::Same));
     }
 }

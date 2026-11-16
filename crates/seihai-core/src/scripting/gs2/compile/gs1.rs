@@ -1675,6 +1675,10 @@ impl Lower {
         if let Some(s) = self.string_command(name, args) {
             return s;
         }
+        // NoExec on 2.05 with no GS2 name: drop the call (issue #93).
+        if omitted_command(name) {
+            return Stmt::empty();
+        }
         let name = renamed_command(name).unwrap_or(name);
         if !gs2_has_command(name) {
             self.err(format!(
