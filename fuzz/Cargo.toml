@@ -1,0 +1,89 @@
+[package]
+name = "seihai-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+seihai-core = { path = "../crates/seihai-core", default-features = false }
+
+[[bin]]
+name = "level"
+path = "fuzz_targets/level.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gani"
+path = "fuzz_targets/gani.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gmap"
+path = "fuzz_targets/gmap.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "zlib_body"
+path = "fuzz_targets/zlib_body.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "list_reply"
+path = "fuzz_targets/list_reply.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "player_props"
+path = "fuzz_targets/player_props.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gs1_parse"
+path = "fuzz_targets/gs1_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gs2_compile"
+path = "fuzz_targets/gs2_compile.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gs2_bytecode"
+path = "fuzz_targets/gs2_bytecode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gen3_decode"
+path = "fuzz_targets/gen3_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gen5_frame"
+path = "fuzz_targets/gen5_frame.rs"
+test = false
+doc = false
+bench = false
