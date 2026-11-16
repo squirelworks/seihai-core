@@ -1,0 +1,4 @@
+function onCreated() {
+  temp.a = new[2];
+  temp.a[0] = {1, 2};
+}

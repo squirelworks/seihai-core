@@ -1,5 +1,7 @@
 [workspace]
 members = ["crates/seihai-core", "crates/seihai-draw"]
+# Nightly cargo-fuzz project (#80); keep it out of stable `cargo test --workspace`.
+exclude = ["fuzz"]
 resolver = "2"
 
 [workspace.package]
