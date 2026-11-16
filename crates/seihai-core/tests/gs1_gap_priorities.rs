@@ -1,5 +1,6 @@
-//! seihai-core#93: lock the corpus-priority gap inventory and the inert
-//! NoExec omit path. Aggregate command names only; no script text.
+//! seihai-core#93: lock the corpus-priority gap inventory and the
+//! Statements / omit paths for high-hit names. Aggregate command names
+//! only; no script text.
 
 use seihai_core::scripting::engine::Era;
 use seihai_core::scripting::gs2::compile::{
@@ -84,7 +85,6 @@ fn setbody_lowers_to_player_bodyimg() {
     assert_eq!(a.write(), b.write());
 }
 
-
 #[test]
 fn setbackpal_and_putobject_are_omitted() {
     // Removed from every C++ engine at 3.04; GS2-era clients never had them.
@@ -124,7 +124,6 @@ fn setstring_and_addstring_plain_names_lower() {
     .unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(a.disassemble(), b.disassemble());
 }
-
 
 #[test]
 fn savelog2_lowers_to_savelog_join() {
