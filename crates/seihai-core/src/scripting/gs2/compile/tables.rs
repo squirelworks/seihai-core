@@ -618,9 +618,6 @@ mod tests {
         // Still in the 3.153 table: Same, not omitted.
         assert!(!omitted_command("setfocus"));
         assert!(!omitted_command("updateterrain"));
-        assert_eq!(
-            gs1_command_lowering("setfocus"),
-            Some(Gs1Lowering::Same)
-        );
+        assert_eq!(gs1_command_lowering("setfocus"), Some(Gs1Lowering::Same));
     }
 }

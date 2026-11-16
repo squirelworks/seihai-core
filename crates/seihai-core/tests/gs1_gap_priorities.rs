@@ -109,7 +109,11 @@ fn inert_noexec_commands_are_omitted() {
     ] {
         let a = compile::compile_gs1(src, Era::V217).unwrap_or_else(|e| panic!("{src}\n{e}"));
         let b = compile::compile_gs2(keep).unwrap_or_else(|e| panic!("{keep}\n{e}"));
-        assert_eq!(a.disassemble(), b.disassemble(), "GS1:\n{src}\nGS2:\n{keep}");
+        assert_eq!(
+            a.disassemble(),
+            b.disassemble(),
+            "GS1:\n{src}\nGS2:\n{keep}"
+        );
         assert_eq!(a.write(), b.write());
     }
 }
