@@ -1,30 +1,38 @@
-//! Binary level writer: `GR-V1.03` (`.graal`) and `Z3-V1.04` (`.zelda`).
+//! Binary level writer: `GR-V1.03` / `GR-V1.05` (`.graal`) and `Z3-V1.04`
+//! (`.zelda`).
 //!
 //! The inverse of the binary reader in `level.rs`, after the layout in the
-//! format notes (`formats/level-binary.md` in Graal_analysis): an 8-byte
-//! magic, the layer-0 board as a run-length bit stream (13-bit codes for
-//! `GR-V1.03`, 12-bit for `Z3-V1.04`, low bit first), then links, baddies
-//! (three raw bytes and a verse line, ended by `FF FF FF`), NPCs and chests
-//! (`GR-V1` only), and signs in the sign alphabet.
+//! format notes (`formats/level-binary.md` and `formats/gr-v105-500r7.md` in
+//! Graal_analysis): an 8-byte magic, then either one layer-0 board
+//! (`GR-V1.03` / `Z3-V1.04`) or a GCHAR layer count plus one 13-bit board
+//! per layer (`GR-V1.05`, no pad after the count). Boards use run-length
+//! codes (13-bit for `GR-V1.*`, 12-bit for `Z3-V1.04`, low bit first). Then
+//! links, baddies (three raw bytes and a verse line, ended by `FF FF FF`),
+//! NPCs and chests (`GR-V1` only), and signs in the sign alphabet.
 //!
 //! The board writer follows the 2.05 editor's rule: a single run for 2 to
 //! 64 equal tiles, a double run for an `A B A B` pattern, a plain code
-//! otherwise. What a binary level cannot hold is reported, not invented:
-//! layers above 0, NPCs and chests in `Z3-V1`, tile ids over 2047 in
-//! `Z3-V1`, positions outside 0 to 223, baddy types that are not numbers.
+//! otherwise. Stock `.graal` writers pick `GR-V1.05` when the live tile
+//! layer count is greater than 1 (clamped to 223); otherwise `GR-V1.03`.
+//! Empty cells on layers above 0 are written as tile id 4095. What a
+//! format cannot hold is reported, not invented: layers above 0 in
+//! `Z3-V1`, NPCs and chests in `Z3-V1`, tile ids over 2047 in `Z3-V1`,
+//! positions outside 0 to 223, baddy types that are not numbers.
 
-use super::level::{Level, CHEST_ITEMS, SIGN_ALPHABET, SIGN_GLYPHS};
+use super::level::{tile_id, Level, CHEST_ITEMS, SIGN_ALPHABET, SIGN_GLYPHS};
 
 /// Which binary level to write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryLevel {
-    /// `GR-V1.03`, what the 2.05 and 2.22 editors write for a `.graal`.
+    /// `.graal`: `GR-V1.03` for one tile layer, `GR-V1.05` when more.
     Graal,
     /// `Z3-V1.04`, the `.zelda` level with baddy verses.
     Zelda,
 }
 
 impl BinaryLevel {
+    /// Classic single-layer magic for this format. Multi-layer `.graal`
+    /// files from [`encode_binary`] use `GR-V1.05` instead.
     pub fn magic(self) -> &'static [u8; 8] {
         match self {
             BinaryLevel::Graal => b"GR-V1.03",
@@ -178,30 +186,78 @@ fn gchar(n: f32) -> Option<u8> {
     (0.0..=223.0).contains(&n).then(|| n as u8 + 32)
 }
 
+/// How many tile layers the level holds (at least 1). Stock `GR-V1.05`
+/// writers clamp the count to 223.
+fn tile_layer_count(level: &Level) -> u32 {
+    let max = level
+        .boards
+        .iter()
+        .map(|r| r.layer)
+        .filter(|&l| l >= 0)
+        .max()
+        .unwrap_or(0);
+    ((max as u32) + 1).clamp(1, 223)
+}
+
+/// A 64×64 board for `layer`. Missing cells are 0 on layer 0 and 4095 on
+/// every upper layer (the on-disk empty marker for `GR-V1.05`). Values are
+/// masked to 12 bits.
+fn layer_board(level: &Level, layer: i32) -> Vec<u16> {
+    let empty = if layer == 0 { 0u16 } else { 4095 };
+    let mut board = vec![empty; 64 * 64];
+    for run in level.boards.iter().filter(|r| r.layer == layer) {
+        if !(0..64).contains(&run.y) {
+            continue;
+        }
+        for (i, t) in run.tiles.iter().enumerate() {
+            let x = run.x + i as i32;
+            if (0..64).contains(&x) {
+                board[run.y as usize * 64 + x as usize] = tile_id(*t) & 0xFFF;
+            }
+        }
+    }
+    board
+}
+
 /// Write `level` as a binary level.
 pub fn encode_binary(level: &Level, format: BinaryLevel) -> Written {
     let mut w = Written::default();
     let zelda = format == BinaryLevel::Zelda;
     let out = &mut w.bytes;
     let warn = &mut w.warnings;
-    out.extend_from_slice(format.magic());
+    let layers = tile_layer_count(level);
+    let bits = format.code_bits();
+    let magic: &[u8] = match format {
+        BinaryLevel::Zelda => b"Z3-V1.04",
+        BinaryLevel::Graal if layers > 1 => b"GR-V1.05",
+        BinaryLevel::Graal => b"GR-V1.03",
+    };
+    out.extend_from_slice(magic);
 
-    if level.boards.iter().any(|r| r.layer != 0) {
-        warn.push("layers above 0 are not kept: a binary level has one layer".into());
+    if zelda && level.boards.iter().any(|r| r.layer != 0) {
+        warn.push("layers above 0 are not kept: a Z3-V1 level has one layer".into());
     }
-    let mut board: Vec<u16> = level.layer0_board();
-    if zelda {
-        let over = board.iter().filter(|&&t| t > 2047).count();
-        if over > 0 {
-            warn.push(format!(
-                "{over} tiles above 2047 kept as their low 11 bits (Z3-V1 codes are 12-bit)"
-            ));
-            for t in &mut board {
-                *t &= 0x7FF;
+
+    if magic == b"GR-V1.05" {
+        out.push(layers as u8 + 32);
+        for layer in 0..layers {
+            out.extend(encode_board(&layer_board(level, layer as i32), bits));
+        }
+    } else {
+        let mut board = layer_board(level, 0);
+        if zelda {
+            let over = board.iter().filter(|&&t| t > 2047).count();
+            if over > 0 {
+                warn.push(format!(
+                    "{over} tiles above 2047 kept as their low 11 bits (Z3-V1 codes are 12-bit)"
+                ));
+                for t in &mut board {
+                    *t &= 0x7FF;
+                }
             }
         }
+        out.extend(encode_board(&board, bits));
     }
-    out.extend(encode_board(&board, format.code_bits()));
 
     for link in &level.links {
         let offset = (link.new_x.is_none() && link.x_offset != 0.0)
@@ -329,6 +385,7 @@ pub fn encode_binary(level: &Level, format: BinaryLevel) -> Written {
 mod tests {
     use super::*;
     use crate::assets::decode_sign_text;
+    use crate::assets::level::{tile_code, BoardRun};
 
     const TEXT: &str = "GLEVNW01
 BOARD 0 0 4 0 AAABAAAB
@@ -351,6 +408,10 @@ Hello, #A world?
 New line!
 SIGNEND
 ";
+
+    fn layer_tiles(level: &Level, layer: i32) -> Vec<u16> {
+        layer_board(level, layer)
+    }
 
     #[test]
     fn graal_round_trips_through_the_reader() {
@@ -377,6 +438,48 @@ SIGNEND
     }
 
     #[test]
+    fn graal_105_round_trips_multiple_layers() {
+        let mut level = Level::parse(TEXT).unwrap();
+        level.boards.push(BoardRun {
+            x: 2,
+            y: 3,
+            width: 2,
+            layer: 1,
+            tiles: vec![tile_code(100), tile_code(101)],
+        });
+        level.boards.push(BoardRun {
+            x: 0,
+            y: 0,
+            width: 1,
+            layer: 2,
+            tiles: vec![tile_code(7)],
+        });
+        let w = encode_binary(&level, BinaryLevel::Graal);
+        assert!(w.warnings.is_empty(), "{:?}", w.warnings);
+        assert_eq!(&w.bytes[..8], b"GR-V1.05");
+        assert_eq!(w.bytes[8], 3 + 32);
+        let back = Level::from_bytes(&w.bytes).unwrap();
+        assert_eq!(back.layer0_board(), level.layer0_board());
+        assert_eq!(layer_tiles(&back, 1), layer_tiles(&level, 1));
+        assert_eq!(layer_tiles(&back, 2), layer_tiles(&level, 2));
+        assert_eq!(layer_tiles(&back, 1)[64 * 3 + 2], 100);
+        assert_eq!(layer_tiles(&back, 1)[0], 4095);
+        assert_eq!(layer_tiles(&back, 2)[0], 7);
+        assert_eq!(layer_tiles(&back, 2)[1], 4095);
+        assert_eq!(back.links.len(), 2);
+        assert_eq!(back.npcs.len(), 1);
+        assert_eq!(back.signs[0].text, level.signs[0].text);
+    }
+
+    #[test]
+    fn graal_single_layer_still_writes_103() {
+        let level = Level::parse(TEXT).unwrap();
+        let w = encode_binary(&level, BinaryLevel::Graal);
+        assert_eq!(&w.bytes[..8], b"GR-V1.03");
+        assert_ne!(w.bytes.get(8), Some(&(1 + 32)));
+    }
+
+    #[test]
     fn zelda_drops_what_it_cannot_hold_and_says_so() {
         let mut level = Level::parse(TEXT).unwrap();
         level.boards.push(crate::assets::BoardRun {
@@ -396,6 +499,24 @@ SIGNEND
         assert_eq!(back.links.len(), 2);
         assert_eq!(back.baddies[0].verses, "see you\nouch\nattack");
         assert_eq!(back.signs[0].text, level.signs[0].text);
+    }
+
+    #[test]
+    fn zelda_warns_when_upper_layers_are_dropped() {
+        let mut level = Level::parse(TEXT).unwrap();
+        level.boards.push(BoardRun {
+            x: 0,
+            y: 0,
+            width: 1,
+            layer: 1,
+            tiles: vec![tile_code(9)],
+        });
+        let w = encode_binary(&level, BinaryLevel::Zelda);
+        assert!(w
+            .warnings
+            .iter()
+            .any(|m| m.contains("layers above 0 are not kept")));
+        assert_eq!(&w.bytes[..8], b"Z3-V1.04");
     }
 
     #[test]
