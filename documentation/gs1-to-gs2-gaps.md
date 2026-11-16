@@ -32,44 +32,51 @@ client tables do not register it, so a real GS2 client would report
 
 | GS1 name | failing units | Current class | Notes |
 |---|---:|---|---|
-| `putexplosion` | 424 | `Missing` | Not in 3.153 tables. `explodebomb` is index-based, not a put. |
-| `puthorse` | 249 | `Missing` | Not in 3.153 tables. `takehorse` removes by index. |
-| `setbackpal` | 239 | `Missing` | Removed from GS1 tables at 3.04; absent from 3.153 GS2. |
-| `setstring` | 188 | `Statements` | Partial: plain / `this.` / `client.` forms lower; residual flag forms still refuse (see README Known gaps). |
-| `putnpc` | 158 | `Missing` | GS1 NPC spawn; no 3.153 client command. |
-| `setbody` | 135 | `Missing` | Removed at 3.04; GS2 keeps `sethead` only. |
-| `putbomb` | 134 | `Missing` | Not in 3.153 tables. |
-| `shoot` | 126 | `Missing` | Not in 3.153 tables; `shootarrow` / `setshootparams` are different shapes. |
-| `putnpc2` | 104 | `Missing` | Server-oriented in 2.17–3.04 notes; not a 3.153 client command. |
-| `putexplosion2` | 86 | `Missing` | Same family as `putexplosion`. |
-| `addstring` | 80 | `Statements` | Partial: only `this.` / `client.` lists; plain GS1 string lists refuse. |
+| `putexplosion` | 424 | `Missing` | Not in 3.153 tables. `explodebomb` is index-based, not a put. **TODO(lab):** needs a documented GS2 or server path. |
+| `puthorse` | 249 | `Missing` | Not in 3.153 tables. `takehorse` removes by index. **TODO(lab).** |
+| `setbackpal` | 239 | `Statements` | Omitted: removed from every C++ engine at 3.04; GS2-era clients never had it. |
+| `setstring` | 188 | `Statements` | Plain / `this.` / `client.` forms lower; residual flag forms still refuse (see README Known gaps). |
+| `putnpc` | 158 | `Missing` | GS1 NPC spawn; no 3.153 client command. **TODO(lab):** server `PUTNPC` path. |
+| `setbody` | 135 | `Statements` | `player.bodyimg = file` (same as `setplayerprop #8`). |
+| `putbomb` | 134 | `Missing` | Not in 3.153 tables. **TODO(lab).** |
+| `shoot` | 126 | `Missing` | Not in 3.153 tables; `shootarrow` / `setshootparams` are different shapes. **TODO(lab).** |
+| `putnpc2` | 104 | `Missing` | Server-oriented in 2.17–3.04 notes; not a 3.153 client command. **TODO(lab).** |
+| `putexplosion2` | 86 | `Missing` | Same family as `putexplosion`. **TODO(lab).** |
+| `addstring` | 80 | `Statements` | `this.` / `client.` lists, and plain names via `client.gs1_<flag>` like `setstring`. |
 
 Smaller #93 counts (examples): `putcomp` / `drawovertrees` / `replacestring` /
-`timershow` (21); `savelog2` (18); `removecompus` (15); `sendpm` /
-`sendtonc` / `putobject` (~9–10); others ≤6. Several inventory names had
-**0** failing-unit hits in that run (low priority unless product need says
-otherwise).
+`timershow` (21); `savelog2` (18, now `savelog(a @ b)`); `removecompus` (15);
+`sendpm` / `sendtonc` / `putobject` (~9–10; `putobject` omitted like
+`setbackpal`). Several inventory names had **0** failing-unit hits in that
+run (low priority unless product need says otherwise).
 
-## Inert NoExec → omit
+## Inert / engine-removed → omit
 
-These GS1 names are `NoExec` on 2.05 (the classic client accepts them and
-does nothing) and are **not** in the 3.153 shared-command list. The front
-end now **omits** the call (`Statements`: "omitted…"):
+These names have **no** 3.153 GS2 command. The front end **omits** the call
+(`Statements`: "omitted…"):
 
-`seturllevel`, `setbacktile`, `setbacktile2`, `canwarp`, `canwarp2`,
-`drawovertrees`, `freezeplayer2`, `unfreezeplayer`, `setz`.
+**2.05 `NoExec`:** `seturllevel`, `setbacktile`, `setbacktile2`, `canwarp`,
+`canwarp2`, `drawovertrees`, `freezeplayer2`, `unfreezeplayer`, `setz`.
+
+**Removed from the C++ engine at 3.04** (never on a GS2-era client):
+`setbackpal`, `putobject`.
 
 `setfocus`, `resetfocus`, and `updateterrain` are also `NoExec` in GS1 but
 **are** registered in 3.153, so they stay `Same`. `join` stays the special
 `join("class")` call.
 
-## What is not in this pass
+## What still needs a lab form
 
-No `Same` / `Renamed` inventing for the high-hit Effect commands above.
-That needs a documented GS2 form (shared-command table, opcode notes, or
-lab capture), not a Seihai-only host polyfill. Track progress by moving a
-name out of `Missing` in `gs1_command_lowering` and updating the tests in
-`tests/gs1_gap_priorities.rs`.
+Do **not** invent a Seihai-only host polyfill for the spawn/combat family
+below. A silent `Same` call would fail on real GS2 clients. Track progress
+by moving a name out of `Missing` in `gs1_command_lowering` once a
+shared-command, opcode, or server-assisted form is documented:
+
+- `putexplosion`, `putexplosion2`, `putbomb`, `puthorse`
+- `putnpc`, `putnpc2`
+- `shoot` (and whether any `setshootparams` + projectile pair matches)
+- `timershow` (not the same as `timereverywhere`)
+- `sendpm`, `setpm`, `sendtonc` (server-side in 2.17–3.04 notes)
 
 ## Inventory API
 

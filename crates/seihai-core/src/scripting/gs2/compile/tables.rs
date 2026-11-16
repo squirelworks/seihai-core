@@ -143,22 +143,28 @@ fn statement_lowering(name: &str) -> Option<&'static str> {
     Some(match name {
         "setstring" => "`this.`/`client.` names: an assignment; any other name is a player flag: `client.gs1_<flag> = …`",
         "addstring" | "insertstring" | "replacestring" | "removestring" | "deletestring" => {
-            "the GS2 list method on a `this.`/`client.` list (`add`, `insert`, `replace`, `remove`, `delete`); before 2.1 the builds have no `addstring`"
+            "the GS2 list method on a `this.`/`client.` list (`add`, `insert`, `replace`, `remove`, `delete`); a plain name uses `client.gs1_<flag>` like `setstring`; before 2.1 the builds have no `addstring`"
         }
         "tokenize" | "tokenize2" => "`tokens = text.tokenize(seps)`",
         "setcharprop" => "an assignment to the NPC's own property (`this.nick`, `this.colors[i]`, ...)",
+        "setbody" => "`player.bodyimg = file` (same as `setplayerprop #8`; GS2 has `sethead` only)",
+        "savelog2" => "`savelog(a @ b)`: GS2 registers `savelog` with one string",
         // NoExec on 2.05: the classic client accepts the call and does
         // nothing, so GS2 omits it. Names that sit in
         // `GS2_CLIENT_COMMANDS` (`setfocus`, `resetfocus`,
         // `updateterrain`) stay `Same` instead.
-        n if omitted_command(n) => "omitted: the 2.05 client compiles this and does nothing",
+        // `setbackpal` / `putobject` are Effect in 2.05 but gone from every
+        // C++ engine (3.04 onward), so GS2-era clients never had them:
+        // omit like the NoExec warp helpers.
+        n if omitted_command(n) => "omitted: no GS2 form (NoExec on 2.05, or removed from the C++ engine)",
         _ => return None,
     })
 }
 
-/// GS1 `NoExec` names with no GS2 command of their own: the front end
-/// drops the call. `join` is handled separately (it becomes
-/// `join("class")`).
+/// GS1 names with no GS2 command of their own that the front end drops.
+/// Includes 2.05 `NoExec` helpers and commands the C++ engine removed at
+/// 3.04 (`setbackpal`, `putobject`) so every GS2-era client lacks them.
+/// `join` is handled separately (it becomes `join("class")`).
 pub(super) fn omitted_command(name: &str) -> bool {
     matches!(
         name,
@@ -171,6 +177,8 @@ pub(super) fn omitted_command(name: &str) -> bool {
             | "unfreezeplayer"
             | "setbacktile2"
             | "setz"
+            | "setbackpal"
+            | "putobject"
     )
 }
 
@@ -419,11 +427,11 @@ pub(super) fn command_hint(name: &str) -> &'static str {
         "putbomb" => " (no 3.153 GS2 command; explodebomb is not a put)",
         "puthorse" => " (no 3.153 GS2 command; takehorse removes a horse by index)",
         "putnpc" | "putnpc2" => " (no 3.153 GS2 command; NPC spawn is GS1-only here)",
-        "setbackpal" => " (removed from GS1 tables at 3.04; not in 3.153 GS2)",
-        "setbody" => " (removed from GS1 tables at 3.04; GS2 keeps sethead only)",
         "shoot" => " (no 3.153 GS2 command; use shootarrow / setshootparams forms)",
-        "timershow" => " (no 3.153 GS2 command; timereverywhere is the shared form)",
-        "savelog2" | "sendpm" | "setpm" | "sendtonc" => {
+        // TODO(lab): timershow draws the timeout overlay; timereverywhere is
+        // a different permission bit — do not rename until a GS2 form is known.
+        "timershow" => " (no 3.153 GS2 command; not the same as timereverywhere)",
+        "sendpm" | "setpm" | "sendtonc" => {
             " (server-side in 2.17–3.04; not a 3.153 client command)"
         }
         _ => "",
@@ -608,6 +616,8 @@ mod tests {
             "seturllevel",
             "setbacktile",
             "setbacktile2",
+            "setbackpal",
+            "putobject",
         ] {
             assert!(omitted_command(name), "{name}");
             assert!(
@@ -619,5 +629,14 @@ mod tests {
         assert!(!omitted_command("setfocus"));
         assert!(!omitted_command("updateterrain"));
         assert_eq!(gs1_command_lowering("setfocus"), Some(Gs1Lowering::Same));
+        // High-hit Effect still Missing until a lab-backed form exists.
+        assert_eq!(
+            gs1_command_lowering("putexplosion"),
+            Some(Gs1Lowering::Missing { inert: false })
+        );
+        assert!(matches!(
+            gs1_command_lowering("setbody"),
+            Some(Gs1Lowering::Statements(_))
+        ));
     }
 }

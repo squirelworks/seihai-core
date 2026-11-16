@@ -643,14 +643,14 @@ fn stmt_calls(s: &g::Stmt, gs1: bool) -> bool {
 }
 
 /// Whether a GS1 command counts as a call for `OP_CMD_CALL`, judged by
-/// what it is lowered to: `setstring this.a,1;` and `setcharprop` become
-/// assignments, which do not; a flag `setstring` is a `set` call, and the
-/// list and `tokenize` forms are method calls, which do.
+/// what it is lowered to: `setstring`, `setbody` and `setcharprop` become
+/// assignments, which do not; omitted names leave no statement; the list
+/// and `tokenize` forms are method calls, which do; `savelog2` becomes
+/// `savelog(...)`.
 fn command_is_call(name: &str, args: &[g::Arg], gs1: bool) -> bool {
     match name {
-        // Lowered to an assignment to a `client.` (or `this.`) variable.
-        "setstring" | "set" | "unset" => false,
-        "setcharprop" => false,
+        // Lowered to an assignment to a `client.` / `this.` / `player.` var.
+        "setstring" | "set" | "unset" | "setcharprop" | "setbody" => false,
         "setplayerprop" => !matches!(
             args.first(),
             Some(g::Arg::Text(t)) if {
@@ -658,6 +658,8 @@ fn command_is_call(name: &str, args: &[g::Arg], gs1: bool) -> bool {
                 char_prop(t).is_some() && !matches!(t, "#1" | "#2")
             }
         ),
+        // Dropped entirely: nothing left in the GS2 body to call.
+        n if omitted_command(n) => false,
         _ => name_is_call(name, gs1),
     }
 }
@@ -1722,6 +1724,11 @@ impl Lower {
     ///   which `#t(i)` then reads as `tokens[i]`.
     /// - `setcharprop code,value`: the NPC's own property (see
     ///   [`char_prop`]) as `this.<prop> = value`.
+    /// - `setbody file`: `player.bodyimg = file`, the same assignment
+    ///   `setplayerprop #8` lowers to. GS2 has `sethead` but no `setbody`
+    ///   (removed from GS1 tables at 3.04); the body image is the `#8`
+    ///   player property.
+    /// - `savelog2 a,b`: `savelog(a @ b)`; GS2 registers `savelog` only.
     fn string_command(&mut self, name: &str, args: &[g::Arg]) -> Option<Stmt> {
         let text_name = |a: Option<&g::Arg>| match a {
             Some(g::Arg::Text(t)) => {
@@ -1792,13 +1799,18 @@ impl Lower {
                     self.err(format!("`{name}` needs a plain string name"));
                     return Some(Stmt::empty());
                 };
-                if !local(&var) {
-                    self.err(format!(
-                        "`{name}` on `{var}`: only `this.` and `client.` lists are lowered (a plain GS1 string is a player flag)"
-                    ));
-                    return Some(Stmt::empty());
-                }
-                let list = Expr::var(self.name(&var));
+                // `this.` / `client.` lists keep their names. A plain GS1
+                // string list is a player flag, so it uses the same
+                // `client.gs1_<flag>` transport as `setstring` (#30).
+                let list_name = if local(&var) {
+                    self.name(&var)
+                } else {
+                    let Some(flag) = self.sent_flag(name, &var) else {
+                        return Some(Stmt::empty());
+                    };
+                    flag
+                };
+                let list = Expr::var(list_name);
                 let method = match name {
                     "addstring" => "add",
                     "insertstring" => "insert",
@@ -1868,6 +1880,25 @@ impl Lower {
                     op: AssignOp::Set,
                     value: self.expr(&value),
                 }
+            }
+            // `setbody file`: same as `setplayerprop #8,file` → `player.bodyimg`.
+            "setbody" => {
+                let value = raw_value(args.first());
+                Stmt::Assign {
+                    target: Var::plain("player.bodyimg"),
+                    op: AssignOp::Set,
+                    value: self.expr(&value),
+                }
+            }
+            // `savelog2 a,b`: GS2 has `savelog` with one string. Join the
+            // two arguments the way a log line would read them.
+            "savelog2" => {
+                let a = self.expr(&raw_value(args.first()));
+                let b = self.expr(&raw_value(args.get(1)));
+                Stmt::Eval(Expr::HostCall {
+                    name: "savelog".into(),
+                    args: vec![Expr::bin(BinOp::Cat, a, b)],
+                })
             }
             _ => return None,
         })

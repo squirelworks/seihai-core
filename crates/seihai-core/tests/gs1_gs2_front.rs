@@ -256,8 +256,13 @@ fn commands_and_functions_without_gs2_are_errors() {
         "{:?}",
         got.strings
     );
-    let err = compile::compile_gs1("if (created) { addstring a,b; }\n", Era::V217).unwrap_err();
-    assert!(err.to_string().contains("addstring"), "{err}");
+    // Plain-name addstring uses the same client.gs1_ transport as setstring.
+    let got = compile::compile_gs1("if (created) { addstring a,b; }\n", Era::V217).unwrap();
+    assert!(
+        got.strings.contains(&"gs1_a".to_string()) && got.strings.contains(&"b".to_string()),
+        "{:?}",
+        got.strings
+    );
     let err = compile::compile_gs1("if (created) { putnpc x,1,2; }\n", Era::V205).unwrap_err();
     assert!(err.to_string().contains("putnpc"), "{err}");
     let err = compile::compile_gs1("if (created) { if (playersays(hello)) hide; }\n", Era::V205)

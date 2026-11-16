@@ -32,7 +32,9 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
       original-client/control acceptance. Named-event structured-lift
       ordering is already fixed (#71–#73). Synthetic regressions are not
       native all-version parity. Gap triage by corpus fail hits is #93
-      (`documentation/gs1-to-gs2-gaps.md`).
+      (`documentation/gs1-to-gs2-gaps.md`); `setbody`, plain `addstring`,
+      `savelog2`, and engine-removed omits (`setbackpal`, `putobject`) now
+      lower — spawn/combat puts and `shoot` stay `Missing` pending lab.
 - [ ] GS2 VM coverage for the Mac 4.04r2 and 5.12 VMs and the 7.x client
       (`documentation/gs2-vm-versions.md`).
 - [ ] `.code` files for 1.x (#63): core codec shipped in 0.2.10 (#66);

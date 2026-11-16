@@ -1,5 +1,6 @@
-//! seihai-core#93: lock the corpus-priority gap inventory and the inert
-//! NoExec omit path. Aggregate command names only; no script text.
+//! seihai-core#93: lock the corpus-priority gap inventory and the
+//! Statements / omit paths for high-hit names. Aggregate command names
+//! only; no script text.
 
 use seihai_core::scripting::engine::Era;
 use seihai_core::scripting::gs2::compile::{
@@ -30,16 +31,15 @@ fn top_gap_priorities_match_issue_93() {
 }
 
 #[test]
-fn high_hit_effect_commands_stay_missing_until_a_gs2_form_exists() {
-    // These names are not in the 3.153 shared-command table. Emitting a
+fn high_hit_effect_spawn_commands_stay_missing() {
+    // Spawn / combat puts with no 3.153 shared-command form. Emitting a
     // Same call would compile but fail on a real GS2 client ("Function
     // not found"). Keep them Missing until a lab-backed form exists.
+    // TODO(lab): putexplosion(2), putbomb, puthorse, putnpc(2), shoot.
     for name in [
         "putexplosion",
         "puthorse",
-        "setbackpal",
         "putnpc",
-        "setbody",
         "putbomb",
         "shoot",
         "putnpc2",
@@ -59,13 +59,12 @@ fn high_hit_effect_commands_stay_missing_until_a_gs2_form_exists() {
             .unwrap_err()
             .to_string();
         assert!(err.contains(name), "{name}: {err}");
-        // Hints name a concrete reason for the top combat/spawn gaps.
         if matches!(
             name,
-            "putexplosion" | "putbomb" | "puthorse" | "putnpc" | "setbody" | "shoot"
+            "putexplosion" | "putbomb" | "puthorse" | "putnpc" | "shoot"
         ) {
             assert!(
-                err.contains("3.153") || err.contains("sethead") || err.contains("shootarrow"),
+                err.contains("3.153") || err.contains("shootarrow"),
                 "{name}: {err}"
             );
         }
@@ -73,7 +72,40 @@ fn high_hit_effect_commands_stay_missing_until_a_gs2_form_exists() {
 }
 
 #[test]
-fn setstring_and_addstring_are_partial_statement_gaps() {
+fn setbody_lowers_to_player_bodyimg() {
+    assert!(matches!(
+        gs1_command_lowering("setbody"),
+        Some(Gs1Lowering::Statements(_))
+    ));
+    let a = compile::compile_gs1("if (created) { setbody body13.png; }\n", Era::V217)
+        .unwrap_or_else(|e| panic!("{e}"));
+    let b = compile::compile_gs2("function onCreated() {\n  player.bodyimg = \"body13.png\";\n}\n")
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(a.disassemble(), b.disassemble());
+    assert_eq!(a.write(), b.write());
+}
+
+#[test]
+fn setbackpal_and_putobject_are_omitted() {
+    // Removed from every C++ engine at 3.04; GS2-era clients never had them.
+    for name in ["setbackpal", "putobject"] {
+        assert!(matches!(
+            gs1_command_lowering(name),
+            Some(Gs1Lowering::Statements(_))
+        ));
+    }
+    let a = compile::compile_gs1(
+        "if (created) { setbackpal tiles.png; putobject bush,1,2; hide; }\n",
+        Era::V217,
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    let b = compile::compile_gs2("function onCreated() {\n  hide();\n}\n")
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(a.disassemble(), b.disassemble());
+}
+
+#[test]
+fn setstring_and_addstring_plain_names_lower() {
     assert!(matches!(
         gs1_command_lowering("setstring"),
         Some(Gs1Lowering::Statements(_))
@@ -82,13 +114,28 @@ fn setstring_and_addstring_are_partial_statement_gaps() {
         gs1_command_lowering("addstring"),
         Some(Gs1Lowering::Statements(_))
     ));
-    // Plain-name setstring still lowers (player flag transport).
     compile::compile_gs1("if (created) { setstring door,open; }\n", Era::V217).unwrap();
-    // Plain-name addstring still refuses (only this./client. lists).
-    let err = compile::compile_gs1("if (created) { addstring a,b; }\n", Era::V217)
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains("addstring"), "{err}");
+    // Plain-name addstring uses the same client.gs1_ transport as setstring.
+    let a = compile::compile_gs1("if (created) { addstring lastweapon,sword; }\n", Era::V217)
+        .unwrap_or_else(|e| panic!("{e}"));
+    let b = compile::compile_gs2(
+        "function onCreated() {\n  client.gs1_lastweapon.add(\"sword\");\n}\n",
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(a.disassemble(), b.disassemble());
+}
+
+#[test]
+fn savelog2_lowers_to_savelog_join() {
+    assert!(matches!(
+        gs1_command_lowering("savelog2"),
+        Some(Gs1Lowering::Statements(_))
+    ));
+    let a = compile::compile_gs1("if (created) { savelog2 a,b; }\n", Era::V217)
+        .unwrap_or_else(|e| panic!("{e}"));
+    let b = compile::compile_gs2("function onCreated() {\n  savelog(\"a\" @ \"b\");\n}\n")
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(a.disassemble(), b.disassemble());
 }
 
 #[test]
