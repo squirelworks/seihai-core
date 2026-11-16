@@ -310,8 +310,9 @@ pub fn hold_frame_for_board(
 pub const BIGMAP_NEAR_EDGE: f32 = 10.0;
 
 /// A parsed `.gmap` file (`GRMAP001`), the reader keys only: the keys a
-/// client needs to place levels. Generator keys (`GENERATED`, `HEIGHTMAP`,
-/// ...) are skipped.
+/// client needs to place levels. Generator tuning keys (`GENSEED`,
+/// `HEIGHTMAP`, …) are skipped; [`Gmap::generated`] and the name grid are
+/// kept so generator forms without a `LEVELNAMES` block still place levels.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Gmap {
     /// Levels across and down.
@@ -328,6 +329,10 @@ pub struct Gmap {
     pub load_full_map: bool,
     /// `LOADATSTART` names.
     pub load_at_start: Vec<String>,
+    /// `GENERATED` argument, when present. Terrain writers use `1` as a
+    /// flag; dungeon writers put the bottom-right level name here and omit
+    /// `LEVELNAMES`.
+    pub generated: Option<String>,
 }
 
 /// Split one `LEVELNAMES` row: comma-separated, each name optionally in
@@ -340,9 +345,99 @@ fn split_row(line: &str) -> Vec<String> {
         .collect()
 }
 
+/// A bare token that looks like a level file name (terrain generator form).
+fn looks_like_level_name(s: &str) -> bool {
+    let s = s.trim();
+    if s.is_empty() || s.contains(char::is_whitespace) {
+        return false;
+    }
+    let lower = s.to_ascii_lowercase();
+    lower.ends_with(".nw") || lower.ends_with(".graal") || lower.ends_with(".zelda")
+}
+
+/// Skip a generator multi-line block until its `*END` marker.
+fn skip_block<'a>(lines: &mut impl Iterator<Item = &'a str>, end: &str) {
+    for row in lines.by_ref() {
+        if row.trim() == end {
+            break;
+        }
+    }
+}
+
+/// Column letters as the 2.22 generators write them: `0 → A`, `25 → Z`,
+/// `26 → AA`.
+fn column_letters(mut index: usize) -> String {
+    let mut name = String::new();
+    loop {
+        name.insert(0, (b'A' + (index % 26) as u8) as char);
+        if index < 26 {
+            return name;
+        }
+        index = index / 26 - 1;
+    }
+}
+
+/// Inverse of [`column_letters`]: `A → 0`, `Z → 25`, `AA → 26`.
+fn parse_column_letters(s: &str) -> Option<usize> {
+    if s.is_empty() || !s.chars().all(|c| c.is_ascii_alphabetic()) {
+        return None;
+    }
+    let mut n = 0usize;
+    for c in s.chars() {
+        n = n
+            .checked_mul(26)?
+            .checked_add((c.to_ascii_uppercase() as usize) - ('A' as usize) + 1)?;
+    }
+    n.checked_sub(1)
+}
+
+/// Rebuild a dungeon short-form grid from `GENERATED` naming the
+/// bottom-right level (`LEVELSTART`, column letters, 1-based row, optional
+/// `.nw`). `None` when the name is not that cell of `width`×`height`.
+fn names_from_generated(generated: &str, width: usize, height: usize) -> Option<Vec<String>> {
+    let name = generated.trim();
+    if name.is_empty() || name == "1" {
+        return None;
+    }
+    let (stem, ext) = match name.rfind('.') {
+        Some(i) => (&name[..i], &name[i..]),
+        None => (name, ".nw"),
+    };
+    let digit_at = stem.rfind(|c: char| !c.is_ascii_digit())?;
+    let (before_row, row_text) = stem.split_at(digit_at + 1);
+    if row_text.is_empty() {
+        return None;
+    }
+    let row: usize = row_text.parse().ok()?;
+    let letter_at = before_row
+        .rfind(|c: char| !c.is_ascii_alphabetic())
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    let (prefix, col_text) = before_row.split_at(letter_at);
+    let col = parse_column_letters(col_text)?;
+    if col + 1 != width || row != height {
+        return None;
+    }
+    let mut names = Vec::with_capacity(width * height);
+    for y in 0..height {
+        for x in 0..width {
+            names.push(format!("{prefix}{}{}{ext}", column_letters(x), y + 1));
+        }
+    }
+    Some(names)
+}
+
 impl Gmap {
     /// Parse `GRMAP001` text. `None` if the signature line is missing or the
     /// grid has no cells.
+    ///
+    /// Name sources, in order:
+    /// 1. a `LEVELNAMES` … `LEVELNAMESEND` block (quoted CSV rows);
+    /// 2. otherwise, bare level-file lines (terrain generator form: one name
+    ///    per cell, row-major, outside any keyword block);
+    /// 3. otherwise, rebuild from `GENERATED` when it names the bottom-right
+    ///    level (dungeon short form);
+    /// 4. otherwise, a declared `WIDTH`×`HEIGHT` of empty holes.
     pub fn parse(text: &str) -> Option<Self> {
         let mut lines = text.lines().map(|l| l.trim_end_matches('\r'));
         if lines.by_ref().find(|l| !l.trim().is_empty())?.trim() != "GRMAP001" {
@@ -351,6 +446,8 @@ impl Gmap {
         let mut g = Gmap::default();
         let (mut declared_w, mut declared_h) = (None, None);
         let mut rows: Vec<Vec<String>> = Vec::new();
+        let mut had_levelnames = false;
+        let mut bare_names: Vec<String> = Vec::new();
         while let Some(line) = lines.next() {
             let mut words = line.split_whitespace();
             let Some(key) = words.next() else { continue };
@@ -361,7 +458,9 @@ impl Gmap {
                 "MINIMAPIMG" => g.minimap_img = words.next().map(str::to_string),
                 "NOAUTOMAPPING" => g.no_auto_mapping = true,
                 "LOADFULLMAP" => g.load_full_map = true,
+                "GENERATED" => g.generated = words.next().map(str::to_string),
                 "LEVELNAMES" => {
+                    had_levelnames = true;
                     for row in lines.by_ref() {
                         if row.trim() == "LEVELNAMESEND" {
                             break;
@@ -380,19 +479,53 @@ impl Gmap {
                             .extend(split_row(row).into_iter().filter(|n| !n.is_empty()));
                     }
                 }
+                // Generator tuning blocks: skip so their contents are never
+                // mistaken for bare level names.
+                "HEIGHTMAP" => skip_block(&mut lines, "HEIGHTMAPEND"),
+                "RANDOMSEEDS" => skip_block(&mut lines, "RANDOMSEEDSEND"),
+                "HEIGHTS" => skip_block(&mut lines, "HEIGHTSEND"),
+                // Other generator keys (`GENSEED`, …): one line, ignored.
+                "GENSEED" | "GENBASE" | "GENEVENBORDERS" | "GENHEIGHT" | "GENCHAOS"
+                | "LEVHEIGHT" | "LEVCHAOS" => {}
+                _ if words.next().is_none() && looks_like_level_name(key) => {
+                    bare_names.push(key.to_string());
+                }
                 _ => {}
             }
         }
-        // The declared size wins; without one, the rows decide.
-        g.width = declared_w.unwrap_or_else(|| rows.iter().map(Vec::len).max().unwrap_or(0));
-        g.height = declared_h.unwrap_or(rows.len());
+        // The declared size wins; without one, the rows or bare list decide.
+        g.width = declared_w.unwrap_or_else(|| {
+            rows.iter()
+                .map(Vec::len)
+                .max()
+                .unwrap_or_else(|| bare_names.len().max(1))
+        });
+        g.height = declared_h.unwrap_or_else(|| {
+            if !rows.is_empty() {
+                rows.len()
+            } else if !bare_names.is_empty() && g.width > 0 {
+                bare_names.len().div_ceil(g.width)
+            } else {
+                0
+            }
+        });
         if g.width == 0 || g.height == 0 || g.width > 255 || g.height > 255 {
             return None;
         }
         g.names = vec![String::new(); g.width * g.height];
-        for (y, row) in rows.iter().take(g.height).enumerate() {
-            for (x, name) in row.iter().take(g.width).enumerate() {
-                g.names[y * g.width + x] = name.clone();
+        if had_levelnames || !rows.is_empty() {
+            for (y, row) in rows.iter().take(g.height).enumerate() {
+                for (x, name) in row.iter().take(g.width).enumerate() {
+                    g.names[y * g.width + x] = name.clone();
+                }
+            }
+        } else if !bare_names.is_empty() {
+            for (i, name) in bare_names.into_iter().take(g.width * g.height).enumerate() {
+                g.names[i] = name;
+            }
+        } else if let Some(generated) = g.generated.as_deref() {
+            if let Some(names) = names_from_generated(generated, g.width, g.height) {
+                g.names = names;
             }
         }
         Some(g)
@@ -1107,6 +1240,84 @@ mod tests {
         );
         assert!(Gmap::parse("GRMAP001\n").is_none());
         assert!(Gmap::parse("").is_none());
+    }
+
+    /// Terrain generator form: no `LEVELNAMES` block; one level file name
+    /// per cell as a bare line (row-major), with generator blocks skipped.
+    #[test]
+    fn terrain_form_reads_bare_level_names() {
+        let t = "\
+GRMAP001
+WIDTH 2
+HEIGHT 2
+GENERATED 1
+GENSEED 7
+GENBASE 0
+GENEVENBORDERS 0
+GENHEIGHT 64
+GENCHAOS 0.5
+LEVHEIGHT 64
+LEVCHAOS 0.5
+MAPIMG world.png
+worldA00.nw
+worldB00.nw
+worldA01.nw
+worldB01.nw
+HEIGHTMAP
+0 0 0
+0 1 0
+0 0 0
+HEIGHTMAPEND
+RANDOMSEEDS
+1
+2
+3
+4
+RANDOMSEEDSEND
+";
+        let g = Gmap::parse(t).unwrap();
+        assert_eq!(g.generated.as_deref(), Some("1"));
+        assert_eq!(g.map_img.as_deref(), Some("world.png"));
+        assert_eq!(g.level_at(0, 0), Some("worldA00.nw"));
+        assert_eq!(g.level_at(1, 0), Some("worldB00.nw"));
+        assert_eq!(g.level_at(0, 1), Some("worldA01.nw"));
+        assert_eq!(g.level_at(1, 1), Some("worldB01.nw"));
+        assert_eq!(g.cell_of("WORLDB01.NW"), Some((1, 1)));
+    }
+
+    /// Dungeon short form: `GENERATED` names the bottom-right level and
+    /// there is no name list; the grid is rebuilt from that name.
+    #[test]
+    fn dungeon_form_rebuilds_names_from_generated() {
+        let t = "GRMAP001\nWIDTH 3\nHEIGHT 2\nGENERATED cave_C2.nw\n";
+        let g = Gmap::parse(t).unwrap();
+        assert_eq!(g.generated.as_deref(), Some("cave_C2.nw"));
+        assert_eq!(g.level_at(0, 0), Some("cave_A1.nw"));
+        assert_eq!(g.level_at(1, 0), Some("cave_B1.nw"));
+        assert_eq!(g.level_at(2, 0), Some("cave_C1.nw"));
+        assert_eq!(g.level_at(0, 1), Some("cave_A2.nw"));
+        assert_eq!(g.level_at(2, 1), Some("cave_C2.nw"));
+        // A flag-only GENERATED with no names stays a hole grid.
+        let holes = Gmap::parse("GRMAP001\nWIDTH 2\nHEIGHT 2\nGENERATED 1\n").unwrap();
+        assert!(holes.names.iter().all(|n| n.is_empty()));
+        // Wrong bottom-right for the declared size: leave holes.
+        let bad = Gmap::parse("GRMAP001\nWIDTH 2\nHEIGHT 2\nGENERATED cave_A1.nw\n").unwrap();
+        assert!(bad.names.iter().all(|n| n.is_empty()));
+    }
+
+    #[test]
+    fn levelnames_block_wins_over_bare_names() {
+        let t = "\
+GRMAP001
+WIDTH 1
+HEIGHT 1
+LEVELNAMES
+\"listed.nw\"
+LEVELNAMESEND
+ignored.nw
+";
+        let g = Gmap::parse(t).unwrap();
+        assert_eq!(g.level_at(0, 0), Some("listed.nw"));
     }
 
     #[test]
