@@ -11,7 +11,7 @@ seihai-listserver, seihai-npcserver, seihai-rc, seihai-servertools) builds on
 one tag and the protocol, assets, GS1 and GS2 layers cover the builds those
 consumers play.
 
-- [ ] One seihai-core in every lock file, and gserver's temporary Cargo patch removed (#79).
+- [x] One seihai-core in every lock file, and gserver's temporary Cargo patch removed (#79). Done: seihai-rc#61, seihai-gserver#151, seihai-servertools#95; suite check 2026-11-16.
 - [ ] GS1 to GS2 lowering, the remaining slices (#6).
 - [ ] GS2 VM coverage for the Mac 4.04r2 and 5.12 VMs and the 7.x client (#7, item 4).
 - [ ] `.code` files for 1.x (#63).
