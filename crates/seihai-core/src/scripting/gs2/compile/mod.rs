@@ -34,7 +34,10 @@ mod lexer;
 mod parser;
 mod tables;
 
-pub use tables::{gs1_command_lowering, gs1_commands_without_gs2, gs2_event_function, Gs1Lowering};
+pub use tables::{
+    gs1_command_lowering, gs1_commands_without_gs2, gs1_gap_priorities, gs2_event_function,
+    Gs1GapPriority, Gs1Lowering,
+};
 
 use super::Script;
 use crate::scripting::engine::{vocab, Era};
