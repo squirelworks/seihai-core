@@ -147,6 +147,7 @@ fn statement_lowering(name: &str) -> Option<&'static str> {
         }
         "tokenize" | "tokenize2" => "`tokens = text.tokenize(seps)`",
         "setcharprop" => "an assignment to the NPC's own property (`this.nick`, `this.colors[i]`, ...)",
+        "setbody" => "`player.bodyimg = file` (same as `setplayerprop #8`; GS2 has `sethead` only)",
         // NoExec on 2.05: the classic client accepts the call and does
         // nothing, so GS2 omits it. Names that sit in
         // `GS2_CLIENT_COMMANDS` (`setfocus`, `resetfocus`,
@@ -419,8 +420,6 @@ pub(super) fn command_hint(name: &str) -> &'static str {
         "putbomb" => " (no 3.153 GS2 command; explodebomb is not a put)",
         "puthorse" => " (no 3.153 GS2 command; takehorse removes a horse by index)",
         "putnpc" | "putnpc2" => " (no 3.153 GS2 command; NPC spawn is GS1-only here)",
-        "setbackpal" => " (removed from GS1 tables at 3.04; not in 3.153 GS2)",
-        "setbody" => " (removed from GS1 tables at 3.04; GS2 keeps sethead only)",
         "shoot" => " (no 3.153 GS2 command; use shootarrow / setshootparams forms)",
         "timershow" => " (no 3.153 GS2 command; timereverywhere is the shared form)",
         "savelog2" | "sendpm" | "setpm" | "sendtonc" => {

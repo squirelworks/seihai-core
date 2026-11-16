@@ -1793,6 +1793,17 @@ impl EffectHost {
                     value: p.chat.clone(),
                 }
             }
+            // Looks codes from `setplayerprop` / `setbody` / `sethead`
+            // lowering (`#3` head, `#8` body). Same effects the GS1
+            // `sethead` / `setbody` commands produce on the offline host.
+            "headimg" => Effect::SetPlayerProp {
+                code: "#3".into(),
+                value: value.text(),
+            },
+            "bodyimg" => Effect::SetPlayerProp {
+                code: "#8".into(),
+                value: value.text(),
+            },
             "x" => {
                 p.x = value.num();
                 var("playerx")

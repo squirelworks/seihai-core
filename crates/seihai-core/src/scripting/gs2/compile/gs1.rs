@@ -648,9 +648,8 @@ fn stmt_calls(s: &g::Stmt, gs1: bool) -> bool {
 /// list and `tokenize` forms are method calls, which do.
 fn command_is_call(name: &str, args: &[g::Arg], gs1: bool) -> bool {
     match name {
-        // Lowered to an assignment to a `client.` (or `this.`) variable.
-        "setstring" | "set" | "unset" => false,
-        "setcharprop" => false,
+        // Lowered to an assignment to a `client.` / `this.` / `player.` var.
+        "setstring" | "set" | "unset" | "setcharprop" | "setbody" => false,
         "setplayerprop" => !matches!(
             args.first(),
             Some(g::Arg::Text(t)) if {
@@ -1722,6 +1721,10 @@ impl Lower {
     ///   which `#t(i)` then reads as `tokens[i]`.
     /// - `setcharprop code,value`: the NPC's own property (see
     ///   [`char_prop`]) as `this.<prop> = value`.
+    /// - `setbody file`: `player.bodyimg = file`, the same assignment
+    ///   `setplayerprop #8` lowers to. GS2 has `sethead` but no `setbody`
+    ///   (removed from GS1 tables at 3.04); the body image is the `#8`
+    ///   player property.
     fn string_command(&mut self, name: &str, args: &[g::Arg]) -> Option<Stmt> {
         let text_name = |a: Option<&g::Arg>| match a {
             Some(g::Arg::Text(t)) => {
@@ -1865,6 +1868,15 @@ impl Lower {
                 let value = raw_value(args.get(1));
                 Stmt::Assign {
                     target,
+                    op: AssignOp::Set,
+                    value: self.expr(&value),
+                }
+            }
+            // `setbody file`: same as `setplayerprop #8,file` → `player.bodyimg`.
+            "setbody" => {
+                let value = raw_value(args.first());
+                Stmt::Assign {
+                    target: Var::plain("player.bodyimg"),
                     op: AssignOp::Set,
                     value: self.expr(&value),
                 }

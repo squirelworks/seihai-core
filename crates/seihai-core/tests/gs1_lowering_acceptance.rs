@@ -154,6 +154,26 @@ fn player_properties_lower_to_the_player_object() {
 }
 
 #[test]
+fn setbody_lowers_to_player_bodyimg_effect() {
+    // `setbody` is gone from the C++ GS1 table; GS2 keeps `sethead` only.
+    // Lowering matches `setplayerprop #8` → `player.bodyimg`.
+    let s = same(
+        "if (created) { setbody body13.png; setplayerprop #3,head5.png; }\n",
+        "function onCreated() {\n  player.bodyimg = \"body13.png\";\n  player.headimg = \"head5.png\";\n}\n",
+    );
+    let (mut m, mut host) = created(s);
+    assert!(host.effects.iter().any(|e| matches!(
+        e,
+        Effect::SetPlayerProp { code, value } if code == "#8" && value == "body13.png"
+    )));
+    assert!(host.effects.iter().any(|e| matches!(
+        e,
+        Effect::SetPlayerProp { code, value } if code == "#3" && value == "head5.png"
+    )));
+    let _ = (&mut m, &mut host);
+}
+
+#[test]
 fn counts_and_old_command_names_lower() {
     same(
         "if (created) {\n  tokenize a b c;\n  this.n = tokenscount;\n  setgif door.png;\n  setgifpart door.png,0,0,32,32;\n}\n",
@@ -212,7 +232,11 @@ fn every_gs1_command_says_how_it_lowers() {
         gs1_command_lowering("putnpc"),
         Some(Gs1Lowering::Missing { inert: false })
     );
-    assert!(missing.len() >= 25, "{missing:?}");
+    assert!(matches!(
+        gs1_command_lowering("setbody"),
+        Some(Gs1Lowering::Statements(_))
+    ));
+    assert!(missing.len() >= 20, "{missing:?}");
     assert_eq!(gs1_command_lowering("notacommand"), None);
 }
 
