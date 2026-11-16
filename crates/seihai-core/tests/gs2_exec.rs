@@ -509,3 +509,56 @@ fn player_props_read_the_snapshot_and_writes_are_player_effects() {
         ]
     );
 }
+
+/// Handler lookup folds ASCII case: a script that spells `onTimeOut` still
+/// receives the timer fire that looks up `onTimeout` (#92).
+#[test]
+fn timeout_dispatch_matches_ontimeout_spelling() {
+    use seihai_core::scripting::gs2::compile;
+    let script = compile::compile_gs2(
+        "function onCreated() { setTimer(0.05); }\n\
+         function onTimeOut() { this.fired += 1; }\n",
+    )
+    .unwrap();
+    let mut m = Machine::new(script);
+    let mut h = host();
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    assert_eq!(m.timeout(), 0.05);
+    let ran: Vec<String> = m.tick(&mut h).into_iter().map(|(e, _)| e).collect();
+    assert_eq!(ran, ["onTimeout"]);
+    assert_eq!(m.var(Root::This, "fired"), Some(&Val::Num(1.0)));
+    // Direct dispatch with the canonical casing also finds the handler.
+    assert_eq!(m.call_event("onTimeout", &[], &mut h), Outcome::Done);
+    assert_eq!(m.var(Root::This, "fired"), Some(&Val::Num(2.0)));
+}
+
+/// Scheduled dispatch and cancel fold ASCII case the same way: a queued
+/// `pInG` finds `onPing`, and `cancelEvents("drop")` drops `Drop`.
+#[test]
+fn scheduled_event_name_folds_case() {
+    use seihai_core::scripting::gs2::compile;
+    let script = compile::compile_gs2(
+        "function onCreated() {\n\
+           scheduleEvent(0.05, \"pInG\");\n\
+           scheduleEvent(0.10, \"Drop\");\n\
+           cancelEvents(\"drop\");\n\
+         }\n\
+         function onPing() { this.ping += 1; }\n\
+         function onDrop() { this.drop += 1; }\n",
+    )
+    .unwrap();
+    let mut m = Machine::new(script);
+    let mut h = host();
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    let mut ran = Vec::new();
+    for _ in 1..=3 {
+        for (event, out) in m.tick(&mut h) {
+            assert_eq!(out, Outcome::Done, "{event}");
+            ran.push(event);
+        }
+    }
+    // Tick reports the lookup spelling (`on` + queued name); the handler ran.
+    assert_eq!(ran, ["onpInG"]);
+    assert_eq!(m.var(Root::This, "ping"), Some(&Val::Num(1.0)));
+    assert_eq!(m.var(Root::This, "drop"), None);
+}
