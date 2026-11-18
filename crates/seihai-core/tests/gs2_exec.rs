@@ -598,3 +598,31 @@ fn an_object_in_a_variable_or_parameter_is_still_the_object() {
     assert_eq!(m.var(Root::This, "got"), Some(&Val::from("Squirrel")));
     assert_eq!(m.var(Root::This, "param"), Some(&Val::from("Squirrel")));
 }
+
+/// A host property can be a list: `temp.p = player.position; temp.p[1]`.
+#[test]
+fn a_host_property_can_be_a_list() {
+    use seihai_core::scripting::gs2::compile::compile_gs2;
+    use seihai_core::scripting::gs2::exec::Host;
+    use seihai_core::scripting::gs2::lists::Value;
+    struct ListHost(Vec<String>);
+    impl Host for ListHost {
+        fn command(&mut self, _: &str, _: &[Val]) -> Option<Val> {
+            None
+        }
+        fn get_prop_value(&mut self, root: Root, name: &str) -> Option<Value> {
+            (root == Root::Player && name == "position")
+                .then(|| Value::List([0.0, -6.0, 1.0].map(|n| Value::Val(Val::Num(n))).to_vec()))
+        }
+        fn log(&mut self, line: String) {
+            self.0.push(line);
+        }
+    }
+    let src = "function onCreated() {\n  temp.p = player.position;\n  this.y = temp.p[1];\n  this.n = player.position.size();\n}\n";
+    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let mut h = ListHost(Vec::new());
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    assert_eq!(m.var(Root::This, "y"), Some(&Val::Num(-6.0)));
+    assert_eq!(m.var(Root::This, "n"), Some(&Val::Num(3.0)));
+    assert!(h.0.is_empty(), "{:?}", h.0);
+}

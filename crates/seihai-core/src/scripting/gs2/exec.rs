@@ -88,6 +88,12 @@ pub trait Host {
     fn get_prop(&mut self, _root: Root, _name: &str) -> Option<Val> {
         None
     }
+    /// A built-in property as a full value, for a property that is a list
+    /// (a 3D object's `position`, read as `p[0]`, `p[1]`, `p[2]`). The
+    /// default is [`Host::get_prop`].
+    fn get_prop_value(&mut self, root: Root, name: &str) -> Option<Value> {
+        self.get_prop(root, name).map(Value::Val)
+    }
     /// Writes a built-in property. `false` if it is not one.
     fn set_prop(&mut self, _root: Root, _name: &str, _value: &Val) -> bool {
         false
@@ -582,8 +588,8 @@ impl Machine {
                 Val::Num(self.loop_limit as f64).into()
             }
             Some(r) => {
-                if let Some(v) = host.get_prop(r, name) {
-                    return v.into();
+                if let Some(v) = host.get_prop_value(r, name) {
+                    return v;
                 }
                 self.vars
                     .get(&(Self::store(r), name.to_string()))
@@ -606,8 +612,8 @@ impl Machine {
                 {
                     return Val::Num(self.loop_limit as f64).into();
                 }
-                if let Some(v) = host.get_prop(this, name) {
-                    return v.into();
+                if let Some(v) = host.get_prop_value(this, name) {
+                    return v;
                 }
                 for r in [Self::store(this), Root::Level, Root::Global] {
                     if let Some(v) = self.vars.get(&(r, name.to_string())) {
