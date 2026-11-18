@@ -184,12 +184,23 @@ pub(super) fn omitted_command(name: &str) -> bool {
 
 pub(super) fn gs2_has_command(name: &str) -> bool {
     GS2_CLIENT_COMMANDS.binary_search(&name).is_ok()
+        || GS2_CORPUS_COMMANDS.contains(&name)
         || matches!(
             name,
             "set" | "unset" | "setlevel" | "setlevel2" | "setplayerprop" | "join"
         )
         || opcode_builtin(name).is_some()
 }
+
+/// GS1 command names that the 3.153 table lacks but that real compiled
+/// GS2 weapon scripts call by name on 4.x to 6.x clients (#93; Graal_analysis
+/// `npc-library/gs2-weapon-corpus-2026-11-14.md`, aggregate counts only):
+/// `shoot` in both the 2007 set (25 weapons, written for 4.20r8/5.00r7) and
+/// the 2018 set (67), `putbomb` in the 2018 set (5). A world would not ship
+/// a client call the client refuses, so the later clients have them **[inf]**.
+/// They keep their GS1 argument order (`putbomb power,x,y`;
+/// `shoot x,y,z,angle,zangle,power,ani,aniparams`).
+const GS2_CORPUS_COMMANDS: &[&str] = &["putbomb", "shoot"];
 
 /// Names registered by the 3.153 client, lower case, sorted.
 /// From `documentation/gs2-shared-commands.md`.
@@ -424,10 +435,10 @@ pub(super) fn command_hint(name: &str) -> &'static str {
         "putexplosion" | "putexplosion2" => {
             " (no 3.153 GS2 command; explodebomb addresses an existing bomb index)"
         }
-        "putbomb" => " (no 3.153 GS2 command; explodebomb is not a put)",
         "puthorse" => " (no 3.153 GS2 command; takehorse removes a horse by index)",
-        "putnpc" | "putnpc2" => " (no 3.153 GS2 command; NPC spawn is GS1-only here)",
-        "shoot" => " (no 3.153 GS2 command; use shootarrow / setshootparams forms)",
+        "putnpc" | "putnpc2" => {
+            " (no 3.153 GS2 command, and no real GS2 client script calls it; NPC spawn is GS1-only here)"
+        }
         // TODO(lab): timershow draws the timeout overlay; timereverywhere is
         // a different permission bit — do not rename until a GS2 form is known.
         "timershow" => " (no 3.153 GS2 command; not the same as timereverywhere)",
@@ -634,6 +645,9 @@ mod tests {
             gs1_command_lowering("putexplosion"),
             Some(Gs1Lowering::Missing { inert: false })
         );
+        // Called by name in real GS2 weapon scripts.
+        assert_eq!(gs1_command_lowering("putbomb"), Some(Gs1Lowering::Same));
+        assert_eq!(gs1_command_lowering("shoot"), Some(Gs1Lowering::Same));
         assert!(matches!(
             gs1_command_lowering("setbody"),
             Some(Gs1Lowering::Statements(_))
