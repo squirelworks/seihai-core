@@ -1,0 +1,13 @@
+if (created) {
+  setimg lamp_glow.png;
+  dontblock;
+}
+//#CLIENTSIDE
+if (playerenters) {
+  setcoloreffect 1,.8,0,0.6;
+  setzoomeffect 2;
+  drawaslight;
+}
+function onCreated() {
+  x += 1;
+}

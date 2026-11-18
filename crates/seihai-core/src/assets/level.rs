@@ -27,6 +27,10 @@ pub fn tile_id(tile: Tile) -> u16 {
     (val(tile[0]) << 6) | val(tile[1])
 }
 
+/// The tile id that marks an empty cell on a layer above 0 (`//` in a
+/// `BOARD` row, and every empty upper cell of a `GR-V1.05` level).
+pub const EMPTY_UPPER_TILE: u16 = 4095;
+
 /// One BOARD line: a horizontal run of tiles.
 #[derive(Debug, Clone)]
 pub struct BoardRun {
@@ -1421,6 +1425,29 @@ impl Level {
             }
         }
         board
+    }
+
+    /// Tile id at `(x, y)` on `layer`, if the layer has a tile there. As on
+    /// layer 0 ([`Self::tile_at`]), the first run that covers the cell wins.
+    /// On layers above 0, [`EMPTY_UPPER_TILE`] (4095, `//` in a `BOARD`
+    /// row) is no tile: editors write blank upper layers out in full with
+    /// it, and `GR-V1.05` stores every empty upper cell as it. So a cell no
+    /// run covers and a cell written as 4095 read the same.
+    pub fn tile_id_on_layer(&self, layer: i32, x: i32, y: i32) -> Option<u16> {
+        let run = self
+            .boards
+            .iter()
+            .find(|r| r.layer == layer && r.y == y && x >= r.x && x < r.x + r.width)?;
+        let id = tile_id(*run.tiles.get((x - run.x) as usize)?);
+        (layer == 0 || id != EMPTY_UPPER_TILE).then_some(id)
+    }
+
+    /// The tile layers the level's `BOARD` rows use, lowest first.
+    pub fn tile_layers(&self) -> Vec<i32> {
+        let mut layers: Vec<i32> = self.boards.iter().map(|r| r.layer).collect();
+        layers.sort_unstable();
+        layers.dedup();
+        layers
     }
 
     /// Tile id at (x, y), if present.

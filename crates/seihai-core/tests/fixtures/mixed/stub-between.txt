@@ -1,0 +1,6 @@
+if (created) dontblock;
+y = y + .5;
+function onCreated() {
+  dontblock;
+  dontblock();
+}

@@ -1,6 +1,6 @@
 //! A level's tile grid, blitted from a `pics1.png`-style sheet.
 
-use seihai_core::assets::{tile_id, Level};
+use seihai_core::assets::Level;
 
 use crate::{blit, CopyMode, Image, PixelBuffer};
 
@@ -50,8 +50,9 @@ pub fn draw_tile(dst: &mut PixelBuffer, sheet: Image<'_>, id: u16, dx: i32, dy: 
 /// [`TILE_PX`] pixels, and only the 64×64 board is drawn. Layers go from
 /// the lowest number to the highest, so a layer 1 tile covers the layer 0
 /// tile under it. On one layer the first `BOARD` run that covers a cell
-/// wins, which is what [`Level::tile_id_at`] answers for layer 0. A cell a
-/// layer does not define is left as it was. A tile that does not fit on
+/// wins, which is what [`Level::tile_id_on_layer`] answers. A cell a
+/// layer does not define is left as it was, and so is a cell above layer 0
+/// that holds the empty marker 4095 (an editor's blank upper layer). A tile that does not fit on
 /// `sheet` is skipped.
 ///
 /// This is the board only. Chest records, the camera and the "dead player
@@ -69,14 +70,12 @@ pub fn draw_level_tiles(
     ) else {
         return;
     };
-    let mut layers: Vec<i32> = level.boards.iter().map(|run| run.layer).collect();
-    layers.sort_unstable();
-    layers.dedup();
+    let layers = level.tile_layers();
     let tile = i64::from(TILE_PX);
     for layer in layers {
         for ty in y0..=y1 {
             for tx in x0..=x1 {
-                let Some(id) = tile_on_layer(level, layer, tx, ty) else {
+                let Some(id) = level.tile_id_on_layer(layer, tx, ty) else {
                     continue;
                 };
                 let dx = i64::from(tx) * tile - i64::from(origin_x);
@@ -97,17 +96,6 @@ pub fn draw_level_tiles(
             }
         }
     }
-}
-
-/// The first run on `layer` that covers `(x, y)`, as a tile id.
-fn tile_on_layer(level: &Level, layer: i32, x: i32, y: i32) -> Option<u16> {
-    for run in &level.boards {
-        if run.layer == layer && run.y == y && x >= run.x && x < run.x + run.width {
-            let idx = (x - run.x) as usize;
-            return run.tiles.get(idx).copied().map(tile_id);
-        }
-    }
-    None
 }
 
 /// Tile columns (or rows) that overlap a span of `span` pixels starting at
@@ -213,6 +201,47 @@ mod tests {
             "tile 16 is off this sheet"
         );
         assert_eq!(buf.pixel(48, 0), Some([1, 2, 3, 4]), "past the runs");
+    }
+
+    #[test]
+    fn the_empty_marker_on_an_upper_layer_paints_nothing() {
+        // An editor saves a blank layer 1 or 2 as full rows of `//` (tile
+        // 4095). Those cells are empty, so the layer-0 tile shows, and a
+        // cell no layer defines keeps the buffer. The sheet is the full
+        // 128×32-tile size, so tile 4095 would fit if it were drawn.
+        let level = Level::parse(
+            "GLEVNW01\n\
+             BOARD 0 0 1 0 AA\n\
+             BOARD 0 0 2 1 ////\n\
+             BOARD 1 0 1 2 //\n\
+             BOARD 2 0 1 1 AA\n",
+        )
+        .unwrap();
+        assert_eq!(level.tile_layers(), [0, 1, 2]);
+        assert_eq!(level.tile_id_on_layer(1, 0, 0), None);
+        assert_eq!(level.tile_id_on_layer(1, 2, 0), Some(0));
+        assert_eq!(level.tile_id_on_layer(0, 0, 0), Some(0));
+        let (w, h) = (128 * TILE_PX, 32 * TILE_PX);
+        let mut px = vec![77u8; (w * h * 3) as usize];
+        for y in 0..TILE_PX {
+            for x in 0..TILE_PX {
+                let i = ((y * w + x) * 3) as usize;
+                px[i..i + 3].copy_from_slice(&[200, 10, 10]);
+            }
+        }
+        let mut buf = PixelBuffer::filled(48, 16, [1, 2, 3, 4]);
+        draw_level_tiles(&mut buf, &level, Image::rgb(&px, w, h), 0, 0);
+        assert_eq!(buf.pixel(0, 0), Some([200, 10, 10, 255]), "layer 0 shows");
+        assert_eq!(
+            buf.pixel(16, 0),
+            Some([1, 2, 3, 4]),
+            "4095 on layers 1 and 2"
+        );
+        assert_eq!(
+            buf.pixel(32, 0),
+            Some([200, 10, 10, 255]),
+            "a real layer-1 tile"
+        );
     }
 
     #[test]
