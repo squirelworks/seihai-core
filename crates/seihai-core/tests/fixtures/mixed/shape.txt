@@ -1,0 +1,8 @@
+if (created) {
+  x += .5;
+}
+//#CLIENTSIDE
+function onCreated() {
+  setshape2(2, 2, { 22, 22,
+                    22, 22, });
+}

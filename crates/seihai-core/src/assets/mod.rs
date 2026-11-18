@@ -36,7 +36,7 @@ pub use level::{
     decode_sign_record, decode_sign_text, graal_code_bits, image_vis_height, new_world_tile_type,
     tile_code, tile_id, Baddy, BoardRun, Chest, DrawLayer, GraalLayout, ImageEffect, Level, Link,
     Npc, NpcImage, Object2x2, ObjectTables, Sign, Tile, TileKind, TileTypes, CHEST_ITEMS,
-    SCREEN_HEIGHT, TYPE_BED_BOTTOM, TYPE_CHAIR, TYPE_THROW_THROUGH, TYPE_WATER,
+    EMPTY_UPPER_TILE, SCREEN_HEIGHT, TYPE_BED_BOTTOM, TYPE_CHAIR, TYPE_THROW_THROUGH, TYPE_WATER,
 };
 pub use level_write::{encode_binary, encode_board, encode_sign_text, BinaryLevel, Written};
 pub use mng::{

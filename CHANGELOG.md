@@ -4,6 +4,10 @@ One line per release. The full notes for each version from 0.0.14 on are
 in [`release-notes/`](release-notes/) and on the GitHub release; the
 versioning rule is in the README.
 
+## 0.5.x
+
+- **0.5.0**: Mixed GS1/GS2 level NPCs run both parts: unmarked scripts lift top-level `if (created)`-style tests, and both front ends fold them into the script's own handler (new `Quirk::Gs1EventTest`). `Level::tile_id_on_layer` treats 4095 as empty on upper layers, and `seihai-draw` no longer paints it.
+
 ## 0.4.x
 
 - **0.4.4**: `Script::write` omits the trailing `0x0A` after the four GS2 segments, matching official bodies; the reader still accepts an older leftover newline.

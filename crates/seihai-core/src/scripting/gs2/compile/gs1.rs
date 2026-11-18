@@ -54,22 +54,13 @@ pub(super) fn program(src: &str, era: Era) -> Result<Program, CompileErrors> {
     }
     let mut flags = Vec::new();
     parsed.body.iter().for_each(|s| player_flags(s, &mut flags));
-    let own_fns: Vec<String> = parsed
-        .body
-        .iter()
-        .filter_map(|s| match s {
-            g::Stmt::Function { name, .. } => Some(name.to_ascii_lowercase()),
-            _ => None,
-        })
-        .collect();
     // The structured lift gives one GS2 function per event. A script it
     // cannot split that way (code between event tests, an event in a
     // larger condition, an event test with `else`, an event flag read
     // inside a block) runs whole, as GS1 runs it, from one dispatcher (see
     // [`dispatch`]).
-    let lowered = |raw: Vec<Raw>, dispatched: bool| {
-        lower_items(raw, dispatched, flags.clone(), &own_fns, era)
-    };
+    let lowered =
+        |raw: Vec<Raw>, dispatched: bool| lower_items(raw, dispatched, flags.clone(), era);
     match lift(parsed.body.clone(), era) {
         Ok(raw) => match lowered(raw, false) {
             Ok(p) => Ok(p),
@@ -83,7 +74,6 @@ fn lower_items(
     raw: Vec<Raw>,
     dispatched: bool,
     flags: Vec<String>,
-    own_fns: &[String],
     era: Era,
 ) -> Result<Program, CompileErrors> {
     let mut lower = Lower {
@@ -104,12 +94,27 @@ fn lower_items(
         with_depth: 0,
         temps: 0,
     };
+    // The items the lift or the dispatcher made, as opposed to the
+    // script's own functions.
+    let lifted: Vec<usize> = raw
+        .iter()
+        .enumerate()
+        .filter_map(|(i, item)| match item {
+            Raw::Function { own: false, .. } => Some(i),
+            _ => None,
+        })
+        .collect();
     let items = raw
         .into_iter()
         .map(|item| match item {
-            Raw::Function { name, params, body } => {
+            Raw::Function {
+                name,
+                params,
+                body,
+                own,
+            } => {
                 lower.event_param = dispatched && name == DISPATCH;
-                lower.run_body = !own_fns.contains(&name.to_ascii_lowercase());
+                lower.run_body = !own;
                 let lowered = lower.stmts(&body);
                 lower.event_param = false;
                 lower.run_body = false;
@@ -128,11 +133,13 @@ fn lower_items(
             errors: lower.errors,
         });
     }
-    Ok(Program {
+    let mut program = Program {
         items,
         lambdas: Vec::new(),
         later_wins: false,
-    })
+    };
+    super::mixed::merge_event_functions(&mut program, &lifted);
+    Ok(program)
 }
 
 /// Lower one GS1 command written inside a GS2 script.
@@ -188,6 +195,9 @@ enum Raw {
         name: String,
         params: Vec<String>,
         body: Vec<g::Stmt>,
+        /// Written in the script, as opposed to made by the lift or the
+        /// dispatcher.
+        own: bool,
     },
     Code(Vec<g::Stmt>),
 }
@@ -208,9 +218,12 @@ fn lift(body: Vec<g::Stmt>, era: Era) -> Result<Vec<Raw>, CompileErrors> {
     };
     for stmt in body {
         match stmt {
-            g::Stmt::Function { name, params, body } => {
-                items.push(Raw::Function { name, params, body })
-            }
+            g::Stmt::Function { name, params, body } => items.push(Raw::Function {
+                name,
+                params,
+                body,
+                own: true,
+            }),
             g::Stmt::If { cond, then, els } => match event_arms(&cond, era) {
                 Arms::NotEvent => {
                     let stmt = g::Stmt::If { cond, then, els };
@@ -266,6 +279,7 @@ fn lift(body: Vec<g::Stmt>, era: Era) -> Result<Vec<Raw>, CompileErrors> {
                                     name,
                                     params: Vec::new(),
                                     body,
+                                    own: false,
                                 });
                             }
                         }
@@ -318,7 +332,12 @@ fn dispatch(body: Vec<g::Stmt>, era: Era) -> Vec<Raw> {
         match st {
             g::Stmt::Function { name, params, body } => {
                 own.push(name.clone());
-                items.push(Raw::Function { name, params, body })
+                items.push(Raw::Function {
+                    name,
+                    params,
+                    body,
+                    own: true,
+                })
             }
             other => code.push(other),
         }
@@ -338,12 +357,14 @@ fn dispatch(body: Vec<g::Stmt>, era: Era) -> Vec<Raw> {
                 args: vec![g::Expr::Str(ev.clone())],
                 line: 0,
             }],
+            own: false,
         });
     }
     items.push(Raw::Function {
         name: DISPATCH.into(),
         params: vec![DISPATCH_PARAM.into()],
         body: code,
+        own: false,
     });
     items
 }

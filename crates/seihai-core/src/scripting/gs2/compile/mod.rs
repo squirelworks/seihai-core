@@ -24,6 +24,18 @@
 //! Only legacy mode guesses the language of a script that does not say
 //! ([`Language::Detect`]).
 //!
+//! # Mixed GS1 and GS2
+//!
+//! Many 2.x/3.x-era level NPCs hold a GS1 event test and a GS2 event
+//! function for the same event (`if (created) dontblock;` next to
+//! `function onCreated() { … }`). Both are event code, and both run, the
+//! GS1 part first: each front end folds the GS1 code into the script's own
+//! handler, matched without regard to case or `public.`. An unmarked
+//! script ([`Language::Detect`]) read as GS2 lifts its top-level GS1 event
+//! tests for this ([`Quirk::Gs1EventTest`]); a script marked GS2 keeps
+//! them as variable tests, as gs2-parser does. This is Seihai's reading;
+//! no original client run has confirmed it yet.
+//!
 //! GS2-to-GS1 and server-side GS2 are out of scope. A construct the
 //! compiler cannot lower is an error in both modes.
 
@@ -31,6 +43,7 @@ mod ast;
 mod codegen;
 mod gs1;
 mod lexer;
+mod mixed;
 mod parser;
 mod tables;
 
@@ -62,9 +75,11 @@ pub enum Language {
     /// Not marked, as a server holding both GS1 and GS2 scripts would see
     /// it (legacy mode only). A script with no `function` that tests a GS1
     /// event (`if (playerenters)`) is GS1; any other is GS2, and falls back
-    /// to GS1 when only the GS1 front end takes it. This is Seihai's
-    /// reading: how the live servers chose is not recorded. The era is the
-    /// one the GS1 front end reads.
+    /// to GS1 when only the GS1 front end takes it. Read as GS2, a
+    /// top-level GS1 event test still runs on its event, beside the
+    /// script's own handler for it (see "Mixed GS1 and GS2" in the
+    /// module docs). This is Seihai's reading: how the live servers chose
+    /// is not recorded. The era is the one the GS1 front end reads.
     Detect(Era),
 }
 
@@ -119,6 +134,11 @@ pub enum Quirk {
     Gs1Command(String),
     /// A GS1 message code (`#a`, `#v(x)`) used as a GS2 value.
     Gs1MessageCode,
+    /// A top-level GS1 event test (`if (created) …`) in an unmarked script
+    /// read as GS2, taken as code for that event (see "Mixed GS1 and GS2"
+    /// in the module docs). Holds
+    /// the event. A script marked GS2 keeps it as a variable test.
+    Gs1EventTest(String),
     /// GS1's `in <a, b>` for `in |a, b|`.
     Gs1Range,
     /// `global enum`.
@@ -196,6 +216,11 @@ impl fmt::Display for Quirk {
             }
             Quirk::Gs1Command(name) => write!(f, "GS1 command line `{name}` in a GS2 script"),
             Quirk::Gs1MessageCode => write!(f, "GS1 message code used as a GS2 value"),
+            Quirk::Gs1EventTest(event) => write!(
+                f,
+                "GS1 event test `if ({event})` in a script read as GS2; run as `{}`",
+                gs2_event_function(event)
+            ),
             Quirk::Gs1Range => write!(f, "GS1 range `in <a, b>`; write `in |a, b|`"),
             Quirk::GlobalEnum => write!(f, "`global enum`"),
             Quirk::EnumText => write!(f, "`enum` member with a text value"),
@@ -285,7 +310,7 @@ pub struct Compiled {
 pub fn compile(src: &str, language: Language, mode: Mode) -> Result<Compiled, CompileErrors> {
     match language {
         Language::Gs1(era) => gs1_script(src, era, mode),
-        Language::Gs2 => gs2_script(src, mode),
+        Language::Gs2 => gs2_script(src, mode, false),
         Language::Detect(era) => detect(src, era, mode),
     }
 }
@@ -330,12 +355,20 @@ fn gs1_script(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors
     }
 }
 
-fn gs2_script(src: &str, mode: Mode) -> Result<Compiled, CompileErrors> {
+/// `lift_events`: read top-level GS1 event tests as event code (only for
+/// an unmarked script, see [`mixed`]). A script marked GS2 keeps them as
+/// variable tests, as gs2-parser does (issue 32).
+fn gs2_script(src: &str, mode: Mode, lift_events: bool) -> Result<Compiled, CompileErrors> {
     let parser::Parsed {
         mut program,
         spellings,
         mut quirks,
     } = parser::parse(src)?;
+    if lift_events {
+        let (lifted, lift_warnings) = mixed::lift_event_tests(&mut program);
+        mixed::merge_event_functions(&mut program, &lifted);
+        quirks.extend(lift_warnings.into_iter().map(|w| (w.line, w.quirk)));
+    }
     quirks.extend(
         codegen::replaced_functions(&program)
             .into_iter()
@@ -392,7 +425,7 @@ fn detect(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors> {
             return Ok(guessed(c));
         }
     }
-    match gs2_script(src, Mode::Legacy) {
+    match gs2_script(src, Mode::Legacy, true) {
         Ok(c) => Ok(guessed(c)),
         Err(gs2) => gs1_script(src, era, mode).map(guessed).map_err(|gs1| {
             // Both fronts failed: report both, the likelier one first.
