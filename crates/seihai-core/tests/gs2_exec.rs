@@ -562,3 +562,39 @@ fn scheduled_event_name_folds_case() {
     assert_eq!(m.var(Root::This, "ping"), Some(&Val::Num(1.0)));
     assert_eq!(m.var(Root::This, "drop"), None);
 }
+
+/// An object kept in a variable or passed as a parameter is still that
+/// object: `this.me = player; this.me.chat = …` writes the player, and an
+/// object compares unequal to null (Seihai #458: a real 5.12 walks its 3D
+/// player through a variable that holds `player`).
+#[test]
+fn an_object_in_a_variable_or_parameter_is_still_the_object() {
+    use seihai_core::scripting::gs2::compile::compile_gs2;
+    let src = "function onCreated() {\n\
+                 this.me = NULL;\n\
+                 this.wasnull = (this.me == NULL);\n\
+                 this.me = player;\n\
+                 this.isnull = (this.me == NULL);\n\
+                 this.same = (this.me == player);\n\
+                 this.me.chat = \"via variable\";\n\
+                 this.got = this.me.nick;\n\
+                 tell(player);\n\
+               }\n\
+               function tell(o) {\n\
+                 this.param = o.nick;\n\
+               }\n";
+    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let mut h = EffectHost::new(
+        Era::for_version(seihai_core::protocol::ClientVersion::V600R2),
+        7,
+    );
+    h.player.nick = "Squirrel".into();
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    assert!(h.log.is_empty(), "{:?}", h.log);
+    assert_eq!(m.var(Root::This, "wasnull"), Some(&Val::Num(1.0)));
+    assert_eq!(m.var(Root::This, "isnull"), Some(&Val::Num(0.0)));
+    assert_eq!(m.var(Root::This, "same"), Some(&Val::Num(1.0)));
+    assert_eq!(h.player.chat, "via variable");
+    assert_eq!(m.var(Root::This, "got"), Some(&Val::from("Squirrel")));
+    assert_eq!(m.var(Root::This, "param"), Some(&Val::from("Squirrel")));
+}
