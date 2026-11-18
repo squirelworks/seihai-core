@@ -81,14 +81,17 @@ impl Bytecode {
         let num_str = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
         pos += 4;
 
-        let mut string_constants = Vec::with_capacity(num_str);
+        // A count is only a promise: each entry needs at least four more
+        // bytes, so never reserve more than the rest of the input can hold
+        // (an 8-byte input once asked for 19 GB here, #80).
+        let mut string_constants = Vec::with_capacity(num_str.min((data.len() - pos) / 4));
         for _ in 0..num_str {
             if pos + 4 > data.len() {
                 return Err("truncated string table".into());
             }
             let len = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
             pos += 4;
-            if pos + len > data.len() {
+            if len > data.len() - pos {
                 return Err("truncated string".into());
             }
             let s = String::from_utf8_lossy(&data[pos..pos + len]).into_owned();
@@ -102,7 +105,7 @@ impl Bytecode {
         let num_num = u32::from_le_bytes(data[pos..pos + 4].try_into().unwrap()) as usize;
         pos += 4;
 
-        let mut number_constants = Vec::with_capacity(num_num);
+        let mut number_constants = Vec::with_capacity(num_num.min((data.len() - pos) / 4));
         for _ in 0..num_num {
             if pos + 4 > data.len() {
                 return Err("truncated number".into());
@@ -451,6 +454,27 @@ impl Opcode {
 #[cfg(test)]
 mod vm_tests {
     use super::*;
+
+    /// A string count far past the input used to be reserved up front: the
+    /// 8-byte input below asked for about 19 GB and aborted the process
+    /// (a local mutational run of the `gs2_bytecode` fuzz entry, #80). It
+    /// is now a plain "truncated" error.
+    #[test]
+    fn a_huge_count_is_not_reserved() {
+        let data = [0x01, 0x00, 0x00, 0x00, 0xe8, 0x00, 0x2a, 0x2f];
+        assert_eq!(
+            Bytecode::parse(&data).unwrap_err(),
+            "truncated string table"
+        );
+        let mut nums = 8u32.to_le_bytes().to_vec();
+        nums.extend(0u32.to_le_bytes());
+        nums.extend(u32::MAX.to_le_bytes());
+        assert_eq!(Bytecode::parse(&nums).unwrap_err(), "truncated number");
+        let mut long = 0u32.to_le_bytes().to_vec();
+        long.extend(1u32.to_le_bytes());
+        long.extend(u32::MAX.to_le_bytes());
+        assert_eq!(Bytecode::parse(&long).unwrap_err(), "truncated string");
+    }
 
     #[test]
     fn add_two_numbers() {

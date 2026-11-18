@@ -403,15 +403,18 @@ fn names_from_generated(generated: &str, width: usize, height: usize) -> Option<
         Some(i) => (&name[..i], &name[i..]),
         None => (name, ".nw"),
     };
+    // Byte offsets just past the last non-digit and the last non-letter:
+    // that character may be more than one byte (fuzz crasher, #80).
+    let after = |s: &str, i: usize| i + s[i..].chars().next().map_or(0, char::len_utf8);
     let digit_at = stem.rfind(|c: char| !c.is_ascii_digit())?;
-    let (before_row, row_text) = stem.split_at(digit_at + 1);
+    let (before_row, row_text) = stem.split_at(after(stem, digit_at));
     if row_text.is_empty() {
         return None;
     }
     let row: usize = row_text.parse().ok()?;
     let letter_at = before_row
         .rfind(|c: char| !c.is_ascii_alphabetic())
-        .map(|i| i + 1)
+        .map(|i| after(before_row, i))
         .unwrap_or(0);
     let (prefix, col_text) = before_row.split_at(letter_at);
     let col = parse_column_letters(col_text)?;
@@ -1066,6 +1069,22 @@ pub fn sync_world(
 
 #[cfg(test)]
 mod tests {
+    /// A `GENERATED` name whose last non-digit (or last non-letter) is a
+    /// multi-byte character used to split inside it and panic: the weekly
+    /// fuzz run's `gmap` crasher (2026-11-16, #80). It now reads as a
+    /// gmap with no derived names.
+    #[test]
+    fn generated_names_with_multibyte_characters_do_not_panic() {
+        for generated in ["a\u{e9}2", "\u{e9}b2", "x\u{57e}AB12.nw", "\u{e9}"] {
+            let text = format!("GRMAP001\nWIDTH 2\nHEIGHT 12\nGENERATED {generated}\n");
+            let g = super::Gmap::parse(&text).unwrap();
+            assert_eq!((g.width, g.height), (2, 12), "{generated}");
+        }
+        // A multi-byte prefix before the letters still names the grid.
+        let g = super::Gmap::parse("GRMAP001\nWIDTH 2\nHEIGHT 1\nGENERATED d\u{e9}B1\n").unwrap();
+        assert_eq!(g.names, ["d\u{e9}A1.nw", "d\u{e9}B1.nw"]);
+    }
+
     /// The big-map view loads the eight levels around the player's (bare
     /// grid names get `.nw`), keeps the one left behind, drops the ones no
     /// longer next door, and asks the loader for a missing name once until
