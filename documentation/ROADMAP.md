@@ -36,7 +36,15 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
       `savelog2`, and engine-removed omits (`setbackpal`, `putobject`) now
       lower — spawn/combat puts and `shoot` stay `Missing` pending lab.
 - [ ] GS2 VM coverage for the Mac 4.04r2 and 5.12 VMs and the 7.x client
-      (`documentation/gs2-vm-versions.md`).
+      (`documentation/gs2-vm-versions.md`). The 7.x opcode set is now
+      read (Graal_analysis `protocol/gs2-opcode-table.md`, PR #630):
+      7.12.43 dispatches the same 165 bytes as 5.30r3 to 6.1.1.3, and so
+      do Android Classic 1.8 and 2.2. Its per-opcode semantics are still
+      unread. Two points for the compiler: `waitfor` (11) has no case
+      before 4.20r8, so a script meant for 4.03r3 to 4.11 must not use
+      it; and the Linux x64 6.x VMs also run 0 and a Linux-only 164,
+      which the compiler never needs to emit. Of the Delteria features
+      below, only `waitfor` needs more than the 4.03r3 opcode set.
 - [ ] GS2 seen in the 2019 Delteria backup (Graal_analysis PR #625,
       counts in its note) that compiles but does not run yet. The
       compiler takes every feature the note counts; mixed GS1/GS2 NPCs
