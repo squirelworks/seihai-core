@@ -1276,6 +1276,15 @@ impl<'a> Run<'a> {
                 let (dx, dy) = (nv(&v, 0), nv(&v, 1));
                 // `move` is first in 2.03's table, with all four arguments.
                 let (time, options) = (nv(&v, 2), nv(&v, 3) as i64);
+                // Option 32 (GServer-v2 beta4's blocking mode, not an
+                // original option): the move stops before a wall in the
+                // NPC's box, when the level's walls are known.
+                let (dx, dy) = match &self.core.walls {
+                    Some(walls) if options & MOVE_BLOCKING != 0 => {
+                        clip_move(walls, self.obj, dx, dy)
+                    }
+                    _ => (dx, dy),
+                };
                 self.obj.x += dx;
                 self.obj.y += dy;
                 self.core.effects.push(Effect::Move {
@@ -1434,4 +1443,41 @@ fn timeout_ticks(era: Era, secs: f64) -> Option<u64> {
         return (steps > 0).then_some(steps);
     }
     Some(secs_to_ticks(secs))
+}
+
+/// `move` option 32: block checks in the direction of travel.
+pub(crate) const MOVE_BLOCKING: i64 = 32;
+
+/// The part of a move by (`dx`, `dy`) tiles that `obj`'s box (its shape,
+/// in pixels) can make before it would overlap a wall tile. Checked every
+/// sixteenth of a tile along the path; a box that starts in a wall may
+/// still move out of it. Tiles off the board are not walls here, so a
+/// move off the level is not stopped.
+fn clip_move(walls: &[bool], obj: &ScriptObject, dx: f64, dy: f64) -> (f64, f64) {
+    let (w, h) = (
+        (obj.w_px / 16.0).max(1.0 / 16.0),
+        (obj.h_px / 16.0).max(1.0 / 16.0),
+    );
+    let hits = |x: f64, y: f64| {
+        let (x0, y0) = (x.floor() as i64, y.floor() as i64);
+        let (x1, y1) = ((x + w - 1e-6).floor() as i64, (y + h - 1e-6).floor() as i64);
+        (y0..=y1).any(|ty| {
+            (x0..=x1).any(|tx| {
+                (0..64).contains(&tx)
+                    && (0..64).contains(&ty)
+                    && walls.get((ty * 64 + tx) as usize).copied().unwrap_or(false)
+            })
+        })
+    };
+    let steps = ((dx.abs().max(dy.abs())) * 16.0).ceil().max(1.0) as usize;
+    let started_in = hits(obj.x, obj.y);
+    let mut done = 0.0;
+    for i in 1..=steps.min(64 * 16 * 4) {
+        let t = i as f64 / steps as f64;
+        if !started_in && hits(obj.x + dx * t, obj.y + dy * t) {
+            break;
+        }
+        done = t;
+    }
+    (dx * done, dy * done)
 }
