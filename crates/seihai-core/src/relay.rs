@@ -4,6 +4,9 @@
 //! `client-internals/live-trace-early.md` (qualified original-client captures).
 //! This implements the two rooms, pairing and player/chat subset, not HTTP,
 //! shared combat, item or board synchronization, or every earlier dialect.
+//! It also carries the registration-key check of 15th Graal to 1.1.9
+//! (relay type `8`, the key read from `reg.code`; see
+//! [`crate::graaldes::code_read`] and Graal_analysis `formats/graalsav.md`).
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::{self, Read, Write};
@@ -183,7 +186,7 @@ impl Room {
         }
         Ok(lines)
     }
-    fn push(&mut self, player: &Player, clock: u128) -> io::Result<()> {
+    fn push(&mut self, player: &Player, clock: u128, key: Option<&[u8]>) -> io::Result<()> {
         self.data(b'L', player.level.as_bytes())?;
         self.data(b'P', &position(player.x, player.y, player.sprite))?;
         self.data(b'N', player.nickname.as_bytes())?;
@@ -191,6 +194,9 @@ impl Room {
         colors.extend(player.colors.map(|c| (c & 127) + 32));
         self.data(b'S', &colors)?;
         self.data(b'7', &[])?;
+        if let Some(key) = key {
+            self.data(b'8', key)?;
+        }
         let time: Vec<_> = (0..10)
             .map(|i| ((clock >> (i * 7)) & 127) as u8 + 32)
             .collect();
@@ -217,6 +223,8 @@ pub struct Client {
     clock: u128,
     peers: BTreeMap<u16, Peer>,
     chats: Vec<(u16, String)>,
+    registration: Option<Vec<u8>>,
+    duplicate_registration: bool,
 }
 impl Client {
     pub fn connect(endpoint: &str, player: Player) -> io::Result<Self> {
@@ -239,7 +247,26 @@ impl Client {
                 .as_millis(),
             peers: BTreeMap::new(),
             chats: Vec::new(),
+            registration: None,
+            duplicate_registration: false,
         })
+    }
+    /// The registration key this client shows its peers (relay type `8`,
+    /// sent with the player's state each time a peer joins), as 15th Graal
+    /// to 1.1.9 broadcast the key read from `reg.code`. Set it before
+    /// polling. A key that does not decode (the client's `###`) should not
+    /// be set: when no key is set nothing is sent **[inf]**.
+    pub fn set_registration_key(&mut self, key: &str) -> io::Result<()> {
+        text(key)?;
+        self.registration = Some(key.as_bytes().to_vec());
+        Ok(())
+    }
+    /// True once a peer in the level room has shown the same registration
+    /// key as this client. The original then says "Another player uses the
+    /// same registration key like you. You will be disconnected." and
+    /// leaves; the caller does that.
+    pub fn duplicate_registration(&self) -> bool {
+        self.duplicate_registration
     }
     pub fn peers(&self) -> impl Iterator<Item = &Peer> {
         self.peers.values()
@@ -327,7 +354,7 @@ impl Client {
                                 return Err(io::ErrorKind::InvalidData.into());
                             }
                             room.party.insert(peer);
-                            room.push(&self.player, self.clock)?;
+                            room.push(&self.player, self.clock, self.registration.as_deref())?;
                         }
                     }
                     b'-' => {
@@ -362,6 +389,11 @@ impl Client {
                         match body[2] {
                             b'L' => peer.level = String::from_utf8_lossy(data).into_owned(),
                             b'N' => peer.nickname = String::from_utf8_lossy(data).into_owned(),
+                            b'8' => {
+                                if self.registration.as_deref() == Some(data) {
+                                    self.duplicate_registration = true;
+                                }
+                            }
                             b'C' => {
                                 peer.chat = String::from_utf8_lossy(data).into_owned();
                                 if self.chats.len() >= MAX_PEERS {

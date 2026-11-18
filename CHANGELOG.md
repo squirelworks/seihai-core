@@ -6,7 +6,7 @@ versioning rule is in the README.
 
 ## 0.5.x
 
-- **0.5.1**: GS1 `putbomb` and `shoot` lower to GS2 calls of the same name, as real 4.x–6.x GS2 weapon scripts make them (#93). The release workflow builds and tests on macOS before it publishes (#78).
+- **0.5.1**: GS1 `putbomb` and `shoot` lower to GS2 calls of the same name, as real 4.x–6.x GS2 weapon scripts make them (#93). The 1.1.9 relay client shows a `reg.code` registration key as type `8` and flags a peer with the same key (#63). The release workflow builds and tests on macOS before it publishes (#78).
 - **0.5.0**: Mixed GS1/GS2 level NPCs run both parts: unmarked scripts lift top-level `if (created)`-style tests, and both front ends fold them into the script's own handler (new `Quirk::Gs1EventTest`). `Level::tile_id_on_layer` treats 4095 as empty on upper layers, and `seihai-draw` no longer paints it.
 
 ## 0.4.x

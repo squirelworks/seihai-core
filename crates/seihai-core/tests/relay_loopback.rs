@@ -177,6 +177,11 @@ fn three_clients_pair_full_mesh_exchange_state_rejoin_and_disconnect() {
         std::io::ErrorKind::WouldBlock
     );
     let mut b = Client::connect(&endpoint, player("Beta", 20.0)).unwrap();
+    // Both show the same registration key, as two 1.1.9 installs sharing
+    // one reg.code would (relay type 8).
+    a.set_registration_key("SQRL-ACORN").unwrap();
+    b.set_registration_key("SQRL-ACORN").unwrap();
+    assert!(b.set_registration_key("bad\nkey").is_err());
     fn until(a: &mut Client, b: &mut Client, predicate: impl Fn(&Client, &Client) -> bool) {
         let end = Instant::now() + Duration::from_secs(3);
         loop {
@@ -197,6 +202,14 @@ fn three_clients_pair_full_mesh_exchange_state_rejoin_and_disconnect() {
     });
     let peer = b.peers().next().unwrap();
     assert_eq!((peer.x, peer.y, peer.colors), (12.5, 18.5, [1, 2, 3, 4, 5]));
+    until(&mut a, &mut b, |a, b| {
+        a.duplicate_registration() && b.duplicate_registration()
+    });
+    assert!(captured
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|(i, line)| *i == 1 && line == b"D \x228SQRL-ACORN"));
     {
         let wire = captured.lock().unwrap();
         assert!(wire
@@ -265,6 +278,7 @@ fn three_clients_pair_full_mesh_exchange_state_rejoin_and_disconnect() {
         thread::sleep(Duration::from_millis(2));
     }
     let mut c = Client::connect(&endpoint, player("Charlie", 8.5)).unwrap();
+    c.set_registration_key("OTHER-KEY").unwrap();
     fn until_three(
         a: &mut Client,
         b: &mut Client,
@@ -302,6 +316,8 @@ fn three_clients_pair_full_mesh_exchange_state_rejoin_and_disconnect() {
                 .iter()
                 .any(|(i, line)| *i == 4 && line == b"D \x25NCharlie")
     });
+    // A different key is not a duplicate.
+    assert!(!c.duplicate_registration());
     {
         let wire = captured.lock().unwrap();
         assert!(wire
