@@ -8,7 +8,7 @@
 //!
 //! The backends here are [`NullSound`], which plays nothing, so a client
 //! runs on a box with no sound card and with no sound files, and
-//! [`RodioSound`], the device output, behind the `audio` feature.
+//! `RodioSound`, the device output, behind the `audio` feature.
 //! [`default_backend`] picks the one a client starts with.
 
 mod engine;

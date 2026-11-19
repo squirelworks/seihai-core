@@ -146,7 +146,7 @@ impl Era {
     /// The 1.x to 2.1 script engine, before the 2.17.1 rewrite: a
     /// comparison of two constants is 0, and the message expander drops the
     /// `#` of a code it does not know. Read in 2.05r2 and 1.41 rev 1, and run
-    /// on both [lab]; 2.17.1, 2.22, 2.31 and 3.04 do neither.
+    /// on both \[lab\]; 2.17.1, 2.22, 2.31 and 3.04 do neither.
     pub fn old_engine(self) -> bool {
         self < Era::V217
     }

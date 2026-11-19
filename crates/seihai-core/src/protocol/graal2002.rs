@@ -17,8 +17,8 @@ use crate::scripting::engine::vocab::{command_in, keyword_in, Era, Exec};
 /// FileVersion. This is a receive binding override, not a complete online
 /// profile, a sender contract, or a native execution result.
 /// Source: Graal_analysis by squirelworks (CC BY 4.0), pinned study:
-/// https://github.com/squirelworks/Graal_analysis/blob/bb0a330816e0f71be4df6ca509937be8a5461908/client-internals/graal2002-and-140-builds.md
-/// https://creativecommons.org/licenses/by/4.0/
+/// <https://github.com/squirelworks/Graal_analysis/blob/bb0a330816e0f71be4df6ca509937be8a5461908/client-internals/graal2002-and-140-builds.md>
+/// <https://creativecommons.org/licenses/by/4.0/>
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Graal210ReceiveBuild {

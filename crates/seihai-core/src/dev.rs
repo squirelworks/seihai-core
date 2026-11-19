@@ -7,10 +7,10 @@
 //! Rules:
 //! - Off at every start. It is never saved in settings.
 //! - It switches itself off on a warp, a level change and a disconnect
-//!   (callers use [`DevMode::reset`]), so there is no hidden key to turn
+//!   (callers use `DevMode::reset`), so there is no hidden key to turn
 //!   it off. F9 still toggles it.
 //! - While it is on the screen shows a `DEV MODE` badge.
-//! - With the `dev` cargo feature off, [`DevMode::toggle`] does nothing
+//! - With the `dev` cargo feature off, `DevMode::toggle` does nothing
 //!   and the wallhack code is never reachable.
 
 /// Developer-only switches.

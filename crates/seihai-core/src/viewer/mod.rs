@@ -3,12 +3,12 @@
 //! A command-line tool that reads a capture and prints the decoded messages
 //! with the packet names and field layouts from the repository tables:
 //!
-//! * [`load`] reads a pcap (through the difftest reader and Seihai's own
+//! * `load` reads a pcap (through the difftest reader and Seihai's own
 //!   codecs) or a `seihai-trace v1` file (what `difftest trace` writes);
-//! * [`build_view`] filters the messages, adds the layout and raw bytes where
+//! * `build_view` filters the messages, adds the layout and raw bytes where
 //!   the tables and the decoder leave something undecoded;
-//! * [`layout_report`] shows one packet's layout across the version chain;
-//! * [`render`] prints text, tsv or json.
+//! * `layout_report` shows one packet's layout across the version chain;
+//! * `render` prints text, tsv or json.
 //!
 //! Login frames are always redacted: the password is never decoded, and the
 //! account is masked unless `--no-mask` is given. The raw bytes of a login

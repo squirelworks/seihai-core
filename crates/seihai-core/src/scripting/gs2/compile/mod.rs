@@ -1,12 +1,12 @@
 //! The GS1 and GS2 compiler: script source to the GS2 bytecode described in
 //! `documentation/gs2-opcodes.md` and `documentation/gs2-grammar.md`.
 //!
-//! Two front ends build one syntax tree ([`ast`]), and one code generator
-//! ([`codegen`]) writes the bytecode:
+//! Two front ends build one syntax tree (`ast`), and one code generator
+//! (`codegen`) writes the bytecode:
 //!
-//! - GS2 source goes through [`parser`].
+//! - GS2 source goes through `parser`.
 //! - GS1 source is parsed with the GS1 engine's grammar and lowered by
-//!   [`gs1`]: event tests become event functions, message codes become
+//!   `gs1`: event tests become event functions, message codes become
 //!   joins, GS1 commands become GS2 calls or statements.
 //!
 //! # Strict and legacy

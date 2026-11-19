@@ -116,7 +116,7 @@ pub struct Jump {
     /// Where the player stood when it started.
     pub x0: f32,
     pub y0: f32,
-    /// Ticks shown so far (1 after the start, [`JUMP_TICKS`] on landing).
+    /// Ticks shown so far (1 after the start, `JUMP_TICKS` on landing).
     pub shown: u8,
 }
 
@@ -623,7 +623,7 @@ impl OfflineSession {
         self.note_board_change(ax - 1, ay - 1, 4, 4);
     }
 
-    /// A on a wall: start holding it. The point is [`GRAB_POINT`]; anything
+    /// A on a wall: start holding it. The point is `GRAB_POINT`; anything
     /// that blocks there as a tile can be grabbed. Not while swimming,
     /// carrying, dead or jumping.
     pub fn try_grab(&mut self) -> bool {

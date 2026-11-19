@@ -136,7 +136,7 @@ pub enum ServerMode {
 /// a 3-field payload was ignored entirely (lab, 2026-10-24).
 ///
 /// The text is split by the clients' own comma-text reader (2.17.1, 2.22
-/// and 2.31 share it; see [`delphi_comma_text`]): quotes, doubled quotes,
+/// and 2.31 share it; see `delphi_comma_text`): quotes, doubled quotes,
 /// and white space that ends an unquoted field. A name with a space in it
 /// must therefore be quoted, or it shifts the later fields. The three
 /// clients read the fields the same way; field 1 is kept as the server's

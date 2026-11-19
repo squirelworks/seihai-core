@@ -7,8 +7,8 @@
 //! Do not apply this native ordering to other client builds.
 //!
 //! ID/name facts: Graal_analysis by squirelworks, CC BY 4.0:
-//! https://github.com/squirelworks/Graal_analysis/blob/07f55908c1eb888d7f44c41fcf18213b2d955113/npc-library/gs1-reference-205.md
-//! https://creativecommons.org/licenses/by/4.0/
+//! <https://github.com/squirelworks/Graal_analysis/blob/07f55908c1eb888d7f44c41fcf18213b2d955113/npc-library/gs1-reference-205.md>
+//! <https://creativecommons.org/licenses/by/4.0/>
 //! Cleaned ID/name pairs only; source argument columns and prose omitted.
 //! No original addresses, binary data or decompiler implementation.
 //!

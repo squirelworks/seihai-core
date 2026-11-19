@@ -6,8 +6,12 @@
 //! goes to the [`Host`]; [`EffectHost`] turns the commands GS1 already has
 //! (`set`, `unset`, `say2`, `setlevel2`, `showimg`, `hideimg`, …) into the
 //! GS1 engine's [`Effect`]s, so whatever applies GS1 effects can apply
-//! these. Opcodes outside that set are logged and skipped; they are
-//! Stage D. Behaviour was first taken from the 3.153 client's VM
+//! these. Objects made with `new` (`new TStaticVar()`, the
+//! `new GuiWindowCtrl("name") { … }` blocks) live under the global object
+//! by name, with their type: `with` reaches them, `objecttype()` and
+//! `destroy()` work on them, and [`Machine::objects`] lists them for a host
+//! that draws GUI controls. `OP_OBJ_LINK` and `OP_OBJ_FROM_STR` (which the
+//! compiler never emits) are still logged and skipped. Behaviour was first taken from the 3.153 client's VM
 //! (`documentation/gs2-executor.md`); what later VMs change (limits,
 //! `%`, `^`, shifts, the opcodes they added) is a [`VmProfile`]
 //! (`documentation/gs2-vm-versions.md`). [`Machine::new`] runs 3.153's
@@ -165,8 +169,15 @@ pub struct Machine {
     scheduled: Vec<Scheduled>,
     /// Events whose frame came while a run was asleep, in order.
     due: Vec<(String, Vec<Val>)>,
-    /// The objects of the `with` blocks the run is in, innermost last.
-    with: Vec<Root>,
+    /// The objects of the `with` blocks the run is in, innermost last: a
+    /// root, and the path under it (empty for the root itself; the name of
+    /// an object made with `new`, or a variable path, otherwise).
+    with: Vec<(Root, String)>,
+    /// Objects made with `new` (`OP_NEW_OBJECT`), by their path under
+    /// [`Root::Global`]: their type, as `objecttype()` gives it.
+    objects: HashMap<String, String>,
+    /// Anonymous objects made so far (`new TStaticVar()`), for their names.
+    anonymous: u32,
     /// For each open `with`: the first op of its body, the op its
     /// `OP_WITH` skips to, and the call depth it was opened at. A jump out
     /// of the body (`break`/`continue`, which the compiler emits as a
@@ -220,6 +231,8 @@ impl Machine {
             due: Vec::new(),
             with: Vec::new(),
             with_span: Vec::new(),
+            objects: HashMap::new(),
+            anonymous: 0,
         }
     }
 
@@ -550,7 +563,24 @@ impl Machine {
 
     /// What `this` is: the innermost `with` object, else the script's own.
     fn this_root(&self) -> Root {
-        self.with.last().copied().unwrap_or(Root::This)
+        self.with.last().map_or(Root::This, |w| w.0)
+    }
+
+    /// What `this` is, with its path: an object made with `new` (or a
+    /// variable path) inside `with` has one, a root has none.
+    fn this_obj(&self) -> (Root, String) {
+        self.with
+            .last()
+            .cloned()
+            .unwrap_or((Root::This, String::new()))
+    }
+
+    /// The path of the innermost `with` object, when it is not a root.
+    fn this_path(&self) -> Option<(Root, &str)> {
+        match self.with.last() {
+            Some((r, p)) if !p.is_empty() => Some((*r, p.as_str())),
+            _ => None,
+        }
     }
 
     fn store(root: Root) -> Root {
@@ -609,6 +639,20 @@ impl Machine {
             None => {
                 if let Some(v) = self.frames.last().and_then(|f| f.locals.get(name)) {
                     return v.clone();
+                }
+                // Inside `with` on an object with a path: its own
+                // variables, then the level, then the global object.
+                if let Some((root, path)) = self.this_path() {
+                    let own = (Self::store(root), format!("{path}.{name}"));
+                    if let Some(v) = self.vars.get(&own) {
+                        return v.clone();
+                    }
+                    for r in [Root::Level, Root::Global] {
+                        if let Some(v) = self.vars.get(&(r, name.to_string())) {
+                            return v.clone();
+                        }
+                    }
+                    return Value::default();
                 }
                 let this = self.this_root();
                 if this == Root::This && name.eq_ignore_ascii_case("timeout") {
@@ -670,6 +714,18 @@ impl Machine {
                     .filter(|f| f.locals.contains_key(name))
                 {
                     f.locals.insert(name.to_string(), value);
+                    return;
+                }
+                // Inside `with` on an object with a path: a name the level
+                // has stays the level's, anything else is the object's.
+                if let Some((root, path)) = self.this_path() {
+                    let level = (Root::Level, name.to_string());
+                    let target = if self.vars.contains_key(&level) {
+                        level
+                    } else {
+                        (Self::store(root), format!("{path}.{name}"))
+                    };
+                    self.vars.insert(target, value);
                     return;
                 }
                 let this = self.this_root();
@@ -758,6 +814,130 @@ impl Machine {
             Slot::List(l) => Value::List(l).val(),
             Slot::Obj(None) | Slot::Marker => Val::Num(0.0),
         }
+    }
+
+    /// `OP_CONV_TO_OBJECT`: what a slot names as an object.
+    fn as_object(&mut self, top: Slot, host: &mut dyn Host) -> Slot {
+        match top {
+            // A variable that holds an object is that object. An
+            // unqualified name that is one of the function's own variables
+            // (a parameter, or an event's `params`) otherwise stays that
+            // variable: `params[0]`.
+            Slot::Var(root, name) => match self.read_value(root, &name, host) {
+                Value::Obj(r, p) => Slot::Obj(Some((r, p))),
+                _ if root.is_none()
+                    && self
+                        .frames
+                        .last()
+                        .is_some_and(|f| f.locals.contains_key(&name)) =>
+                {
+                    Slot::Var(Some(Root::Temp), name)
+                }
+                _ => Slot::Obj(Some((root.unwrap_or(Root::Global), name))),
+            },
+            Slot::Obj(o) => Slot::Obj(o),
+            _ => Slot::Obj(None),
+        }
+    }
+
+    /// `OP_MEMBER_ACCESS`: the variable `name` under an object.
+    fn member(obj: Slot, name: String) -> Slot {
+        match obj {
+            Slot::Obj(Some((root, path))) if path.is_empty() => Slot::Var(Some(root), name),
+            Slot::Obj(Some((root, path))) => Slot::Var(Some(root), format!("{path}.{name}")),
+            _ => Slot::Var(Some(Root::Global), String::new()),
+        }
+    }
+
+    /// `makevar(name)`: the variable a dotted name names, resolved as the
+    /// same name written in the script would be (`this.a.b` is `this`,
+    /// then `a`, then `b`; a plain name is looked up as an unqualified one).
+    fn make_var(&mut self, name: &str, host: &mut dyn Host) -> Slot {
+        let mut parts = name.split('.');
+        let first = parts.next().unwrap_or("");
+        let rest: Vec<&str> = parts.collect();
+        if rest.is_empty() {
+            return Slot::Var(None, first.to_string());
+        }
+        let mut slot = match first.to_ascii_lowercase().as_str() {
+            "this" => Slot::Obj(Some(self.this_obj())),
+            "thiso" => Slot::Obj(Some((Root::ThisO, String::new()))),
+            "player" => Slot::Obj(Some((Root::Player, String::new()))),
+            "playero" => Slot::Obj(Some((Root::PlayerO, String::new()))),
+            "level" => Slot::Obj(Some((Root::Level, String::new()))),
+            "temp" => Slot::Obj(Some((Root::Temp, String::new()))),
+            _ => Slot::Var(None, first.to_string()),
+        };
+        for part in rest {
+            let obj = self.as_object(slot, host);
+            slot = Self::member(obj, part.to_string());
+        }
+        slot
+    }
+
+    /// `OP_NEW_OBJECT`: an object of type `ty` named `name` (an anonymous
+    /// one for `None`), kept under the global object. Its variable holds
+    /// the object itself, so the bare name reaches it from anywhere, as in
+    /// the client. A name that is already an object keeps its variables
+    /// (a second `new GuiWindowCtrl("X")` sets the same control again).
+    fn new_object(&mut self, ty: &str, name: Option<String>) -> Slot {
+        let name = match name.filter(|n| !n.is_empty()) {
+            Some(n) => n,
+            None => {
+                self.anonymous += 1;
+                format!("unknown_object#{}", self.anonymous)
+            }
+        };
+        self.objects.insert(name.clone(), ty.to_string());
+        self.vars.insert(
+            (Root::Global, name.clone()),
+            Value::Obj(Root::Global, name.clone()),
+        );
+        Slot::Obj(Some((Root::Global, name)))
+    }
+
+    /// Methods every object made with `new` has: `objecttype()` and
+    /// `destroy()`. `None` when `name` is not one of them on such an
+    /// object, so the call goes on to the host.
+    fn object_method(&mut self, name: &(Option<Root>, String)) -> Option<Val> {
+        let (root, path, method) = match name {
+            (Some(r), n) => {
+                let (path, method) = n.rsplit_once('.')?;
+                (*r, path.to_string(), method)
+            }
+            (None, n) => {
+                let (r, path) = self.this_path()?;
+                (r, path.to_string(), n.as_str())
+            }
+        };
+        if root != Root::Global {
+            return None;
+        }
+        let ty = self.objects.get(&path)?.clone();
+        match method.to_ascii_lowercase().as_str() {
+            "objecttype" => Some(Val::Str(ty)),
+            "destroy" => {
+                let inner = format!("{path}.");
+                self.vars.retain(|(r, n), _| {
+                    *r != Root::Global || (n != &path && !n.starts_with(&inner))
+                });
+                self.objects.remove(&path);
+                Some(Val::Num(0.0))
+            }
+            _ => None,
+        }
+    }
+
+    /// The objects made with `new` that still exist, by name, with their
+    /// type: what a host lists to draw GUI controls, for one.
+    pub fn objects(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.objects.iter().map(|(n, t)| (n.as_str(), t.as_str()))
+    }
+
+    /// A variable of an object made with `new` (`profile` of
+    /// `MyWindow`), as the script last set it.
+    pub fn object_var(&self, object: &str, name: &str) -> Option<&Value> {
+        self.vars.get(&(Root::Global, format!("{object}.{name}")))
     }
 
     // --- stack -----------------------------------------------------------
@@ -946,7 +1126,7 @@ impl Machine {
                         Op::TypeFalse => Slot::Num(0.0),
                         Op::TypeNull => Slot::Obj(None),
                         Op::Pi => Slot::Num(std::f64::consts::PI),
-                        Op::This => Slot::Obj(Some((self.this_root(), String::new()))),
+                        Op::This => Slot::Obj(Some(self.this_obj())),
                         Op::ThisO => Slot::Obj(Some((Root::ThisO, String::new()))),
                         Op::Player => Slot::Obj(Some((Root::Player, String::new()))),
                         Op::PlayerO => Slot::Obj(Some((Root::PlayerO, String::new()))),
@@ -991,27 +1171,7 @@ impl Machine {
                     let Some(top) = self.pop() else {
                         return fault(self, host);
                     };
-                    let obj = match top {
-                        // A variable that holds an object is that object.
-                        // An unqualified name that is one of the function's
-                        // own variables (a parameter, or an event's
-                        // `params`) otherwise stays that variable:
-                        // `params[0]`.
-                        Slot::Var(root, name) => match self.read_value(root, &name, host) {
-                            Value::Obj(r, p) => Slot::Obj(Some((r, p))),
-                            _ if root.is_none()
-                                && self
-                                    .frames
-                                    .last()
-                                    .is_some_and(|f| f.locals.contains_key(&name)) =>
-                            {
-                                Slot::Var(Some(Root::Temp), name)
-                            }
-                            _ => Slot::Obj(Some((root.unwrap_or(Root::Global), name))),
-                        },
-                        Slot::Obj(o) => Slot::Obj(o),
-                        _ => Slot::Obj(None),
-                    };
+                    let obj = self.as_object(top, host);
                     self.push(obj);
                 }
                 // `obj.name`: a variable under the object. A null object
@@ -1024,15 +1184,7 @@ impl Machine {
                         Slot::Var(_, n) | Slot::Str(n) => n,
                         _ => String::new(),
                     };
-                    self.push(match obj {
-                        Slot::Obj(Some((root, path))) if path.is_empty() => {
-                            Slot::Var(Some(root), name)
-                        }
-                        Slot::Obj(Some((root, path))) => {
-                            Slot::Var(Some(root), format!("{path}.{name}"))
-                        }
-                        _ => Slot::Var(Some(Root::Global), String::new()),
-                    });
+                    self.push(Self::member(obj, name));
                 }
                 Op::Assign => {
                     let (Some(value), Some(target)) = (self.pop(), self.pop()) else {
@@ -1528,23 +1680,20 @@ impl Machine {
                     let n = client_int(n).clamp(0, 10_000) as usize;
                     self.edit_list(&o, host, |l| l.resize(n, Value::Val(Val::Num(0.0))));
                 }
-                // A null object (or one Seihai cannot name) skips the block.
+                // A root, an object made with `new`, or a variable path
+                // (`with (this.part)`: its variables are `this.part.*`). A
+                // null object skips the block.
                 Op::With => {
                     let Some(o) = self.pop() else {
                         return fault(self, host);
                     };
                     match o {
-                        Slot::Obj(Some((root, path))) if path.is_empty() => {
-                            self.with.push(root);
+                        Slot::Obj(Some((root, path))) => {
+                            self.with.push((root, path));
                             let end = int.unwrap_or(0).max(0) as usize;
                             self.with_span.push((self.pc, end, self.frames.len()));
                         }
-                        other => {
-                            if let Slot::Obj(Some((_, path))) = other {
-                                host.log(format!("gs2: with ({path}) at op {at}: Seihai has no object references, block skipped"));
-                            }
-                            self.pc = int.unwrap_or(0).max(0) as usize;
-                        }
+                        _ => self.pc = int.unwrap_or(0).max(0) as usize,
                     }
                 }
                 Op::WithEnd => {
@@ -1583,6 +1732,53 @@ impl Machine {
                         return fault(self, host);
                     };
                     self.push(Slot::Num(compare(&a, &b).signum() as f64));
+                }
+                // `new T(name) { … }`: the name becomes the global variable
+                // the new object is assigned to (`OP_ASSIGN` after
+                // `OP_NEW_OBJECT`).
+                Op::InlineNew => {
+                    let Some(top) = self.pop() else {
+                        return fault(self, host);
+                    };
+                    let name = val_text(&self.value(top, host));
+                    let name = if name.is_empty() {
+                        self.anonymous += 1;
+                        format!("unknown_object#{}", self.anonymous)
+                    } else {
+                        name
+                    };
+                    self.push(Slot::Var(Some(Root::Global), name));
+                }
+                // `new T(name)`: the type on top, the name below it. The
+                // compiler pushes the variable `unknown_object` for no name.
+                Op::NewObject => {
+                    let (Some(ty), Some(name)) = (self.pop_val(host), self.pop()) else {
+                        return fault(self, host);
+                    };
+                    let name = match name {
+                        Slot::Var(None, n) if n == "unknown_object" => None,
+                        // The name `OP_INLINE_NEW` made: taken as it is.
+                        Slot::Var(Some(Root::Global), n) => Some(n),
+                        other => Some(val_text(&self.value(other, host))),
+                    };
+                    let obj = self.new_object(&val_text(&ty), name);
+                    if !self.push(obj) {
+                        return fault(self, host);
+                    }
+                }
+                // `makevar(name)`: the variable the text names.
+                Op::MakeVar => {
+                    let Some(v) = self.pop_val(host) else {
+                        return fault(self, host);
+                    };
+                    let slot = self.make_var(&val_text(&v), host);
+                    self.push(slot);
+                }
+                // `params`: the running function's argument list.
+                Op::Params => {
+                    if !self.push(Slot::Var(Some(Root::Temp), "params".into())) {
+                        return fault(self, host);
+                    }
                 }
                 Op::Unknown(n) => {
                     if let Some(o) = self.run_extra(n, &ins.operand, at, host) {
@@ -1631,6 +1827,13 @@ impl Machine {
         }
         // The first argument sits next to the name, so it came off first.
         self.stack.truncate(m);
+        if let Some(v) = self.object_method(&name) {
+            self.stack.push(match v {
+                Val::Num(n) => Slot::Num(n),
+                Val::Str(s) => Slot::Str(s),
+            });
+            return None;
+        }
         let full = match name.0 {
             None => name.1.clone(),
             Some(r) => format!("{}.{}", root_name(r), name.1),
@@ -1883,6 +2086,16 @@ fn text(args: &[Val], i: usize) -> String {
     args.get(i).map(Val::text).unwrap_or_default()
 }
 
+/// The arguments from `from` on as text, joined with commas.
+fn join_from(args: &[Val], from: usize) -> String {
+    args.get(from..)
+        .unwrap_or_default()
+        .iter()
+        .map(Val::text)
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 fn num(args: &[Val], i: usize) -> f64 {
     args.get(i).map(Val::num).unwrap_or(0.0)
 }
@@ -1975,6 +2188,35 @@ impl Host for EffectHost {
                 file: text(args, 0),
             }),
             "stopmidi" => self.effects.push(Effect::StopMidi),
+            // `triggeraction(x, y, action, params…)`: the GS1 effect, the
+            // action lower-cased as the GS1 engine does it and the
+            // parameters joined with commas.
+            "triggeraction" => self.effects.push(Effect::TriggerAction {
+                x: num(args, 0),
+                y: num(args, 1),
+                action: text(args, 2).trim().to_ascii_lowercase(),
+                params: join_from(args, 3),
+            }),
+            // `triggerserver(type, name, params…)`: a trigger action at
+            // (0, 0) named `serverside`, its parameters the weapon or NPC
+            // name and then the script's, which is how GServer-v2 reads one
+            // (`msgPLI_TRIGGERACTION` hands `serverside` to the named
+            // weapon's `onActionServerSide`). **[inf]** from the server
+            // side; no client capture yet.
+            "triggerserver" => {
+                let mut params = text(args, 1);
+                let rest = join_from(args, 2);
+                if args.len() > 2 {
+                    params.push(',');
+                    params.push_str(&rest);
+                }
+                self.effects.push(Effect::TriggerAction {
+                    x: 0.0,
+                    y: 0.0,
+                    action: "serverside".into(),
+                    params,
+                });
+            }
             // How `seteffect` mixes. The GS1 vocabulary dates it to 2.1;
             // a GS2 host takes it whatever era it was made for, and sends it
             // as GS1 does.

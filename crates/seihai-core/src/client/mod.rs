@@ -35,7 +35,7 @@ use crate::assets::{AssetResolver, AssetRoot, Level};
 use crate::filecache::{DownloadStore, FileSession};
 use crate::gmap::{apply_board_mods_to, sync_world, Crossing, Gmap, GmapRules, WorldLoader};
 use crate::net::{
-    link_request_frame, login_gserver_with, random_key, walk_message_for, wantfile_message,
+    link_request_frame, login_gserver_secure, random_key, walk_message_for, wantfile_message,
 };
 use crate::offline::OfflineSession;
 use crate::protocol::layouts::BoardModify2;
@@ -64,6 +64,10 @@ pub struct Login {
     pub password: String,
     pub nick: String,
     pub language: String,
+    /// The Seihai secure login (`SEI00001`) for every game server of the
+    /// session, the 5.x/6.x Login lobby and the server it warps to
+    /// included. `None` is the build's own clear login.
+    pub secure: Option<crate::net::SecureLogin>,
 }
 
 /// How long the server must stay quiet after a level is stored before it
@@ -246,6 +250,11 @@ pub struct Live {
     /// items the server rolls), in the order they came, for the game to
     /// add to or take from the level.
     pub items: SharedItems,
+    /// Trigger actions the server sent (`PLO_TRIGGERACTION`, 48): another
+    /// player's `triggeraction`, or a server script's `triggerclient`, in
+    /// the order they came, for the game to hand its scripts as
+    /// `onAction…` events (#106).
+    pub triggers: SharedTriggers,
     /// GS2 scripts of server NPCs (`PLO_NPCBYTECODE`) that did not come
     /// with their level's [`Arrival`]: a script sent after the level had
     /// settled (an NPC that came later, or a script the server sent
@@ -307,6 +316,20 @@ impl ScriptFeed {
         // goes again.
         self.sent.retain(|id, _| st.npc_bytecode.contains_key(id));
         out
+    }
+}
+
+/// [`Live::triggers`].
+pub type SharedTriggers = Arc<Mutex<Vec<crate::protocol::ServerTrigger>>>;
+
+/// Move the server's trigger actions `st` holds to the game's queue.
+/// Drained either way, so nothing builds up with no game.
+fn take_triggers(st: &mut SessionState, to: Option<&SharedTriggers>) {
+    let triggers = std::mem::take(&mut st.triggers);
+    if let (Some(to), false) = (to, triggers.is_empty()) {
+        to.lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .extend(triggers);
     }
 }
 
@@ -1093,6 +1116,7 @@ pub fn run_hooked(
     let throws = live.as_ref().map(|l| l.throws.clone());
     let hits = live.as_ref().map(|l| l.hits.clone());
     let items = live.as_ref().map(|l| l.items.clone());
+    let triggers = live.as_ref().map(|l| l.triggers.clone());
     let leader = live.as_ref().map(|l| l.leader.clone());
     let npc_scripts = live.as_ref().map(|l| l.npc_scripts.clone());
     let say = live.as_ref().map(|l| l.say.clone());
@@ -1126,7 +1150,7 @@ pub fn run_hooked(
                 name: warp_name.take(),
             });
         }
-        let mut s = login_gserver_with(
+        let mut s = login_gserver_secure(
             &addr,
             version,
             random_key(),
@@ -1135,6 +1159,7 @@ pub fn run_hooked(
             false,
             first_session,
             wantfile_message,
+            login.secure.as_ref(),
         )
         .map_err(|e| e.to_string())?;
         first_session = false;
@@ -1227,6 +1252,7 @@ pub fn run_hooked(
                     take_level_objects(&mut st, level_objects.as_ref(), throws.as_ref());
                     take_hits(&mut st, hits.as_ref());
                     take_items(&mut st, items.as_ref());
+                    take_triggers(&mut st, triggers.as_ref());
                     if let Some(l) = leader.as_ref() {
                         l.store(st.is_leader, std::sync::atomic::Ordering::Relaxed);
                     }
@@ -1853,6 +1879,31 @@ mod others_tests {
         st.items.push(ServerItem::Del(1.0, 1.0));
         take_items(&mut st, None);
         assert!(st.items.is_empty());
+    }
+
+    /// The server's trigger actions go to the game once each, in order;
+    /// with no game they are dropped (#106).
+    #[test]
+    fn the_server_triggers_go_to_the_game() {
+        let mut st = SessionState::for_version(ClientVersion::V205);
+        let mut payload = b"    !!(".to_vec();
+        payload.extend_from_slice(b"open,red");
+        st.apply(&crate::protocol::Message { id: 48, payload });
+        let to: SharedTriggers = Arc::default();
+        take_triggers(&mut st, Some(&to));
+        assert!(st.triggers.is_empty());
+        let got = std::mem::take(&mut *to.lock().unwrap());
+        assert_eq!(got.len(), 1);
+        assert_eq!(
+            (got[0].action.as_str(), got[0].params.as_str()),
+            ("open", "red")
+        );
+        st.apply(&crate::protocol::Message {
+            id: 48,
+            payload: b"    !!(x".to_vec(),
+        });
+        take_triggers(&mut st, None);
+        assert!(st.triggers.is_empty());
     }
 
     /// The chat lines move to the view once each; the state keeps none.

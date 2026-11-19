@@ -37,9 +37,9 @@ pub use compress::{bz2_compress, bz2_decompress};
 pub use dispatch::{
     latin1, read_gint3, read_gshort, script_text, split_messages, sword_power_from_wire, ChatKind,
     ChatLine, IncomingFile, LevelObject, Message, NpcDelete, OtherLooks, OtherPlayer, ServerItem,
-    SessionState, Splitter, Weapon,
+    ServerTrigger, SessionState, Splitter, Weapon,
 };
-pub use dispatch::{parse_script_delivery, ScriptDelivery};
+pub use dispatch::{parse_script_delivery, parse_server_trigger, ScriptDelivery};
 pub use extras::MapSpec;
 pub use frame::{
     read_zlib_frame, write_zlib_frame, write_zlib_frame_best, zlib_compress, zlib_compress_best,

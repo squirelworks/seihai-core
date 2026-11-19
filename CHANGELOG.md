@@ -4,6 +4,11 @@ One line per release. The full notes for each version from 0.0.14 on are
 in [`release-notes/`](release-notes/) and on the GitHub release; the
 versioning rule is in the README.
 
+## 0.6.x
+
+- **0.6.1**: The GS2 VM runs `new` objects (`new TStaticVar()`, `new GuiWindowCtrl("name") { … }` blocks), `with` on them and on variable paths, `makevar`, and `objecttype()` / `destroy()`; `Machine::objects` lists them. `EffectHost` turns GS2 `triggeraction` and `triggerserver` into `Effect::TriggerAction`. `PLO_TRIGGERACTION` (48) is decoded into `SessionState::triggers` and `Live::triggers` (#106). `delivery` compiles a mixed GS1/GS2 client part that strict GS1 refuses. `cargo doc` builds without warnings, checked in CI.
+- **0.6.0**: `client::Login` gains `secure`: with it, every game server of a client session (the 5.x/6.x Login lobby and its warp included) uses the Seihai secure login instead of the build's clear login (squirelworks/seihai#564). Breaking: a new field in a struct built by literal. The secure list login's error names the shapes it takes.
+
 ## 0.5.x
 
 - **0.5.1**: GS1 `putbomb` and `shoot` lower to GS2 calls of the same name, as real 4.x–6.x GS2 weapon scripts make them (#93). The 1.1.9 relay client shows a `reg.code` registration key as type `8` and flags a peer with the same key (#63). GS2 event handlers read their arguments as `params`. The release workflow builds and tests on macOS before it publishes (#78).

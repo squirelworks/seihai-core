@@ -1106,7 +1106,7 @@ impl Connection {
     /// Connect to `host:port`.
     ///
     /// The name is resolved with the system resolver and every address it
-    /// returns is tried in turn, each with [`CONNECT_TIMEOUT`], so a dead
+    /// returns is tried in turn, each with `CONNECT_TIMEOUT`, so a dead
     /// first address (an unreachable IPv6 one, say) does not hide a
     /// working second one. The last error is returned if none connects.
     pub fn connect(addr: &str) -> io::Result<Self> {
@@ -1431,7 +1431,7 @@ impl Connection {
             if !matches!(shape, LoginShape::Gen5 | LoginShape::Gen5OneFrame) {
                 return Err(io::Error::new(
                     io::ErrorKind::Unsupported,
-                    "the secure list login needs a 2.22 or later profile",
+                    "the secure list login needs a gen-5 list shape (2.22, 2.31 or 3.04); 5.x and 6.x borrow 2.05's list, so fetch the list as 2.22",
                 ));
             }
             let prefix = [7 + 0x20, (key & 0x7F) + 0x20];
@@ -1486,7 +1486,7 @@ impl Connection {
     /// five frames have gone by. Real listservers send the server list in
     /// one frame and the status text, site URL and upgrade URL in a
     /// second. Once servers are in, this keeps reading for up to
-    /// [`LIST_TAIL_WAIT`] in total, stops as soon as the status is in, and
+    /// `LIST_TAIL_WAIT` in total, stops as soon as the status is in, and
     /// treats a timeout or any read error at that point as the end of the
     /// reply, so an open connection never makes it hang.
     /// 1.33–1.39 have no listserver, so they fetch the list as 2.05.
@@ -2178,7 +2178,7 @@ impl Connection {
     /// on links at all (lab, 2026-10-24). Returns whether 39 went along.
     ///
     /// This is the form for a level the client does not hold. With a copy,
-    /// use [`Self::send_cached_link_request`].
+    /// use `Self::send_cached_link_request`.
     pub fn send_link_request(
         &mut self,
         x: f32,

@@ -15,7 +15,7 @@ pub fn bz2_compress(data: &[u8]) -> io::Result<Vec<u8>> {
     enc.finish()
 }
 
-/// Decompress a bz2 body (at most [`super::frame::MAX_BODY`] bytes of
+/// Decompress a bz2 body (at most `super::frame::MAX_BODY` bytes of
 /// output; bz2 packs a long run of one byte far tighter than zlib).
 pub fn bz2_decompress(data: &[u8]) -> io::Result<Vec<u8>> {
     super::frame::read_bounded(BzDecoder::new(data), "bz2")

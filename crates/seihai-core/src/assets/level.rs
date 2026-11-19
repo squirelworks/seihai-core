@@ -299,10 +299,10 @@ pub struct ObjectTables {
     pub sprites: Vec<u32>,
     /// Array 8: the ledge tiles, one list per facing (up, left, down,
     /// right). These are the tiles the 2.05 client calls type 21: running
-    /// against one jumps the player off it (see [`crate::ledge`]).
+    /// against one jumps the player off it (see `crate::ledge`).
     pub ledges: [Vec<u16>; 4],
     /// Array 16: the stone blocks. Entry 0 can be pushed, entry 1 pulled
-    /// (see [`crate::ledge`]).
+    /// (see `crate::ledge`).
     pub blocks: Vec<Object2x2>,
     /// Arrays 20, 22 and 23: the baddy poses, its death puff and the swamp
     /// soldier in the water (see [`crate::baddies::DrawTables`]).
