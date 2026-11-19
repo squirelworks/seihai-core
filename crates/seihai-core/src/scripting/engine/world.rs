@@ -662,6 +662,21 @@ impl ScriptWorld {
         self.broadcast("playerchats");
     }
 
+    /// A key went down: `keypressed` everywhere, with the key's code and
+    /// character as `#p(0)` and `#p(1)` (`#p(2)` is empty, as on the real
+    /// 2.22 and 2.31). Nothing runs in an era without the event, and
+    /// nothing is logged for it: every key would log a line.
+    pub fn key_pressed(&mut self, code: u32, key: &str) {
+        if vocab::event_since("keypressed").is_some_and(|e| e > self.core.era) {
+            return;
+        }
+        let params = [code.to_string(), key.to_string(), String::new()];
+        for id in self.ids() {
+            self.fire_one(id, "keypressed", &params);
+        }
+        self.drain();
+    }
+
     /// The player pressed the weapon button for the named weapon.
     pub fn weapon_fired(&mut self, name: &str) {
         let ids: Vec<ObjId> = self

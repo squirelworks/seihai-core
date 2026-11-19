@@ -666,6 +666,12 @@ pub static EVENTS: &[(&str, Era)] = &[
     ("playerdies", V201),
     ("playerhurt", V201),
     ("movementfinished", V203),
+    // A key went down: `#p(0)` is the Windows virtual-key code, `#p(1)` the
+    // lower-case character and `#p(2)` empty. Seen on the real 2.22 and
+    // 2.31 (lab key sweep, 2026-11-19, Graal_analysis
+    // `protocol/keysweep/`); 2.17.1 has the same command table. Absent in
+    // 2.05.
+    ("keypressed", V217),
     // Server-side: the NPC-server (2001, 2.x scripts) runs it when a player
     // leaves the NPC's level, not on disconnect (Graal_analysis
     // `tools/npcserver-2001.md`). It is absent from the 2.05, 2.17.1 and
