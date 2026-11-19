@@ -7,6 +7,7 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
+- The GS1 `keypressed` event lowers to `onKeyPressed`, the spelling real 5.x and 6.x scripts use; it was `onKeypressed`. No API change.
 - Releases are deliberate: the version changes only in a release PR, and `version-guard` checks release PRs (VERSIONING.md). The release workflow publishes and tags a release PR automatically once CI passes. No API change.
 
 ## 0.6.x

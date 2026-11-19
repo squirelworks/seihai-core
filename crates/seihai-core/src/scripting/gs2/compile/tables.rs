@@ -572,9 +572,9 @@ pub fn gs2_event_function(event: &str) -> String {
 
 const EVENT_WORDS: &[&str] = &[
     "movement", "selected", "finished", "shooted", "reading", "exploded", "timeout", "created",
-    "weapon", "player", "touchs", "enters", "leaves", "thrown", "pushed", "pulled", "compus",
-    "action", "chats", "other", "baddy", "fired", "comps", "shot", "pelt", "hurt", "dies", "dead",
-    "lays", "item", "ends", "was", "me", "by",
+    "pressed", "weapon", "player", "touchs", "enters", "leaves", "thrown", "pushed", "pulled",
+    "compus", "action", "chats", "other", "baddy", "fired", "comps", "shot", "pelt", "hurt",
+    "dies", "dead", "lays", "item", "ends", "key", "was", "me", "by",
 ];
 
 #[cfg(test)]
@@ -592,6 +592,8 @@ mod tests {
         assert_eq!(gs2_event_function("playerleaves"), "onPlayerLeaves");
         assert_eq!(gs2_event_function("playerlogin"), "onPlayerLogin");
         assert_eq!(gs2_event_function("playerlogout"), "onPlayerLogout");
+        // The spelling real 5.x and 6.x scripts use (`params[0]` is the key).
+        assert_eq!(gs2_event_function("keypressed"), "onKeyPressed");
     }
 
     #[test]
