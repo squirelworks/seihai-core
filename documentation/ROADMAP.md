@@ -35,8 +35,10 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
       (`documentation/gs1-to-gs2-gaps.md`); `setbody`, plain `addstring`,
       `savelog2`, and engine-removed omits (`setbackpal`, `putobject`) now
       lower; `putbomb` and `shoot` call through by name, as real GS2
-      weapons do (0.5.1) — `putexplosion(2)`, `puthorse` and `putnpc(2)`
-      stay `Missing` pending lab (#104).
+      weapons do (0.5.1) — from 0.6.2 `putexplosion(2)` and `puthorse`
+      call through too (lab #104: real 4.20r8 and 5.12 run them);
+      `putnpc2` stays `Missing` (those clients refuse it) and `putnpc` is
+      untested.
 - [ ] GS2 VM coverage for the Mac 4.04r2 and 5.12 VMs and the 7.x client
       (`documentation/gs2-vm-versions.md`). The 7.x opcode set is now
       read (Graal_analysis `protocol/gs2-opcode-table.md`, PR #630):
@@ -71,9 +73,10 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
       - ~~`delivery` compiles client scripts as strict GS1~~: from
         0.6.1 a client part strict GS1 refuses is compiled as
         `Language::Detect` reads it.
-- [ ] Server trigger actions (#106): `PLO_TRIGGERACTION` (48) is
-      decoded from 0.6.1 (layout **[srv][2.05]**); the lab capture
-      from a real 2.22 and 5.12 that confirms the field order is open.
+- [x] Server trigger actions (#106): `PLO_TRIGGERACTION` (48) is
+      decoded from 0.6.1; the field order is lab-confirmed on real 2.22,
+      4.20r8 and 5.12 (0.6.2). Which script a real client runs for a
+      received 48 is still unobserved.
 - [ ] `.code` files for 1.x (#63): core codec shipped in 0.2.10 (#66);
       Seihai client-folder integration and observable guild/registration
       behaviour remain open.

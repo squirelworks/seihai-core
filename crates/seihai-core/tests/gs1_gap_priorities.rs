@@ -31,20 +31,11 @@ fn top_gap_priorities_match_issue_93() {
 }
 
 #[test]
-fn high_hit_effect_spawn_commands_stay_missing() {
-    // Spawn puts with no 3.153 shared-command form and no call in the real
-    // GS2 weapon corpus. Emitting a Same call could compile but fail on a
-    // real GS2 client ("Function not found"). Keep them Missing until a
-    // lab-backed form exists.
-    // TODO(lab): putexplosion(2), puthorse, putnpc(2).
-    for name in [
-        "putexplosion",
-        "puthorse",
-        "putnpc",
-        "putnpc2",
-        "putexplosion2",
-        "timershow",
-    ] {
+fn spawn_commands_without_a_gs2_client_form_stay_missing() {
+    // No 3.153 shared-command form, and real GS2 clients refuse `putnpc2`
+    // ("Function putnpc2 not found", 4.20r8 and 5.12, lab #104). Emitting a
+    // Same call would compile but fail there.
+    for name in ["putnpc", "putnpc2", "timershow"] {
         assert_eq!(
             gs1_command_lowering(name),
             Some(Gs1Lowering::Missing { inert: false }),
@@ -58,9 +49,31 @@ fn high_hit_effect_spawn_commands_stay_missing() {
             .unwrap_err()
             .to_string();
         assert!(err.contains(name), "{name}: {err}");
-        if matches!(name, "putexplosion" | "puthorse" | "putnpc") {
-            assert!(err.contains("3.153"), "{name}: {err}");
-        }
+    }
+}
+
+#[test]
+fn putexplosion_and_puthorse_call_through_as_real_gs2_clients_run_them() {
+    // Real 4.20r8 and 5.12 clients run these from a GS2 weapon script with
+    // the GS1 argument order (lab #104, 2026-11-19).
+    for (gs1, gs2) in [
+        ("putexplosion 1,30,31;", "putexplosion(1, 30, 31);"),
+        ("putexplosion2 1,2,30,31;", "putexplosion2(1, 2, 30, 31);"),
+        (
+            "puthorse ride.png,30,31;",
+            "puthorse(\"ride.png\", 30, 31);",
+        ),
+    ] {
+        let name = gs1.split(' ').next().unwrap();
+        assert_eq!(
+            gs1_command_lowering(name),
+            Some(Gs1Lowering::Same),
+            "{name}"
+        );
+        let a = compile::compile_gs1(&format!("if (created) {{ {gs1} }}\n"), Era::V217)
+            .unwrap_or_else(|e| panic!("{gs1}: {e}"));
+        let b = compile::compile_gs2(&format!("function onCreated() {{\n  {gs2}\n}}\n")).unwrap();
+        assert_eq!(a.disassemble(), b.disassemble(), "{gs1}");
     }
 }
 

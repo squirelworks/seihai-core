@@ -185,6 +185,7 @@ pub(super) fn omitted_command(name: &str) -> bool {
 pub(super) fn gs2_has_command(name: &str) -> bool {
     GS2_CLIENT_COMMANDS.binary_search(&name).is_ok()
         || GS2_CORPUS_COMMANDS.contains(&name)
+        || GS2_LAB_COMMANDS.contains(&name)
         || matches!(
             name,
             "set" | "unset" | "setlevel" | "setlevel2" | "setplayerprop" | "join"
@@ -201,6 +202,15 @@ pub(super) fn gs2_has_command(name: &str) -> bool {
 /// They keep their GS1 argument order (`putbomb power,x,y`;
 /// `shoot x,y,z,angle,zangle,power,ani,aniparams`).
 const GS2_CORPUS_COMMANDS: &[&str] = &["putbomb", "shoot"];
+
+/// GS1 command names the 3.153 table lacks that real 4.20r8 and 5.12
+/// clients run when a GS2 weapon script calls them, with the GS1 argument
+/// order **\[lab\]** (seihai-core#104, Mirae Windows 10 VM, 2026-11-19):
+/// `putexplosion(power, x, y)` and `putexplosion2(power, radius, x, y)`
+/// explode and hurt the player, and send PLI 27; `puthorse(image, x, y)`
+/// puts a horse and sends PLI 7. `putnpc2` is not one: both clients log
+/// "Function putnpc2 not found".
+const GS2_LAB_COMMANDS: &[&str] = &["putexplosion", "putexplosion2", "puthorse"];
 
 /// Names registered by the 3.153 client, lower case, sorted.
 /// From `documentation/gs2-shared-commands.md`.
@@ -432,11 +442,10 @@ pub(super) fn command_hint(name: &str) -> &'static str {
         | "deletestring" => " (GS2 uses list methods such as add and delete)",
         "tokenize" | "tokenize2" => " (GS2 uses the tokenize method)",
         // High-hit #93 gaps: point at why there is no Same/Renamed form.
-        "putexplosion" | "putexplosion2" => {
-            " (no 3.153 GS2 command; explodebomb addresses an existing bomb index)"
+        "putnpc2" => {
+            " (real 4.20r8 and 5.12 clients report \"Function putnpc2 not found\" (lab, #104); NPC spawn is GS1-only here)"
         }
-        "puthorse" => " (no 3.153 GS2 command; takehorse removes a horse by index)",
-        "putnpc" | "putnpc2" => {
+        "putnpc" => {
             " (no 3.153 GS2 command, and no real GS2 client script calls it; NPC spawn is GS1-only here)"
         }
         // TODO(lab): timershow draws the timeout overlay; timereverywhere is
@@ -640,9 +649,17 @@ mod tests {
         assert!(!omitted_command("setfocus"));
         assert!(!omitted_command("updateterrain"));
         assert_eq!(gs1_command_lowering("setfocus"), Some(Gs1Lowering::Same));
-        // High-hit Effect still Missing until a lab-backed form exists.
+        // Run by real 4.20r8 and 5.12 GS2 clients (lab, #104).
+        for name in ["putexplosion", "putexplosion2", "puthorse"] {
+            assert_eq!(
+                gs1_command_lowering(name),
+                Some(Gs1Lowering::Same),
+                "{name}"
+            );
+        }
+        // Refused by them: still Missing.
         assert_eq!(
-            gs1_command_lowering("putexplosion"),
+            gs1_command_lowering("putnpc2"),
             Some(Gs1Lowering::Missing { inert: false })
         );
         // Called by name in real GS2 weapon scripts.
