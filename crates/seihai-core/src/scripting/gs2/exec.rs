@@ -74,6 +74,7 @@ impl From<Value> for Slot {
             Value::Val(Val::Num(n)) => Slot::Num(n),
             Value::Val(Val::Str(s)) => Slot::Str(s),
             Value::List(l) => Slot::List(l),
+            Value::Obj(r, p) => Slot::Obj(Some((r, p))),
         }
     }
 }
@@ -86,6 +87,12 @@ pub trait Host {
     /// A built-in property such as `x` of `this`. `None` if it is not one.
     fn get_prop(&mut self, _root: Root, _name: &str) -> Option<Val> {
         None
+    }
+    /// A built-in property as a full value, for a property that is a list
+    /// (a 3D object's `position`, read as `p[0]`, `p[1]`, `p[2]`). The
+    /// default is [`Host::get_prop`].
+    fn get_prop_value(&mut self, root: Root, name: &str) -> Option<Value> {
+        self.get_prop(root, name).map(Value::Val)
     }
     /// Writes a built-in property. `false` if it is not one.
     fn set_prop(&mut self, _root: Root, _name: &str, _value: &Val) -> bool {
@@ -230,7 +237,7 @@ impl Machine {
     pub fn var(&self, root: Root, name: &str) -> Option<&Val> {
         match self.vars.get(&(Self::store(root), name.to_string()))? {
             Value::Val(v) => Some(v),
-            Value::List(_) => None,
+            Value::List(_) | Value::Obj(..) => None,
         }
     }
 
@@ -238,7 +245,7 @@ impl Machine {
     pub fn list(&self, root: Root, name: &str) -> Option<&[Value]> {
         match self.vars.get(&(Self::store(root), name.to_string()))? {
             Value::List(l) => Some(l),
-            Value::Val(_) => None,
+            Value::Val(_) | Value::Obj(..) => None,
         }
     }
 
@@ -589,8 +596,8 @@ impl Machine {
                 Val::Num(self.loop_limit as f64).into()
             }
             Some(r) => {
-                if let Some(v) = host.get_prop(r, name) {
-                    return v.into();
+                if let Some(v) = host.get_prop_value(r, name) {
+                    return v;
                 }
                 self.vars
                     .get(&(Self::store(r), name.to_string()))
@@ -613,8 +620,8 @@ impl Machine {
                 {
                     return Val::Num(self.loop_limit as f64).into();
                 }
-                if let Some(v) = host.get_prop(this, name) {
-                    return v.into();
+                if let Some(v) = host.get_prop_value(this, name) {
+                    return v;
                 }
                 for r in [Self::store(this), Root::Level, Root::Global] {
                     if let Some(v) = self.vars.get(&(r, name.to_string())) {
@@ -704,6 +711,8 @@ impl Machine {
             Slot::Obj(Some((root, path))) if !path.is_empty() => {
                 self.read_value(Some(root), &path, host)
             }
+            // An object itself (`player`, `this`): kept as a reference.
+            Slot::Obj(Some((root, path))) => Value::Obj(root, path),
             Slot::List(l) => Value::List(l),
             s => self.value(s, host).into(),
         }
@@ -723,7 +732,7 @@ impl Machine {
     fn list_of(&mut self, slot: &Slot, host: &mut dyn Host) -> Vec<Value> {
         match self.value_full(slot.clone(), host) {
             Value::List(l) => l,
-            Value::Val(_) => Vec::new(),
+            Value::Val(_) | Value::Obj(..) => Vec::new(),
         }
     }
 
@@ -734,7 +743,7 @@ impl Machine {
         };
         let mut l = match self.read_value(root, &name, host) {
             Value::List(l) => l,
-            Value::Val(_) => Vec::new(),
+            Value::Val(_) | Value::Obj(..) => Vec::new(),
         };
         f(&mut l);
         self.write_var(root, &name, Value::List(l), host);
@@ -982,22 +991,28 @@ impl Machine {
                     let Some(top) = self.pop() else {
                         return fault(self, host);
                     };
-                    let local = |name: &str| {
-                        self.frames
-                            .last()
-                            .is_some_and(|f| f.locals.contains_key(name))
-                    };
-                    self.push(match top {
+                    let obj = match top {
+                        // A variable that holds an object is that object.
                         // An unqualified name that is one of the function's
                         // own variables (a parameter, or an event's
-                        // `params`) stays that variable: `params[0]`.
-                        Slot::Var(None, name) if local(&name) => Slot::Var(Some(Root::Temp), name),
-                        Slot::Var(root, name) => {
-                            Slot::Obj(Some((root.unwrap_or(Root::Global), name)))
-                        }
+                        // `params`) otherwise stays that variable:
+                        // `params[0]`.
+                        Slot::Var(root, name) => match self.read_value(root, &name, host) {
+                            Value::Obj(r, p) => Slot::Obj(Some((r, p))),
+                            _ if root.is_none()
+                                && self
+                                    .frames
+                                    .last()
+                                    .is_some_and(|f| f.locals.contains_key(&name)) =>
+                            {
+                                Slot::Var(Some(Root::Temp), name)
+                            }
+                            _ => Slot::Obj(Some((root.unwrap_or(Root::Global), name))),
+                        },
                         Slot::Obj(o) => Slot::Obj(o),
                         _ => Slot::Obj(None),
-                    });
+                    };
+                    self.push(obj);
                 }
                 // `obj.name`: a variable under the object. A null object
                 // gives a variable with no name, which reads as 0.
@@ -1105,10 +1120,18 @@ impl Machine {
                     }));
                 }
                 Op::Eq | Op::Neq | Op::Lt | Op::Gt | Op::Lte | Op::Gte => {
-                    let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else {
+                    let (Some(b), Some(a)) = (self.pop(), self.pop()) else {
                         return fault(self, host);
                     };
-                    let c = compare(&a, &b);
+                    // An object is never null; two objects are equal when
+                    // they are the same one.
+                    let (a, b) = (self.value_full(a, host), self.value_full(b, host));
+                    let null = |s: &Value| matches!(s, Value::Val(Val::Num(n)) if *n == 0.0);
+                    let c = match (&a, &b) {
+                        (Value::Obj(..), Value::Obj(..)) => (!a.same(&b, compare)) as i32,
+                        (Value::Obj(..), o) | (o, Value::Obj(..)) if null(o) => 1,
+                        _ => compare(&a.val(), &b.val()),
+                    };
                     let t = match ins.op {
                         Op::Eq => c == 0,
                         Op::Neq => c != 0,
@@ -1218,7 +1241,7 @@ impl Machine {
                     };
                     let n = match self.value_full(o, host) {
                         Value::List(l) => l.len() as f64,
-                        Value::Val(_) => 0.0,
+                        Value::Val(_) | Value::Obj(..) => 0.0,
                     };
                     self.push(Slot::Num(n));
                 }
@@ -1476,6 +1499,7 @@ impl Machine {
                             Value::List(_) => -1.0,
                             Value::Val(Val::Num(_)) => 0.0,
                             Value::Val(Val::Str(_)) => 1.0,
+                            Value::Obj(..) => 2.0,
                         },
                     };
                     self.push(Slot::Num(t));
@@ -1674,7 +1698,7 @@ fn fill_leaves(l: &mut [Value], m: i32) {
     }
 }
 
-fn root_name(r: Root) -> &'static str {
+pub(super) fn root_name(r: Root) -> &'static str {
     match r {
         Root::This => "this",
         Root::ThisO => "thiso",
