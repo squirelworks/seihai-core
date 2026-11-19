@@ -63,6 +63,11 @@ struct Parser<'a> {
     /// Names the script defines with `function`, so `move();` calls the
     /// script's own `move` rather than the command.
     funcs: Vec<String>,
+    /// Commas where `, second in |lo,hi|` was tried and did not follow.
+    /// The try parses `second` and rewinds; without this, commas nested in
+    /// parentheses retry each other's tries and the time doubles with each
+    /// level (a fuzz timeout, #80).
+    no_pair_in: std::collections::HashSet<usize>,
 }
 
 impl<'a> Parser<'a> {
@@ -89,6 +94,7 @@ impl<'a> Parser<'a> {
             depth: 0,
             len: src.len(),
             funcs,
+            no_pair_in: std::collections::HashSet::new(),
         }
     }
 
@@ -823,6 +829,10 @@ impl<'a> Parser<'a> {
     }
 
     fn pair_in(&mut self, first: &Expr) -> Option<Expr> {
+        let at = self.peek().start;
+        if self.no_pair_in.contains(&at) {
+            return None;
+        }
         let saved = (self.lx.clone(), self.peeked.clone(), self.diags.len());
         self.next();
         let second = self.binary(4);
@@ -846,6 +856,7 @@ impl<'a> Parser<'a> {
         self.lx = saved.0;
         self.peeked = saved.1;
         self.diags.truncate(saved.2);
+        self.no_pair_in.insert(at);
         None
     }
 

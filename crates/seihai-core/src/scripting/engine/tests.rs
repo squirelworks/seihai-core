@@ -1742,3 +1742,22 @@ fn message_codes_follow_the_build() {
         }
     }
 }
+
+/// Commas nested in parentheses used to retry each other's
+/// `, b in |lo,hi|` look-ahead, doubling the parse time per level (a
+/// `gs1_parse` fuzz timeout, #80). Twelve levels now parse at once.
+#[test]
+fn nested_commas_parse_in_linear_time() {
+    let src = format!("x={};", "s(lay(@e((((((e,".repeat(12));
+    let t = std::time::Instant::now();
+    let _ = super::parse(&src, Era::V205);
+    let _ = super::parse(&src, Era::V140);
+    assert!(
+        t.elapsed() < std::time::Duration::from_secs(2),
+        "{:?}",
+        t.elapsed()
+    );
+    // The look-ahead still finds a real pair.
+    let p = super::parse("if (a in |1,3|, b in |2,4|) { message x; }", Era::V205);
+    assert!(p.diagnostics.is_empty(), "{:?}", p.diagnostics);
+}

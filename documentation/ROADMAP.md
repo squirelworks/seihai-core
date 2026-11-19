@@ -84,8 +84,9 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
 
 - [ ] Fuzz targets for every decoder that sees network or world-file
       input, with every crasher fixed (#80). **Scaffold landed** in #90
-      (11 targets, seeds, weekly workflow); longer runs and crasher fixes
-      remain — leave #80 open.
+      (11 targets, seeds, weekly workflow). 0.6.1 adds `session_apply`
+      and `gs2_exec`, and a 4-minute run of all 13 found one GS1 parser
+      timeout, fixed. Longer runs remain — leave #80 open.
 - [ ] macOS build and tests before a tag is published (#78). macOS stays
       off the per-push CI.
 - [ ] Release notes per tag in `release-notes/`; tags only with the

@@ -6,7 +6,7 @@ versioning rule is in the README.
 
 ## 0.6.x
 
-- **0.6.1**: The GS2 VM runs `new` objects (`new TStaticVar()`, `new GuiWindowCtrl("name") { … }` blocks), `with` on them and on variable paths, `makevar`, and `objecttype()` / `destroy()`; `Machine::objects` lists them. `EffectHost` turns GS2 `triggeraction` and `triggerserver` into `Effect::TriggerAction`. `PLO_TRIGGERACTION` (48) is decoded into `SessionState::triggers` and `Live::triggers` (#106). `delivery` compiles a mixed GS1/GS2 client part that strict GS1 refuses. `cargo doc` builds without warnings, checked in CI.
+- **0.6.1**: The GS2 VM runs `new` objects (`new TStaticVar()`, `new GuiWindowCtrl("name") { … }` blocks), `with` on them and on variable paths, `makevar`, and `objecttype()` / `destroy()`; `Machine::objects` lists them. `EffectHost` turns GS2 `triggeraction` and `triggerserver` into `Effect::TriggerAction`. `PLO_TRIGGERACTION` (48) is decoded into `SessionState::triggers` and `Live::triggers` (#106). `delivery` compiles a mixed GS1/GS2 client part that strict GS1 refuses. `cargo doc` builds without warnings, checked in CI. Two new fuzz targets (`session_apply`, `gs2_exec`) and a fix for an exponential GS1 parse the fuzzer found (#80).
 - **0.6.0**: `client::Login` gains `secure`: with it, every game server of a client session (the 5.x/6.x Login lobby and its warp included) uses the Seihai secure login instead of the build's clear login (squirelworks/seihai#564). Breaking: a new field in a struct built by literal. The secure list login's error names the shapes it takes.
 
 ## 0.5.x
