@@ -1011,6 +1011,41 @@ fn move_applies_the_offset_and_can_signal_the_end() {
         .any(|e| matches!(e, Effect::Move { .. })));
 }
 
+#[test]
+fn move_option_32_stops_before_a_wall() {
+    // The NPC is at (10, 20), 2 by 2 tiles; a wall column at x = 15.
+    let mut walls = vec![false; 64 * 64];
+    for y in 0..64 {
+        walls[y * 64 + 15] = true;
+    }
+    let (mut w, id) = npc("if (created) { move 8,0,1,32; }");
+    w.core.walls = Some(walls.clone());
+    w.fire(id, "created", &[]);
+    assert_eq!(
+        w.obj(id).unwrap().x,
+        13.0,
+        "stops with its right edge at the wall"
+    );
+    let moved = w.take_effects().into_iter().find_map(|e| match e {
+        Effect::Move { dx, options, .. } => Some((dx, options)),
+        _ => None,
+    });
+    assert_eq!(moved, Some((3.0, 32)));
+    // Without 32 the wall is not checked.
+    let (mut w, id) = npc("if (created) { move 8,0,1,0; }");
+    w.core.walls = Some(walls.clone());
+    w.fire(id, "created", &[]);
+    assert_eq!(w.obj(id).unwrap().x, 18.0);
+    // Away from the wall, and with no walls known, the whole move is made.
+    let (mut w, id) = npc("if (created) { move -4,2,1,32; }");
+    w.core.walls = Some(walls);
+    w.fire(id, "created", &[]);
+    assert_eq!((w.obj(id).unwrap().x, w.obj(id).unwrap().y), (6.0, 22.0));
+    let (mut w, id) = npc("if (created) { move 8,0,1,32; }");
+    w.fire(id, "created", &[]);
+    assert_eq!(w.obj(id).unwrap().x, 18.0);
+}
+
 // ---- version gating ----
 
 #[test]
