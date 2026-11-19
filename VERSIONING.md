@@ -6,7 +6,7 @@ same in every Seihai repo.
 
 ## This repo
 
-- **Current version:** 0.7.0.
+- **Current version:** 0.7.1.
 - **Where the version lives:** `version` under `[workspace.package]` in `Cargo.toml` (seihai-core and seihai-draw share it and are tagged together).
 - **Public surface** (the things a version number makes promises about):
   - the public Rust API of `seihai-core` and `seihai-draw`: items, signatures, struct fields, enum variants, Cargo features (`dev`, `audio`);
