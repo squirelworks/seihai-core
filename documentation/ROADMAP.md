@@ -66,7 +66,7 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
         `requesttext`, `savelog`) wait on server-side GS2, which is out
         of the compiler's scope.
       - ~~GS1 message codes on plain strings (`#s(name)`)~~ read
-        `player.<name>` from 0.6.1, as plain flag reads do; `local.` and
+        `player.<name>` from 0.6.2, as plain flag reads do; `local.` and
         `server.` strings and run-time plain names stay refused.
       - ~~`delivery` compiles client scripts as strict GS1~~: from
         0.6.1 a client part strict GS1 refuses is compiled as
@@ -85,7 +85,7 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
 
 - [ ] Fuzz targets for every decoder that sees network or world-file
       input, with every crasher fixed (#80). **Scaffold landed** in #90
-      (11 targets, seeds, weekly workflow). 0.6.1 adds `session_apply`
+      (11 targets, seeds, weekly workflow). 0.6.2 adds `session_apply`
       and `gs2_exec`, and a 4-minute run of all 13 found one GS1 parser
       timeout, fixed. Longer runs remain — leave #80 open.
 - [ ] macOS build and tests before a tag is published (#78). macOS stays
