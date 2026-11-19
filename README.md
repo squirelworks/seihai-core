@@ -49,14 +49,14 @@ a release. A PR that changes the public API adds a line under `## Unreleased`
 in `CHANGELOG.md` and leaves the version alone. A release PR (with
 `Release: vX.Y.Z` in its body) bumps `[workspace.package] version` and adds
 `release-notes/vX.Y.Z.md`. Once CI passes on `main`, the release workflow
-builds and tests on macOS and drafts the release, and the owner publishes it.
+builds and tests on macOS and publishes the release with its tag.
 Before 1.0, a minor bump (0.6 to 0.7) is for a breaking change or a finished
 milestone, and a patch is for everything else. Next milestone: #108. 1.0.0
 criteria: #109.
 
 CI builds Linux and Windows on every push and PR. macOS is built and
 tested only at release: the release workflow's `macos` job runs on the
-commit being drafted, and the draft waits for it to pass (#78).
+commit being released, and the release waits for it to pass (#78).
 
 The `dev`, `difftest` and `viewer` modules are tools for the suite's own
 binaries. They are hidden from the docs and can change in a patch release.

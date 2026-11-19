@@ -1,18 +1,18 @@
 name: Release
 
-# Drafts "seihai-core vX.Y.Z" when main carries a workspace version that has
-# no release yet. The version changes only in a release PR (VERSIONING.md):
-# an ordinary merge leaves it alone, so an ordinary green merge makes no
-# release. The workflow runs after CI passes on a push to main, so a draft is
-# only made from a green commit. It makes a DRAFT: the tag exists once the
-# owner presses Publish. Notes come from release-notes/vX.Y.Z.md (the
-# version-guard check makes the release PR add it). If the release (draft or
-# published) already exists, its notes are refreshed from the file. Run it by
-# hand (workflow_dispatch) to draft or refresh main's current version.
+# Publishes "seihai-core vX.Y.Z", tag included, when main carries a workspace
+# version that has no release yet. The version changes only in a release PR
+# (VERSIONING.md): an ordinary merge leaves it alone, so an ordinary green
+# merge makes no release. The workflow runs after CI passes on a push to main,
+# so a release is only cut from a green commit. Notes come from
+# release-notes/vX.Y.Z.md (the version-guard check makes the release PR add
+# it). If the release already exists, its notes are refreshed from the file.
+# Run it by hand (workflow_dispatch) to publish or refresh main's current
+# version.
 #
 # CI runs Linux and Windows on every push. macOS builds only here, and only
-# when a new release is about to be drafted: the `macos` job builds and tests
-# the commit, and the draft waits for it, so no release is cut from a commit
+# when a new release is about to be published: the `macos` job builds and
+# tests the commit, and the release waits for it, so no release is cut from a commit
 # that never compiled on macOS (#78).
 
 on:
@@ -58,10 +58,10 @@ jobs:
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
              git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
             echo "new=false" >> "$GITHUB_OUTPUT"
-            echo "Workspace version $version already has a release (draft or published)."
+            echo "Workspace version $version already has a release."
           else
             echo "new=true" >> "$GITHUB_OUTPUT"
-            echo "Workspace version $version has no release yet: drafting one."
+            echo "Workspace version $version has no release yet: publishing one."
           fi
 
   macos:
@@ -87,7 +87,7 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - name: Draft the release, or refresh its notes
+      - name: Publish the release, or refresh its notes
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.plan.outputs.tag }}
@@ -111,8 +111,7 @@ jobs:
           fi
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --draft \
             --target "$SHA" \
             --title "seihai-core $TAG" \
             "${notes_args[@]}"
-          echo "Drafted seihai-core $TAG on $SHA; the owner publishes it (VERSIONING.md)."
+          echo "Published seihai-core $TAG on $SHA"
