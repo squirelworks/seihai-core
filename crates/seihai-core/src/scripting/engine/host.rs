@@ -364,6 +364,14 @@ impl SessionScripts {
         self.apply(session);
     }
 
+    /// A key went down: `keypressed` on every object (2.17.1 and later;
+    /// see [`ScriptWorld::key_pressed`]).
+    pub fn key_pressed(&mut self, session: &mut OfflineSession, code: u32, key: &str) {
+        self.sync_player(session);
+        self.world.key_pressed(code, key);
+        self.apply(session);
+    }
+
     /// The player typed a chat line: `playerchats` runs on every object, and
     /// the text to send is returned.
     ///

@@ -1742,3 +1742,20 @@ fn message_codes_follow_the_build() {
         }
     }
 }
+
+// ---- keys ----
+
+/// `keypressed` gives the key's code and character, as the real 2.22 and
+/// 2.31 do (lab key sweep, 2026-11-19); 2.05 has no such event and runs
+/// nothing.
+#[test]
+fn keypressed_gives_code_and_character() {
+    let src = "if (keypressed) { message #p(0),#p(1),#p(2); }";
+    let (mut w, _) = npc_in(src, Era::V217);
+    w.key_pressed(65, "a");
+    assert_eq!(messages(&mut w), vec!["65,a,"]);
+    let (mut w, _) = npc_in(src, Era::V205);
+    w.key_pressed(65, "a");
+    assert!(messages(&mut w).is_empty());
+    assert!(w.take_log().is_empty(), "no line for every key");
+}
