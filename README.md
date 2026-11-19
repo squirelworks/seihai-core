@@ -42,6 +42,10 @@ Each merged PR that changes the crate bumps the workspace version in
 publishes the tag once CI passes on `main`. Tags are cut only with the
 owner's go-ahead.
 
+CI builds Linux and Windows on every push and PR. macOS is built and
+tested only at release: the release workflow's `macos` job runs on the
+commit being tagged, and the publish step waits for it to pass (#78).
+
 From 0.1.0 the numbers follow Cargo's rules for 0.x:
 
 - **Minor (0.1 to 0.2)** for a breaking change to the public API: a

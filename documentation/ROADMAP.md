@@ -34,7 +34,9 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
       native all-version parity. Gap triage by corpus fail hits is #93
       (`documentation/gs1-to-gs2-gaps.md`); `setbody`, plain `addstring`,
       `savelog2`, and engine-removed omits (`setbackpal`, `putobject`) now
-      lower — spawn/combat puts and `shoot` stay `Missing` pending lab.
+      lower; `putbomb` and `shoot` call through by name, as real GS2
+      weapons do (0.5.1) — `putexplosion(2)`, `puthorse` and `putnpc(2)`
+      stay `Missing` pending lab (#104).
 - [ ] GS2 VM coverage for the Mac 4.04r2 and 5.12 VMs and the 7.x client
       (`documentation/gs2-vm-versions.md`). The 7.x opcode set is now
       read (Graal_analysis `protocol/gs2-opcode-table.md`, PR #630):

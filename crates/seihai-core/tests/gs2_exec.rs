@@ -563,6 +563,25 @@ fn scheduled_event_name_folds_case() {
     assert_eq!(m.var(Root::This, "drop"), None);
 }
 
+#[test]
+fn an_events_arguments_are_also_params() {
+    use seihai_core::scripting::gs2::compile::compile_gs2;
+    let src = "function onKeyPressed() { this.k = params[0]; this.t = params[1]; }\n\
+               function onNamed(a) { this.a = a; this.p = params[0]; }\n";
+    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let mut h = host();
+    let args = [Val::Num(65.0), Val::Str("a".into())];
+    assert_eq!(m.call_event("onKeyPressed", &args, &mut h), Outcome::Done);
+    assert_eq!(m.var(Root::This, "k"), Some(&Val::Num(65.0)));
+    assert_eq!(m.var(Root::This, "t"), Some(&Val::Str("a".into())));
+    assert_eq!(
+        m.call_event("onNamed", &[Val::Num(3.0)], &mut h),
+        Outcome::Done
+    );
+    assert_eq!(m.var(Root::This, "a"), Some(&Val::Num(3.0)));
+    assert_eq!(m.var(Root::This, "p"), Some(&Val::Num(3.0)));
+}
+
 /// An object kept in a variable or passed as a parameter is still that
 /// object: `this.me = player; this.me.chat = …` writes the player, and an
 /// object compares unequal to null (Seihai #458: a real 5.12 walks its 3D

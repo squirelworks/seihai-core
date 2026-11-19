@@ -32,16 +32,15 @@ fn top_gap_priorities_match_issue_93() {
 
 #[test]
 fn high_hit_effect_spawn_commands_stay_missing() {
-    // Spawn / combat puts with no 3.153 shared-command form. Emitting a
-    // Same call would compile but fail on a real GS2 client ("Function
-    // not found"). Keep them Missing until a lab-backed form exists.
-    // TODO(lab): putexplosion(2), putbomb, puthorse, putnpc(2), shoot.
+    // Spawn puts with no 3.153 shared-command form and no call in the real
+    // GS2 weapon corpus. Emitting a Same call could compile but fail on a
+    // real GS2 client ("Function not found"). Keep them Missing until a
+    // lab-backed form exists.
+    // TODO(lab): putexplosion(2), puthorse, putnpc(2).
     for name in [
         "putexplosion",
         "puthorse",
         "putnpc",
-        "putbomb",
-        "shoot",
         "putnpc2",
         "putexplosion2",
         "timershow",
@@ -59,14 +58,8 @@ fn high_hit_effect_spawn_commands_stay_missing() {
             .unwrap_err()
             .to_string();
         assert!(err.contains(name), "{name}: {err}");
-        if matches!(
-            name,
-            "putexplosion" | "putbomb" | "puthorse" | "putnpc" | "shoot"
-        ) {
-            assert!(
-                err.contains("3.153") || err.contains("shootarrow"),
-                "{name}: {err}"
-            );
+        if matches!(name, "putexplosion" | "puthorse" | "putnpc") {
+            assert!(err.contains("3.153"), "{name}: {err}");
         }
     }
 }
@@ -163,4 +156,28 @@ fn inert_noexec_commands_are_omitted() {
         );
         assert_eq!(a.write(), b.write());
     }
+}
+
+#[test]
+fn putbomb_and_shoot_call_through_by_name() {
+    // Real compiled GS2 weapon scripts call both on 4.x to 6.x clients.
+    for name in ["putbomb", "shoot"] {
+        assert_eq!(
+            gs1_command_lowering(name),
+            Some(Gs1Lowering::Same),
+            "{name}"
+        );
+        assert!(!gs1_commands_without_gs2().contains(&name), "{name}");
+    }
+    let a = compile::compile_gs1("if (created) { putbomb 1,x+2,y; }\n", Era::V217)
+        .unwrap_or_else(|e| panic!("{e}"));
+    let b = compile::compile_gs2("function onCreated() {\n  putbomb(1, x + 2, y);\n}\n")
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(a.disassemble(), b.disassemble());
+    let a = compile::compile_gs1(
+        "if (playerchats) { shoot x,y,0,0,0,2,arrow.gani,; }\n",
+        Era::V217,
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    assert!(a.disassemble().contains("shoot"), "{}", a.disassemble());
 }

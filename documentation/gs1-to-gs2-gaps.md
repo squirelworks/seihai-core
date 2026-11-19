@@ -17,7 +17,7 @@ class:
 | `Same` | GS2 has the same command or opcode; call by name. |
 | `Renamed` | GS2 uses another name (`setgif` → `setimg`). |
 | `Statements` | Becomes GS2 statements (assignments, list methods, or an intentional omit). |
-| `Missing` | Compile error. No 3.153 shared-command form is known yet. |
+| `Missing` | Compile error. No 3.153 shared-command form, and no real GS2 script calls it. |
 
 `gs1_commands_without_gs2()` lists every name that is not `Same` (so
 `Renamed` / `Statements` / `Missing` all appear there).
@@ -27,6 +27,14 @@ A `Missing` name must not be emitted as a silent `Same` call: the 3.153
 client tables do not register it, so a real GS2 client would report
 "Function not found" at run time. Prefer a lab-backed `Statements` or
 `Renamed` form, or keep the compile error.
+
+The one exception is a name that real compiled GS2 scripts call on 4.x to
+6.x clients. The weapon corpus (Graal_analysis
+`npc-library/gs2-weapon-corpus-2026-11-14.md`) has `shoot` in 25 weapons of
+the 2007 set and 67 of the 2018 set, and `putbomb` in 5 of the 2018 set.
+Both are `Same` (`GS2_CORPUS_COMMANDS` in `tables.rs`), with their GS1
+argument order. That is an inference from shipped scripts **[inf]**, not a
+lab run.
 
 ## Top failing-unit hits (#93)
 
@@ -38,8 +46,8 @@ client tables do not register it, so a real GS2 client would report
 | `setstring` | 188 | `Statements` | Plain / `this.` / `client.` forms lower; residual flag forms still refuse (see README Known gaps). |
 | `putnpc` | 158 | `Missing` | GS1 NPC spawn; no 3.153 client command. **TODO(lab):** server `PUTNPC` path. |
 | `setbody` | 135 | `Statements` | `player.bodyimg = file` (same as `setplayerprop #8`). |
-| `putbomb` | 134 | `Missing` | Not in 3.153 tables. **TODO(lab).** |
-| `shoot` | 126 | `Missing` | Not in 3.153 tables; `shootarrow` / `setshootparams` are different shapes. **TODO(lab).** |
+| `putbomb` | 134 | `Same` | Not in 3.153 tables, but real 2018 GS2 weapons call `putbomb(power, x, y)`. |
+| `shoot` | 126 | `Same` | Not in 3.153 tables, but real 2007 and 2018 GS2 weapons call `shoot(...)` next to `setshootparams`. |
 | `putnpc2` | 104 | `Missing` | Server-oriented in 2.17–3.04 notes; not a 3.153 client command. **TODO(lab).** |
 | `putexplosion2` | 86 | `Missing` | Same family as `putexplosion`. **TODO(lab).** |
 | `addstring` | 80 | `Statements` | `this.` / `client.` lists, and plain names via `client.gs1_<flag>` like `setstring`. |
@@ -72,9 +80,8 @@ below. A silent `Same` call would fail on real GS2 clients. Track progress
 by moving a name out of `Missing` in `gs1_command_lowering` once a
 shared-command, opcode, or server-assisted form is documented:
 
-- `putexplosion`, `putexplosion2`, `putbomb`, `puthorse`
+- `putexplosion`, `putexplosion2`, `puthorse`
 - `putnpc`, `putnpc2`
-- `shoot` (and whether any `setshootparams` + projectile pair matches)
 - `timershow` (not the same as `timereverywhere`)
 - `sendpm`, `setpm`, `sendtonc` (server-side in 2.17–3.04 notes)
 
