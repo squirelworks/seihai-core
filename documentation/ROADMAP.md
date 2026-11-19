@@ -3,8 +3,8 @@
 Working mirror of [issue #7](https://github.com/squirelworks/seihai-core/issues/7).
 The suite-wide plan is squirelworks/seihai#353. This page groups that work
 into three phases so "finished" has a clear meaning for this crate.
-Last checked 2026-11-16 against `main` at `eae5553` (after #90). Tags are
-published through **v0.4.4**; 0.5.0 is pending its tag.
+Last checked 2026-11-19 against `main` at `eb1a732` (after #107), plus
+the 0.6.1 work. Tags are cut with the owner's go-ahead.
 
 ## Where it stands
 
@@ -52,22 +52,27 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
       compiler takes every feature the note counts; mixed GS1/GS2 NPCs
       and layers 1/2 are covered by `tests/mixed_npcs.rs` (0.5.0). Still
       open:
-      - `new Type(…) { … }` blocks and `new TStaticVar()` (97 GUI
-        control blocks and 1 static var): `OP_INLINE_NEW` /
-        `OP_NEW_OBJECT` are skipped by the VM ("Stage D").
-      - `makevar(…) = v`: `OP_MAKEVAR` is skipped by the VM.
-      - Host calls the client VM does not provide: `findplayer`,
-        `findplayerbycommunityname`, `findweapon`, `trigger(…)`,
-        `triggerserver`, `.objecttype()`. Server-only calls
+      - ~~`new Type(…) { … }` blocks and `new TStaticVar()`~~ run from
+        0.6.1: objects live under the global object by name, `with`
+        reaches them, `Machine::objects` lists them. Drawing the GUI
+        controls (`addcontrol`) is the host's (seihai).
+      - ~~`makevar(…) = v`~~ runs from 0.6.1.
+      - ~~`triggerserver`, `triggeraction`, `.objecttype()`~~ from
+        0.6.1 (`triggerserver` as GServer-v2 reads it, **[inf]**).
+      - Host calls that need the host's object model: `findplayer`,
+        `findplayerbycommunityname`, `findweapon`, `trigger(…)`. Server-only calls
         (`triggerclient`, `findlevel`, `findnpc`, `putnpc2`,
         `loadlines`/`savelines`, `loadvars`/`getstringkeys`,
         `requesttext`, `savelog`) wait on server-side GS2, which is out
         of the compiler's scope.
       - GS1 message codes on plain strings in GS2 (`#s(name)`) are
         refused; the levels still hold 440 `#s`/`#v`-style codes.
-      - `delivery` compiles client scripts as strict GS1, so a mixed
-        client part with GS2 call syntax (`setshape2(2, 2, {…})`) is
-        sent as a stub; `Language::Detect` compiles it.
+      - ~~`delivery` compiles client scripts as strict GS1~~: from
+        0.6.1 a client part strict GS1 refuses is compiled as
+        `Language::Detect` reads it.
+- [ ] Server trigger actions (#106): `PLO_TRIGGERACTION` (48) is
+      decoded from 0.6.1 (layout **[srv][2.05]**); the lab capture
+      from a real 2.22 and 5.12 that confirms the field order is open.
 - [ ] `.code` files for 1.x (#63): core codec shipped in 0.2.10 (#66);
       Seihai client-folder integration and observable guild/registration
       behaviour remain open.

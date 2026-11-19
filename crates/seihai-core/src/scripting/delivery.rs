@@ -70,12 +70,20 @@ pub struct Choice<'a> {
 
 impl Prepared {
     /// Compile `source`, written as GS1 of `era`, once. Strict mode: a
-    /// server owner's script is compiled as written. A script that does
-    /// not compile still goes out as GS1 text to the builds that read it.
+    /// server owner's script is compiled as written. A client part that
+    /// mixes GS1 with GS2 call syntax (`setshape2(2, 2, {…})` next to
+    /// `if (created)`), as level NPCs of the GS2 era do, is not strict GS1:
+    /// it is compiled as [`Language::Detect`] reads it (with the legacy
+    /// quirks such scripts rely on), and the GS1 errors
+    /// are kept only when that fails too. A script that does not compile
+    /// still goes out as GS1 text to the builds that read it.
     pub fn gs1(source: &str, era: Era) -> Prepared {
+        let bytecode = compile(source, Language::Gs1(era), Mode::Strict)
+            .or_else(|e| compile(source, Language::Detect(era), Mode::Legacy).map_err(|_| e))
+            .map(|c| c.script.write());
         Prepared {
             source: source.to_string(),
-            bytecode: compile(source, Language::Gs1(era), Mode::Strict).map(|c| c.script.write()),
+            bytecode,
         }
     }
 
@@ -186,6 +194,21 @@ if (timeout) {
                 "{v:?}"
             );
         }
+    }
+
+    #[test]
+    fn a_mixed_client_part_with_gs2_calls_gets_bytecode() {
+        let src = "if (created) {\n  setshape2(2, 2, {22, 22, 22, 22});\n  this.n = 1;\n}\n";
+        assert!(
+            compile(src, Language::Gs1(Era::V217), Mode::Strict).is_err(),
+            "the strict GS1 front end should refuse this"
+        );
+        let p = Prepared::gs1(src, Era::V217);
+        assert!(p.bytecode().is_some(), "{:?}", p.compile_errors());
+        assert!(matches!(
+            p.for_client(ClientVersion::V512).delivery,
+            Delivery::Gs2Bytecode(_)
+        ));
     }
 
     #[test]

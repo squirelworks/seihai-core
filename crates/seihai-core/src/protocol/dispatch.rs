@@ -33,6 +33,67 @@ pub enum ServerItem {
     Del(f32, f32),
 }
 
+/// A trigger action the server sent (`PLO_TRIGGERACTION`, 48): another
+/// player's or a server script's `triggeraction`, or a server script's
+/// `triggerclient`. Layout **\[srv\]\[2.05\]** (Graal_analysis
+/// `protocol/packet-layouts.md`, `payload-and-trigger-205r2.md`): GSHORT
+/// player, GINT3 NPC (0 for none), GCHAR x and y in half tiles, then the
+/// action text, split at the **first** comma only. Not yet checked
+/// against a capture from a real 2.22 or 5.12 (#106).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ServerTrigger {
+    /// The player the action comes from (0 for the server).
+    pub player: u16,
+    /// The NPC the action comes from; 0 when there is none.
+    pub npc: u32,
+    /// Where it was fired, in tiles.
+    pub x: f32,
+    pub y: f32,
+    /// The text before the first comma (`clientside`, `gr.addweapon`, an
+    /// action name, …), as sent.
+    pub action: String,
+    /// Everything after the first comma, as sent; empty when there is no
+    /// comma.
+    pub params: String,
+}
+
+impl ServerTrigger {
+    /// `params` split at its commas, the form `onAction…` handlers read
+    /// as `params`. Empty for no parameters.
+    pub fn param_list(&self) -> Vec<String> {
+        if self.params.is_empty() {
+            Vec::new()
+        } else {
+            self.params.split(',').map(str::to_string).collect()
+        }
+    }
+}
+
+/// Decode a `PLO_TRIGGERACTION` (48) payload. `None` when it is shorter
+/// than the 2.05 handler takes (the player id and six more bytes).
+pub fn parse_server_trigger(p: &[u8]) -> Option<ServerTrigger> {
+    if p.len() < 8 {
+        return None;
+    }
+    let player = read_gshort(p)?;
+    let npc = read_gint3(&p[2..])? as u32;
+    let half = |b: u8| b.wrapping_sub(0x20) as f32 / 2.0;
+    let (x, y) = (half(p[5]), half(p[6]));
+    let text = latin1(&p[7..]);
+    let (action, params) = match text.split_once(',') {
+        Some((a, r)) => (a.to_string(), r.to_string()),
+        None => (text, String::new()),
+    };
+    Some(ServerTrigger {
+        player,
+        npc,
+        x,
+        y,
+        action,
+        params,
+    })
+}
+
 /// A single logical message after frame decompression.
 #[derive(Debug, Clone)]
 pub struct Message {
@@ -571,6 +632,10 @@ pub struct SessionState {
     /// Other players' bombs, explosions and shots (ids 11, 12, 36 and 19),
     /// in the order they came, drained by the game loop.
     pub level_objects: Vec<LevelObject>,
+    /// `PLO_TRIGGERACTION` (48) in arrival order, drained by the game loop
+    /// (scripts' `onAction…` events). Only builds whose receive set has 48
+    /// (2.05 on) fill it.
+    pub triggers: Vec<ServerTrigger>,
     /// Messages dropped because this version has no handler for them.
     pub ignored: HashMap<u8, usize>,
     /// Text of `PLO_DISCMESSAGE` (16). The server closes after it.
@@ -971,6 +1036,13 @@ impl SessionState {
                 // as the 2.05 handler does.
                 if let Some(it) = crate::items::parse_item_add(&msg.payload) {
                     self.items.push(ServerItem::Add(it));
+                }
+            }
+            48 => {
+                // PLO_TRIGGERACTION: GSHORT player, GINT3 npc, x*2, y*2,
+                // action[,params].
+                if let Some(t) = parse_server_trigger(&msg.payload) {
+                    self.triggers.push(t);
                 }
             }
             23 => {
@@ -3190,6 +3262,43 @@ mod tests {
         assert_eq!(st.others[0].account.as_deref(), Some("acct5"));
         assert_eq!(st.identities[&5].account.as_deref(), Some("acct5"));
         assert_eq!(st.identities[&5].nick.as_deref(), Some("Nick"));
+    }
+
+    #[test]
+    fn trigger_actions_are_decoded_for_builds_that_take_48() {
+        // GSHORT player 3, GINT3 npc 1 (0x20 0x20 0x21), x 10.5, y 4,
+        // then the action and its parameters.
+        let mut payload = vec![0x20, 0x23, 0x20, 0x20, 0x21, 0x20 + 21, 0x20 + 8];
+        payload.extend_from_slice(b"clientside,-Shop,buy,2");
+        let msg = Message { id: 48, payload };
+        let mut st = SessionState::for_version(ClientVersion::V205);
+        st.apply(&msg);
+        assert_eq!(
+            st.triggers,
+            [ServerTrigger {
+                player: 3,
+                npc: 1,
+                x: 10.5,
+                y: 4.0,
+                action: "clientside".into(),
+                params: "-Shop,buy,2".into(),
+            }]
+        );
+        assert_eq!(st.triggers[0].param_list(), ["-Shop", "buy", "2"]);
+        // No comma: the whole text is the action.
+        let t = parse_server_trigger(b"    !!(open").unwrap();
+        assert_eq!(
+            (t.player, t.npc, t.action.as_str(), t.params.as_str()),
+            (0, 1, "open", "")
+        );
+        assert!(t.param_list().is_empty());
+        // Shorter than the 2.05 handler takes: dropped.
+        assert_eq!(parse_server_trigger(b"    !!("), None);
+        // 2.02r2 has no 48 in its receive set.
+        let mut old = SessionState::for_version(ClientVersion::V202R2);
+        old.apply(&msg);
+        assert!(old.triggers.is_empty());
+        assert_eq!(old.ignored.get(&48), Some(&1));
     }
 
     #[test]
