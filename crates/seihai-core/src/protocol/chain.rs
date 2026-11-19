@@ -879,14 +879,14 @@ pub const CHAIN: &[Step] = &[
             bow_prop10: Some(false),
             // Asks for shield1.png at join, where 2.05 asks .gif names.
             image_ext: Some(".png"),
-            colors: Some((7, 8)),
+            colors: Some((8, 8)),
             side: true,
             ..Delta::NONE
         },
-        source: "binary (md5 88d1f84c) and lab 2026-10-30: PLO 2, 4, 17, 18, 154 and 155 and PLI 7, 8, 11, 15, 16, 17 and 20 gone with the built-in sword, bow, baddies, chests, horses and freeze; GANI (10) a string, COLORS sent as 7 bytes and read as 8, HEADGIF without an extension, STATUS bit 0x20; login props 0, 11, 13, 18, 31, 33 then LANGUAGE; PLO 42 is the NewWorld time (GINT4 minutes since 1000/01/01); GS1 161 commands plus the nw* time variables; 65x65 terrain heights in the level",
+        source: "binary (md5 88d1f84c) and lab 2026-10-30: PLO 2, 4, 17, 18, 154 and 155 and PLI 7, 8, 11, 15, 16, 17 and 20 gone with the built-in sword, bow, baddies, chests, horses and freeze; GANI (10) a string, COLORS sent and read as 8 bytes (lab 2026-11-19 against seihai-gserver: 8 on every login; the 7 of the 2026-10-30 notes was a misread), HEADGIF without an extension, STATUS bit 0x20; login props 0, 11, 13, 18, 31, 33 then LANGUAGE; PLO 42 is the NewWorld time (GINT4 minutes since 1000/01/01); GS1 161 commands plus the nw* time variables; 65x65 terrain heights in the level",
         unknown: &[
             Unknown { area: "listserver", what: "the real client dials 14921 and asks for the list `newworld` (id 0 only); this row keeps 2.05's frame with `newmain`, and the public listserver was not asked for a `newworld` list" },
-            Unknown { area: "props", what: "what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build" },
+            Unknown { area: "props", what: "what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build, and the betas draw those parts (pullover, pants, border, as seen in the 2026-11-19 lab) white" },
             Unknown { area: "life", what: "the death and combat rules are carried from 2.05; with no built-in sword the server must give a sword weapon, and hits were not traced" },
             Unknown { area: "ui", what: "the HUD (150/150 health and the NewWorld calendar clock) and the terrain heights are not modelled; the row carries 2.05's" },
             Unknown { area: "files", what: "the .png default image extension is taken from the join requests (shield1.png, bodynw.png); the default-image table was not read" },
@@ -954,7 +954,7 @@ pub const CHAIN: &[Step] = &[
             // Classic login as 2.1 test 3 (lab), port not checked with it.
             listserver: Some(Some(Listserver::new(ListKind::Legacy, PortStatus::Assumed, None))),
             pli: IdDelta { minus: &[7, 8, 11, 15, 16, 17, 20], ..IdDelta::NONE },
-            colors: Some((7, 8)),
+            colors: Some((8, 8)),
             // 2.1 test 3's file packets: no modtime (binary).
             modtime: Some(false),
             download_maps: Some(false),
@@ -968,7 +968,7 @@ pub const CHAIN: &[Step] = &[
         unknown: &[
             Unknown { area: "base", what: "the binary is 2.1 test 3; this row is built on the generic inferred 2.1 row, so values the NewWorld profile does not list (UI, death rules, image extension) are that row's; the file packets are set back to 2.1 test 3's (no modtime, no maps folder rule)" },
             Unknown { area: "listserver", what: "the real client dials 14922 and asks for the list `newworld`; this row keeps 2.1's frame with `newmain`. It sent fewer password characters than were typed (23 of 28); the cut-off was not pinned down" },
-            Unknown { area: "props", what: "what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build" },
+            Unknown { area: "props", what: "what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build, and the betas draw those parts (pullover, pants, border, as seen in the 2026-11-19 lab) white" },
         ],
     },
     Step {
@@ -2721,7 +2721,7 @@ mod tests {
             assert_eq!(previous(nw), Some(base));
             assert_eq!(previous(next), Some(base));
             assert_eq!(p(nw).token, "G2N15041");
-            assert_eq!((p(nw).props.colors_sent, p(nw).props.colors_read), (7, 8));
+            assert_eq!((p(nw).props.colors_sent, p(nw).props.colors_read), (8, 8));
             assert_eq!(
                 (p(next).props.colors_sent, p(next).props.colors_read),
                 (5, 5)

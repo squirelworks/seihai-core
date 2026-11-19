@@ -395,11 +395,12 @@ pub struct Props {
     /// X2/Y2/Z2 (78–80) and `PLO_MOVE2` are used for positions.
     pub precise_pos: bool,
     /// Bytes of COLORS (prop 13) the build sends. 5 in every build but the
-    /// NewWorld betas, which send 7.
+    /// NewWorld betas, which send 8 (lab, 2026-11-19).
     pub colors_sent: u8,
     /// Bytes of COLORS the build reads in a prop stream from the server. 5
     /// in every build but the NewWorld betas, which read 8: a server must
-    /// pad the prop for them and cut it for everyone else.
+    /// pad the prop for them and cut it for everyone else. Kept apart from
+    /// `colors_sent` because the two widths are separate facts per build.
     pub colors_read: u8,
 }
 

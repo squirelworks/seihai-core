@@ -1136,13 +1136,13 @@ row	area	field	set_by	set_by_basis	evidence	notes
 NewWorld beta 1	protocol	plo (server ids handled)	NewWorld beta 1	binary	read here	
 NewWorld beta 1	protocol	pli (client ids sent)	NewWorld beta 1	binary	read here	
 NewWorld beta 1	protocol	udp	1.28 beta 2	binary	carried	
-NewWorld beta 1	props	own-player props	2.04	binary	carried, flagged unknown	what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build
+NewWorld beta 1	props	own-player props	2.04	binary	carried, flagged unknown	what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build, and the betas draw those parts (pullover, pants, border, as seen in the 2026-11-19 lab) white
 NewWorld beta 1	props	npc_max	2.02	binary	carried	
 NewWorld beta 1	ui	window	2.01	binary	carried	
 NewWorld beta 1	ui	gs1_commands	2.05	binary	carried, flagged unknown	the HUD (150/150 health and the NewWorld calendar clock) and the terrain heights are not modelled; the row carries 2.05's
 NewWorld beta 1	world	world	2.01	binary	carried	
 NewWorld beta 1	life	combat	2.03	binary	carried, flagged unknown	the death and combat rules are carried from 2.05; with no built-in sword the server must give a sword weapon, and hits were not traced
-NewWorld beta 1	props	other-player props	2.04	binary	carried, flagged unknown	what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build
+NewWorld beta 1	props	other-player props	2.04	binary	carried, flagged unknown	what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build, and the betas draw those parts (pullover, pants, border, as seen in the 2026-11-19 lab) white
 NewWorld beta 1	ui	hud	1.38	binary	carried	
 NewWorld beta 1	ui	emoticons	1.38	binary	carried	
 NewWorld beta 1	ui	key_config	1.38	binary	carried	
@@ -1244,13 +1244,13 @@ NewWorld beta 1	scripts	resolve_host	ORIGIN	origin	carried
 NewWorld beta 2	protocol	plo (server ids handled)	NewWorld beta 2	binary	read here	
 NewWorld beta 2	protocol	pli (client ids sent)	NewWorld beta 2	binary	read here	
 NewWorld beta 2	protocol	udp	1.28 beta 2	binary	carried	
-NewWorld beta 2	props	own-player props	2.1	inferred	carried, flagged unknown	what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
+NewWorld beta 2	props	own-player props	2.1	inferred	carried, flagged unknown	what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build, and the betas draw those parts (pullover, pants, border, as seen in the 2026-11-19 lab) white | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
 NewWorld beta 2	props	npc_max	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 NewWorld beta 2	ui	window	2.01	binary	carried	
 NewWorld beta 2	ui	gs1_commands	NewWorld beta 2	binary	read here	
 NewWorld beta 2	world	world	2.01	binary	carried	
 NewWorld beta 2	life	combat	2.03	binary	carried	
-NewWorld beta 2	props	other-player props	2.1	inferred	carried, flagged unknown	what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
+NewWorld beta 2	props	other-player props	2.1	inferred	carried, flagged unknown	what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build, and the betas draw those parts (pullover, pants, border, as seen in the 2026-11-19 lab) white | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
 NewWorld beta 2	ui	hud	1.38	binary	carried	
 NewWorld beta 2	ui	emoticons	1.38	binary	carried	
 NewWorld beta 2	ui	key_config	1.38	binary	carried	

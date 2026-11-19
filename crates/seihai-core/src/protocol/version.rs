@@ -68,7 +68,7 @@ pub enum ClientVersion {
     V205,
     /// NewWorld beta 1 (`G2N15041`, linked 2001-08-06). Gen 3. A side build
     /// off 2.05: the NewWorld test client, with the built-in sword, bow,
-    /// baddies, chests, horses and freeze taken out and a 7-byte COLORS prop.
+    /// baddies, chests, horses and freeze taken out and an 8-byte COLORS prop.
     /// Its changes do not carry into 2.1.
     NewWorldB1,
     /// Generic Graal 2.1 (`GNW31101`). Gen 3; profile inferred. Observed

@@ -75,7 +75,7 @@ Step {
 - `source`: where the delta comes from (a binary, the shipped release notes, server source, a lab capture). One line.
 - `unknown`: what the notes do **not** settle for this build. A value that is not known stays the previous step's value and the step says so here; nothing is filled in. Every step with no binary behind it (`Basis::Inferred`) must have at least one entry, and so must a step whose delta is empty.
 
-- `delta.side`: a **side build**. Its row is the row before it plus its delta, but the next step continues from the row before it, so nothing in a side build's delta carries on. `changes`, `previous` and the tables compare a step with the nearest step before it that is not a side build. The two NewWorld betas (`G2N15041`) are side builds: beta 1 of 2.05, beta 2 of 2.1 (its binary is a 2.1 test 3 build). Both drop the built-in sword, bow, baddies, chests, horses and freeze (PLO 2, 4, 17, 18, 154, 155; PLI 7, 8, 11, 15, 16, 17, 20), send COLORS (13) as 7 bytes and read it as 8 (`Props::colors_sent` and `colors_read`; every other build is 5 and 5), and read GANI (10) as a string. Source: Graal_analysis `client-internals/newworld-betas.md`.
+- `delta.side`: a **side build**. Its row is the row before it plus its delta, but the next step continues from the row before it, so nothing in a side build's delta carries on. `changes`, `previous` and the tables compare a step with the nearest step before it that is not a side build. The two NewWorld betas (`G2N15041`) are side builds: beta 1 of 2.05, beta 2 of 2.1 (its binary is a 2.1 test 3 build). Both drop the built-in sword, bow, baddies, chests, horses and freeze (PLO 2, 4, 17, 18, 154, 155; PLI 7, 8, 11, 15, 16, 17, 20), send and read COLORS (13) as 8 bytes (`Props::colors_sent` and `colors_read`; every other build is 5 and 5), and read GANI (10) as a string. Source: Graal_analysis `client-internals/newworld-betas.md`.
 
 The resolver is a `const fn`, so `PROFILES` is built at compile time and keeps its type, `&'static [VersionProfile]`.
 
@@ -353,15 +353,15 @@ Generated; do not edit between the markers.
 - protocol: **plo (server ids handled)**: -2 BADDYPROPS, -4 LEVELCHEST, -17 HORSEADD, -18 HORSEDEL, -154 FREEZEPLAYER2, -155 UNFREEZEPLAYER (59 -> 53 ids)
 - protocol: **pli (client ids sent)**: -7 HORSEADD, -8 HORSEDEL, -11 THROWCARRIED, -15 BADDYPROPS, -16 BADDYHURT, -17 BADDYADD, -20 OPENCHEST (39 -> 32 ids)
 - props: **bow_prop10**: yes -> no
-- props: **colors_sent**: 5 -> 7
+- props: **colors_sent**: 5 -> 8
 - props: **colors_read**: 5 -> 8
 - files: **image_ext**: ".gif" -> ".png"
 - unknown (listserver): the real client dials 14921 and asks for the list `newworld` (id 0 only); this row keeps 2.05's frame with `newmain`, and the public listserver was not asked for a `newworld` list
-- unknown (props): what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build
+- unknown (props): what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build, and the betas draw those parts (pullover, pants, border, as seen in the 2026-11-19 lab) white
 - unknown (life): the death and combat rules are carried from 2.05; with no built-in sword the server must give a sword weapon, and hits were not traced
 - unknown (ui): the HUD (150/150 health and the NewWorld calendar clock) and the terrain heights are not modelled; the row carries 2.05's
 - unknown (files): the .png default image extension is taken from the join requests (shield1.png, bodynw.png); the default-image table was not read
-- source: binary (md5 88d1f84c) and lab 2026-10-30: PLO 2, 4, 17, 18, 154 and 155 and PLI 7, 8, 11, 15, 16, 17 and 20 gone with the built-in sword, bow, baddies, chests, horses and freeze; GANI (10) a string, COLORS sent as 7 bytes and read as 8, HEADGIF without an extension, STATUS bit 0x20; login props 0, 11, 13, 18, 31, 33 then LANGUAGE; PLO 42 is the NewWorld time (GINT4 minutes since 1000/01/01); GS1 161 commands plus the nw* time variables; 65x65 terrain heights in the level
+- source: binary (md5 88d1f84c) and lab 2026-10-30: PLO 2, 4, 17, 18, 154 and 155 and PLI 7, 8, 11, 15, 16, 17 and 20 gone with the built-in sword, bow, baddies, chests, horses and freeze; GANI (10) a string, COLORS sent and read as 8 bytes (lab 2026-11-19 against seihai-gserver: 8 on every login; the 7 of the 2026-10-30 notes was a misread), HEADGIF without an extension, STATUS bit 0x20; login props 0, 11, 13, 18, 31, 33 then LANGUAGE; PLO 42 is the NewWorld time (GINT4 minutes since 1000/01/01); GS1 161 commands plus the nw* time variables; 65x65 terrain heights in the level
 
 #### 2.1 (`GNW31101`, inferred)
 
@@ -396,7 +396,7 @@ Generated; do not edit between the markers.
 - protocol: **listserver**: listserver.graal.in:14923 (legacy, confirmed), login shape B (login frame inferred, not captured; no evidence for this shape) -> listserver.graal.in:14923 (legacy, assumed), login shape B (login frame inferred, not captured; no evidence for this shape)
 - protocol: **plo (server ids handled)**: -2 BADDYPROPS, -4 LEVELCHEST, -17 HORSEADD, -18 HORSEDEL, -154 FREEZEPLAYER2, -155 UNFREEZEPLAYER, -170 GHOSTMODE, -171 BIGMAP, -172 MINIMAP, -173 GHOSTTEXT, -174 GHOSTICON (66 -> 55 ids)
 - protocol: **pli (client ids sent)**: -7 HORSEADD, -8 HORSEDEL, -11 THROWCARRIED, -15 BADDYPROPS, -16 BADDYHURT, -17 BADDYADD, -20 OPENCHEST (39 -> 32 ids)
-- props: **colors_sent**: 5 -> 7
+- props: **colors_sent**: 5 -> 8
 - props: **colors_read**: 5 -> 8
 - files: **modtime**: yes -> no
 - files: **download_maps**: yes -> no
@@ -405,7 +405,7 @@ Generated; do not edit between the markers.
 - scripts: **gs2**: unknown -> no
 - unknown (base): the binary is 2.1 test 3; this row is built on the generic inferred 2.1 row, so values the NewWorld profile does not list (UI, death rules, image extension) are that row's; the file packets are set back to 2.1 test 3's (no modtime, no maps folder rule)
 - unknown (listserver): the real client dials 14922 and asks for the list `newworld`; this row keeps 2.1's frame with `newmain`. It sent fewer password characters than were typed (23 of 28); the cut-off was not pinned down
-- unknown (props): what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build
+- unknown (props): what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build, and the betas draw those parts (pullover, pants, border, as seen in the 2026-11-19 lab) white
 - source: binary (md5 af2d2106) and lab 2026-10-30: beta 1's removals and COLORS width on a 2.1 test 3 build (PLO 49 and 169, props 43 to 45 and UDP 27 kept); GS1 165 commands (addstring, insertstring, removestring, deletestring); asks for shield1.png, idle.gani and headalgo000 at join; list login id 0 `newworld` then id 1 account and password
 
 #### 2.12 (`GNW01012`, inferred)

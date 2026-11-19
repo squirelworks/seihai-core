@@ -179,7 +179,7 @@ pub fn parse_player_props_in(
 }
 
 /// [`parse_player_props_in`] with COLORS (prop 13) read as `colors` bytes.
-/// Every build reads and sends 5 but the NewWorld betas, which send 7 and
+/// Every build reads and sends 5 but the NewWorld betas, which send and
 /// read 8 (`Props::colors_sent` and `Props::colors_read`): parse what such a
 /// client sends with its `colors_sent`, and what a server sends it with its
 /// `colors_read`.
@@ -213,15 +213,17 @@ pub fn parse_player_props_sized(
 mod tests {
     use super::*;
 
-    /// NewWorld beta 1 sends COLORS as 7 bytes; read as 5, the stream
+    /// The NewWorld betas send COLORS as 8 bytes; read as 5, the stream
     /// would go wrong at the sixth byte.
     #[test]
     fn colors_width_follows_the_build() {
-        // COLORS 7 bytes, then SPRITE dir 2.
-        let p = [0x2d, 0x22, 0x25, 0x32, 0x25, 0x32, 0x20, 0x20, 0x31, 0x22];
-        let props = parse_player_props_sized(&p, false, 7, None);
+        // COLORS 8 bytes, then SPRITE dir 2.
+        let p = [
+            0x2d, 0x22, 0x25, 0x32, 0x25, 0x32, 0x20, 0x20, 0x20, 0x31, 0x22,
+        ];
+        let props = parse_player_props_sized(&p, false, 8, None);
         assert_eq!(props.iter().map(|p| p.id).collect::<Vec<_>>(), [13, 17]);
-        assert_eq!(props[0].raw.len(), 7);
+        assert_eq!(props[0].raw.len(), 8);
         let five = parse_player_props_in(&p, false, None);
         assert_eq!(five[0].raw.len(), 5);
         assert_ne!(five.get(1).map(|p| p.id), Some(17));

@@ -2099,8 +2099,8 @@ impl Connection {
         push_gstring_latin1(&mut msg, looks.body_name());
         msg.push(13 + 0x20);
         msg.extend(looks.colors.map(|c| c + 0x20));
-        // The NewWorld betas send 7 colour bytes; the last two are not known
-        // and go as 0.
+        // The NewWorld betas send 8 colour bytes; the last three are not
+        // known and go as 0.
         msg.extend(std::iter::repeat_n(
             0x20,
             usize::from(self.colors_sent).saturating_sub(5),
