@@ -16,51 +16,52 @@ so `git log` and `git blame` go back to the first commit that touched it.
 
 ## Using it
 
-Pin a tag; never follow a branch:
+Between releases, a consumer's `main` follows core's `main`. `Cargo.lock`
+keeps the exact commit, and `cargo update -p seihai-core -p seihai-draw` moves
+it in the PR that needs it:
 
 ```toml
-seihai-core = { git = "https://github.com/squirelworks/seihai-core", tag = "v0.1.0", default-features = false }
+seihai-core = { git = "https://github.com/squirelworks/seihai-core", branch = "main", default-features = false }
 ```
 
-and, for drawing (same tag, so a `Level` or `Gani` from the parser is the
-type `seihai-draw` paints):
+and, for drawing (the same source, so a `Level` or `Gani` from the parser is
+the type `seihai-draw` paints):
 
 ```toml
-seihai-draw = { git = "https://github.com/squirelworks/seihai-core", tag = "v0.1.0" }
+seihai-draw = { git = "https://github.com/squirelworks/seihai-core", branch = "main" }
 ```
+
+A consumer's release pins a published tag instead (`tag = "vX.Y.Z"`). Test
+builds against a local checkout use an override that isn't committed. See
+[VERSIONING.md](VERSIONING.md), "Pinning seihai-core".
 
 Features: `dev` (developer mode) and `audio` (sound output through rodio,
 needs the ALSA development files on Linux). Both are on by default.
 
-When a new tag is out, move every consumer to it in one round, so each
-lock file holds only one seihai-core.
+Crates that share a lock file have to name core the same way, so that the
+lock file holds only one seihai-core (#79).
 
 ## Versioning
 
-Each merged PR that changes the crate bumps the workspace version in
-`Cargo.toml` and adds `release-notes/vX.Y.Z.md`; the release workflow
-publishes the tag once CI passes on `main`. Tags are cut only with the
-owner's go-ahead.
+[VERSIONING.md](VERSIONING.md) says when a release happens, what the
+numbers mean before 1.0, and what 1.0.0 needs. In short: a merge doesn't make
+a release. A PR that changes the public API adds a line under `## Unreleased`
+in `CHANGELOG.md` and leaves the version alone. A release PR (with
+`Release: vX.Y.Z` in its body) bumps `[workspace.package] version` and adds
+`release-notes/vX.Y.Z.md`. Once CI passes on `main`, the release workflow
+builds and tests on macOS and drafts the release, and the owner publishes it.
+Before 1.0, a minor bump (0.6 to 0.7) is for a breaking change or a finished
+milestone, and a patch is for everything else. Next milestone: #108. 1.0.0
+criteria: #109.
 
 CI builds Linux and Windows on every push and PR. macOS is built and
 tested only at release: the release workflow's `macos` job runs on the
-commit being tagged, and the publish step waits for it to pass (#78).
-
-From 0.1.0 the numbers follow Cargo's rules for 0.x:
-
-- **Minor (0.1 to 0.2)** for a breaking change to the public API: a
-  removed or renamed item, a changed signature, a new field in a struct
-  built by literal or a new variant in an exhaustive enum, or a behaviour
-  change a consumer has to adapt to. The release notes list these under
-  "Breaking changes".
-- **Patch (0.1.0 to 0.1.1)** for everything else: fixes, new items, new
-  profiles and lab-confirmed corrections that keep existing callers
-  compiling.
+commit being drafted, and the draft waits for it to pass (#78).
 
 The `dev`, `difftest` and `viewer` modules are tools for the suite's own
 binaries. They are hidden from the docs and can change in a patch release.
 
-Before 0.1.0 every release was a 0.0.x bump and any of them could break.
+Before 0.1.0, every release was a 0.0.x bump, and any of them could break.
 
 ## Known gaps
 

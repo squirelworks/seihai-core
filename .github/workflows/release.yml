@@ -1,17 +1,19 @@
 name: Release
 
-# Publishes "seihai-core vX.Y.Z" when main carries a workspace version that has
-# no tag yet. It runs after CI passes on a push to main, so a release is only
-# cut from a green commit. Bumping `version` in Cargo.toml is all a release
-# takes. Notes come from release-notes/vX.Y.Z.md; without one, GitHub
-# generates them from the merged PRs. If the release already exists and its
-# notes file is present, the notes are updated to match the file. Run it by
-# hand (workflow_dispatch) to publish or refresh main's current version.
+# Drafts "seihai-core vX.Y.Z" when main carries a workspace version that has
+# no release yet. The version changes only in a release PR (VERSIONING.md):
+# an ordinary merge leaves it alone, so an ordinary green merge makes no
+# release. The workflow runs after CI passes on a push to main, so a draft is
+# only made from a green commit. It makes a DRAFT: the tag exists once the
+# owner presses Publish. Notes come from release-notes/vX.Y.Z.md (the
+# version-guard check makes the release PR add it). If the release (draft or
+# published) already exists, its notes are refreshed from the file. Run it by
+# hand (workflow_dispatch) to draft or refresh main's current version.
 #
-# CI runs Linux and Windows on every push. macOS builds only here: the
-# `macos` job builds and tests the commit being released, and the publish
-# job waits for it, so no tag is cut from a commit that never compiled on
-# macOS (#78).
+# CI runs Linux and Windows on every push. macOS builds only here, and only
+# when a new release is about to be drafted: the `macos` job builds and tests
+# the commit, and the draft waits for it, so no release is cut from a commit
+# that never compiled on macOS (#78).
 
 on:
   workflow_run:
@@ -28,11 +30,43 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  macos:
+  plan:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      new: ${{ steps.version.outputs.new }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Read the workspace version and look for its release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version *= *"\([^"]*\)".*/\1/p' Cargo.toml | head -n1)
+          if [ -z "$version" ]; then
+            echo "No [workspace.package] version in Cargo.toml" >&2
+            exit 1
+          fi
+          tag="v$version"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+             git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "new=false" >> "$GITHUB_OUTPUT"
+            echo "Workspace version $version already has a release (draft or published)."
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+            echo "Workspace version $version has no release yet: drafting one."
+          fi
+
+  macos:
+    needs: plan
+    if: needs.plan.outputs.new == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,33 +77,25 @@ jobs:
       - run: cargo test --workspace --no-fail-fast
 
   release:
-    needs: macos
+    needs: [plan, macos]
+    if: >-
+      always() && needs.plan.result == 'success' &&
+      (needs.plan.outputs.new != 'true' || needs.macos.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-          fetch-depth: 0
 
-      - name: Read the workspace version
-        id: version
-        run: |
-          version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version *= *"\([^"]*\)".*/\1/p' Cargo.toml | head -n1)
-          if [ -z "$version" ]; then
-            echo "No [workspace.package] version in Cargo.toml" >&2
-            exit 1
-          fi
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
-          echo "Workspace version: $version"
-
-      - name: Publish the release, or refresh its notes
+      - name: Draft the release, or refresh its notes
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          NEW: ${{ needs.plan.outputs.new }}
           SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           notes="release-notes/$TAG.md"
-          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+          if [ "$NEW" != "true" ]; then
             if [ -f "$notes" ]; then
               gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$notes"
               echo "Updated the notes on seihai-core $TAG from $notes"
@@ -85,7 +111,8 @@ jobs:
           fi
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
+            --draft \
             --target "$SHA" \
             --title "seihai-core $TAG" \
             "${notes_args[@]}"
-          echo "Published seihai-core $TAG on $SHA"
+          echo "Drafted seihai-core $TAG on $SHA; the owner publishes it (VERSIONING.md)."
