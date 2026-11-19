@@ -35,11 +35,15 @@ pub enum ServerItem {
 
 /// A trigger action the server sent (`PLO_TRIGGERACTION`, 48): another
 /// player's or a server script's `triggeraction`, or a server script's
-/// `triggerclient`. Layout **\[srv\]\[2.05\]** (Graal_analysis
-/// `protocol/packet-layouts.md`, `payload-and-trigger-205r2.md`): GSHORT
-/// player, GINT3 NPC (0 for none), GCHAR x and y in half tiles, then the
-/// action text, split at the **first** comma only. Not yet checked
-/// against a capture from a real 2.22 or 5.12 (#106).
+/// `triggerclient`. Layout (Graal_analysis `protocol/packet-layouts.md`,
+/// `payload-and-trigger-205r2.md`): GSHORT player, GINT3 NPC (0 for
+/// none), GCHAR x and y in half tiles, then the action text, split at the
+/// **first** comma only. **\[lab\]** (#106, 2026-11-19): every 48 that
+/// seihai-gserver-v2 sent to a real 2.22, 4.20r8 and 5.12 decodes this
+/// way, with the same bytes for all three. A relayed trigger carries the
+/// NPC id the sender put in its PLI 38 (0 from a 2.22 weapon, the firing
+/// NPC from 5.12). Not shown yet: which script a real client runs for a
+/// received 48.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ServerTrigger {
     /// The player the action comes from (0 for the server).
