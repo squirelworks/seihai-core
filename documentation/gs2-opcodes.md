@@ -120,7 +120,7 @@ but nothing in the compiler writes it.
 | 33 | 0x21 | OP_CONV_TO_FLOAT | — | Converts to a number | yes |
 | 34 | 0x22 | OP_CONV_TO_STRING | — | Converts to a string | yes |
 | 35 | 0x23 | OP_MEMBER_ACCESS | — | `a.b` | yes |
-| 36 | 0x24 | OP_CONV_TO_OBJECT | — | Converts to an object (method calls, `with`, `for`-each, `in`) | yes |
+| 36 | 0x24 | OP_CONV_TO_OBJECT | — | Converts to an object (method calls, `with`, `for`-each, `in`). A variable that holds an object (`this.me = player`, or a parameter given `player`) converts to that object, so `this.me.chat = …` writes the player. Seihai keeps such a value as a reference to the object's root; an object is never equal to `null` | yes |
 | 37 | 0x25 | OP_ARRAY_END | — | End of an array literal `{…}` | yes |
 | 38 | 0x26 | OP_ARRAY_NEW | — | `new[n]` | yes |
 | 39 | 0x27 | OP_SETARRAY | — | `setarray(var, n)` | yes |

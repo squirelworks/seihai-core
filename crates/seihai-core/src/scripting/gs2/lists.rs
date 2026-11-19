@@ -4,6 +4,7 @@
 //! not in the decompile; what is read from the VM and what is Seihai's own
 //! is in `documentation/gs2-commands.md`.
 
+use super::exec::Root;
 use super::strings::trim;
 use crate::scripting::engine::Val;
 
@@ -12,6 +13,12 @@ use crate::scripting::engine::Val;
 pub enum Value {
     Val(Val),
     List(Vec<Value>),
+    /// An object kept in a variable or passed as a parameter
+    /// (`this.me = player;`): its root, and the path under it (empty for the
+    /// root itself). Member access through the variable reaches the object,
+    /// as in the client, where a variable holds the object itself.
+    /// **[lab]** (a real 5.12 walks its 3D player this way, Seihai #458)
+    Obj(Root, String),
 }
 
 impl Default for Value {
@@ -38,6 +45,8 @@ impl Value {
                     .collect::<Vec<_>>()
                     .join(","),
             ),
+            Value::Obj(r, p) if p.is_empty() => Val::Str(super::exec::root_name(*r).into()),
+            Value::Obj(_, p) => Val::Str(p.clone()),
         }
     }
 
@@ -53,6 +62,7 @@ impl Value {
                 a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.same(y, cmp))
             }
             (Value::Val(a), Value::Val(b)) => cmp(a, b) == 0,
+            (Value::Obj(r, p), Value::Obj(s, q)) => r == s && p == q,
             _ => false,
         }
     }
