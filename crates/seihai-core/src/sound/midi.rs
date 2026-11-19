@@ -330,7 +330,7 @@ impl Noise {
     }
 }
 
-/// Render a Standard MIDI File to mono PCM at [`RATE`].
+/// Render a Standard MIDI File to mono PCM at `RATE`.
 pub fn render_midi(bytes: &[u8]) -> Result<Pcm, String> {
     let notes = notes(bytes)?;
     let rate = f64::from(RATE);

@@ -48,7 +48,7 @@ pub(crate) fn read_bounded<R: Read>(r: R, what: &str) -> io::Result<Vec<u8>> {
     Ok(out)
 }
 
-/// Decompress a zlib body (at most [`MAX_BODY`] bytes of output).
+/// Decompress a zlib body (at most `MAX_BODY` bytes of output).
 pub fn zlib_decompress(data: &[u8]) -> io::Result<Vec<u8>> {
     read_bounded(ZlibDecoder::new(data), "zlib")
 }

@@ -6,7 +6,7 @@
 //! picks, for one client build, what to send:
 //!
 //! 1. **GS1 text** when the build's profile says it runs GS1
-//!    ([`Scripts::gs1`] is `yes`, 1.21 to 2.31) and the script parses in
+//!    (`Scripts::gs1` is `yes`, 1.21 to 2.31) and the script parses in
 //!    that build's GS1 vocabulary ([`Era::for_version`]).
 //! 2. **GS2 bytecode** when the profile says it runs GS2 (`gs2` is `yes`:
 //!    the binary handles `PLO_NPCBYTECODE`, 3.153 on) and the script

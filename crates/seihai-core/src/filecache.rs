@@ -253,7 +253,7 @@ impl SaveLayout {
 /// compare without regard to case:
 ///
 /// 1. `.wav` goes to `sounds`.
-/// 2. With [`Files::download_maps`](crate::protocol::profile::Files): `.gmap`
+/// 2. With `Files::download_maps`](crate::protocol::profile::Files): `.gmap/// 2. With [`Files::download_maps`](crate::protocol::profile::Files): `.gmap`
 ///    goes to `maps`, and so does a `.txt`, `.gif`, `.png` or `.mng` whose
 ///    name contains `map`.
 /// 3. Everything else goes under `levels`, in a folder by name: `bomys` for

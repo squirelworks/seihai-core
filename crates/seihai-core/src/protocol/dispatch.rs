@@ -640,7 +640,7 @@ pub struct SessionState {
     pub ignored: HashMap<u8, usize>,
     /// Text of `PLO_DISCMESSAGE` (16). The server closes after it.
     pub disconnect_message: Option<String>,
-    /// Chat history, oldest first, at most [`CHAT_HISTORY`] lines.
+    /// Chat history, oldest first, at most `CHAT_HISTORY` lines.
     pub chat_log: Vec<ChatLine>,
     /// Milliseconds since the session began, advanced by
     /// [`Self::tick_bubbles`] (one call per frame). Stamps chat lines.

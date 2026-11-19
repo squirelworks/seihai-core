@@ -416,7 +416,7 @@ pub struct OfflineSession {
     /// Whether the glove is held, and its power.
     pub glove_power: u8,
     /// Ledge jumps, pushing, and the A key's grab and pull (see
-    /// [`pushpull`]).
+    /// `pushpull`).
     pub pushpull: PushPull,
     /// Heart containers, in half hearts as Graal counts them.
     pub max_hearts: i32,
@@ -565,7 +565,7 @@ pub enum Interaction {
         kind: usize,
     },
     /// A faced a wall (a rock too heavy for the glove counts): the player
-    /// holds on to it until A is let go, and can pull (see [`pushpull`]).
+    /// holds on to it until A is let go, and can pull (see `pushpull`).
     Grabbed,
     /// The carried object was thrown; `kind` is its lift-table entry.
     Thrown {
@@ -1028,7 +1028,7 @@ impl OfflineSession {
     /// gmap's level list at an index above 0. (The client multiplies the
     /// two list indices, -1 for "not in the list", and saves on a negative
     /// product, so index 0 counts as "same side": a quirk, kept.) Otherwise
-    /// builds with [`DeathRules::entry_name_group`] (2.00 to 2.05) save only when
+    /// builds with `DeathRules::entry_name_group` (2.00 to 2.05) save only when
     /// the two names are in different name groups ([`name_group`]); later
     /// builds do not save. A session without death rules saves every entry.
     pub fn note_entry(&mut self, level: &str) {
@@ -2594,7 +2594,7 @@ impl OfflineSession {
     }
 
     /// Move the player by (dx, dy) as the real client's walking routine
-    /// does ([`Self::walk_step`]): each arrow key on its own, in the order up,
+    /// does (`Self::walk_step`): each arrow key on its own, in the order up,
     /// left, down, right, each tested at the position the earlier ones left,
     /// so a diagonal is two steps and slides along a wall. A refused step can
     /// still move the player: the 0.1-tile corner nudge round a corner, and
@@ -2602,7 +2602,7 @@ impl OfflineSession {
     /// Nothing moves while a warp is pending.
     ///
     /// Each step also counts towards a push or a ledge jump, and while A
-    /// holds a wall the arrows only pull (see [`pushpull`]); in the air they
+    /// holds a wall the arrows only pull (see `pushpull`); in the air they
     /// do nothing.
     /// Returns the emitted `PlayerUpdate` if the position changed.
     pub fn try_move(&mut self, dx: f32, dy: f32) -> Option<PlayerUpdate> {

@@ -94,8 +94,9 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
 - [ ] Public API pass: mark internal modules `pub(crate)`, document each
       public module, and write down the semver rule consumers rely on
       (what counts as breaking, as v0.3.0's GANI change did).
-- [ ] `cargo doc` builds without warnings; docs published with each
-      release.
+- [x] `cargo doc` builds without warnings, checked in CI with
+      `RUSTDOCFLAGS=-D warnings` (0.6.1). Publishing the docs with each
+      release is still open.
 
 ## Phase 3: after it works
 

@@ -1,13 +1,13 @@
 //! The GS2 maths built-ins the 3.153 client's VM runs in place
 //! (Stage D, the rest): `getangle`, `getdir`, `vecx`, `vecy` and the
 //! shifts. Constants the decompile names but does not show are marked
-//! **[inferred]**; see `documentation/gs2-commands.md`.
+//! **\[inferred\]**; see `documentation/gs2-commands.md`.
 
 use std::f64::consts::PI;
 
 /// `getangle(dx, dy)`: `atan(-dy / dx)`, plus π when `dx` is
 /// below 0, plus 2π when that is still below 0, so 0..2π with y down.
-/// `dx == 0` gives 3π/2 when `dy > 0`, else π/2 **[inferred]**.
+/// `dx == 0` gives 3π/2 when `dy > 0`, else π/2 **\[inferred\]**.
 pub fn angle(dx: f64, dy: f64) -> f64 {
     if dx == 0.0 {
         return if dy > 0.0 { 3.0 * PI / 2.0 } else { PI / 2.0 };
@@ -23,7 +23,7 @@ pub fn angle(dx: f64, dy: f64) -> f64 {
 }
 
 /// `getdir(dx, dy)` (case `0x60`): the axis that is longer, ties to the
-/// vertical. Up 0, left 1, down 2, right 3 **[inferred]**.
+/// vertical. Up 0, left 1, down 2, right 3 **\[inferred\]**.
 pub fn dir(dx: f64, dy: f64) -> f64 {
     if dx.abs() <= dy.abs() {
         if dy < 0.0 {
@@ -40,7 +40,7 @@ pub fn dir(dx: f64, dy: f64) -> f64 {
 
 /// `(vecx(d), vecy(d))`: the client reads a four-row table for `d` 0..3
 /// and gives 0 for any other `d`. The rows are the usual direction steps
-/// **[inferred]**: the table's bytes were not read.
+/// **\[inferred\]**: the table's bytes were not read.
 pub fn vec(d: f64) -> (f64, f64) {
     match super::strings::client_int(d) {
         0 => (0.0, -1.0),
