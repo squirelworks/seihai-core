@@ -44,3 +44,9 @@ jobs:
         if: ${{ !cancelled() }}
       - run: cargo clippy --workspace --all-targets $FEATURES -- -D warnings
         if: ${{ !cancelled() }}
+      # The docs build without warnings (roadmap Phase 2): Linux checks
+      # them without `audio`, Windows with it.
+      - run: cargo doc --no-deps --workspace $FEATURES
+        if: ${{ !cancelled() }}
+        env:
+          RUSTDOCFLAGS: -D warnings

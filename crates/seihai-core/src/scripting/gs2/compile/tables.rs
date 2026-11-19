@@ -38,7 +38,7 @@ pub enum Gs1Lowering {
     /// No GS2 counterpart. Compiling it is an error. `inert` is true when
     /// the 2.05 client compiles the command and does nothing with it.
     /// Those names are lowered by omitting the call (see
-    /// [`omitted_command`]); a name that is still `Missing { inert: true }`
+    /// `omitted_command`); a name that is still `Missing { inert: true }`
     /// has not been wired that way yet.
     Missing { inert: bool },
 }

@@ -255,7 +255,7 @@ impl Client {
     /// sent with the player's state each time a peer joins), as 15th Graal
     /// to 1.1.9 broadcast the key read from `reg.code`. Set it before
     /// polling. A key that does not decode (the client's `###`) should not
-    /// be set: when no key is set nothing is sent **[inf]**.
+    /// be set: when no key is set nothing is sent **\[inf\]**.
     pub fn set_registration_key(&mut self, key: &str) -> io::Result<()> {
         text(key)?;
         self.registration = Some(key.as_bytes().to_vec());

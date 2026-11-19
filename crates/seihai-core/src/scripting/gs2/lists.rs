@@ -17,7 +17,7 @@ pub enum Value {
     /// (`this.me = player;`): its root, and the path under it (empty for the
     /// root itself). Member access through the variable reaches the object,
     /// as in the client, where a variable holds the object itself.
-    /// **[lab]** (a real 5.12 walks its 3D player this way, Seihai #458)
+    /// **\[lab\]** (a real 5.12 walks its 3D player this way, Seihai #458)
     Obj(Root, String),
 }
 
@@ -35,7 +35,7 @@ impl From<Val> for Value {
 
 impl Value {
     /// As a GS1 value. A list is its elements' text joined with commas,
-    /// the form of a GS1 string list. **[seihai]**
+    /// the form of a GS1 string list. **\[seihai\]**
     pub fn val(&self) -> Val {
         match self {
             Value::Val(v) => v.clone(),
