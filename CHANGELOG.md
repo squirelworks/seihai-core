@@ -7,6 +7,8 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
+- A secure list fetch for a build with no listserver of its own (4.x to 6.x) uses 2.22's gen-5 list login, the oldest with a secure form, instead of failing; new `net::list_login_version` (squirelworks/seihai#564).
+
 ## 0.6.x
 
 - **0.6.3**: GS1 `keypressed` event from 2.17.1 on (`ScriptWorld::key_pressed`, `SessionScripts::key_pressed`), lowered to GS2 as `onKeyPressed`. Lab fuzz-case examples for GS1 and GS2. Releases come only from a release PR, checked by `version-guard`, and publish automatically (VERSIONING.md).
