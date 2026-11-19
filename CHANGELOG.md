@@ -2,7 +2,12 @@
 
 One line per release. The full notes for each version from 0.0.14 on are
 in [`release-notes/`](release-notes/) and on the GitHub release; the
-versioning rule is in the README.
+versioning rule is in [VERSIONING.md](VERSIONING.md). PRs add a line under
+Unreleased; the release PR moves them under the new version.
+
+## Unreleased
+
+- Releases are deliberate: the version changes only in a release PR, the release workflow drafts instead of publishing, and `version-guard` checks release PRs (VERSIONING.md). No API change.
 
 ## 0.6.x
 
