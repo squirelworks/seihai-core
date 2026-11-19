@@ -7,7 +7,7 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
-- Releases are deliberate: the version changes only in a release PR, the release workflow drafts instead of publishing, and `version-guard` checks release PRs (VERSIONING.md). No API change.
+- Releases are deliberate: the version changes only in a release PR, and `version-guard` checks release PRs (VERSIONING.md). The release workflow publishes and tags a release PR automatically once CI passes. No API change.
 
 ## 0.6.x
 

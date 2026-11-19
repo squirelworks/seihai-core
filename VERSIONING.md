@@ -16,7 +16,7 @@ same in every Seihai repo.
   The `dev`, `difftest` and `viewer` modules are tools for the suite's own binaries. They are hidden from the docs and can change in a patch. Tests, `documentation/`, fuzz targets and CI are not part of the surface either.
 - **Unreleased notes:** the `## Unreleased` section at the top of `CHANGELOG.md`.
 - **Release notes:** `release-notes/vX.Y.Z.md`, plus its one-line entry in `CHANGELOG.md`.
-- **How a release is made:** `.github/workflows/release.yml` runs after CI passes on `main`. When the workspace version has no release yet, it builds and tests on macOS and then **drafts** the release. The owner presses Publish, and that makes the tag. A merge that doesn't change the version makes no release. Until 2026-11-19, every PR bumped the version and published at once, which is why 0.0.8 to 0.6.0 came so quickly.
+- **How a release is made:** `.github/workflows/release.yml` runs after CI passes on `main`. When the workspace version has no release yet, it builds and tests on macOS and then **publishes** the release, which makes the tag (the owner chose automatic tagging on 2026-11-19). A merge that doesn't change the version makes no release. Until 2026-11-19, every PR bumped the version and published at once, which is why 0.0.8 to 0.6.0 came so quickly.
 - **Next milestone:** [#108](https://github.com/squirelworks/seihai-core/issues/108) (0.7.0).
 - **1.0.0 criteria:** [#109](https://github.com/squirelworks/seihai-core/issues/109).
 - **Long-term roadmap:** [#7](https://github.com/squirelworks/seihai-core/issues/7).
@@ -43,8 +43,8 @@ No. A release is a deliberate step, not a side effect of a green PR.
   version and turns the unreleased notes into `vX.Y.Z` notes. This can be a
   PR of its own, or the PR that ticks the milestone's last box, so a release
   doesn't cost an extra CI run. Its body carries a line `Release: vX.Y.Z`.
-- A merged release PR gives a **draft** GitHub release. The tag only exists
-  once the owner presses Publish. Nobody pushes a release tag by hand.
+- In seihai-core, a merged release PR publishes the GitHub release and its
+  tag automatically once CI passes. Nobody pushes a release tag by hand.
 
 The `version-guard` check (in the repos that keep their version in a file)
 fails a PR that changes the version without `Release: vX.Y.Z` in its body or
