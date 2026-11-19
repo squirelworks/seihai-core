@@ -877,6 +877,8 @@ pub const CHAIN: &[Step] = &[
             pli: IdDelta { minus: &[7, 8, 11, 15, 16, 17, 20], ..IdDelta::NONE },
             // GANI (10) is sent and read as a string, as from 2.1.
             bow_prop10: Some(false),
+            // Asks for shield1.png at join, where 2.05 asks .gif names.
+            image_ext: Some(".png"),
             colors: Some((7, 8)),
             side: true,
             ..Delta::NONE
@@ -887,6 +889,7 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "props", what: "what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build" },
             Unknown { area: "life", what: "the death and combat rules are carried from 2.05; with no built-in sword the server must give a sword weapon, and hits were not traced" },
             Unknown { area: "ui", what: "the HUD (150/150 health and the NewWorld calendar clock) and the terrain heights are not modelled; the row carries 2.05's" },
+            Unknown { area: "files", what: "the .png default image extension is taken from the join requests (shield1.png, bodynw.png); the default-image table was not read" },
         ],
     },
     // These generic 2.1 to 2.16 rows remain inferred. Observed Graal 2002
@@ -952,6 +955,9 @@ pub const CHAIN: &[Step] = &[
             listserver: Some(Some(Listserver::new(ListKind::Legacy, PortStatus::Assumed, None))),
             pli: IdDelta { minus: &[7, 8, 11, 15, 16, 17, 20], ..IdDelta::NONE },
             colors: Some((7, 8)),
+            // 2.1 test 3's file packets: no modtime (binary).
+            modtime: Some(false),
+            download_maps: Some(false),
             gs1_commands: Some(165),
             // A binary: GS1 and no NPC bytecode (131).
             scripts: Some(Scripts::GS1),
@@ -960,7 +966,7 @@ pub const CHAIN: &[Step] = &[
         },
         source: "binary (md5 af2d2106) and lab 2026-10-30: beta 1's removals and COLORS width on a 2.1 test 3 build (PLO 49 and 169, props 43 to 45 and UDP 27 kept); GS1 165 commands (addstring, insertstring, removestring, deletestring); asks for shield1.png, idle.gani and headalgo000 at join; list login id 0 `newworld` then id 1 account and password",
         unknown: &[
-            Unknown { area: "base", what: "the binary is 2.1 test 3; this row is built on the generic inferred 2.1 row, so values the NewWorld profile does not list (files, UI, death rules) are that row's" },
+            Unknown { area: "base", what: "the binary is 2.1 test 3; this row is built on the generic inferred 2.1 row, so values the NewWorld profile does not list (UI, death rules, image extension) are that row's; the file packets are set back to 2.1 test 3's (no modtime, no maps folder rule)" },
             Unknown { area: "listserver", what: "the real client dials 14922 and asks for the list `newworld`; this row keeps 2.1's frame with `newmain`. It sent fewer password characters than were typed (23 of 28); the cut-off was not pinned down" },
             Unknown { area: "props", what: "what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build" },
         ],

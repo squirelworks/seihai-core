@@ -355,10 +355,12 @@ Generated; do not edit between the markers.
 - props: **bow_prop10**: yes -> no
 - props: **colors_sent**: 5 -> 7
 - props: **colors_read**: 5 -> 8
+- files: **image_ext**: ".gif" -> ".png"
 - unknown (listserver): the real client dials 14921 and asks for the list `newworld` (id 0 only); this row keeps 2.05's frame with `newmain`, and the public listserver was not asked for a `newworld` list
 - unknown (props): what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build
 - unknown (life): the death and combat rules are carried from 2.05; with no built-in sword the server must give a sword weapon, and hits were not traced
 - unknown (ui): the HUD (150/150 health and the NewWorld calendar clock) and the terrain heights are not modelled; the row carries 2.05's
+- unknown (files): the .png default image extension is taken from the join requests (shield1.png, bodynw.png); the default-image table was not read
 - source: binary (md5 88d1f84c) and lab 2026-10-30: PLO 2, 4, 17, 18, 154 and 155 and PLI 7, 8, 11, 15, 16, 17 and 20 gone with the built-in sword, bow, baddies, chests, horses and freeze; GANI (10) a string, COLORS sent as 7 bytes and read as 8, HEADGIF without an extension, STATUS bit 0x20; login props 0, 11, 13, 18, 31, 33 then LANGUAGE; PLO 42 is the NewWorld time (GINT4 minutes since 1000/01/01); GS1 161 commands plus the nw* time variables; 65x65 terrain heights in the level
 
 #### 2.1 (`GNW31101`, inferred)
@@ -396,10 +398,12 @@ Generated; do not edit between the markers.
 - protocol: **pli (client ids sent)**: -7 HORSEADD, -8 HORSEDEL, -11 THROWCARRIED, -15 BADDYPROPS, -16 BADDYHURT, -17 BADDYADD, -20 OPENCHEST (39 -> 32 ids)
 - props: **colors_sent**: 5 -> 7
 - props: **colors_read**: 5 -> 8
+- files: **modtime**: yes -> no
+- files: **download_maps**: yes -> no
 - ui: **gs1_commands**: 161 -> 165
 - scripts: **gs1**: unknown -> yes
 - scripts: **gs2**: unknown -> no
-- unknown (base): the binary is 2.1 test 3; this row is built on the generic inferred 2.1 row, so values the NewWorld profile does not list (files, UI, death rules) are that row's
+- unknown (base): the binary is 2.1 test 3; this row is built on the generic inferred 2.1 row, so values the NewWorld profile does not list (UI, death rules, image extension) are that row's; the file packets are set back to 2.1 test 3's (no modtime, no maps folder rule)
 - unknown (listserver): the real client dials 14922 and asks for the list `newworld`; this row keeps 2.1's frame with `newmain`. It sent fewer password characters than were typed (23 of 28); the cut-off was not pinned down
 - unknown (props): what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build
 - source: binary (md5 af2d2106) and lab 2026-10-30: beta 1's removals and COLORS width on a 2.1 test 3 build (PLO 49 and 169, props 43 to 45 and UDP 27 kept); GS1 165 commands (addstring, insertstring, removestring, deletestring); asks for shield1.png, idle.gani and headalgo000 at join; list login id 0 `newworld` then id 1 account and password

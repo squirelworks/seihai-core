@@ -1362,14 +1362,20 @@ mod tests {
     }
 
     /// GServer's 2.1 line: modtime, gani prop 10 and `.png` defaults.
-    /// NewWorld beta 1 is a 2.05 that already sends GANI (10) as a string.
+    /// The NewWorld betas mix the two: GANI (10) a string and `.png`
+    /// images, with 2.05's file packets (no modtime).
     #[test]
     fn the_2_1_line() {
         for p in PROFILES {
             let new = p.files.modtime;
-            if p.version != ClientVersion::NewWorldB1 {
-                assert_eq!(new, !p.props.bow_prop10, "{}", p.label);
+            if matches!(
+                p.version,
+                ClientVersion::NewWorldB1 | ClientVersion::NewWorldB2
+            ) {
+                assert!(!new && !p.props.bow_prop10 && p.files.image_ext == ".png");
+                continue;
             }
+            assert_eq!(new, !p.props.bow_prop10, "{}", p.label);
             assert_eq!(new, p.files.image_ext == ".png", "{}", p.label);
         }
         assert!(!profile(ClientVersion::V205).files.modtime);
