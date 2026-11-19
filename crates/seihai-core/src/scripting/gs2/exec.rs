@@ -277,11 +277,19 @@ impl Machine {
                 Val::Str(s) => Slot::Str(s.clone()),
             });
         }
+        // The event's arguments are also `params`, as scripts written
+        // for the real clients read them (`params[0]` in `onKeyPressed`).
+        // A parameter named `params` takes its place.
+        let mut locals = HashMap::new();
+        locals.insert(
+            "params".to_string(),
+            Value::List(args.iter().cloned().map(Value::from).collect()),
+        );
         self.frames.push(Frame {
             with_depth: self.with.len(),
             ret: None,
             base: 0,
-            locals: HashMap::new(),
+            locals,
             slots: Vec::new(),
         });
         self.pc = start;
@@ -974,7 +982,16 @@ impl Machine {
                     let Some(top) = self.pop() else {
                         return fault(self, host);
                     };
+                    let local = |name: &str| {
+                        self.frames
+                            .last()
+                            .is_some_and(|f| f.locals.contains_key(name))
+                    };
                     self.push(match top {
+                        // An unqualified name that is one of the function's
+                        // own variables (a parameter, or an event's
+                        // `params`) stays that variable: `params[0]`.
+                        Slot::Var(None, name) if local(&name) => Slot::Var(Some(Root::Temp), name),
                         Slot::Var(root, name) => {
                             Slot::Obj(Some((root.unwrap_or(Root::Global), name)))
                         }
