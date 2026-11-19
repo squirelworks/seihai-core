@@ -88,6 +88,9 @@ pub struct VmProfile {
     pub v5_literals: bool,
     /// Opcode 54 runs (5.00r7 on).
     pub member_store: bool,
+    /// The text `"0.0"` reads as 0 (6.03r7). Earlier VMs read it as -1,
+    /// as they do every other zero-valued text but `"0"` (see [`text_num`]).
+    pub dot_zero: bool,
 }
 
 /// 3.153 (Mac PPC). The VM the executor was first written from.
@@ -104,6 +107,7 @@ pub const V3153: VmProfile = VmProfile {
     add_or_join: false,
     v5_literals: false,
     member_store: false,
+    dot_zero: false,
 };
 
 /// 4.20r6 (Mac PPC): the stack grows to 10 000, `%` adds 0.0001 before the
@@ -169,6 +173,7 @@ pub const V6: VmProfile = VmProfile {
     stack_limit: None,
     float_sqrt: true,
     v5_literals: false,
+    dot_zero: true,
     ..V500R7
 };
 
@@ -332,6 +337,79 @@ pub fn num_text(n: f64) -> String {
     out
 }
 
+/// The number a text reads as in the GS2 VM. Read from the 6.03r7 Linux
+/// client's text-to-number routine and checked live on 4.20r8, 5.24r4 and
+/// 6.03r7 (Graal_analysis `protocol/script-fuzz-2026-11-19.md`): `""` is 0,
+/// `"true"` 1 and `"false"` 0; a text starting `0x` is read as hex, any
+/// other through C's `strtod`. A zero result stands only when the text is
+/// `"0"` or `"0x0"` (or, on 6.03r7, `"0.0"`); every other text that reads
+/// as zero or has no number (`"abc"`, `"00"`, `" 0"`, `"-0"`, `"0abc"`,
+/// `" "`) reads as -1, the client's "not a number". The rule of VMs before
+/// 4.20r8, and where `"0.0"` joined, are inferred, not measured.
+pub fn text_num(s: &str, dot_zero: bool) -> f64 {
+    match s {
+        "" | "false" => return 0.0,
+        "true" => return 1.0,
+        _ => {}
+    }
+    let n = match s.strip_prefix("0x") {
+        Some(h) => {
+            let digits: String = h.chars().take_while(|c| c.is_ascii_hexdigit()).collect();
+            if digits.is_empty() {
+                0.0
+            } else {
+                u64::from_str_radix(&digits, 16).map_or(f64::INFINITY, |n| n as f64)
+            }
+        }
+        None => leading_number(s),
+    };
+    if n != 0.0 || s == "0" || s == "0x0" || (dot_zero && s == "0.0") {
+        n
+    } else {
+        -1.0
+    }
+}
+
+/// The decimal number at the start of `s`, as `strtod` reads it (blanks,
+/// a sign, digits, a fraction, an exponent), or 0.
+fn leading_number(s: &str) -> f64 {
+    let t = s.trim_start();
+    let b = t.as_bytes();
+    let mut i = 0;
+    if matches!(b.first(), Some(b'-' | b'+')) {
+        i += 1;
+    }
+    let start = i;
+    while i < b.len() && b[i].is_ascii_digit() {
+        i += 1;
+    }
+    let mut digits = i > start;
+    if i < b.len() && b[i] == b'.' {
+        let mut j = i + 1;
+        while j < b.len() && b[j].is_ascii_digit() {
+            j += 1;
+        }
+        digits |= j > i + 1;
+        i = j;
+    }
+    if !digits {
+        return 0.0;
+    }
+    if i < b.len() && (b[i] | 0x20) == b'e' {
+        let mut j = i + 1;
+        if j < b.len() && (b[j] == b'-' || b[j] == b'+') {
+            j += 1;
+        }
+        if j < b.len() && b[j].is_ascii_digit() {
+            while j < b.len() && b[j].is_ascii_digit() {
+                j += 1;
+            }
+            i = j;
+        }
+    }
+    t[..i].parse().unwrap_or(0.0)
+}
+
 /// Compares two numbers as every VM does: equal when they are within
 /// 0.0001 of each other.
 pub fn num_cmp(a: f64, b: f64) -> i32 {
@@ -407,6 +485,54 @@ mod tests {
         assert_eq!(num_text(0.00005), "0");
         assert_eq!(num_text(-0.0), "0");
         assert_eq!(num_text(3e10), "2147483647");
+    }
+
+    #[test]
+    fn texts_read_as_the_clients_read_them() {
+        // Lab run of 2026-11-19, cases 30002-30093, on 4.20r8, 5.24r4 and 6.03r7.
+        for (t, n) in [
+            ("0", 0.0),
+            ("0x0", 0.0),
+            ("", 0.0),
+            ("false", 0.0),
+            ("true", 1.0),
+            ("00", -1.0),
+            (" 0", -1.0),
+            ("0 ", -1.0),
+            ("+0", -1.0),
+            ("-0", -1.0),
+            (".0", -1.0),
+            ("0.", -1.0),
+            ("0e5", -1.0),
+            ("0abc", -1.0),
+            ("a1", -1.0),
+            ("abc", -1.0),
+            (" ", -1.0),
+            ("null", -1.0),
+            ("000001", 1.0),
+            ("1abc", 1.0),
+            ("-1", -1.0),
+            ("1", 1.0),
+            // the earlier campaign's F6 texts and operands
+            ("0x10", 16.0),
+            ("12abc", 12.0),
+            ("1,5", 1.0),
+            ("  3", 3.0),
+            ("1e3", 1000.0),
+            ("nan", -1.0),
+            ("1e-400", -1.0),
+            ("x", -1.0),
+            // from the 6.03r7 routine: only "0x0" is an accepted hex zero
+            ("0x1F", 31.0),
+            ("0x00", -1.0),
+            ("0x", -1.0),
+            ("0xg", -1.0),
+        ] {
+            assert_eq!(text_num(t, false), n, "{t:?}");
+            assert_eq!(text_num(t, true), n, "{t:?} on 6.x");
+        }
+        assert_eq!(text_num("0.0", false), -1.0);
+        assert_eq!(text_num("0.0", true), 0.0);
     }
 
     #[test]

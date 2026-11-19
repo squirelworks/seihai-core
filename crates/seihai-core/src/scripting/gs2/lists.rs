@@ -54,9 +54,14 @@ impl Value {
         self.val().num()
     }
 
+    /// The number this value reads as in a GS2 VM ([`super::vm::text_num`]).
+    pub fn num_in(&self, profile: &super::vm::VmProfile) -> f64 {
+        super::exec::gs2_num(&self.val(), profile)
+    }
+
     /// Equal as the list search compares: lists element by element, other
     /// values through the executor's comparison.
-    pub fn same(&self, other: &Value, cmp: fn(&Val, &Val) -> i32) -> bool {
+    pub fn same(&self, other: &Value, cmp: &dyn Fn(&Val, &Val) -> i32) -> bool {
         match (self, other) {
             (Value::List(a), Value::List(b)) => {
                 a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.same(y, cmp))
