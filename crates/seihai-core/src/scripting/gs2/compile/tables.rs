@@ -592,7 +592,7 @@ mod tests {
         assert_eq!(gs2_event_function("playerleaves"), "onPlayerLeaves");
         assert_eq!(gs2_event_function("playerlogin"), "onPlayerLogin");
         assert_eq!(gs2_event_function("playerlogout"), "onPlayerLogout");
-        // The name the 5.x and 6.x clients call (`params[0]` is the key).
+        // The spelling real 5.x and 6.x scripts use (`params[0]` is the key).
         assert_eq!(gs2_event_function("keypressed"), "onKeyPressed");
     }
 
