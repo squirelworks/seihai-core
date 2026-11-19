@@ -7,6 +7,7 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
+- Every 8-character token in the Graal_analysis catalogue is now in `KNOWN_TOKENS` (25 more: the RemoteControl and NPC Control logins, the NPC-server labels, server-table-only game tokens and the Worlds connector constants). New `STAND_INS`, `NOT_SERVED` and `serve_as`: every game token either has a profile, a nearest profile a server serves it as, or a written reason it is not served, and a unit test fails when a new token is not placed. `documentation/version-tokens.tsv` gains a `served_as` column. Breaking: `TokenKind` gains `NpcControl` and `NpcServer`, and `TokenGrade` gains `ScriptConstant`.
 - A secure list fetch for a build with no listserver of its own (4.x to 6.x) uses 2.22's gen-5 list login, the oldest with a secure form, instead of failing; new `net::list_login_version` (squirelworks/seihai#564).
 
 ## 0.6.x
