@@ -138,7 +138,15 @@ pub struct LayoutRow {
 }
 
 /// Position of a version in chain order.
+///
+/// A side build (the NewWorld betas) ranks as the build it is built on, so
+/// a row's version range takes it in or out with its base.
 pub fn rank(v: ClientVersion) -> usize {
+    let v = if crate::protocol::chain::step(v).delta.side {
+        crate::protocol::chain::previous(v).unwrap_or(v)
+    } else {
+        v
+    };
     ClientVersion::all_versions()
         .iter()
         .position(|&x| x == v)
@@ -222,6 +230,12 @@ impl Tables {
             .rows
             .iter()
             .filter(|r| r.dir == dir && r.id == id && v.is_none_or(|v| r.applies_to(v)))
+            // The `PLO_FILE` modtime follows the profile flag, not the
+            // version range: NewWorld beta 2 sits after 2.1 and has none.
+            .filter(|r| {
+                !(dir == Dir::S2C && id == 102 && r.field == "modtime")
+                    || v.is_none_or(|v| v.file_has_modtime())
+            })
             .collect();
         r.sort_by_key(|r| r.idx);
         r

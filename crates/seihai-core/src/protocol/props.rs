@@ -84,7 +84,7 @@ pub fn bow_slot_holds_gani(data: &[u8]) -> bool {
 ///
 /// Encodings follow the cleaned PLPROP table (2.05 forms where they
 /// differ from later clients).
-fn prop_len(id: u8, data: &[u8], bow_prop10: bool) -> Option<usize> {
+fn prop_len(id: u8, data: &[u8], bow_prop10: bool, colors: usize) -> Option<usize> {
     let c = |i: usize| data.get(i).map(|b| b.wrapping_sub(0x20) as usize);
     let len = match id {
         // Pre-2.1 bow slot: c(10 + len) + image, or c(power) under 10.
@@ -138,8 +138,8 @@ fn prop_len(id: u8, data: &[u8], bow_prop10: bool) -> Option<usize> {
                 1
             }
         }
-        // 5 color indexes
-        13 => 5,
+        // colour indexes: 5, or 7/8 in the NewWorld betas (`Props::colors_*`)
+        13 => colors,
         // attach type + npc id
         42 => 4,
         // pconnected: no payload
@@ -175,6 +175,20 @@ pub fn parse_player_props_in(
     bow_prop10: bool,
     accepted: Option<&IdSet>,
 ) -> Vec<PlayerProp> {
+    parse_player_props_sized(payload, bow_prop10, 5, accepted)
+}
+
+/// [`parse_player_props_in`] with COLORS (prop 13) read as `colors` bytes.
+/// Every build reads and sends 5 but the NewWorld betas, which send 7 and
+/// read 8 (`Props::colors_sent` and `Props::colors_read`): parse what such a
+/// client sends with its `colors_sent`, and what a server sends it with its
+/// `colors_read`.
+pub fn parse_player_props_sized(
+    payload: &[u8],
+    bow_prop10: bool,
+    colors: usize,
+    accepted: Option<&IdSet>,
+) -> Vec<PlayerProp> {
     let mut out = Vec::new();
     let mut i = 0;
     while i < payload.len() {
@@ -183,7 +197,7 @@ pub fn parse_player_props_in(
             break;
         }
         let rest = &payload[i + 1..];
-        let Some(n) = prop_len(id, rest, bow_prop10) else {
+        let Some(n) = prop_len(id, rest, bow_prop10, colors) else {
             break;
         };
         out.push(PlayerProp {
@@ -198,6 +212,20 @@ pub fn parse_player_props_in(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// NewWorld beta 1 sends COLORS as 7 bytes; read as 5, the stream
+    /// would go wrong at the sixth byte.
+    #[test]
+    fn colors_width_follows_the_build() {
+        // COLORS 7 bytes, then SPRITE dir 2.
+        let p = [0x2d, 0x22, 0x25, 0x32, 0x25, 0x32, 0x20, 0x20, 0x31, 0x22];
+        let props = parse_player_props_sized(&p, false, 7, None);
+        assert_eq!(props.iter().map(|p| p.id).collect::<Vec<_>>(), [13, 17]);
+        assert_eq!(props[0].raw.len(), 7);
+        let five = parse_player_props_in(&p, false, None);
+        assert_eq!(five[0].raw.len(), 5);
+        assert_ne!(five.get(1).map(|p| p.id), Some(17));
+    }
 
     #[test]
     fn bow_slot_for_old_clients() {

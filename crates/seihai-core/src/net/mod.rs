@@ -1062,6 +1062,9 @@ pub struct Connection {
     /// login. The real 1.28 beta 2 to 1.39 clients compressed every frame
     /// that way (lab, 2026-10-30).
     zlib_best: bool,
+    /// COLORS (13) bytes the logged-in build sends: 5, or 7 for the
+    /// NewWorld betas. Set by [`Self::login_versioned`].
+    colors_sent: u8,
     /// Flag messages a script queued ([`Self::queue_flag`]): they ride
     /// ahead of the next walk update, or go out on their own.
     flags_out: Vec<Vec<u8>>,
@@ -1143,6 +1146,7 @@ impl Connection {
             frame_len: FrameLen::Short,
             pli: None,
             zlib_best: false,
+            colors_sent: 5,
             flags_out: Vec::new(),
             flags_since: None,
             files_out: Vec::new(),
@@ -1367,6 +1371,7 @@ impl Connection {
         };
         self.send_raw(&frame)?;
         self.pli = Some(version.profile().protocol.pli);
+        self.colors_sent = version.profile().props.colors_sent;
         self.precise_walk = version.profile().props.precise_pos;
         self.client_flags_only = sends_client_flags_only(version);
         self.take_flags();
@@ -2094,6 +2099,12 @@ impl Connection {
         push_gstring_latin1(&mut msg, looks.body_name());
         msg.push(13 + 0x20);
         msg.extend(looks.colors.map(|c| c + 0x20));
+        // The NewWorld betas send 7 colour bytes; the last two are not known
+        // and go as 0.
+        msg.extend(std::iter::repeat_n(
+            0x20,
+            usize::from(self.colors_sent).saturating_sub(5),
+        ));
         // GATTRIB1..5 (37..41), the ones set.
         for (i, a) in looks.attrs.iter().enumerate() {
             if let Some(a) = a.as_ref().filter(|_| own.contains(37 + i as u8)) {

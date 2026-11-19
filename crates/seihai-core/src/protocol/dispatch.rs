@@ -19,7 +19,7 @@ use super::layouts::{
 use super::levelcache::{same_level, CachedLevel, LevelCache};
 use super::npcprops::{parse_npc_props, NpcProps};
 use super::profile::{CombatRules, IdSet};
-use super::props::parse_player_props_in;
+use super::props::parse_player_props_sized;
 use super::version::ClientVersion;
 use crate::chatlists::{BubbleTimer, ChatFilter, Identity};
 use crate::combat::{self, IncomingHit};
@@ -608,6 +608,9 @@ pub struct SessionState {
     pub own_attrs: [Option<String>; 5],
     /// Read prop 10 as the pre-2.1 bow slot.
     pub bow_prop10: bool,
+    /// COLORS (13) bytes this build reads past the usual 5: 3 for the
+    /// NewWorld betas, which read 8 (`Props::colors_read`).
+    pub colors_extra: u8,
     /// `PLO_OTHERPLPROPS` starts with a one-GCHAR player id (1.21 to 1.35),
     /// not a GSHORT (1.36 on).
     pub other_id_gchar: bool,
@@ -800,6 +803,12 @@ struct Restored {
 }
 
 impl SessionState {
+    /// COLORS (13) bytes in a prop stream from the server: 5, or 8 for the
+    /// NewWorld betas.
+    pub fn colors_len(&self) -> usize {
+        5 + usize::from(self.colors_extra)
+    }
+
     /// Opt into an explicitly identified 2.1 receive dispatcher and, for
     /// the public 2001 build only, its verified 170–174 reader details.
     /// Call on a fresh `for_version(ClientVersion::V210)` session. This changes only
@@ -818,6 +827,7 @@ impl SessionState {
         Self {
             file_has_modtime: p.files.modtime,
             bow_prop10: p.props.bow_prop10,
+            colors_extra: p.props.colors_read.saturating_sub(5),
             // 1.21 to 1.35 read the other player's id as one GCHAR: 1.35
             // from exact-build static evidence (graal-client-repro#179),
             // the earlier builds as seihai-gserver #74 sends to them.
@@ -942,6 +952,7 @@ impl SessionState {
                     &msg.payload,
                     self.other_id_gchar,
                     self.bow_prop10,
+                    self.colors_len(),
                     self.other_prop_ids.as_ref(),
                 ) {
                     self.apply_other(u);
@@ -956,6 +967,7 @@ impl SessionState {
                     &self.player_props,
                     &msg.payload,
                     self.bow_prop10,
+                    self.colors_len(),
                     self.own_prop_ids.as_ref(),
                 );
                 self.apply_player_props(&msg.payload);
@@ -1953,7 +1965,12 @@ impl SessionState {
     /// X/Y are props 15/16 (GCHAR, half-tiles); direction is SPRITE
     /// (17) mod 4.
     fn apply_player_props(&mut self, payload: &[u8]) {
-        for prop in parse_player_props_in(payload, self.bow_prop10, self.own_prop_ids.as_ref()) {
+        for prop in parse_player_props_sized(
+            payload,
+            self.bow_prop10,
+            self.colors_len(),
+            self.own_prop_ids.as_ref(),
+        ) {
             match (prop.id, prop.gchar()) {
                 (15, Some(v)) => self.player_x = Some(v as f32 / 2.0),
                 (16, Some(v)) => self.player_y = Some(v as f32 / 2.0),
@@ -2087,6 +2104,7 @@ fn parse_other_player(
     payload: &[u8],
     id_gchar: bool,
     bow_prop10: bool,
+    colors: usize,
     accepted: Option<&IdSet>,
 ) -> Option<OtherUpdate> {
     let (id, id_len) = if id_gchar {
@@ -2099,7 +2117,7 @@ fn parse_other_player(
         ..Default::default()
     };
     let text = |raw: &[u8]| latin1(raw.get(1..).unwrap_or(&[]));
-    for prop in parse_player_props_in(&payload[id_len..], bow_prop10, accepted) {
+    for prop in parse_player_props_sized(&payload[id_len..], bow_prop10, colors, accepted) {
         match prop.id {
             0 => u.nick = Some(text(&prop.raw)),
             34 => u.account = Some(text(&prop.raw)).filter(|a| !a.is_empty()),
@@ -2302,17 +2320,20 @@ fn parse_file_packet(
 /// Only the props this build reads are kept from `old` (the parse stops at
 /// the first id it does not know). When `new` does not parse to its end, it
 /// replaces `old` whole, as before.
+///
+/// COLORS (13) is read as `colors` bytes (8 for the NewWorld betas).
 pub fn merge_player_props(
     old: &[u8],
     new: &[u8],
     bow_prop10: bool,
+    colors: usize,
     accepted: Option<&IdSet>,
 ) -> Vec<u8> {
-    let new_props = parse_player_props_in(new, bow_prop10, accepted);
+    let new_props = parse_player_props_sized(new, bow_prop10, colors, accepted);
     if new_props.iter().map(|p| 1 + p.raw.len()).sum::<usize>() != new.len() {
         return new.to_vec();
     }
-    let old_props = parse_player_props_in(old, bow_prop10, accepted);
+    let old_props = parse_player_props_sized(old, bow_prop10, colors, accepted);
     let mut merged: std::collections::BTreeMap<u8, Vec<u8>> =
         old_props.into_iter().map(|p| (p.id, p.raw)).collect();
     merged.extend(new_props.into_iter().map(|p| (p.id, p.raw)));
@@ -2331,13 +2352,14 @@ mod tests {
     #[test]
     fn carrysprite_19_names_what_another_player_holds() {
         let mut u =
-            parse_other_player(&[0x20, 0x22, 19 + 0x20, 1 + 0x20], false, false, None).unwrap();
+            parse_other_player(&[0x20, 0x22, 19 + 0x20, 1 + 0x20], false, false, 5, None).unwrap();
         assert_eq!(u.carry, Some(Some(261)), "1 is the bush");
-        u = parse_other_player(&[0x20, 0x22, 19 + 0x20, 31], false, false, None).unwrap();
+        u = parse_other_player(&[0x20, 0x22, 19 + 0x20, 31], false, false, 5, None).unwrap();
         assert_eq!(u.carry, Some(None), "-1: empty hands");
-        u = parse_other_player(&[0x20, 0x22, 19 + 0x20, 201 + 0x20], false, false, None).unwrap();
+        u = parse_other_player(&[0x20, 0x22, 19 + 0x20, 201 + 0x20], false, false, 5, None)
+            .unwrap();
         assert_eq!(u.carry, Some(Some(239)));
-        u = parse_other_player(&[0x20, 0x22, 15 + 0x20, 0x40], false, false, None).unwrap();
+        u = parse_other_player(&[0x20, 0x22, 15 + 0x20, 0x40], false, false, 5, None).unwrap();
         assert_eq!(u.carry, None, "no prop 19: unchanged");
     }
 
@@ -2353,7 +2375,7 @@ mod tests {
         p.extend(b"red.png");
         p.extend([g(10), g(4)]);
         p.extend(b"walk");
-        let u = parse_other_player(&p, false, false, None).unwrap();
+        let u = parse_other_player(&p, false, false, 5, None).unwrap();
         assert_eq!(u.sword_power, Some(3));
         let want = |s: &str| Some(s.to_string());
         assert_eq!(
@@ -2374,6 +2396,7 @@ mod tests {
             &[0x20, 0x22, g(8), g(2), g(9), g(0), g(11), g(4)],
             false,
             false,
+            5,
             None,
         )
         .unwrap();
@@ -2383,9 +2406,9 @@ mod tests {
         );
         // A later update without the props keeps them.
         let mut st = SessionState::default();
-        st.apply_other(parse_other_player(&p, false, false, None).unwrap());
+        st.apply_other(parse_other_player(&p, false, false, 5, None).unwrap());
         st.apply_other(
-            parse_other_player(&[0x20, 0x22, g(15), g(20)], false, false, None).unwrap(),
+            parse_other_player(&[0x20, 0x22, g(15), g(20)], false, false, 5, None).unwrap(),
         );
         assert_eq!(st.others[0].looks.shield.as_deref(), Some("shield2.png"));
     }

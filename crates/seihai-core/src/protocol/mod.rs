@@ -63,14 +63,17 @@ pub use profile::{
 };
 pub use props::{
     decode_pos_precise, encode_pos_classic, encode_pos_precise, parse_player_props,
-    parse_player_props_in, parse_player_props_with, PlayerProp,
+    parse_player_props_in, parse_player_props_sized, parse_player_props_with, PlayerProp,
 };
 pub use showimg::{
     apply_showimg_update, describe_showimg_update, parse_showimg_update, showimg_message, ImgField,
     ImgPart, ImgRecord, PlayerImage, PlayerImages, ShowImgInfo, ShowImgSender, ShowImgUpdate,
 };
 pub use tampercheck::{TamperImage, TamperSender, TamperWords};
-pub use tokens::{known_token, tokens_tsv, KnownToken, TokenGrade, TokenKind, KNOWN_TOKENS};
+pub use tokens::{
+    known_token, serve_as, tokens_tsv, KnownToken, TokenGrade, TokenKind, KNOWN_TOKENS, NOT_SERVED,
+    STAND_INS,
+};
 pub use version::{ClientVersion, EncryptionGen};
 
 use std::io::{self, Write};
