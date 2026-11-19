@@ -44,3 +44,37 @@ normal regression test plus a fix PR.
 Seed corpora under `fuzz/corpus/` come from the crate's test fixtures
 (no real hosts or account captures). Commit only those seeds; leave
 libFuzzer-grown inputs local (they rewrite the same directories).
+
+## Live differential cases (GS1 and GS2 scripts)
+
+libFuzzer above only checks that Seihai's own readers never panic. Two
+examples write cases for a **real client** in a lab instead, with what
+Seihai predicts that client will do:
+
+```
+cargo run -p seihai-core --no-default-features --example gs2_fuzzcases -- --seed 1 --count 200 > gs2cases.tsv
+cargo run -p seihai-core --no-default-features --example gs1_fuzzcases -- --seed 1 --count 150 > gs1cases.tsv
+```
+
+Each case is one NPC script that sets `player.chat` to `FZ<id>a`, waits,
+computes one value and sets `player.chat` to `FZ<id>:<value>`, so the
+client reports what its VM did through an ordinary player-prop packet.
+
+- `gs2_fuzzcases`: compiled bytecode with fuzzed parts spliced in.
+  Families `control`, `op` (every byte no compiler writes, the slot and
+  literal opcodes 45-49, 54, 66, 67, 104, 121, 164, the fold bytes 200-242
+  written raw, `waitfor` timeouts), `limit` (stack, loop, `maxlooplimit`
+  and call depth around each profile's limit), `container` (damaged
+  segments, references and operand markers) and `expr` (random
+  expressions over edge values). One prediction column per VM profile
+  (4.20r8, 5.24r4, 6.03r7), from `gs2::exec::Machine`.
+- `gs1_fuzzcases`: GS1 script text (the clients never get GS1 as
+  bytecode). Families `code` (message codes), `cond`, `limit`, `text`
+  (damaged scripts) and `expr`. Predictions for the 2.05 and 2.17
+  vocabularies, from the GS1 engine.
+
+The lab side (a probe plan per case file, and scoring a run's proxy log
+against the prediction columns) is in Graal_analysis
+`tools/probe/scriptfuzz.py`. A case where the client and the prediction
+differ is a lead for a fix here, once the lab note says which side is
+right.
