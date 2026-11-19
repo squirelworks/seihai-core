@@ -1971,9 +1971,9 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.00r7	files	large_file_size	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 5.00r7	ui	editor	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 5.00r7	protocol	login lobby	5.00r7	binary	read here	Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); stock GServer-v2 accepts all three empty (lab, 2026-10-31), other servers are untested | the base-file requests after the language (47 or 23 basepackage.gupd) are not sent | chat is a bold sans serif in the lab; its cell height is not known, 24 is kept
-5.00r7	protocol	gen5_round_down	5.00r7	binary	read here	the gen-5 step count was not read in this binary; round-up is kept, while 4.20r8 before it and 5.12 after it round down
-5.00r7	protocol	gen5_compress_all	ORIGIN	origin	carried, flagged unknown	the gen-5 step count was not read in this binary; round-up is kept, while 4.20r8 before it and 5.12 after it round down
-5.00r7	protocol	gen5_long_frames	ORIGIN	origin	carried, flagged unknown	the gen-5 step count was not read in this binary; round-up is kept, while 4.20r8 before it and 5.12 after it round down
+5.00r7	protocol	gen5_round_down	4.04r2	binary	carried, flagged unknown	the gen-5 step count was not read in this binary; it inherits the round-down of 4.20r8 before it and 5.12 after it (both read), matching the round-down confirmed through 6.03r7 (lab 2026-11-19)
+5.00r7	protocol	gen5_compress_all	ORIGIN	origin	carried, flagged unknown	the gen-5 step count was not read in this binary; it inherits the round-down of 4.20r8 before it and 5.12 after it (both read), matching the round-down confirmed through 6.03r7 (lab 2026-11-19)
+5.00r7	protocol	gen5_long_frames	ORIGIN	origin	carried, flagged unknown	the gen-5 step count was not read in this binary; it inherits the round-down of 4.20r8 before it and 5.12 after it (both read), matching the round-down confirmed through 6.03r7 (lab 2026-11-19)
 5.00r7	scripts	resolve_host	ORIGIN	origin	carried	
 5.12	protocol	plo (server ids handled)	5.00r7	binary	carried	
 5.12	protocol	pli (client ids sent)	5.00r7	binary	carried, flagged unknown	not read; 5.00r7's set is kept | only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
@@ -2023,7 +2023,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.12	files	large_file_size	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 5.12	ui	editor	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 5.12	protocol	login lobby	5.12	binary	read here	
-5.12	protocol	gen5_round_down	5.12	binary	read here	a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
+5.12	protocol	gen5_round_down	4.04r2	binary	carried, flagged unknown	a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
 5.12	protocol	gen5_compress_all	5.12	binary	read here	a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
 5.12	protocol	gen5_long_frames	ORIGIN	origin	carried, flagged unknown	a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
 5.12	scripts	resolve_host	ORIGIN	origin	carried	
@@ -2075,7 +2075,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.12 Mac	files	large_file_size	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 5.12 Mac	ui	editor	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 5.12 Mac	protocol	login lobby	5.12 Mac	binary	read here	the kernel string is the one Mac OS X 10.4.0 gave in the lab; a real Mac sends its own
-5.12 Mac	protocol	gen5_round_down	5.12	binary	carried	a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
+5.12 Mac	protocol	gen5_round_down	4.04r2	binary	carried	
 5.12 Mac	protocol	gen5_compress_all	5.12 Mac	binary	read here	
 5.12 Mac	protocol	gen5_long_frames	ORIGIN	origin	carried	
 5.12 Mac	scripts	resolve_host	ORIGIN	origin	carried	
@@ -2127,7 +2127,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.24r4	files	large_file_size	2.3	inferred	carried, flagged unknown	stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md | no 2.3 binary; the whole step is the 2.31 values
 5.24r4	ui	editor	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 5.24r4	protocol	login lobby	5.24r4	binary	read here	
-5.24r4	protocol	gen5_round_down	5.24r4	binary	read here	
+5.24r4	protocol	gen5_round_down	4.04r2	binary	carried	
 5.24r4	protocol	gen5_compress_all	5.12 Mac	binary	carried	
 5.24r4	protocol	gen5_long_frames	ORIGIN	origin	carried	
 5.24r4	scripts	resolve_host	ORIGIN	origin	carried	
@@ -2179,7 +2179,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.30r3	files	large_file_size	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 5.30r3	ui	editor	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 5.30r3	protocol	login lobby	5.24r4	binary	carried	
-5.30r3	protocol	gen5_round_down	5.24r4	binary	carried	
+5.30r3	protocol	gen5_round_down	4.04r2	binary	carried	
 5.30r3	protocol	gen5_compress_all	5.12 Mac	binary	carried	
 5.30r3	protocol	gen5_long_frames	ORIGIN	origin	carried	
 5.30r3	scripts	resolve_host	ORIGIN	origin	carried	
@@ -2231,7 +2231,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 5.31r4	files	large_file_size	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 5.31r4	ui	editor	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 5.31r4	protocol	login lobby	5.31r4	binary	read here	why it draws no tiles before the warp was not traced in the binary; the lab shows it, and the warp alone brings the tiles back
-5.31r4	protocol	gen5_round_down	5.24r4	binary	carried	
+5.31r4	protocol	gen5_round_down	4.04r2	binary	carried	
 5.31r4	protocol	gen5_compress_all	5.12 Mac	binary	carried	
 5.31r4	protocol	gen5_long_frames	ORIGIN	origin	carried	
 5.31r4	scripts	resolve_host	ORIGIN	origin	carried	
@@ -2283,7 +2283,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.00r2	files	large_file_size	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 6.00r2	ui	editor	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 6.00r2	protocol	login lobby	6.00r2	binary	read here	whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
-6.00r2	protocol	gen5_round_down	5.24r4	binary	carried, flagged unknown	the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
+6.00r2	protocol	gen5_round_down	4.04r2	binary	carried, flagged unknown	the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
 6.00r2	protocol	gen5_compress_all	5.12 Mac	binary	carried, flagged unknown	the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
 6.00r2	protocol	gen5_long_frames	6.00r2	binary	read here	the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
 6.00r2	scripts	resolve_host	ORIGIN	origin	carried	
@@ -2335,7 +2335,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.00r4	files	large_file_size	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 6.00r4	ui	editor	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 6.00r4	protocol	login lobby	6.00r2	binary	carried	whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
-6.00r4	protocol	gen5_round_down	5.24r4	binary	carried, flagged unknown	the 0xFFFF long frame length is taken from 6.00r2, which takes it from 6.01r1
+6.00r4	protocol	gen5_round_down	4.04r2	binary	carried, flagged unknown	the 0xFFFF long frame length is taken from 6.00r2, which takes it from 6.01r1
 6.00r4	protocol	gen5_compress_all	5.12 Mac	binary	carried, flagged unknown	the 0xFFFF long frame length is taken from 6.00r2, which takes it from 6.01r1
 6.00r4	protocol	gen5_long_frames	6.00r2	binary	carried, flagged unknown	the 0xFFFF long frame length is taken from 6.00r2, which takes it from 6.01r1 | the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
 6.00r4	scripts	resolve_host	6.00r4	binary	read here	
@@ -2387,7 +2387,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.015	files	large_file_size	2.3	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | no 2.3 binary; the whole step is the 2.31 values
 6.015	ui	editor	2.3	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | no 2.3 binary; the whole step is the 2.31 values
 6.015	protocol	login lobby	6.00r2	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | the 5.12 to 6.03r7 login line (win, three machine fields, the quoted Windows version) is taken; no capture with this token | Tempus Sans ITC 24 is carried from 6.00r2; Login-mode tile drawing before the warp is not known | whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
-6.015	protocol	gen5_round_down	5.24r4	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | the 0xFFFF long frame length is read in Linux 6.01r1 and taken
+6.015	protocol	gen5_round_down	4.04r2	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | the 0xFFFF long frame length is read in Linux 6.01r1 and taken
 6.015	protocol	gen5_compress_all	5.12 Mac	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | the 0xFFFF long frame length is read in Linux 6.01r1 and taken
 6.015	protocol	gen5_long_frames	6.00r2	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | the 0xFFFF long frame length is read in Linux 6.01r1 and taken | the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
 6.015	scripts	resolve_host	6.015	inferred	inferred here	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
@@ -2439,7 +2439,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.034	files	large_file_size	2.3	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | no 2.3 binary; the whole step is the 2.31 values
 6.034	ui	editor	2.3	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | no 2.3 binary; the whole step is the 2.31 values
 6.034	protocol	login lobby	6.00r2	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred | the 5.12 to 6.03r7 login line (win, three machine fields, the quoted Windows version) is taken; no capture with this token | Tempus Sans ITC 24 is carried; whether 6.03r4 draws tiles before the warp (6.03r7 does not) is not known | whether it draws tiles before the warp was not recorded (5.31r4 and 6.03r7 do not); Seihai draws them
-6.034	protocol	gen5_round_down	5.24r4	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
+6.034	protocol	gen5_round_down	4.04r2	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
 6.034	protocol	gen5_compress_all	5.12 Mac	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
 6.034	protocol	gen5_long_frames	6.00r2	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred | the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
 6.034	scripts	resolve_host	6.015	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | no 6.00r7 or 6.01r5 binary; every value of this step is inferred
@@ -2491,7 +2491,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.03r7	files	large_file_size	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 6.03r7	ui	editor	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 6.03r7	protocol	login lobby	6.03r7	binary	read here	
-6.03r7	protocol	gen5_round_down	5.24r4	binary	carried	
+6.03r7	protocol	gen5_round_down	4.04r2	binary	carried	
 6.03r7	protocol	gen5_compress_all	5.12 Mac	binary	carried	
 6.03r7	protocol	gen5_long_frames	6.00r2	binary	carried	the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
 6.03r7	scripts	resolve_host	6.015	inferred	carried	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
@@ -2543,7 +2543,7 @@ row	area	field	set_by	set_by_basis	evidence	notes
 6.03r7 Linux	files	large_file_size	2.3	inferred	carried, flagged unknown	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for | no 2.3 binary; the whole step is the 2.31 values
 6.03r7 Linux	ui	editor	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 6.03r7 Linux	protocol	login lobby	6.03r7 Linux	binary	read here	the four machine ids are sent as empty quoted strings; the real kernel string field was not captured, and whether it is quoted is not known
-6.03r7 Linux	protocol	gen5_round_down	5.24r4	binary	carried	
+6.03r7 Linux	protocol	gen5_round_down	4.04r2	binary	carried	
 6.03r7 Linux	protocol	gen5_compress_all	5.12 Mac	binary	carried	
 6.03r7 Linux	protocol	gen5_long_frames	6.00r2	binary	carried	the 0xFFFF long frame length is read in Linux 6.01r1 and 6.03r7, not in this build; taken from 6.01r1
 6.03r7 Linux	scripts	resolve_host	6.015	inferred	carried	no 6.00r7 or 6.01r5 binary; every value of this step is inferred

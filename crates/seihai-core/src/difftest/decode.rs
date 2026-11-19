@@ -919,22 +919,27 @@ mod tests {
     fn gen5_cipher_follows_the_profile() {
         assert!(gen5_for(ClientVersion::V512, false, 0x21).is_round_down());
         assert!(!gen5_for(ClientVersion::V512, true, 0x21).is_round_down());
+        // 2.22 is gen-3, not gen-5: the round-down flag never applies.
         assert!(!gen5_for(ClientVersion::V222, false, 0x21).is_round_down());
-        assert!(!gen5_for(ClientVersion::V603R7, false, 0x21).is_round_down());
-        // The 4.x builds (Windows 4.04r2 and 4.20r8, Mac PowerPC 4.04r2 and
-        // 4.20r6) and the Mac 5.12 round down too (read in their binaries,
-        // 2026-11-13), but only the Windows 5.12 compresses every frame.
+        // Every gen-5 build rounds the compressed step down: read in the
+        // binaries (4.04r2 Win/Mac, 4.20r6 Mac, 4.20r8, 5.12 Win/Mac, 6.03r7
+        // Linux; 2026-11-13 and 2026-11-19) and inferred for the two unread
+        // builds (5.00r7, 5.24r4), which sit between read round-down builds.
+        // Only the Windows 5.12 compresses every frame.
         for v in [
             ClientVersion::V404R2,
             ClientVersion::V404R2Mac,
             ClientVersion::V420R6,
             ClientVersion::V420R8,
+            ClientVersion::V500R7,
             ClientVersion::V512Mac,
+            ClientVersion::V524R4,
+            ClientVersion::V603R7,
+            ClientVersion::V603R7Linux,
         ] {
             assert!(gen5_for(v, false, 0x21).is_round_down(), "{}", v.label());
             assert!(!v.profile().protocol.gen5_compress_all, "{}", v.label());
         }
-        assert!(!gen5_for(ClientVersion::V500R7, false, 0x21).is_round_down());
         assert!(ClientVersion::V512.profile().protocol.gen5_compress_all);
         assert!(!ClientVersion::V524R4.profile().protocol.gen5_compress_all);
     }
