@@ -6,7 +6,7 @@ same in every Seihai repo.
 
 ## This repo
 
-- **Current version:** 0.6.0.
+- **Current version:** 0.7.0.
 - **Where the version lives:** `version` under `[workspace.package]` in `Cargo.toml` (seihai-core and seihai-draw share it and are tagged together).
 - **Public surface** (the things a version number makes promises about):
   - the public Rust API of `seihai-core` and `seihai-draw`: items, signatures, struct fields, enum variants, Cargo features (`dev`, `audio`);
@@ -17,7 +17,7 @@ same in every Seihai repo.
 - **Unreleased notes:** the `## Unreleased` section at the top of `CHANGELOG.md`.
 - **Release notes:** `release-notes/vX.Y.Z.md`, plus its one-line entry in `CHANGELOG.md`.
 - **How a release is made:** `.github/workflows/release.yml` runs after CI passes on `main`. When the workspace version has no release yet, it builds and tests on macOS and then **publishes** the release, which makes the tag (the owner chose automatic tagging on 2026-11-19). A merge that doesn't change the version makes no release. Until 2026-11-19, every PR bumped the version and published at once, which is why 0.0.8 to 0.6.0 came so quickly.
-- **Next milestone:** [#108](https://github.com/squirelworks/seihai-core/issues/108) (0.7.0).
+- **Next milestone:** [#123](https://github.com/squirelworks/seihai-core/issues/123) (0.8.0).
 - **1.0.0 criteria:** [#109](https://github.com/squirelworks/seihai-core/issues/109).
 - **Long-term roadmap:** [#7](https://github.com/squirelworks/seihai-core/issues/7).
 - **Check:** `.github/workflows/version-guard.yml` checks every PR that changes the version (see below).
