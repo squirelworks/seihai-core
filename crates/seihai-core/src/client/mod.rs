@@ -35,7 +35,7 @@ use crate::assets::{AssetResolver, AssetRoot, Level};
 use crate::filecache::{DownloadStore, FileSession};
 use crate::gmap::{apply_board_mods_to, sync_world, Crossing, Gmap, GmapRules, WorldLoader};
 use crate::net::{
-    link_request_frame, login_gserver_with, random_key, walk_message_for, wantfile_message,
+    link_request_frame, login_gserver_secure, random_key, walk_message_for, wantfile_message,
 };
 use crate::offline::OfflineSession;
 use crate::protocol::layouts::BoardModify2;
@@ -64,6 +64,10 @@ pub struct Login {
     pub password: String,
     pub nick: String,
     pub language: String,
+    /// The Seihai secure login (`SEI00001`) for every game server of the
+    /// session, the 5.x/6.x Login lobby and the server it warps to
+    /// included. `None` is the build's own clear login.
+    pub secure: Option<crate::net::SecureLogin>,
 }
 
 /// How long the server must stay quiet after a level is stored before it
@@ -1126,7 +1130,7 @@ pub fn run_hooked(
                 name: warp_name.take(),
             });
         }
-        let mut s = login_gserver_with(
+        let mut s = login_gserver_secure(
             &addr,
             version,
             random_key(),
@@ -1135,6 +1139,7 @@ pub fn run_hooked(
             false,
             first_session,
             wantfile_message,
+            login.secure.as_ref(),
         )
         .map_err(|e| e.to_string())?;
         first_session = false;

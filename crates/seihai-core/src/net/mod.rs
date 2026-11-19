@@ -1431,7 +1431,7 @@ impl Connection {
             if !matches!(shape, LoginShape::Gen5 | LoginShape::Gen5OneFrame) {
                 return Err(io::Error::new(
                     io::ErrorKind::Unsupported,
-                    "the secure list login needs a 2.22 or later profile",
+                    "the secure list login needs a gen-5 list shape (2.22, 2.31 or 3.04); 5.x and 6.x borrow 2.05's list, so fetch the list as 2.22",
                 ));
             }
             let prefix = [7 + 0x20, (key & 0x7F) + 0x20];
