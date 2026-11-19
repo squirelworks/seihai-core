@@ -2262,9 +2262,18 @@ fn split_codes(s: &str, era: Era) -> Result<Vec<Result<String, Code>>, String> {
                     // The name is text with codes: GS2 builds it and reads
                     // the variable of that name with `makevar`.
                     Some(Code::DynVar(x.trim().to_string()))
+                } else if is_plain_name(&n)
+                    && !["local.", "server."].iter().any(|p| n.starts_with(p))
+                {
+                    // A plain GS1 string is a player flag (`name=value`).
+                    // GS2 reads a player flag as `player.<name>`, as a real
+                    // 5.24r4 reads a server flag by its plain name (lab
+                    // 2026-11-13); that it gives the flag's value for a
+                    // string is **[inf]**.
+                    Some(var(&format!("player.{n}"), None))
                 } else {
                     return Err(format!(
-                        "`#s({x})`: only `this.`, `client.`, `clientr.` and `serverr.` strings are lowered (a plain GS1 string is a player flag)"
+                        "`#s({x})`: a `local.` or `server.` string, or a plain string name built at run time, is not lowered"
                     ));
                 }
             }

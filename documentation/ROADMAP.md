@@ -65,8 +65,9 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
         `loadlines`/`savelines`, `loadvars`/`getstringkeys`,
         `requesttext`, `savelog`) wait on server-side GS2, which is out
         of the compiler's scope.
-      - GS1 message codes on plain strings in GS2 (`#s(name)`) are
-        refused; the levels still hold 440 `#s`/`#v`-style codes.
+      - ~~GS1 message codes on plain strings (`#s(name)`)~~ read
+        `player.<name>` from 0.6.1, as plain flag reads do; `local.` and
+        `server.` strings and run-time plain names stay refused.
       - ~~`delivery` compiles client scripts as strict GS1~~: from
         0.6.1 a client part strict GS1 refuses is compiled as
         `Language::Detect` reads it.
