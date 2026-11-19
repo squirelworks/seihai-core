@@ -31,6 +31,10 @@
 //! - `container`: byte-level damage to a good case (segments dropped,
 //!   reordered, unknown or oversized; string and jump references out of
 //!   range; operand markers F0-FF in odd places; trailing bytes).
+//! - `numtext`: fixed texts near zero (`"0"`, `"00"`, `" 0"`, `"0abc"`,
+//!   `"abc"`, `""` and others) through `+ 0`, `!`, `== 0` and `== -1`,
+//!   to pin down which texts the clients read as -1 instead of 0. Comes
+//!   last, so the ids of the other families do not move.
 //!
 //! Output is a TSV with one case per line: `id`, `family`, `what`, the
 //! bytecode as hex (without the compiler's trailing newline), then one
@@ -877,6 +881,35 @@ fn hex(b: &[u8]) -> String {
     s
 }
 
+/// Texts that may or may not read as zero, each through `+ 0`, `!`, `== 0`
+/// and `== -1`: which texts the clients turn into −1 rather than 0.
+fn numtext_cases(id: &mut u32, out: &mut Vec<Case>) {
+    const TEXTS: &[&str] = &[
+        "0", "0.0", "00", " 0", "0 ", "+0", "-0", ".0", "0.", "0e5", "0x0", "0abc", "000001", "1",
+        "-1", "1abc", "a1", "abc", "", " ", "true", "false", "null",
+    ];
+    for t in TEXTS {
+        let lit = format!("\"{t}\"");
+        for e in [
+            format!("{lit} + 0"),
+            format!("!{lit}"),
+            format!("({lit} == 0)"),
+            format!("({lit} == -1)"),
+        ] {
+            let Ok(s) = compile_gs2(&template(*id, &e)) else {
+                continue;
+            };
+            out.push(Case {
+                id: *id,
+                family: "numtext",
+                what: e,
+                bytes: s.write(),
+            });
+            *id += 1;
+        }
+    }
+}
+
 fn main() {
     let mut seed = 1u64;
     let mut count = 300usize;
@@ -923,6 +956,9 @@ fn main() {
     }
     if want("expr") {
         expr_cases(&mut r, &mut id, count, &mut cases);
+    }
+    if want("numtext") {
+        numtext_cases(&mut id, &mut cases);
     }
     println!(
         "id\tfamily\twhat\thex\t{}",

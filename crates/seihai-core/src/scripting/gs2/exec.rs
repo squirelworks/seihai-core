@@ -484,7 +484,7 @@ impl Machine {
                 self.push(if join {
                     Slot::Str(val_text(&a) + &val_text(&b))
                 } else {
-                    Slot::Num(a.num() + b.num())
+                    Slot::Num(gs2_num(&a, self.profile) + gs2_num(&b, self.profile))
                 });
             }
             // A list of numbers from the values on the stack (5.00r7).
@@ -497,7 +497,10 @@ impl Machine {
                 let items: Vec<Slot> = self.stack.drain(at..).collect();
                 let list = items
                     .into_iter()
-                    .map(|s| Value::Val(Val::Num(self.value(s, host).num())))
+                    .map(|s| {
+                        let v = self.value(s, host);
+                        Value::Val(Val::Num(gs2_num(&v, self.profile)))
+                    })
                     .collect();
                 self.push(Slot::List(list));
             }
@@ -691,14 +694,15 @@ impl Machine {
                 return;
             }
             Some(Root::This | Root::ThisO) if name.eq_ignore_ascii_case("timeout") => {
-                self.timeout = frames(value.num());
+                self.timeout = frames(value.num_in(self.profile));
                 return;
             }
             // `TGraalVar::setMaxLoopLimit` (5.00r7): 100 to 1 000 000.
             Some(Root::This | Root::ThisO)
                 if self.profile.max_loop_limit && name.eq_ignore_ascii_case("maxlooplimit") =>
             {
-                self.loop_limit = (client_int(value.num()).clamp(100, 1_000_000)) as u32;
+                self.loop_limit =
+                    (client_int(value.num_in(self.profile)).clamp(100, 1_000_000)) as u32;
                 return;
             }
             Some(r) => {
@@ -730,14 +734,15 @@ impl Machine {
                 }
                 let this = self.this_root();
                 if this == Root::This && name.eq_ignore_ascii_case("timeout") {
-                    self.timeout = frames(value.num());
+                    self.timeout = frames(value.num_in(self.profile));
                     return;
                 }
                 if this == Root::This
                     && self.profile.max_loop_limit
                     && name.eq_ignore_ascii_case("maxlooplimit")
                 {
-                    self.loop_limit = (client_int(value.num()).clamp(100, 1_000_000)) as u32;
+                    self.loop_limit =
+                        (client_int(value.num_in(self.profile)).clamp(100, 1_000_000)) as u32;
                     return;
                 }
                 if host.set_prop(this, name, &value.val()) {
@@ -952,7 +957,8 @@ impl Machine {
     }
 
     fn pop_num(&mut self, host: &mut dyn Host) -> Option<f64> {
-        self.pop_val(host).map(|v| v.num())
+        let p = self.profile;
+        self.pop_val(host).map(|v| gs2_num(&v, p))
     }
 
     fn push(&mut self, s: Slot) -> bool {
@@ -1031,7 +1037,8 @@ impl Machine {
                     let Some(top) = self.stack.last().cloned() else {
                         return fault(self, host);
                     };
-                    let v = self.value(top, host).num();
+                    let v = self.value(top, host);
+                    let v = gs2_num(&v, self.profile);
                     if (v != 0.0) == (ins.op == Op::Or) {
                         self.pc = int.unwrap_or(0).max(0) as usize;
                     } else {
@@ -1042,7 +1049,7 @@ impl Machine {
                     let Some(top) = self.pop_val(host) else {
                         return fault(self, host);
                     };
-                    let n = top.num();
+                    let n = gs2_num(&top, self.profile);
                     self.push(Slot::Num(if n != 0.0 { 1.0 } else { 0.0 }));
                 }
                 Op::CmdCall => {
@@ -1162,7 +1169,7 @@ impl Machine {
                         return fault(self, host);
                     };
                     self.push(if ins.op == Op::ConvToFloat {
-                        Slot::Num(v.num())
+                        Slot::Num(gs2_num(&v, self.profile))
                     } else {
                         Slot::Str(val_text(&v))
                     });
@@ -1203,7 +1210,8 @@ impl Machine {
                     };
                     let d = if ins.op == Op::Inc { 1.0 } else { -1.0 };
                     if let Slot::Var(root, name) = &top {
-                        let n = self.read_var(*root, name, host).num() + d;
+                        let v = self.read_var(*root, name, host);
+                        let n = gs2_num(&v, self.profile) + d;
                         self.write_var(*root, name, Val::Num(n).into(), host);
                     } else if let Slot::Num(n) = top {
                         *self.stack.last_mut().unwrap() = Slot::Num(n + d);
@@ -1280,9 +1288,11 @@ impl Machine {
                     let (a, b) = (self.value_full(a, host), self.value_full(b, host));
                     let null = |s: &Value| matches!(s, Value::Val(Val::Num(n)) if *n == 0.0);
                     let c = match (&a, &b) {
-                        (Value::Obj(..), Value::Obj(..)) => (!a.same(&b, compare)) as i32,
+                        (Value::Obj(..), Value::Obj(..)) => {
+                            (!a.same(&b, &|x: &Val, y: &Val| compare(x, y, self.profile))) as i32
+                        }
                         (Value::Obj(..), o) | (o, Value::Obj(..)) if null(o) => 1,
-                        _ => compare(&a.val(), &b.val()),
+                        _ => compare(&a.val(), &b.val(), self.profile),
                     };
                     let t = match ins.op {
                         Op::Eq => c == 0,
@@ -1308,7 +1318,7 @@ impl Machine {
                         return fault(self, host);
                     };
                     self.push(match ins.op {
-                        Op::Char => Slot::Str(strings::char_of(v.num())),
+                        Op::Char => Slot::Str(strings::char_of(gs2_num(&v, self.profile))),
                         Op::ObjTrim => Slot::Str(strings::trim(&val_text(&v))),
                         _ => Slot::Num(val_text(&v).chars().count() as f64),
                     });
@@ -1320,7 +1330,7 @@ impl Machine {
                     let (s, t) = (val_text(&a), val_text(&b));
                     self.push(match ins.op {
                         Op::ObjPos => Slot::Num(strings::pos(&s, &t) as f64),
-                        Op::ObjCharAt => Slot::Str(strings::charat(&s, b.num())),
+                        Op::ObjCharAt => Slot::Str(strings::charat(&s, gs2_num(&b, self.profile))),
                         Op::ObjStarts => Slot::Num(s.starts_with(t.as_str()) as i32 as f64),
                         _ => Slot::Num(s.ends_with(t.as_str()) as i32 as f64),
                     });
@@ -1460,7 +1470,9 @@ impl Machine {
                     self.edit_list(&o, host, |l| {
                         if add {
                             l.push(v);
-                        } else if let Some(k) = l.iter().position(|e| e.same(&v, compare)) {
+                        } else if let Some(k) = l.iter().position(|e| {
+                            e.same(&v, &|x: &Val, y: &Val| compare(x, y, self.profile))
+                        }) {
                             l.remove(k);
                         }
                     });
@@ -1526,7 +1538,7 @@ impl Machine {
                     let l = self.list_of(&o, host);
                     let k = l
                         .iter()
-                        .position(|e| e.same(&v, compare))
+                        .position(|e| e.same(&v, &|x: &Val, y: &Val| compare(x, y, self.profile)))
                         .map_or(-1.0, |k| k as f64);
                     self.push(Slot::Num(k));
                 }
@@ -1537,7 +1549,10 @@ impl Machine {
                     };
                     let v = self.value_full(v, host);
                     let l = self.list_of(&o, host);
-                    let has = |x: &Value| l.iter().any(|e| e.same(x, compare));
+                    let has = |x: &Value| {
+                        l.iter()
+                            .any(|e| e.same(x, &|x: &Val, y: &Val| compare(x, y, self.profile)))
+                    };
                     let yes = match &v {
                         Value::List(xs) if !xs.is_empty() => xs.iter().all(has),
                         x => has(x),
@@ -1630,10 +1645,11 @@ impl Machine {
                     else {
                         return fault(self, host);
                     };
+                    let p = self.profile;
                     let inside = |v: f64| v >= a && v <= b;
                     let yes = match self.value_full(x, host) {
-                        Value::List(l) if !l.is_empty() => l.iter().all(|e| inside(e.num())),
-                        v => inside(v.num()),
+                        Value::List(l) if !l.is_empty() => l.iter().all(|e| inside(e.num_in(p))),
+                        v => inside(v.num_in(p)),
                     };
                     self.push(Slot::Num(yes as i32 as f64));
                 }
@@ -1667,7 +1683,9 @@ impl Machine {
                     let found = l
                         .iter()
                         .enumerate()
-                        .filter(|(_, e)| e.same(&v, compare))
+                        .filter(|(_, e)| {
+                            e.same(&v, &|x: &Val, y: &Val| compare(x, y, self.profile))
+                        })
                         .map(|(i, _)| Value::Val(Val::Num(i as f64)))
                         .collect();
                     self.push(Slot::List(found));
@@ -1731,7 +1749,7 @@ impl Machine {
                     let (Some(b), Some(a)) = (self.pop_val(host), self.pop_val(host)) else {
                         return fault(self, host);
                     };
-                    self.push(Slot::Num(compare(&a, &b).signum() as f64));
+                    self.push(Slot::Num(compare(&a, &b, self.profile).signum() as f64));
                 }
                 // `new T(name) { … }`: the name becomes the global variable
                 // the new object is assigned to (`OP_ASSIGN` after
@@ -1916,10 +1934,19 @@ pub(super) fn root_name(r: Root) -> &'static str {
 /// Two numbers compare as numbers (equal within [`vm::TOLERANCE`], as in
 /// every VM read), two strings as text, and a string against a number as
 /// the number it reads as.
-fn compare(a: &Val, b: &Val) -> i32 {
+fn compare(a: &Val, b: &Val, profile: &VmProfile) -> i32 {
     match (a, b) {
         (Val::Str(x), Val::Str(y)) => x.cmp(y) as i32,
-        _ => vm::num_cmp(a.num(), b.num()),
+        _ => vm::num_cmp(gs2_num(a, profile), gs2_num(b, profile)),
+    }
+}
+
+/// The number a value reads as in a GS2 VM: a text through
+/// [`vm::text_num`] (`"abc"` is -1, not 0).
+pub(super) fn gs2_num(v: &Val, profile: &VmProfile) -> f64 {
+    match v {
+        Val::Num(n) => *n,
+        Val::Str(s) => vm::text_num(s, profile.dot_zero),
     }
 }
 
