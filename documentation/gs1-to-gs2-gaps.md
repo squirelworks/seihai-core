@@ -40,16 +40,16 @@ lab run.
 
 | GS1 name | failing units | Current class | Notes |
 |---|---:|---|---|
-| `putexplosion` | 424 | `Missing` | Not in 3.153 tables. `explodebomb` is index-based, not a put. **TODO(lab):** needs a documented GS2 or server path. |
-| `puthorse` | 249 | `Missing` | Not in 3.153 tables. `takehorse` removes by index. **TODO(lab).** |
+| `putexplosion` | 424 | `Same` | Not in 3.153 tables, but real 4.20r8 and 5.12 run it from a GS2 weapon (GS1 order; sends PLI 27) **[lab]** #104. |
+| `puthorse` | 249 | `Same` | Not in 3.153 tables, but real 4.20r8 and 5.12 run it (GS1 order; sends PLI 7) **[lab]** #104. |
 | `setbackpal` | 239 | `Statements` | Omitted: removed from every C++ engine at 3.04; GS2-era clients never had it. |
 | `setstring` | 188 | `Statements` | Plain / `this.` / `client.` forms lower; residual flag forms still refuse (see README Known gaps). |
 | `putnpc` | 158 | `Missing` | GS1 NPC spawn; no 3.153 client command. **TODO(lab):** server `PUTNPC` path. |
 | `setbody` | 135 | `Statements` | `player.bodyimg = file` (same as `setplayerprop #8`). |
 | `putbomb` | 134 | `Same` | Not in 3.153 tables, but real 2018 GS2 weapons call `putbomb(power, x, y)`. |
 | `shoot` | 126 | `Same` | Not in 3.153 tables, but real 2007 and 2018 GS2 weapons call `shoot(...)` next to `setshootparams`. |
-| `putnpc2` | 104 | `Missing` | Server-oriented in 2.17–3.04 notes; not a 3.153 client command. **TODO(lab).** |
-| `putexplosion2` | 86 | `Missing` | Same family as `putexplosion`. **TODO(lab).** |
+| `putnpc2` | 104 | `Missing` | Real 4.20r8 and 5.12 log "Function putnpc2 not found" **[lab]** #104. |
+| `putexplosion2` | 86 | `Same` | Run by real 4.20r8 and 5.12 (GS1 order; PLI 27) **[lab]** #104. |
 | `addstring` | 80 | `Statements` | `this.` / `client.` lists, and plain names via `client.gs1_<flag>` like `setstring`. |
 
 Smaller #93 counts (examples): `putcomp` / `drawovertrees` / `replacestring` /
@@ -80,7 +80,6 @@ below. A silent `Same` call would fail on real GS2 clients. Track progress
 by moving a name out of `Missing` in `gs1_command_lowering` once a
 shared-command, opcode, or server-assisted form is documented:
 
-- `putexplosion`, `putexplosion2`, `puthorse`
 - `putnpc`, `putnpc2`
 - `timershow` (not the same as `timereverywhere`)
 - `sendpm`, `setpm`, `sendtonc` (server-side in 2.17–3.04 notes)

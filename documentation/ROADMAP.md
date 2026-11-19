@@ -35,8 +35,10 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
       (`documentation/gs1-to-gs2-gaps.md`); `setbody`, plain `addstring`,
       `savelog2`, and engine-removed omits (`setbackpal`, `putobject`) now
       lower; `putbomb` and `shoot` call through by name, as real GS2
-      weapons do (0.5.1) — `putexplosion(2)`, `puthorse` and `putnpc(2)`
-      stay `Missing` pending lab (#104).
+      weapons do (0.5.1) — from 0.6.2 `putexplosion(2)` and `puthorse`
+      call through too (lab #104: real 4.20r8 and 5.12 run them);
+      `putnpc2` stays `Missing` (those clients refuse it) and `putnpc` is
+      untested.
 - [ ] GS2 VM coverage for the Mac 4.04r2 and 5.12 VMs and the 7.x client
       (`documentation/gs2-vm-versions.md`). The 7.x opcode set is now
       read (Graal_analysis `protocol/gs2-opcode-table.md`, PR #630):
@@ -65,14 +67,16 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
         `loadlines`/`savelines`, `loadvars`/`getstringkeys`,
         `requesttext`, `savelog`) wait on server-side GS2, which is out
         of the compiler's scope.
-      - GS1 message codes on plain strings in GS2 (`#s(name)`) are
-        refused; the levels still hold 440 `#s`/`#v`-style codes.
+      - ~~GS1 message codes on plain strings (`#s(name)`)~~ read
+        `player.<name>` from 0.6.2, as plain flag reads do; `local.` and
+        `server.` strings and run-time plain names stay refused.
       - ~~`delivery` compiles client scripts as strict GS1~~: from
         0.6.1 a client part strict GS1 refuses is compiled as
         `Language::Detect` reads it.
-- [ ] Server trigger actions (#106): `PLO_TRIGGERACTION` (48) is
-      decoded from 0.6.1 (layout **[srv][2.05]**); the lab capture
-      from a real 2.22 and 5.12 that confirms the field order is open.
+- [x] Server trigger actions (#106): `PLO_TRIGGERACTION` (48) is
+      decoded from 0.6.1; the field order is lab-confirmed on real 2.22,
+      4.20r8 and 5.12 (0.6.2). Which script a real client runs for a
+      received 48 is still unobserved.
 - [ ] `.code` files for 1.x (#63): core codec shipped in 0.2.10 (#66);
       Seihai client-folder integration and observable guild/registration
       behaviour remain open.
@@ -84,8 +88,9 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
 
 - [ ] Fuzz targets for every decoder that sees network or world-file
       input, with every crasher fixed (#80). **Scaffold landed** in #90
-      (11 targets, seeds, weekly workflow); longer runs and crasher fixes
-      remain — leave #80 open.
+      (11 targets, seeds, weekly workflow). 0.6.2 adds `session_apply`
+      and `gs2_exec`, and a 4-minute run of all 13 found one GS1 parser
+      timeout, fixed. Longer runs remain — leave #80 open.
 - [ ] macOS build and tests before a tag is published (#78). macOS stays
       off the per-push CI.
 - [ ] Release notes per tag in `release-notes/`; tags only with the

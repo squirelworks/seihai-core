@@ -38,6 +38,8 @@ normal regression test plus a fix PR.
 | `gs2_bytecode` | GS2 segment loader and OpenGS1-style bytecode |
 | `gen3_decode` | gen-3 insertion decode (key = first byte) |
 | `gen5_frame` | gen-5 length headers + body decode (key = first byte) |
+| `session_apply` | every server→client decoder behind `SessionState::apply`, as 2.05, 2.22 and 5.12 |
+| `gs2_exec` | the GS2 executor (top level, `onCreated`, one tick) on any bytecode the reader takes, 3.153 and 5.00r7 rules |
 
 Seed corpora under `fuzz/corpus/` come from the crate's test fixtures
 (no real hosts or account captures). Commit only those seeds; leave

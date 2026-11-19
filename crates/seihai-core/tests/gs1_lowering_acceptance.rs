@@ -105,6 +105,33 @@ fn reading_a_flag_by_its_plain_name_reads_the_player_flag() {
 }
 
 #[test]
+fn a_plain_string_code_reads_the_player_flag() {
+    // `#s(door)` reads the string flag `door`, which `setstring` sends as
+    // `client.gs1_door` and the server keeps as `door`.
+    let dis = compile::compile_gs1(
+        "if (created) { setstring door,open; message #s(door); }\n",
+        Era::V217,
+    )
+    .unwrap()
+    .disassemble();
+    assert!(
+        dis.contains("OP_PLAYER\n   13  OP_TYPE_VAR #3 \"door\"\n   14  OP_MEMBER_ACCESS"),
+        "{dis}"
+    );
+    // `local.` and `server.` strings, and a name built at run time, stay refused.
+    for src in [
+        "message #s(local.a);",
+        "message #s(server.a);",
+        "message #s(w#v(1));",
+    ] {
+        assert!(
+            compile::compile_gs1(&format!("if (created) {{ {src} }}\n"), Era::V217).is_err(),
+            "{src}"
+        );
+    }
+}
+
+#[test]
 fn this_and_client_variables_keep_their_names() {
     let s = same(
         "if (created) {\n  this.hp = 3;\n  client.score = 2;\n  client.score += 5;\n  setstring this.name,bob;\n  setstring client.k,v;\n}\n",

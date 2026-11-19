@@ -24,6 +24,7 @@ jobs:
           targets=(
             level gani gmap zlib_body list_reply player_props
             gs1_parse gs2_compile gs2_bytecode gen3_decode gen5_frame
+            session_apply gs2_exec
           )
           for t in "${targets[@]}"; do
             echo "::group::fuzz $t"

@@ -87,3 +87,17 @@ path = "fuzz_targets/gen5_frame.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "session_apply"
+path = "fuzz_targets/session_apply.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gs2_exec"
+path = "fuzz_targets/gs2_exec.rs"
+test = false
+doc = false
+bench = false
