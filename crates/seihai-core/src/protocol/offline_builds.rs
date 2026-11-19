@@ -1,7 +1,7 @@
 //! Early builds outside Seihai's central game-server profile table.
 //!
-//! These are the Zelda Online and Graal clients from before 1.21 (and the
-//! NewWorld betas) that have no row in [`super::profile::PROFILES`]: no
+//! These are the Zelda Online and Graal clients from before 1.21 that have
+//! no row in [`super::profile::PROFILES`]: no
 //! account/token login is selected for them. The default launcher lists them under
 //! "All versions" with "(offline-only)", and picking one starts the offline
 //! game with the rules of [`OfflineBuild::plays_as`] and that build's own
@@ -23,8 +23,6 @@ pub enum Family {
     Java,
     /// The 1998 and early 1999 Delphi betas, 1st Graal to 1.1.9 (gen 1).
     DelphiBeta,
-    /// The NewWorld betas of 2001 (`G2N15041`).
-    NewWorld,
 }
 
 /// Why a build uses the default launcher's offline route.
@@ -318,26 +316,6 @@ pub const OFFLINE_BUILDS: &[OfflineBuild] = &[
         levels: GR03,
         plays_as: ClientVersion::V121,
         start_level: Some("level13.graal"),
-    },
-    OfflineBuild {
-        label: "NewWorld beta 1",
-        archive: "graalnwb1",
-        date: "2001-08-06",
-        family: Family::NewWorld,
-        offline: Offline::UnknownToken("G2N15041"),
-        levels: "as 2.05 (GR-V, GLEVNW01, GRMAP001)",
-        plays_as: ClientVersion::V205,
-        start_level: None,
-    },
-    OfflineBuild {
-        label: "NewWorld beta 2",
-        archive: "graalnwb2",
-        date: "2001-10-03",
-        family: Family::NewWorld,
-        offline: Offline::UnknownToken("G2N15041"),
-        levels: "as 2.05 (GR-V, GLEVNW01, GRMAP001)",
-        plays_as: ClientVersion::V205,
-        start_level: None,
     },
 ];
 

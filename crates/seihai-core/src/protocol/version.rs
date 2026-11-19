@@ -66,10 +66,19 @@ pub enum ClientVersion {
     /// Graal 2.05 rev 2 (`GNW03081`). Gen 3.
     #[default]
     V205,
+    /// NewWorld beta 1 (`G2N15041`, linked 2001-08-06). Gen 3. A side build
+    /// off 2.05: the NewWorld test client, with the built-in sword, bow,
+    /// baddies, chests, horses and freeze taken out and a 7-byte COLORS prop.
+    /// Its changes do not carry into 2.1.
+    NewWorldB1,
     /// Generic Graal 2.1 (`GNW31101`). Gen 3; profile inferred. Observed
     /// Graal 2002 world builds share this token but differ in capabilities;
     /// this variant does not select an exact world build.
     V210,
+    /// NewWorld beta 2 (`G2N15041`, linked 2001-10-03). Gen 3. A side build
+    /// off 2.1 (its binary is a 2.1 test 3 build) with NewWorld beta 1's
+    /// removals and COLORS width. Same token as beta 1.
+    NewWorldB2,
     /// Graal 2.12 (`GNW01012`). Gen 3. No binary; inferred.
     V212,
     /// Graal 2.13 (`GNW23012`). Gen 3. No binary; inferred.
@@ -382,7 +391,9 @@ impl ClientVersion {
             Self::V203,
             Self::V204,
             Self::V205,
+            Self::NewWorldB1,
             Self::V210,
+            Self::NewWorldB2,
             Self::V212,
             Self::V213,
             Self::V214,

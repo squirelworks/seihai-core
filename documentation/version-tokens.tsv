@@ -36,7 +36,7 @@ GNW24061	W	game	2.04	2.04	2.04
 GNW03081	W	game	2.05, 2.05 rev1, 2.05 rev2, 2.1 test 2 and 3, Graal 2002 ver7-ver9	2.05	2.05
 G2N29070	L	game	NewWorld 1.39 (the 1.39 server tree only)	-	not served: NewWorld line: no profile yet, and no executable
 G2NRC004	L	rc	NewWorld RemoteControl, 2000-08-19 label (server tree only)	-	-
-G2N15041	W	game	NewWorld beta 1 (pre-update and final), beta 2	-	not served: NewWorld line: no profile yet
+G2N15041	W	game	NewWorld beta 1 (pre-update and final), beta 2	NewWorld beta 1, NewWorld beta 2	NewWorld beta 1
 GSERV019	B	rc	RemoteControl 2000-08-19	-	-
 GSERV020	B	rc	RemoteControl 2000-10-25	-	-
 GSERV021	B	rc	RemoteControl 2001-01-27	-	-

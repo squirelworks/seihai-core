@@ -20,9 +20,10 @@ modern list, and it does not mean the original 1.33 or 5.24r4 ever spoke a
 listserver protocol. A unit test checks that a row is "native" for
 discovery exactly when its own profile has a listserver.
 
-The NewWorld betas log in with a token no profile row has and that no
-server was seen to accept, so they are "direct game server (unconfirmed
-token)" and stay offline-only.
+The NewWorld betas have profile rows of their own, side builds of 2.05 and
+2.1. Seihai lists them with their base build's listserver frame, which asks
+for the `newmain` list; the real betas ask for `newworld`, which the public
+listserver was not asked for.
 
 ## Every build
 
@@ -51,8 +52,6 @@ token)" and stay offline-only.
 | 1.1.9 Gold Edition | relay lobby | none (offline-only) |
 | 1.1 | relay lobby | none (offline-only) |
 | Java Graal | relay lobby | none (offline-only) |
-| NewWorld beta 1 | direct game server (unconfirmed token) | none (offline-only) |
-| NewWorld beta 2 | direct game server (unconfirmed token) | none (offline-only) |
 | 1.21 | direct game server | borrowed: lists as 2.05 |
 | 1.28 beta 2 | direct game server | borrowed: lists as 2.05 |
 | 1.3 test | direct game server | borrowed: lists as 2.05 |
@@ -74,7 +73,9 @@ token)" and stay offline-only.
 | 2.03 | listserver (classic) | own listserver login |
 | 2.04 | listserver (classic) | own listserver login |
 | 2.05 | listserver (classic) | own listserver login |
+| NewWorld beta 1 | listserver (classic) | own listserver login |
 | 2.1 | listserver (classic) | own listserver login |
+| NewWorld beta 2 | listserver (classic) | own listserver login |
 | 2.12 | listserver (classic) | own listserver login |
 | 2.13 | listserver (classic) | own listserver login |
 | 2.14 | listserver (classic) | own listserver login |

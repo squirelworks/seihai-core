@@ -4,7 +4,7 @@ Roadmap #7, "Next 2". For every profile row and every field the chain ever
 changes, where the row's value comes from: the step that set it, how that
 step is backed, and what the row's own step says it does not know. The full
 table is [profile-audit.tsv](profile-audit.tsv), one line per row and field
-(52 fields × 49 rows). Code: `crates/seihai-core/src/protocol/audit.rs`;
+(54 fields × 51 rows). Code: `crates/seihai-core/src/protocol/audit.rs`;
 regenerate with
 
 ```sh
@@ -37,55 +37,57 @@ its own reads.
 
 | Row | Basis | Read here | Inferred here | Carried | Carried, flagged unknown | Carried, no binary |
 |---|---|---|---|---|---|---|
-| 1.21 | binary | 52 | 0 | 0 | 0 | 0 |
-| 1.28 beta 2 | binary | 8 | 0 | 44 | 0 | 0 |
-| 1.3 test | binary | 5 | 0 | 47 | 0 | 0 |
-| 1.31 | binary | 2 | 0 | 50 | 0 | 0 |
-| 1.32 | binary | 2 | 0 | 50 | 0 | 0 |
-| 1.33 | binary | 2 | 0 | 50 | 0 | 0 |
-| 1.34 | binary | 3 | 0 | 48 | 1 | 0 |
-| 1.35 | binary | 2 | 0 | 50 | 0 | 0 |
-| 1.36 | binary | 1 | 0 | 51 | 0 | 0 |
-| 1.37 | binary | 1 | 0 | 51 | 0 | 0 |
-| 1.38 | binary | 7 | 0 | 45 | 0 | 0 |
-| 1.39 | binary | 8 | 0 | 43 | 1 | 0 |
-| 1.41 | binary | 12 | 0 | 36 | 4 | 0 |
-| 1.42 | binary | 11 | 0 | 41 | 0 | 0 |
-| 2.00 | binary | 4 | 0 | 44 | 4 | 0 |
-| 2.01 | binary | 7 | 0 | 45 | 0 | 0 |
-| 2.02 | binary | 5 | 0 | 47 | 0 | 0 |
-| 2.02 rev2 | binary | 2 | 0 | 50 | 0 | 0 |
-| 2.03 | binary | 4 | 0 | 48 | 0 | 0 |
-| 2.04 | binary | 4 | 0 | 48 | 0 | 0 |
-| 2.05 | binary | 8 | 0 | 44 | 0 | 0 |
-| 2.1 | inferred | 0 | 15 | 0 | 0 | 37 |
-| 2.12 | inferred | 0 | 0 | 0 | 0 | 52 |
-| 2.13 | inferred | 0 | 0 | 0 | 0 | 52 |
-| 2.14 | inferred | 0 | 4 | 0 | 0 | 48 |
-| 2.15 | inferred | 0 | 0 | 0 | 0 | 52 |
-| 2.16 | inferred | 0 | 2 | 0 | 0 | 50 |
-| 2.17 | binary | 13 | 0 | 34 | 5 | 0 |
-| 2.22 | binary | 11 | 0 | 38 | 3 | 0 |
-| 2.3 | inferred | 0 | 14 | 0 | 0 | 38 |
-| 2.31 | binary | 6 | 0 | 45 | 1 | 0 |
-| 3.04 | binary | 13 | 0 | 36 | 3 | 0 |
-| 3.153 | binary | 9 | 0 | 42 | 1 | 0 |
-| 4.04r2 | binary | 9 | 0 | 40 | 3 | 0 |
-| 4.04r2 Mac | binary | 2 | 0 | 48 | 2 | 0 |
-| 4.20r6 | binary | 3 | 0 | 48 | 1 | 0 |
-| 4.20r8 | binary | 2 | 0 | 0 | 50 | 0 |
-| 5.00r7 | binary | 4 | 0 | 40 | 8 | 0 |
-| 5.12 | binary | 2 | 0 | 47 | 3 | 0 |
-| 5.12 Mac | binary | 3 | 0 | 47 | 2 | 0 |
-| 5.24r4 | binary | 2 | 0 | 44 | 6 | 0 |
-| 5.30r3 | binary | 1 | 0 | 50 | 1 | 0 |
-| 5.31r4 | binary | 1 | 0 | 48 | 3 | 0 |
-| 6.00r2 | binary | 5 | 0 | 44 | 3 | 0 |
-| 6.00r4 | binary | 1 | 0 | 47 | 4 | 0 |
-| 6.015 | inferred | 0 | 3 | 0 | 0 | 49 |
-| 6.034 | inferred | 0 | 2 | 0 | 0 | 50 |
-| 6.03r7 | binary | 2 | 0 | 50 | 0 | 0 |
-| 6.03r7 Linux | binary | 1 | 0 | 45 | 6 | 0 |
+| 1.21 | binary | 54 | 0 | 0 | 0 | 0 |
+| 1.28 beta 2 | binary | 8 | 0 | 46 | 0 | 0 |
+| 1.3 test | binary | 5 | 0 | 49 | 0 | 0 |
+| 1.31 | binary | 2 | 0 | 52 | 0 | 0 |
+| 1.32 | binary | 2 | 0 | 52 | 0 | 0 |
+| 1.33 | binary | 2 | 0 | 52 | 0 | 0 |
+| 1.34 | binary | 3 | 0 | 50 | 1 | 0 |
+| 1.35 | binary | 2 | 0 | 52 | 0 | 0 |
+| 1.36 | binary | 1 | 0 | 53 | 0 | 0 |
+| 1.37 | binary | 1 | 0 | 53 | 0 | 0 |
+| 1.38 | binary | 7 | 0 | 47 | 0 | 0 |
+| 1.39 | binary | 8 | 0 | 45 | 1 | 0 |
+| 1.41 | binary | 12 | 0 | 38 | 4 | 0 |
+| 1.42 | binary | 11 | 0 | 43 | 0 | 0 |
+| 2.00 | binary | 4 | 0 | 46 | 4 | 0 |
+| 2.01 | binary | 7 | 0 | 47 | 0 | 0 |
+| 2.02 | binary | 5 | 0 | 49 | 0 | 0 |
+| 2.02 rev2 | binary | 2 | 0 | 52 | 0 | 0 |
+| 2.03 | binary | 4 | 0 | 50 | 0 | 0 |
+| 2.04 | binary | 4 | 0 | 50 | 0 | 0 |
+| 2.05 | binary | 8 | 0 | 46 | 0 | 0 |
+| NewWorld beta 1 | binary | 5 | 0 | 41 | 8 | 0 |
+| 2.1 | inferred | 0 | 15 | 0 | 0 | 39 |
+| NewWorld beta 2 | binary | 8 | 0 | 44 | 2 | 0 |
+| 2.12 | inferred | 0 | 0 | 0 | 0 | 54 |
+| 2.13 | inferred | 0 | 0 | 0 | 0 | 54 |
+| 2.14 | inferred | 0 | 4 | 0 | 0 | 50 |
+| 2.15 | inferred | 0 | 0 | 0 | 0 | 54 |
+| 2.16 | inferred | 0 | 2 | 0 | 0 | 52 |
+| 2.17 | binary | 13 | 0 | 36 | 5 | 0 |
+| 2.22 | binary | 11 | 0 | 40 | 3 | 0 |
+| 2.3 | inferred | 0 | 14 | 0 | 0 | 40 |
+| 2.31 | binary | 6 | 0 | 47 | 1 | 0 |
+| 3.04 | binary | 13 | 0 | 38 | 3 | 0 |
+| 3.153 | binary | 9 | 0 | 44 | 1 | 0 |
+| 4.04r2 | binary | 9 | 0 | 42 | 3 | 0 |
+| 4.04r2 Mac | binary | 2 | 0 | 50 | 2 | 0 |
+| 4.20r6 | binary | 3 | 0 | 50 | 1 | 0 |
+| 4.20r8 | binary | 2 | 0 | 0 | 52 | 0 |
+| 5.00r7 | binary | 4 | 0 | 42 | 8 | 0 |
+| 5.12 | binary | 2 | 0 | 49 | 3 | 0 |
+| 5.12 Mac | binary | 3 | 0 | 49 | 2 | 0 |
+| 5.24r4 | binary | 2 | 0 | 46 | 6 | 0 |
+| 5.30r3 | binary | 1 | 0 | 52 | 1 | 0 |
+| 5.31r4 | binary | 1 | 0 | 50 | 3 | 0 |
+| 6.00r2 | binary | 5 | 0 | 46 | 3 | 0 |
+| 6.00r4 | binary | 1 | 0 | 49 | 4 | 0 |
+| 6.015 | inferred | 0 | 3 | 0 | 0 | 51 |
+| 6.034 | inferred | 0 | 2 | 0 | 0 | 52 |
+| 6.03r7 | binary | 2 | 0 | 52 | 0 | 0 |
+| 6.03r7 Linux | binary | 1 | 0 | 47 | 6 | 0 |
 
 ## What the audit shows
 

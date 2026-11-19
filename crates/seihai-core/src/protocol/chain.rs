@@ -148,6 +148,8 @@ pub struct Delta {
     pub npc_max: Option<u8>,
     pub bow_prop10: Option<bool>,
     pub precise_pos: Option<bool>,
+    /// COLORS (prop 13) width: (bytes sent, bytes read).
+    pub colors: Option<(u8, u8)>,
     // Files.
     pub modtime: Option<bool>,
     pub large_files: Option<bool>,
@@ -187,6 +189,10 @@ pub struct Delta {
     pub world: Option<WorldRules>,
     // Script engines.
     pub scripts: Option<Scripts>,
+    /// A side build: its row is the row before it plus this delta, but the
+    /// step after it continues from the row before it, so none of this
+    /// delta carries on. The NewWorld betas are side builds of 2.05 and 2.1.
+    pub side: bool,
 }
 
 impl Delta {
@@ -213,6 +219,7 @@ impl Delta {
         npc_max: None,
         bow_prop10: None,
         precise_pos: None,
+        colors: None,
         modtime: None,
         large_files: None,
         large_file_size: None,
@@ -244,6 +251,7 @@ impl Delta {
         drops: None,
         world: None,
         scripts: None,
+        side: false,
     };
 }
 
@@ -315,6 +323,10 @@ pub const fn apply(prev: VersionProfile, s: &Step) -> VersionProfile {
     p.props.npc_max = pick(p.props.npc_max, d.npc_max);
     p.props.bow_prop10 = pick(p.props.bow_prop10, d.bow_prop10);
     p.props.precise_pos = pick(p.props.precise_pos, d.precise_pos);
+    if let Some((sent, read)) = d.colors {
+        p.props.colors_sent = sent;
+        p.props.colors_read = read;
+    }
 
     p.files.modtime = pick(p.files.modtime, d.modtime);
     p.files.large_files = pick(p.files.large_files, d.large_files);
@@ -400,6 +412,8 @@ pub const ORIGIN: VersionProfile = VersionProfile {
         npc_max: 17,
         bow_prop10: true,
         precise_pos: false,
+        colors_sent: 5,
+        colors_read: 5,
     },
     files: Files {
         modtime: false,
@@ -848,6 +862,33 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "listserver", what: "this profile now sends the real 2.05 frame (shape A, captured in the lab: id 0 `newmain` only). No public run has used it: the 2026-10-25 matrix binary sent the gen-5 login for 2.05 (the saved-version override, since fixed) and both 14922 and 14923 answered that. 14923 answered the older classic login (shape B) of every other classic profile, so 14923 is assumed here" },
         ],
     },
+    // NewWorld beta 1: the NewWorld test client, a side build of 2.05
+    // (Graal_analysis `client-internals/newworld-betas.md`, profile `vnwb1`).
+    // Its removals and the 7/8-byte COLORS do not carry into 2.1.
+    Step {
+        version: ClientVersion::NewWorldB1,
+        label: "NewWorld beta 1",
+        token: "G2N15041",
+        date: "2001-08-06",
+        basis: Basis::Binary,
+        delta: Delta {
+            // Built-in baddies, chests, horses and freeze are gone.
+            plo: IdDelta { minus: &[2, 4, 17, 18, 154, 155], ..IdDelta::NONE },
+            pli: IdDelta { minus: &[7, 8, 11, 15, 16, 17, 20], ..IdDelta::NONE },
+            // GANI (10) is sent and read as a string, as from 2.1.
+            bow_prop10: Some(false),
+            colors: Some((7, 8)),
+            side: true,
+            ..Delta::NONE
+        },
+        source: "binary (md5 88d1f84c) and lab 2026-10-30: PLO 2, 4, 17, 18, 154 and 155 and PLI 7, 8, 11, 15, 16, 17 and 20 gone with the built-in sword, bow, baddies, chests, horses and freeze; GANI (10) a string, COLORS sent as 7 bytes and read as 8, HEADGIF without an extension, STATUS bit 0x20; login props 0, 11, 13, 18, 31, 33 then LANGUAGE; PLO 42 is the NewWorld time (GINT4 minutes since 1000/01/01); GS1 161 commands plus the nw* time variables; 65x65 terrain heights in the level",
+        unknown: &[
+            Unknown { area: "listserver", what: "the real client dials 14921 and asks for the list `newworld` (id 0 only); this row keeps 2.05's frame with `newmain`, and the public listserver was not asked for a `newworld` list" },
+            Unknown { area: "props", what: "what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build" },
+            Unknown { area: "life", what: "the death and combat rules are carried from 2.05; with no built-in sword the server must give a sword weapon, and hits were not traced" },
+            Unknown { area: "ui", what: "the HUD (150/150 health and the NewWorld calendar clock) and the terrain heights are not modelled; the row carries 2.05's" },
+        ],
+    },
     // These generic 2.1 to 2.16 rows remain inferred. Observed Graal 2002
     // world builds share tokens but have distinct command/dispatch tables;
     // this row does not select one. Its deltas still come from release notes
@@ -889,6 +930,39 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "props", what: "player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release" },
             Unknown { area: "life", what: "death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)" },
             Unknown { area: "files", what: "the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule" },
+        ],
+    },
+    // NewWorld beta 2: a side build of 2.1 (its binary is a 2.1 test 3
+    // build; Graal_analysis profile `vnwb2`) with beta 1's removals.
+    Step {
+        version: ClientVersion::NewWorldB2,
+        label: "NewWorld beta 2",
+        token: "G2N15041",
+        date: "2001-10-03",
+        basis: Basis::Binary,
+        delta: Delta {
+            // 2.1 test 3 handles up to 169: 170 to 174 of the generic 2.1 row
+            // are out too.
+            plo: IdDelta {
+                minus: &[2, 4, 17, 18, 154, 155],
+                minus_ranges: &[(170, 174)],
+                ..IdDelta::NONE
+            },
+            // Classic login as 2.1 test 3 (lab), port not checked with it.
+            listserver: Some(Some(Listserver::new(ListKind::Legacy, PortStatus::Assumed, None))),
+            pli: IdDelta { minus: &[7, 8, 11, 15, 16, 17, 20], ..IdDelta::NONE },
+            colors: Some((7, 8)),
+            gs1_commands: Some(165),
+            // A binary: GS1 and no NPC bytecode (131).
+            scripts: Some(Scripts::GS1),
+            side: true,
+            ..Delta::NONE
+        },
+        source: "binary (md5 af2d2106) and lab 2026-10-30: beta 1's removals and COLORS width on a 2.1 test 3 build (PLO 49 and 169, props 43 to 45 and UDP 27 kept); GS1 165 commands (addstring, insertstring, removestring, deletestring); asks for shield1.png, idle.gani and headalgo000 at join; list login id 0 `newworld` then id 1 account and password",
+        unknown: &[
+            Unknown { area: "base", what: "the binary is 2.1 test 3; this row is built on the generic inferred 2.1 row, so values the NewWorld profile does not list (files, UI, death rules) are that row's" },
+            Unknown { area: "listserver", what: "the real client dials 14922 and asks for the list `newworld`; this row keeps 2.1's frame with `newmain`. It sent fewer password characters than were typed (23 of 28); the cut-off was not pinned down" },
+            Unknown { area: "props", what: "what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build" },
         ],
     },
     Step {
@@ -1554,11 +1628,20 @@ const fn resolve_chain() -> [VersionProfile; CHAIN.len()] {
     let mut cur = ORIGIN;
     let mut i = 0;
     while i < CHAIN.len() {
-        cur = apply(cur, &CHAIN[i]);
-        out[i] = cur;
+        let row = apply(cur, &CHAIN[i]);
+        out[i] = row;
+        if !CHAIN[i].delta.side {
+            cur = row;
+        }
         i += 1;
     }
     out
+}
+
+/// The index of the step that step `i` is built on: the nearest step before
+/// it that is not a side build.
+pub fn base_index(i: usize) -> Option<usize> {
+    (0..i).rev().find(|&j| !CHAIN[j].delta.side)
 }
 
 /// The step for a version.
@@ -1572,7 +1655,7 @@ pub fn step(v: ClientVersion) -> &'static Step {
 /// The version a step follows, if any.
 pub fn previous(v: ClientVersion) -> Option<ClientVersion> {
     let i = CHAIN.iter().position(|s| s.version == v)?;
-    i.checked_sub(1).map(|j| CHAIN[j].version)
+    base_index(i).map(|j| CHAIN[j].version)
 }
 
 // -- The generated handler-change table. ------------------------------------
@@ -1987,6 +2070,22 @@ pub fn diff(a: &VersionProfile, b: &VersionProfile) -> Vec<Change> {
         &rb.precise_pos,
         yes_no,
     );
+    value_change(
+        &mut o,
+        "props",
+        "colors_sent",
+        &ra.colors_sent,
+        &rb.colors_sent,
+        dbg,
+    );
+    value_change(
+        &mut o,
+        "props",
+        "colors_read",
+        &ra.colors_read,
+        &rb.colors_read,
+        dbg,
+    );
     let (fa, fb) = (&a.files, &b.files);
     value_change(&mut o, "files", "modtime", &fa.modtime, &fb.modtime, yes_no);
     value_change(
@@ -2200,12 +2299,13 @@ fn manner_text(m: &Mannerisms) -> String {
     }
 }
 
-/// The changes of step `i` against step `i - 1`; empty for the origin.
+/// The changes of step `i` against the step it is built on (the step before
+/// it, skipping side builds); empty for the origin.
 pub fn changes(i: usize) -> Vec<Change> {
-    if i == 0 {
-        return Vec::new();
+    match base_index(i) {
+        Some(j) => diff(&RESOLVED[j], &RESOLVED[i]),
+        None => Vec::new(),
     }
-    diff(&RESOLVED[i - 1], &RESOLVED[i])
 }
 
 /// Output flavours of [`render`].
@@ -2243,7 +2343,19 @@ pub fn render(format: Format, only: Option<ClientVersion>) -> String {
                 "-".into(),
                 "start of the chain, written out in full as ORIGIN".into(),
             ));
-        } else if ch.is_empty() {
+        }
+        if s.delta.side {
+            let base = base_index(i).map_or("-", |j| CHAIN[j].label);
+            rows.push((
+                "side",
+                "-".into(),
+                "-".into(),
+                format!(
+                    "side build off {base}: the next step continues from {base}, not from this one"
+                ),
+            ));
+        }
+        if i != 0 && ch.is_empty() {
             rows.push((
                 "same",
                 "-".into(),
@@ -2353,7 +2465,8 @@ mod tests {
     /// The U7 static reads (2026-11-13) then found the 1.x id 40 handler
     /// (1.31 on, so 1.31 to 1.42 decode packet hits, with 1.31 to 1.39
     /// testing no range), the flat 3-heart revive of 1.39, and the 2.17+
-    /// ghost and 176/177 tests (`ghost_and_stop_gates`).
+    /// ghost and 176/177 tests (`ghost_and_stop_gates`). The props then got
+    /// the COLORS widths, 5 and 5 in every one of these rows.
     #[test]
     fn chain_equals_the_hand_written_rows() {
         let mut seen = 0;
@@ -2366,6 +2479,9 @@ mod tests {
             let got = strip_field(&format!("{p:?}"), "login: ", ", udp:");
             // So did the chat font (`chat_text`).
             let got = strip_field(&got, ", chat_text: ", ", gs1_commands");
+            // And the COLORS widths (`colors_sent`, `colors_read`, 5 in
+            // every one of these rows; the NewWorld betas came later).
+            let got = strip_field(&got, ", colors_sent: ", " }, files:");
             // And the mannerisms, the last field.
             let got = match got.find(", mannerisms: ") {
                 Some(i) => format!("{} }}", &got[..i]),
@@ -2587,6 +2703,40 @@ mod tests {
             doc[a..b].trim() == render(Format::Markdown, None).trim(),
             "the table in documentation/version-chain.md is stale; paste the output of seihai --version-chain --chain-format md between the markers"
         );
+    }
+
+    /// The NewWorld betas are side builds: their removals and COLORS width
+    /// stay on their own rows, and 2.1 and 2.12 build on 2.05 and 2.1.
+    #[test]
+    fn side_builds_do_not_carry_on() {
+        use ClientVersion::*;
+        let p = |v: ClientVersion| v.profile();
+        for (nw, base, next) in [(NewWorldB1, V205, V210), (NewWorldB2, V210, V212)] {
+            assert_eq!(previous(nw), Some(base));
+            assert_eq!(previous(next), Some(base));
+            assert_eq!(p(nw).token, "G2N15041");
+            assert_eq!((p(nw).props.colors_sent, p(nw).props.colors_read), (7, 8));
+            assert_eq!(
+                (p(next).props.colors_sent, p(next).props.colors_read),
+                (5, 5)
+            );
+            assert!(!p(nw).props.bow_prop10);
+            for id in [2, 4, 17, 18, 154, 155] {
+                assert!(!p(nw).protocol.plo.contains(id), "{nw:?} {id}");
+                assert!(p(next).protocol.plo.contains(id), "{next:?} {id}");
+            }
+            for id in [7, 8, 11, 15, 16, 17, 20] {
+                assert!(!p(nw).protocol.pli.contains(id), "{nw:?} {id}");
+                assert!(p(next).protocol.pli.contains(id), "{next:?} {id}");
+            }
+            assert_eq!(p(nw).protocol.encryption, EncryptionGen::Gen3);
+        }
+        // 2.1 against 2.05, not against NewWorld beta 1.
+        let i = CHAIN.iter().position(|s| s.version == V210).unwrap();
+        assert!(!changes(i).iter().any(|c| c.field.contains("colors")));
+        assert_eq!(p(NewWorldB2).ui.gs1_commands, 165);
+        assert!(!p(NewWorldB2).protocol.plo.contains(170));
+        assert!(p(NewWorldB2).protocol.plo.contains(169));
     }
 
     #[test]

@@ -394,6 +394,13 @@ pub struct Props {
     pub bow_prop10: bool,
     /// X2/Y2/Z2 (78–80) and `PLO_MOVE2` are used for positions.
     pub precise_pos: bool,
+    /// Bytes of COLORS (prop 13) the build sends. 5 in every build but the
+    /// NewWorld betas, which send 7.
+    pub colors_sent: u8,
+    /// Bytes of COLORS the build reads in a prop stream from the server. 5
+    /// in every build but the NewWorld betas, which read 8: a server must
+    /// pad the prop for them and cut it for everyone else.
+    pub colors_read: u8,
 }
 
 /// File transfer.
@@ -1225,9 +1232,11 @@ mod tests {
     fn tokens_and_labels() {
         for p in PROFILES {
             assert_eq!(p.token.len(), 8, "{}", p.label);
-            // GSERV before 1.33, GNW for the later 2D builds, G3D for the 3.x ones.
+            // GSERV before 1.33, GNW for the later 2D builds, G2N for the
+            // NewWorld betas, G3D for the 3.x ones.
             assert!(
                 p.token.starts_with("GNW")
+                    || p.token.starts_with("G2N")
                     || p.token.starts_with("G3D")
                     || p.token.starts_with("GSERV"),
                 "{}",
@@ -1353,11 +1362,14 @@ mod tests {
     }
 
     /// GServer's 2.1 line: modtime, gani prop 10 and `.png` defaults.
+    /// NewWorld beta 1 is a 2.05 that already sends GANI (10) as a string.
     #[test]
     fn the_2_1_line() {
         for p in PROFILES {
             let new = p.files.modtime;
-            assert_eq!(new, !p.props.bow_prop10, "{}", p.label);
+            if p.version != ClientVersion::NewWorldB1 {
+                assert_eq!(new, !p.props.bow_prop10, "{}", p.label);
+            }
             assert_eq!(new, p.files.image_ext == ".png", "{}", p.label);
         }
         assert!(!profile(ClientVersion::V205).files.modtime);
@@ -1646,7 +1658,9 @@ mod tests {
             "2.03",
             "2.04",
             "2.05",
+            "NewWorld beta 1",
             "2.1",
+            "NewWorld beta 2",
             "2.12",
             "2.13",
             "2.14",

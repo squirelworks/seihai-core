@@ -63,7 +63,7 @@ pub use profile::{
 };
 pub use props::{
     decode_pos_precise, encode_pos_classic, encode_pos_precise, parse_player_props,
-    parse_player_props_in, parse_player_props_with, PlayerProp,
+    parse_player_props_in, parse_player_props_sized, parse_player_props_with, PlayerProp,
 };
 pub use showimg::{
     apply_showimg_update, describe_showimg_update, parse_showimg_update, showimg_message, ImgField,

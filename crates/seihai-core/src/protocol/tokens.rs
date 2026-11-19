@@ -257,7 +257,7 @@ pub const KNOWN_TOKENS: &[KnownToken] = {
             G::Wire,
             K::Game,
             "NewWorld beta 1 (pre-update and final), beta 2",
-            &[],
+            &[V::NewWorldB1, V::NewWorldB2],
         ),
         KnownToken::new(
             "GSERV019",
@@ -636,7 +636,6 @@ pub const NOT_SERVED: &[(&str, &str)] = &[
         "GSERV015",
         "no client build is known for it; do not infer a 1.30",
     ),
-    ("G2N15041", "NewWorld line: no profile yet"),
     (
         "G2N29070",
         "NewWorld line: no profile yet, and no executable",

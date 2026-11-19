@@ -131,8 +131,9 @@ impl Era {
             V202 | V202R2 => Era::V202,
             V203 => Era::V203,
             V204 => Era::V204,
-            V205 => Era::V205,
-            V210 => Era::V21,
+            V205 | NewWorldB1 => Era::V205,
+            // NewWorld beta 2 has 165 of the 166: no `play2`.
+            V210 | NewWorldB2 => Era::V21,
             V212 | V213 | V214 => Era::V212,
             V215 => Era::V215,
             V216 => Era::V216,
