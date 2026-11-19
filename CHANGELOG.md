@@ -7,9 +7,9 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
-- Every 8-character token in the Graal_analysis catalogue is now in `KNOWN_TOKENS` (25 more: the RemoteControl and NPC Control logins, the NPC-server labels, server-table-only game tokens and the Worlds connector constants). New `STAND_INS`, `NOT_SERVED` and `serve_as`: every game token either has a profile, a nearest profile a server serves it as, or a written reason it is not served, and a unit test fails when a new token is not placed. `documentation/version-tokens.tsv` gains a `served_as` column. Breaking: `TokenKind` gains `NpcControl` and `NpcServer`, and `TokenGrade` gains `ScriptConstant`.
-- The NewWorld betas (`G2N15041`) have profile rows: `ClientVersion::NewWorldB1`, a side build of 2.05, and `NewWorldB2`, a side build of 2.1, from Graal_analysis `newworld-betas.md` (new `Delta::side`; a side build's delta does not carry into the next step). `Props` gains `colors_sent` and `colors_read`: the betas send COLORS (13) as 7 bytes and read it as 8. New `parse_player_props_sized` reads a prop stream with that width; `SessionState` reads server props with its build's width and `Connection::send_looks` pads COLORS to it. `G2N15041` leaves `NOT_SERVED`. Breaking: two new `ClientVersion` variants, new fields in `Props` and `Delta`, and the NewWorld rows and `Family::NewWorld` leave `offline_builds`.
-- A secure list fetch for a build with no listserver of its own (4.x to 6.x) uses 2.22's gen-5 list login, the oldest with a secure form, instead of failing; new `net::list_login_version` (squirelworks/seihai#564).
+## 0.7.x
+
+- **0.7.0**: The NewWorld betas (`G2N15041`) have profiles: `ClientVersion::NewWorldB1` and `NewWorldB2`, side builds of 2.05 and 2.1 (new `Delta::side`), with COLORS sent as 7 bytes and read as 8 (`Props::colors_sent`, `colors_read`, `parse_player_props_sized`). Every catalogued version token has a profile, a stand-in or a reason (`STAND_INS`, `NOT_SERVED`, `serve_as`). GS2 texts that are not numbers read as -1, as on the real clients (#120). A secure list fetch for 4.x to 6.x borrows 2.22's login. Breaking: new `ClientVersion` variants, new `Props` and `Delta` fields, new `TokenKind` and `TokenGrade` variants, and the NewWorld rows leave `offline_builds`. Released early for seihai-gserver; the rest of #108 moves to 0.8.0 (#123).
 
 ## 0.6.x
 
