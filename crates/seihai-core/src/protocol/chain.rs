@@ -1295,8 +1295,10 @@ pub const CHAIN: &[Step] = &[
             showimg: Some(None),
             // The 4.x login line; the 4.x after-login messages are not carried over.
             lobby: Some(Some(LOBBY_500)),
-            // Not read in this binary; round-up is kept, as before.
-            gen5_round_down: Some(false),
+            // Not read in this binary. The round-up guess here is dropped: it
+            // inherits the round-down step of 4.20r8 before it and 5.12 after
+            // it (both read), matching the universal round-down confirmed
+            // through 6.03r7 (lab disasm 2026-11-19).
             ..Delta::NONE
         },
         source: "binary (unpacked engine DLL) and lab (lab-v5-2026-10-30): PLO set of 100 ids, send ids from the send wrappers, login id 5 with G3D22067 and the win,<3 md5> list in the plain zlib frame, then 37 in its own gen-5 frame; Login mode until 178",
@@ -1307,7 +1309,7 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "props", what: "own and other prop sets are 3.153's; no 5.x parser was read" },
             Unknown { area: "ui", what: "chat is a bold sans serif in the lab; its cell height is not known, 24 is kept" },
             Unknown { area: "3d", what: "the Torque 3D mode (Graal3DEngine.dll, protocol 24) is not modelled" },
-            Unknown { area: "framing", what: "the gen-5 step count was not read in this binary; round-up is kept, while 4.20r8 before it and 5.12 after it round down" },
+            Unknown { area: "framing", what: "the gen-5 step count was not read in this binary; it inherits the round-down of 4.20r8 before it and 5.12 after it (both read), matching the round-down confirmed through 6.03r7 (lab 2026-11-19)" },
         ],
     },
     Step {
@@ -1359,7 +1361,9 @@ pub const CHAIN: &[Step] = &[
         delta: Delta {
             // Against the Windows 5.12; 41, 100 and 108 undo the Mac 5.12 row.
             plo: IdDelta::plus_minus(&[41, 109, 198], &[75, 100, 108, 132, 133, 171, 193]),
-            gen5_round_down: Some(false),
+            // Not machine-read (only a packed installer was to hand): it
+            // inherits round-down from 5.12 before it and 6.03r7 after it, both
+            // read round-down (lab 2026-11-13 and 2026-11-19).
             gen5_compress_all: Some(false),
             // The Windows 5.12 lobby again, after the Mac 5.12 row.
             lobby: Some(Some(LOBBY_512)),
@@ -1532,7 +1536,7 @@ pub const CHAIN: &[Step] = &[
             lobby: Some(Some(LOBBY_603_LINUX)),
             ..Delta::NONE
         },
-        source: "binary (Linux x64 ELF, not packed): token stored as the scrambled string g3d0511c, login list linux plus four machine ids (eth0 MAC md5, /etc inode md5, empty, kernel string); PLO and PLI sets are the ones the Windows row took from it; gs2lib names the token 6.037 (Linux)",
+        source: "binary (Linux x64 ELF, not packed): token stored as the scrambled string g3d0511c, login list linux plus four machine ids (eth0 MAC md5, /etc inode md5, empty, kernel string); PLO and PLI sets are the ones the Windows row took from it; gs2lib names the token 6.037 (Linux); frame cipher read 2026-11-19 (this build's ELF, platform-identical engine to the Windows G3D0311C): a zlib or bz2 body steps floor(len/4) times, cap 4 (srawi ...,2 at 0x62050e), a raw body steps ceil, cap 12 (0x620275) - round down, so 6.03r7 and every row from 4.04r2 on round the compressed step down",
         unknown: &[
             Unknown { area: "login", what: "the four machine ids are sent as empty quoted strings; the real kernel string field was not captured, and whether it is quoted is not known" },
             Unknown { area: "lab", what: "the Linux client was not run; the Windows 6.03r7 lab run (2026-10-31) stands in for it" },

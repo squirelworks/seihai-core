@@ -141,6 +141,7 @@ If the new build lands between two existing ones, the step after it must be re-c
 Generated; do not edit between the markers.
 
 <!-- version-chain:begin -->
+
 #### 1.21 (`GSERV007`, binary, linked 1999-05-10)
 
 - start of the chain, written out in full as ORIGIN
@@ -573,20 +574,18 @@ Generated; do not edit between the markers.
 - protocol: **pli (client ids sent)**: +159 UPDATEPACKAGEREQUESTFILE; -162 RC_UNKNOWN162 (59 -> 59 ids)
 - protocol: **showimg (id 24)**: every 5145 ms -> none
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252 -> first server "Login", nothing drawn until 178, login line ends win,"","",""
-- protocol: **gen5_round_down**: yes -> no
 - unknown (pli): only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
 - unknown (login): Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); stock GServer-v2 accepts all three empty (lab, 2026-10-31), other servers are untested
 - unknown (login): the base-file requests after the language (47 or 23 basepackage.gupd) are not sent
 - unknown (props): own and other prop sets are 3.153's; no 5.x parser was read
 - unknown (ui): chat is a bold sans serif in the lab; its cell height is not known, 24 is kept
 - unknown (3d): the Torque 3D mode (Graal3DEngine.dll, protocol 24) is not modelled
-- unknown (framing): the gen-5 step count was not read in this binary; round-up is kept, while 4.20r8 before it and 5.12 after it round down
+- unknown (framing): the gen-5 step count was not read in this binary; it inherits the round-down of 4.20r8 before it and 5.12 after it (both read), matching the round-down confirmed through 6.03r7 (lab 2026-11-19)
 - source: binary (unpacked engine DLL) and lab (lab-v5-2026-10-30): PLO set of 100 ids, send ids from the send wrappers, login id 5 with G3D22067 and the win,<3 md5> list in the plain zlib frame, then 37 in its own gen-5 frame; Login mode until 178
 
 #### 5.12 (`G3D14097`, binary, linked 2007-10-19)
 
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
-- protocol: **gen5_round_down**: no -> yes
 - protocol: **gen5_compress_all**: no -> yes
 - unknown (pli): not read; 5.00r7's set is kept
 - unknown (framing): a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
@@ -606,7 +605,6 @@ Generated; do not edit between the markers.
 
 - protocol: **plo (server ids handled)**: +41 STARTMESSAGE, +109 UNKNOWN109, +198 SERVEROPTIONS; -75 PROFILE, -100 RAWDATA, -108 UNKNOWN108, -132 UNKNOWN132, -133 UNKNOWN133, -171 BIGMAP, -193 UNKNOWN193 (101 -> 97 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends mac,"","","","8.0.0  Darwin Kernel Version 8.0.0: Sat Mar 26 14:15:22 PST 2005; root:xnu-792.obj~1/RELEASE_PPC"; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0 -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
-- protocol: **gen5_round_down**: yes -> no
 - unknown (pli): not read; 5.00r7's set is kept
 - unknown (files): stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md
 - unknown (plo): 109 (probably a file redirect) and 198 (one GINT5) are in the set but not decoded
@@ -685,5 +683,6 @@ Generated; do not edit between the markers.
 - unknown (login): the four machine ids are sent as empty quoted strings; the real kernel string field was not captured, and whether it is quoted is not known
 - unknown (lab): the Linux client was not run; the Windows 6.03r7 lab run (2026-10-31) stands in for it
 - unknown (files): Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for
-- source: binary (Linux x64 ELF, not packed): token stored as the scrambled string g3d0511c, login list linux plus four machine ids (eth0 MAC md5, /etc inode md5, empty, kernel string); PLO and PLI sets are the ones the Windows row took from it; gs2lib names the token 6.037 (Linux)
+- source: binary (Linux x64 ELF, not packed): token stored as the scrambled string g3d0511c, login list linux plus four machine ids (eth0 MAC md5, /etc inode md5, empty, kernel string); PLO and PLI sets are the ones the Windows row took from it; gs2lib names the token 6.037 (Linux); frame cipher read 2026-11-19 (this build's ELF, platform-identical engine to the Windows G3D0311C): a zlib or bz2 body steps floor(len/4) times, cap 4 (srawi ...,2 at 0x62050e), a raw body steps ceil, cap 12 (0x620275) - round down, so 6.03r7 and every row from 4.04r2 on round the compressed step down
+
 <!-- version-chain:end -->

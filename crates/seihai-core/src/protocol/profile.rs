@@ -1276,18 +1276,24 @@ mod tests {
         assert_eq!(n(ClientVersion::V512Mac), 101);
         assert_eq!(n(ClientVersion::V404R2), 98);
         assert_eq!(n(ClientVersion::V512), 100);
+        // Every gen-5 build rounds the compressed step down (floor(len/4)):
+        // read in the binaries (4.04r2 Win/Mac, 4.20r6 Mac, 4.20r8, 5.12
+        // Win/Mac, 6.03r7 Linux) and inferred for the unread ones (5.00r7,
+        // 5.24r4), which are bracketed by read round-down builds. No gen-5
+        // client has been shown to round up (lab 2026-11-13, 2026-11-19).
         for v in [
             ClientVersion::V404R2,
             ClientVersion::V404R2Mac,
             ClientVersion::V420R6,
             ClientVersion::V420R8,
+            ClientVersion::V500R7,
             ClientVersion::V512,
             ClientVersion::V512Mac,
+            ClientVersion::V524R4,
+            ClientVersion::V603R7,
+            ClientVersion::V603R7Linux,
         ] {
             assert!(profile(v).protocol.gen5_round_down, "{v:?}");
-        }
-        for v in [ClientVersion::V500R7, ClientVersion::V524R4] {
-            assert!(!profile(v).protocol.gen5_round_down, "{v:?}");
         }
         assert!(!profile(ClientVersion::V231).protocol.plo.contains(44));
         assert!(!profile(ClientVersion::V139).protocol.plo.contains(42));
