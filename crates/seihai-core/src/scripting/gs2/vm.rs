@@ -337,54 +337,47 @@ pub fn num_text(n: f64) -> String {
     out
 }
 
-/// The number a text reads as in the GS2 VM. Measured on 4.20r8, 5.24r4
-/// and 6.03r7 (Graal_analysis `protocol/script-fuzz-2026-11-19.md`): the
-/// leading number is read as C's `atof` would (blanks, a sign, digits, a
-/// fraction, an exponent; or `0x` and hex digits). A non-zero result
-/// stands. A zero result stands only for `"0"`, a hex zero, `""`,
-/// `"false"` and, on 6.03r7, `"0.0"`; every other text that reads as zero
-/// or has no number at all (`"abc"`, `"00"`, `" 0"`, `"-0"`, `"0abc"`,
-/// `" "`) reads as -1. `"true"` reads as 1. Other VMs are assumed to
-/// share the rule (inferred, not measured).
+/// The number a text reads as in the GS2 VM. Read from the 6.03r7 Linux
+/// client's text-to-number routine and checked live on 4.20r8, 5.24r4 and
+/// 6.03r7 (Graal_analysis `protocol/script-fuzz-2026-11-19.md`): `""` is 0,
+/// `"true"` 1 and `"false"` 0; a text starting `0x` is read as hex, any
+/// other through C's `strtod`. A zero result stands only when the text is
+/// `"0"` or `"0x0"` (or, on 6.03r7, `"0.0"`); every other text that reads
+/// as zero or has no number (`"abc"`, `"00"`, `" 0"`, `"-0"`, `"0abc"`,
+/// `" "`) reads as -1, the client's "not a number". The rule of VMs before
+/// 4.20r8, and where `"0.0"` joined, are inferred, not measured.
 pub fn text_num(s: &str, dot_zero: bool) -> f64 {
     match s {
-        "" | "false" | "0" => return 0.0,
+        "" | "false" => return 0.0,
         "true" => return 1.0,
-        "0.0" if dot_zero => return 0.0,
         _ => {}
     }
-    let (n, hex) = leading_number(s);
-    if n != 0.0 || hex {
+    let n = match s.strip_prefix("0x") {
+        Some(h) => {
+            let digits: String = h.chars().take_while(|c| c.is_ascii_hexdigit()).collect();
+            if digits.is_empty() {
+                0.0
+            } else {
+                u64::from_str_radix(&digits, 16).map_or(f64::INFINITY, |n| n as f64)
+            }
+        }
+        None => leading_number(s),
+    };
+    if n != 0.0 || s == "0" || s == "0x0" || (dot_zero && s == "0.0") {
         n
     } else {
         -1.0
     }
 }
 
-/// The number at the start of `s` and whether it was written in hex.
-fn leading_number(s: &str) -> (f64, bool) {
+/// The decimal number at the start of `s`, as `strtod` reads it (blanks,
+/// a sign, digits, a fraction, an exponent), or 0.
+fn leading_number(s: &str) -> f64 {
     let t = s.trim_start();
     let b = t.as_bytes();
     let mut i = 0;
-    let neg = match b.first() {
-        Some(b'-') => {
-            i += 1;
-            true
-        }
-        Some(b'+') => {
-            i += 1;
-            false
-        }
-        _ => false,
-    };
-    if b.len() > i + 2 && b[i] == b'0' && (b[i + 1] | 0x20) == b'x' && b[i + 2].is_ascii_hexdigit()
-    {
-        let digits: String = t[i + 2..]
-            .chars()
-            .take_while(|c| c.is_ascii_hexdigit())
-            .collect();
-        let n = u64::from_str_radix(&digits, 16).map_or(f64::INFINITY, |n| n as f64);
-        return (if neg { -n } else { n }, true);
+    if matches!(b.first(), Some(b'-' | b'+')) {
+        i += 1;
     }
     let start = i;
     while i < b.len() && b[i].is_ascii_digit() {
@@ -400,7 +393,7 @@ fn leading_number(s: &str) -> (f64, bool) {
         i = j;
     }
     if !digits {
-        return (0.0, false);
+        return 0.0;
     }
     if i < b.len() && (b[i] | 0x20) == b'e' {
         let mut j = i + 1;
@@ -414,8 +407,7 @@ fn leading_number(s: &str) -> (f64, bool) {
             i = j;
         }
     }
-    let n: f64 = t[start..i].parse().unwrap_or(0.0);
-    (if neg { -n } else { n }, false)
+    t[..i].parse().unwrap_or(0.0)
 }
 
 /// Compares two numbers as every VM does: equal when they are within
@@ -530,6 +522,11 @@ mod tests {
             ("nan", -1.0),
             ("1e-400", -1.0),
             ("x", -1.0),
+            // from the 6.03r7 routine: only "0x0" is an accepted hex zero
+            ("0x1F", 31.0),
+            ("0x00", -1.0),
+            ("0x", -1.0),
+            ("0xg", -1.0),
         ] {
             assert_eq!(text_num(t, false), n, "{t:?}");
             assert_eq!(text_num(t, true), n, "{t:?} on 6.x");
