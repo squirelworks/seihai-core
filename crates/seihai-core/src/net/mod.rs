@@ -1102,6 +1102,27 @@ struct IoThread {
 /// at most this long.
 const IO_IDLE: Duration = Duration::from_millis(2);
 
+/// The build whose listserver login a list fetch uses. A build with no
+/// listserver of its own (4.x to 6.x) borrows 2.05's login, which has no
+/// secure form; with the Seihai secure login it borrows 2.22's gen-5 login
+/// instead, the oldest shape that has one (seihai #564). The list reply
+/// is the same either way.
+pub fn list_login_version(version: ClientVersion, secure: bool) -> ClientVersion {
+    let list = version.list_version();
+    let borrowed = list != version;
+    if secure
+        && borrowed
+        && !matches!(
+            list.listserver().shape,
+            LoginShape::Gen5 | LoginShape::Gen5OneFrame
+        )
+    {
+        ClientVersion::V222
+    } else {
+        list
+    }
+}
+
 impl Connection {
     /// Connect to `host:port`.
     ///
@@ -1431,7 +1452,7 @@ impl Connection {
             if !matches!(shape, LoginShape::Gen5 | LoginShape::Gen5OneFrame) {
                 return Err(io::Error::new(
                     io::ErrorKind::Unsupported,
-                    "the secure list login needs a gen-5 list shape (2.22, 2.31 or 3.04); 5.x and 6.x borrow 2.05's list, so fetch the list as 2.22",
+                    "the secure list login needs a gen-5 list shape (2.22, 2.31 or 3.04); a secure list fetch for 4.x to 6.x uses 2.22's login",
                 ));
             }
             let prefix = [7 + 0x20, (key & 0x7F) + 0x20];
@@ -1508,7 +1529,7 @@ impl Connection {
         password: &str,
         secure: Option<&SecureLogin>,
     ) -> io::Result<ListReply> {
-        let version = version.list_version();
+        let version = list_login_version(version, secure.is_some());
         let mut conn = Self::connect(addr)?;
         conn.login_listserver_secure(
             version,
@@ -2982,6 +3003,58 @@ mod tests {
             .unwrap();
         let reply = parse_list_reply(&conn.read_body().unwrap());
         assert_eq!(reply.status.as_deref(), Some("Lab listserver"));
+    }
+
+    #[test]
+    fn a_secure_list_fetch_for_a_lobby_build_borrows_the_gen5_login() {
+        // 6.x and 5.x borrow 2.05's list login, which has no secure form.
+        for v in [
+            ClientVersion::V603R7,
+            ClientVersion::V512,
+            ClientVersion::V404R2,
+        ] {
+            assert_eq!(list_login_version(v, false), ClientVersion::V205, "{v:?}");
+            assert_eq!(list_login_version(v, true), ClientVersion::V222, "{v:?}");
+        }
+        // A build with its own listserver keeps it, secure or not.
+        assert_eq!(
+            list_login_version(ClientVersion::V231, true),
+            ClientVersion::V231
+        );
+        assert_eq!(
+            list_login_version(ClientVersion::V304, true),
+            ClientVersion::V304
+        );
+        assert_eq!(
+            list_login_version(ClientVersion::V205, true),
+            ClientVersion::V205
+        );
+    }
+
+    #[test]
+    fn secure_list_fetch_for_603r7_sends_the_sei00001_hello() {
+        use crate::protocol::seclogin::ServerIdentity;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        let id = ServerIdentity::generate();
+        let secure = SecureLogin::pinned(id.public_key());
+        let t = std::thread::spawn(move || {
+            let (mut srv, _) = listener.accept().unwrap();
+            wire(&mut srv)
+        });
+        // The fetch fails once the fake server hangs up; only the first
+        // bytes on the wire matter here.
+        let _ = Connection::fetch_server_list_secure(
+            &addr,
+            ClientVersion::V603R7,
+            "ab",
+            "cd",
+            Some(&secure),
+        );
+        let first = t.join().unwrap();
+        let body = crate::protocol::zlib_decompress(&first[2..]).unwrap();
+        // id 7, the key byte, then the secure token and 2.22's list token
+        assert!(body[2..].starts_with(b"SEI00001GNW30123"), "{body:?}");
     }
 
     #[test]
