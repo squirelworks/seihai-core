@@ -386,8 +386,7 @@ Generated; do not edit between the markers.
 - unknown (pli): client send set is carried from 2.05
 - unknown (props): player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release
 - unknown (life): death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)
-- unknown (files): the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-- source: server source and release notes: gani prop 10, .png defaults, PLO_FILE modtime, gserver minimap, ghost mode; PLO 49 and 169 are in the two 2.1 test builds
+- source: server source and release notes: gani prop 10, .png defaults, PLO_FILE modtime, gserver minimap, ghost mode; PLO 49 and 169 are in the two 2.1 test builds; the maps download folder rule is in every Graal 2002 build from ver9 (2.1.0.0) on, read statically in all six (Graal_analysis client-internals/graal2002-save-folders-2026-11-20.md); ver7 and ver8, which send 2.05's token, lack it
 
 #### NewWorld beta 2 (`G2N15041`, binary, linked 2001-10-03)
 
