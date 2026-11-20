@@ -7,10 +7,9 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
-- `files.modtime` is now yes for 2.05 and both NewWorld betas: real 2.05 rev 2 and both betas drop a served file sent without the GINT5 mod time (Wine labs against seihai-gserver, 2026-11-05 and 2026-11-20). The `PLO_FILE` layout row starts at 2.05. The NewWorld rows' COLORS note now names bytes 6 to 8 (pullover, pants, border).
-
 ## 0.7.x
 
+- **0.7.2**: `files.modtime` is yes for 2.05 and both NewWorld betas: real 2.05 rev 2 and both betas drop a served file sent without the GINT5 mod time (Wine labs against seihai-gserver, 2026-11-05 and 2026-11-20). The `PLO_FILE` layout row starts at 2.05, and the NewWorld COLORS note names bytes 6 to 8 (pullover, pants, border).
 - **0.7.1**: The NewWorld betas send COLORS as 8 bytes, not 7 (`Props::colors_sent` is 8; lab against seihai-gserver, 2026-11-19). With 7, every login prop after COLORS was misread.
 - **0.7.0**: The NewWorld betas (`G2N15041`) have profiles: `ClientVersion::NewWorldB1` and `NewWorldB2`, side builds of 2.05 and 2.1 (new `Delta::side`), with COLORS sent as 7 bytes and read as 8 (`Props::colors_sent`, `colors_read`, `parse_player_props_sized`). Every catalogued version token has a profile, a stand-in or a reason (`STAND_INS`, `NOT_SERVED`, `serve_as`). GS2 texts that are not numbers read as -1, as on the real clients (#120). A secure list fetch for 4.x to 6.x borrows 2.22's login. Breaking: new `ClientVersion` variants, new `Props` and `Delta` fields, new `TokenKind` and `TokenGrade` variants, and the NewWorld rows leave `offline_builds`. Released early for seihai-gserver; the rest of #108 moves to 0.8.0 (#123).
 
