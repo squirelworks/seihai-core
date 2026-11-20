@@ -1184,6 +1184,16 @@ pub fn run_hooked(
         let mut nick_owed = sends_nick_props(version);
         let title = version.profile().window_title(server_name.as_deref());
         let mut st = SessionState::for_version(version);
+        // The script cache lives in the server's cache folder, when there
+        // is one, so a 197 finds what an earlier session kept.
+        st.script_cache.set_dir(
+            files
+                .store
+                .resolver()
+                .cache_roots()
+                .next()
+                .map(|r| r.root.clone()),
+        );
         let mut walker = WalkSender::new(version);
         // The gmap side of core's walk, kept here where the server's state
         // is: `sync_world` fills its world, and the view gets a copy.
@@ -1311,6 +1321,11 @@ pub fn run_hooked(
                     }
                     if !got.send.is_empty() {
                         let _ = s.conn.send_messages(&got.send);
+                    }
+                    // 197s the script cache missed: ask for the scripts.
+                    let asks = std::mem::take(&mut st.script_requests);
+                    if !asks.is_empty() {
+                        let _ = s.conn.send_messages(&asks);
                     }
                     if let Some(a) = arrived_sounds.as_ref() {
                         let sounds = arrived_sounds_of(&got.written, &files.store);
