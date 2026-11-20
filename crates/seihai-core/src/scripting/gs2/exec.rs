@@ -2027,6 +2027,11 @@ pub struct EffectHost {
     /// `resolveHost(host)` is a builtin (6.00r4 only:
     /// `VersionProfile::scripts.resolve_host`). Off by default.
     pub resolve_host: bool,
+    /// The last click, in level tiles: the globals `mousex` and `mousey`.
+    /// The real 6.03r7 gives `onMouseDown` only the button (`"left"`,
+    /// `"right"`) and leaves the position here (seihai-core#136, lab
+    /// 2026-11-20). The host sets it before the event runs.
+    pub mouse: (f64, f64),
 }
 
 impl EffectHost {
@@ -2041,6 +2046,7 @@ impl EffectHost {
             effects: Vec::new(),
             log: Vec::new(),
             resolve_host: false,
+            mouse: (0.0, 0.0),
         }
     }
 }
@@ -2276,6 +2282,12 @@ impl Host for EffectHost {
         match (root, name) {
             (Root::This | Root::ThisO, "x") => Some(Val::Num(self.x)),
             (Root::This | Root::ThisO, "y") => Some(Val::Num(self.y)),
+            (Root::This | Root::ThisO | Root::Global, n) if n.eq_ignore_ascii_case("mousex") => {
+                Some(Val::Num(self.mouse.0))
+            }
+            (Root::This | Root::ThisO | Root::Global, n) if n.eq_ignore_ascii_case("mousey") => {
+                Some(Val::Num(self.mouse.1))
+            }
             (Root::Player | Root::PlayerO, _) => {
                 let p = &self.player;
                 Some(match name.to_ascii_lowercase().as_str() {
