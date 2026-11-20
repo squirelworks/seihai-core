@@ -108,6 +108,15 @@ pub fn code_write(text: &[u8], pad: impl FnMut() -> u8) -> [u8; 48] {
     out
 }
 
+/// The guild name in a 1.x `guildname.code`, for the script view's
+/// `PlayerView::guild` (`playeringuild`). `None` when the file does not
+/// read back ([`code_read`]); the client then matches no name.
+pub fn guild_name(bytes: &[u8]) -> Option<String> {
+    code_read(bytes)
+        .ok()
+        .map(|t| String::from_utf8_lossy(&t).into_owned())
+}
+
 /// The text of a `.code` file. Refused, as the client refuses it, when the
 /// file is not 48 bytes, the two halves do not decrypt to the same block,
 /// or the length byte is out of range.

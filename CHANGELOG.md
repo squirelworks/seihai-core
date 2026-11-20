@@ -7,6 +7,8 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
+- GS1 `playeringuild(NAME)` (and the bare `playeringuild`, for the empty name) is true when the guild name from `guildname.code` equals NAME exactly, case included. No file, or one whose halves differ, matches no name (lab, 1.1 and 1.1.9 offline, 2026-11-20; #63). The host fills the new `PlayerView::guild` with the new `graaldes::guild_name`. Breaking: a new field in `PlayerView`.
+
 ## 0.7.x
 
 - **0.7.2**: `files.modtime` is yes for 2.05 and both NewWorld betas: real 2.05 rev 2 and both betas drop a served file sent without the GINT5 mod time (Wine labs against seihai-gserver, 2026-11-05 and 2026-11-20). The `PLO_FILE` layout row starts at 2.05, and the NewWorld COLORS note names bytes 6 to 8 (pullover, pants, border).

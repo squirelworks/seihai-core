@@ -342,6 +342,10 @@ impl<'a> Run<'a> {
             if vocab::status_flag(&p.base, self.era()) {
                 return self.status_get(&p.base).into();
             }
+            // A bare `playeringuild` asks for the empty guild name.
+            if p.base == "playeringuild" {
+                return self.in_guild("").into();
+            }
         } else if self.is_board(&p.base) {
             return self
                 .board_get(p)
@@ -451,6 +455,12 @@ impl<'a> Run<'a> {
                 value: Some(value),
             });
         }
+    }
+
+    /// `playeringuild`: the player's guild (from `guildname.code`) is
+    /// exactly `name`.
+    fn in_guild(&self, name: &str) -> bool {
+        self.core.player.guild.as_deref() == Some(name)
     }
 
     fn status_get(&self, name: &str) -> bool {
@@ -840,6 +850,7 @@ impl<'a> Run<'a> {
             // 2.05 answers only for the tilesets of the new kind (`addtiledef`
             // type 1 or 2); the default tileset, typed by `arrays.dat`, gets -1.
             "tiletype" => Val::Num(-1.0),
+            "playeringuild" => self.in_guild(&s(0)).into(),
             "playersays" | "playersays2" => {
                 if self.event != "playerchats" {
                     return Val::Num(0.0);
