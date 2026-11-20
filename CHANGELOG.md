@@ -7,6 +7,8 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
+- `files.modtime` is now yes for 2.05 and both NewWorld betas: real 2.05 rev 2 and both betas drop a served file sent without the GINT5 mod time (Wine labs against seihai-gserver, 2026-11-05 and 2026-11-20). The `PLO_FILE` layout row starts at 2.05. The NewWorld rows' COLORS note now names bytes 6 to 8 (pullover, pants, border).
+
 ## 0.7.x
 
 - **0.7.1**: The NewWorld betas send COLORS as 8 bytes, not 7 (`Props::colors_sent` is 8; lab against seihai-gserver, 2026-11-19). With 7, every login prop after COLORS was misread.

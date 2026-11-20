@@ -231,7 +231,7 @@ impl Tables {
             .iter()
             .filter(|r| r.dir == dir && r.id == id && v.is_none_or(|v| r.applies_to(v)))
             // The `PLO_FILE` modtime follows the profile flag, not the
-            // version range: NewWorld beta 2 sits after 2.1 and has none.
+            // version range, so a later row can set it back.
             .filter(|r| {
                 !(dir == Dir::S2C && id == 102 && r.field == "modtime")
                     || v.is_none_or(|v| v.file_has_modtime())

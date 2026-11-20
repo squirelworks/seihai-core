@@ -789,7 +789,7 @@ fn layout_differs_between_versions_where_the_table_says_so() {
         .filter(|r| r.handled && !r.rows.iter().any(|f| f.field == "modtime"))
         .collect();
     assert!(!with.is_empty() && !without.is_empty());
-    assert_eq!(with[0].from, "2.1");
+    assert_eq!(with[0].from, "2.05");
     // 2.05 has a different LEVELMODTIME layout from 2.17.
     let rep = layout_report(&t, Dir::S2C, 39);
     let a = rep.runs.iter().find(|r| r.from == "2.05").unwrap();

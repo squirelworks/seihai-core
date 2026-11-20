@@ -57,10 +57,10 @@ its own reads.
 | 2.02 rev2 | binary | 2 | 0 | 52 | 0 | 0 |
 | 2.03 | binary | 4 | 0 | 50 | 0 | 0 |
 | 2.04 | binary | 4 | 0 | 50 | 0 | 0 |
-| 2.05 | binary | 8 | 0 | 46 | 0 | 0 |
+| 2.05 | binary | 9 | 0 | 45 | 0 | 0 |
 | NewWorld beta 1 | binary | 6 | 0 | 36 | 12 | 0 |
-| 2.1 | inferred | 0 | 15 | 0 | 0 | 39 |
-| NewWorld beta 2 | binary | 10 | 0 | 42 | 2 | 0 |
+| 2.1 | inferred | 0 | 14 | 0 | 0 | 40 |
+| NewWorld beta 2 | binary | 9 | 0 | 43 | 2 | 0 |
 | 2.12 | inferred | 0 | 0 | 0 | 0 | 54 |
 | 2.13 | inferred | 0 | 0 | 0 | 0 | 54 |
 | 2.14 | inferred | 0 | 4 | 0 | 0 | 50 |
