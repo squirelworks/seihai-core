@@ -300,9 +300,8 @@ pub(super) const DISPATCH: &str = "__gs1run";
 pub(super) const DISPATCH_PARAM: &str = "__gs1event";
 
 /// A GS1 script as GS1 runs it: the whole script, top to bottom, once per
-/// event, with the event flags telling which event this is. For each event
-/// in the era's closed list, and for each `action…` name the script tests,
-/// `onEvent()` calls `__gs1run("event")`. `__gs1run` holds every statement
+/// event it names, with the event flags telling which event this is. For
+/// each event the script tests, `onEvent()` calls `__gs1run("event")`. `__gs1run` holds every statement
 /// outside the script's own functions, in source order, with each event
 /// flag read as `__gs1event == "event"`. Nothing is left as GS2 top-level
 /// code, so no statement runs before or after where GS1 runs it.
@@ -317,14 +316,10 @@ fn dispatch(body: Vec<g::Stmt>, era: Era) -> Vec<Raw> {
     for st in &body {
         stmt_events(st, era, &mut events);
     }
-    // GS1 runs the body for every event the host gives the NPC, including
-    // events the script never tests. The closed list is [`vocab::EVENTS`];
-    // it is the same list [`crate::scripting::engine::world`] will fire.
-    for &(name, since) in vocab::EVENTS {
-        if since <= era && !events.iter().any(|event| event == name) {
-            events.push(name.to_string());
-        }
-    }
+    // Only the events the script tests get a wrapper. A real 2.22 runs a GS1
+    // body only for the events the script names: with `if (created)` and
+    // `if (timeout)` alone, touching the NPC or entering the level does not
+    // run the code outside the tests (seihai-core#130 lab, 2026-11-20).
     let mut items = Vec::new();
     let mut code = Vec::new();
     let mut own = Vec::new();

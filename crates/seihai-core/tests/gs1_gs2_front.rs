@@ -289,27 +289,14 @@ fn names(s: &seihai_core::scripting::gs2::Script) -> Vec<&str> {
     s.functions.iter().map(|f| f.name.as_str()).collect()
 }
 
-/// A dispatched script lists the events it names first, then every other
-/// event in the era's closed list, then `__gs1run`.
+/// A dispatched script has a wrapper for each event it names, in first-use
+/// order, then `__gs1run`. Events it never tests get none: a real 2.22 does
+/// not run the body for them (seihai-core#130 lab, 2026-11-20).
 fn assert_dispatched(script: &Script, era: Era, named: &[&str]) {
     let got = names(script);
-    assert!(got.starts_with(named), "named events stay first: {got:?}");
-    assert_eq!(got.last().copied(), Some("__gs1run"));
-    let mut expect: Vec<String> = named.iter().map(|s| (*s).to_string()).collect();
-    for &(event, since) in seihai_core::scripting::engine::vocab::EVENTS {
-        if since <= era {
-            let function = gs2_event_function(event);
-            if !expect.iter().any(|name| name == &function) {
-                expect.push(function);
-            }
-        }
-    }
-    expect.push("__gs1run".into());
-    assert_eq!(
-        got,
-        expect.iter().map(String::as_str).collect::<Vec<_>>(),
-        "era {era:?}"
-    );
+    let mut expect: Vec<&str> = named.to_vec();
+    expect.push("__gs1run");
+    assert_eq!(got, expect, "era {era:?}");
 }
 
 #[test]

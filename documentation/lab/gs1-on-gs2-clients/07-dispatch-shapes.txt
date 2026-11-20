@@ -1,0 +1,16 @@
+// Dispatcher shapes (#130): an unconditional prefix before the named events,
+// a suffix after the event blocks, and events the script never names
+// (playerenters, playertouchsme). Visible: the message shows
+// r = prefix runs, c = created runs, t = timeout runs, p = suffix runs.
+// Expected: r = p every frame; r - c - t = unnamed events seen (enters, touches).
+this.runs += 1;
+if (created) {
+  this.c += 1;
+  timeout = 1;
+}
+if (timeout) {
+  this.t += 1;
+  timeout = 1;
+}
+this.post += 1;
+message r#v(this.runs) c#v(this.c) t#v(this.t) p#v(this.post);

@@ -120,8 +120,67 @@ under Wine, not a compiler one.
   - **Shared VM.** Another lab shared the VM, so this lab ended up in its own
     namespace, client copies and Wine prefix.
 
-## Not done (handed over)
+## Pass 3: 2026-11-20 (main `a18093d`, seihai-core#130)
 
-- **2.22 GS1-text control:** only 01 was run (✓). 02–06 are still to do.
-- **01's creation-time chat:** check it with an early frame, about 12–16 s
-  after start.
+Same tree and method as above, on GwenTea2's Debian lab VM (each run in its
+own loopback-only namespace). Compiler: `gs1c` at main `a18093d`. 5.24r4
+logs in through the gs2emu-73 login server; the hud1111 build refuses its
+token (`G3D15010`). 6.03r7 needs the login server's own `pics1.png`, with
+its mod time, in its cache; otherwise the warp cuts the pics1 download and
+no tile is drawn.
+
+| Script | bytes | SHA-256 prefix |
+|---|---|---|
+| 01-chat-and-timer | 189 | `75570ec9` |
+| 02-touch-and-image | 201 | `679a57f7` |
+| 03-showimg-and-vars | 277 | `b72a2282` |
+| 04-players-array | 190 | `875f2b11` |
+| 05e-tile632 | 206 | `cfe292b9` |
+| 06-dispatch | 1765 | `5118dcfe` |
+| 07-dispatch-shapes | 1720 | `838f7703` |
+
+All are one byte shorter than in the 2026-11-14 pass. 06 grew from 444 to
+1765 bytes, and 07 is about the same size, because of the every-event
+wrappers this pass removes (below).
+
+| Script | 6.03r7 | 5.24r4 | 4.20r8 | 2.22 GS1 text (control) |
+|---|---|---|---|---|
+| 01 chat + timer | ✓ counter; "gs1 ok" sent | ✓ | ✓ (box glyphs) | ✓ (11-14) |
+| 02 touch + image | ✓ bush, "touched 1", "touched 2" | ✓ | ✓ | ✓ "touched 1" |
+| 03 showimg + client. var | ✓ "seen 1 x=30" | ✓ | ✓ | ✓ same text and place |
+| 04 players[0] follow | ✓ | ✓ | ✓ | ✓ |
+| 05e tile 632 | ✓ 2x2 black block at x+3 | ✓ | ✓ | ✓ |
+| 06 dispatch | ✓ "touch 1/2 on gs1lab.nw", "other runs" | ✓ | ✓ (box glyphs) | ✓ "touch 1/2 on gs1ctl.nw", "other runs" |
+| 07 dispatcher shapes | r = p ✓; r − c − t = 2, then 14, then 41 | r = p ✓; 3, then 14, then 39 | r = p ✓ | r = p, and **r − c − t = 0 throughout**, touches included |
+
+No client crashed. No script error appeared in the 6.03r7 console.
+
+**01's creation-time chat is answered.** 6.03r7 sends the "gs1 ok" chat to
+the server (`PLI_PLAYERPROPS` chat) about 7 s after start. It disappeared
+from the screen because the lab world's `GS1Test` weapon sets "gs1 timer
+ok" 3 s after creation. It is not a compiler issue.
+
+**The dispatcher shapes (the three #130 cases):**
+- The unconditional prefix before named events: ✓ on every client. `this.runs`
+  is counted once per run, before the tests.
+- The suffix after the event blocks: ✓ on every client (p = r at every frame).
+- Events the script never names: **a difference.** On real 2.22 a GS1
+  script that tests only `created` and `timeout` ran exactly once per
+  created and per timeout (r = c + t at every frame). Holding the player
+  against the NPC, and touching it twice, added nothing. With the
+  every-event wrappers (seihai-core 0.2.17), the same script lowered to GS2
+  also ran for level entry and for every touch and push. That added 2 or 3
+  runs at the start and 12 to 29 per push on the three GS2 clients. In 06
+  this shows up as "other runs" jumping by 14 to 29 per push on 5.24r4 and
+  6.03r7, but by about 1 per second (only timeouts) on 2.22.
+  **Fix:** only the events a script tests get a wrapper again
+  (`compile/gs1.rs`, `tests/gs1_dispatch.rs`).
+
+Touches themselves agree: `onPlayerTouchsMe` fired once per touch on
+6.03r7 and 4.20r8 ("touch 1", "touch 2"), the same as 2.22.
+
+**Rerun with the fix.** 07 compiled with named-only wrappers is 341 bytes
+(`fde73546`) and 06 is 443 bytes (`07ee02ab`). On 6.03r7 and 5.24r4, 07
+showed r = c + t = p at every frame, touches and pushes included (6.03r7:
+`r35 c1 t34 p35` after the first push, `r45 c1 t44 p45` at the end). That
+is the same as 2.22.
