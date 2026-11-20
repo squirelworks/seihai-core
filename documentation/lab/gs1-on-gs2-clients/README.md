@@ -20,6 +20,7 @@ prints the disassembly and what each client build is sent.
 | `04-players-array.txt` | the NPC follows the first player (`players[0].x`) |
 | `05-tiles.txt` | touching the NPC writes a 2x2 block of tile 2047 beside it; its appearance depends on the tile sheet |
 | `06-dispatch.txt` | whole-script GS1: touching says "touch N on <level>"; between touches a message counts the other runs |
+| `07-dispatch-shapes.txt` | dispatcher shapes: `message r… c… t… p…` counts the prefix runs, `created` and `timeout` runs, and suffix runs; on 2.22, r = c + t always |
 
 Results go in `lab-results.md` in this folder: the client, the isolated
 runtime and what was seen. Screenshots and raw lab tools stay private.
