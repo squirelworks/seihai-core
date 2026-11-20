@@ -170,7 +170,8 @@ impl ClientVersion {
         self.profile().protocol.encryption
     }
 
-    /// `PLO_FILE` carries a modtime for clients GServer counts as 2.1+.
+    /// `PLO_FILE` carries a modtime: 2.05 (rev 2 lab), the NewWorld betas
+    /// and 2.1+. GServer counts it from 2.1 only.
     pub fn file_has_modtime(self) -> bool {
         self.profile().files.modtime
     }

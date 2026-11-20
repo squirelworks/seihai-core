@@ -143,7 +143,6 @@ If the new build lands between two existing ones, the step after it must be re-c
 Generated; do not edit between the markers.
 
 <!-- version-chain:begin -->
-
 #### 1.21 (`GSERV007`, binary, linked 1999-05-10)
 
 - start of the chain, written out in full as ORIGIN
@@ -338,6 +337,7 @@ Generated; do not edit between the markers.
 
 - protocol: **listserver**: listserver.graal.in:14923 (legacy, assumed), login shape A (login frame inferred, not captured) -> listserver.graal.in:14923 (legacy, assumed), login shape A (login frame captured from a real client)
 - protocol: **plo (server ids handled)**: +168 UNKNOWN168 (58 -> 59 ids)
+- files: **modtime**: no -> yes
 - levels: **nw**: no -> yes
 - levels: **gmap**: no -> yes
 - levels: **cached_links**: no -> yes
@@ -345,7 +345,7 @@ Generated; do not edit between the markers.
 - ui: **gs1_commands**: 157 -> 161
 - mannerisms: **mannerisms**: NewMain 1.41 (pull lets go to grab, swim freezes when still, hide keeps the carry poses) -> 2.05 (hidden ganis, pull stays, swim runs on)
 - unknown (listserver): this profile now sends the real 2.05 frame (shape A, captured in the lab: id 0 `newmain` only). No public run has used it: the 2026-10-25 matrix binary sent the gen-5 login for 2.05 (the saved-version override, since fixed) and both 14922 and 14923 answered that. 14923 answered the older classic login (shape B) of every other classic profile, so 14923 is assumed here
-- source: binary (rev 1 and rev 2) and lab: .nw and .gmap levels, PLO 168, server name in the title, GS1 157 to 161; death rules traced here (combat as 2.03, traced in both)
+- source: binary (rev 1 and rev 2) and lab: .nw and .gmap levels, PLO 168, server name in the title, GS1 157 to 161; death rules traced here (combat as 2.03, traced in both); PLO_FILE with the mod time (rev 2 lab)
 
 #### NewWorld beta 1 (`G2N15041`, binary, linked 2001-08-06)
 
@@ -357,7 +357,7 @@ Generated; do not edit between the markers.
 - props: **colors_read**: 5 -> 8
 - files: **image_ext**: ".gif" -> ".png"
 - unknown (listserver): the real client dials 14921 and asks for the list `newworld` (id 0 only); this row keeps 2.05's frame with `newmain`, and the public listserver was not asked for a `newworld` list
-- unknown (props): what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build, and the betas draw those parts (pullover, pants, border, as seen in the 2026-11-19 lab) white
+- unknown (props): COLORS bytes 6 to 8 are pullover, pants and border (the beta readme; the 2026-11-19 lab saw them drawn white when padded with 0). A server should fill them from the classic five (pullover = coat, pants = shoes, black border), as seihai-gserver does; the betas fill their own the same way
 - unknown (life): the death and combat rules are carried from 2.05; with no built-in sword the server must give a sword weapon, and hits were not traced
 - unknown (ui): the HUD (150/150 health and the NewWorld calendar clock) and the terrain heights are not modelled; the row carries 2.05's
 - unknown (files): the .png default image extension is taken from the join requests (shield1.png, bodynw.png); the default-image table was not read
@@ -371,7 +371,6 @@ Generated; do not edit between the markers.
 - props: **other-player props**: +43 GMAPLEVELX, +44 GMAPLEVELY, +45 Z (31 -> 34 ids)
 - props: **npc_max**: 40 -> 43
 - props: **bow_prop10**: yes -> no
-- files: **modtime**: no -> yes
 - files: **image_ext**: ".gif" -> ".png"
 - files: **download_maps**: no -> yes
 - life: **death**: 2.05 rules (name-group test) -> 2.1 rules (no name-group test)
@@ -398,14 +397,13 @@ Generated; do not edit between the markers.
 - protocol: **pli (client ids sent)**: -7 HORSEADD, -8 HORSEDEL, -11 THROWCARRIED, -15 BADDYPROPS, -16 BADDYHURT, -17 BADDYADD, -20 OPENCHEST (39 -> 32 ids)
 - props: **colors_sent**: 5 -> 8
 - props: **colors_read**: 5 -> 8
-- files: **modtime**: yes -> no
 - files: **download_maps**: yes -> no
 - ui: **gs1_commands**: 161 -> 165
 - scripts: **gs1**: unknown -> yes
 - scripts: **gs2**: unknown -> no
-- unknown (base): the binary is 2.1 test 3; this row is built on the generic inferred 2.1 row, so values the NewWorld profile does not list (UI, death rules, image extension) are that row's; the file packets are set back to 2.1 test 3's (no modtime, no maps folder rule)
+- unknown (base): the binary is 2.1 test 3; this row is built on the generic inferred 2.1 row, so values the NewWorld profile does not list (UI, death rules, image extension) are that row's; the maps folder rule is set back to 2.1 test 3's (none). The file packets keep the mod time: the static read said 2.1 test 3 has none, but both betas drop every file sent without it (Wine lab against seihai-gserver, 2026-11-20)
 - unknown (listserver): the real client dials 14922 and asks for the list `newworld`; this row keeps 2.1's frame with `newmain`. It sent fewer password characters than were typed (23 of 28); the cut-off was not pinned down
-- unknown (props): what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build, and the betas draw those parts (pullover, pants, border, as seen in the 2026-11-19 lab) white
+- unknown (props): COLORS bytes 6 to 8 are pullover, pants and border (the beta readme; the 2026-11-19 lab saw them drawn white when padded with 0). A server should fill them from the classic five (pullover = coat, pants = shoes, black border), as seihai-gserver does; the betas fill their own the same way
 - source: binary (md5 af2d2106) and lab 2026-10-30: beta 1's removals and COLORS width on a 2.1 test 3 build (PLO 49 and 169, props 43 to 45 and UDP 27 kept); GS1 165 commands (addstring, insertstring, removestring, deletestring); asks for shield1.png, idle.gani and headalgo000 at join; list login id 0 `newworld` then id 1 account and password
 
 #### 2.12 (`GNW01012`, inferred)
@@ -720,5 +718,4 @@ Generated; do not edit between the markers.
 - unknown (lab): the Linux client was not run; the Windows 6.03r7 lab run (2026-10-31) stands in for it
 - unknown (files): Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for
 - source: binary (Linux x64 ELF, not packed): token stored as the scrambled string g3d0511c, login list linux plus four machine ids (eth0 MAC md5, /etc inode md5, empty, kernel string); PLO and PLI sets are the ones the Windows row took from it; gs2lib names the token 6.037 (Linux); frame cipher read 2026-11-19 (this build's ELF, platform-identical engine to the Windows G3D0311C): a zlib or bz2 body steps floor(len/4) times, cap 4 (srawi ...,2 at 0x62050e), a raw body steps ceil, cap 12 (0x620275) - round down, so 6.03r7 and every row from 4.04r2 on round the compressed step down
-
 <!-- version-chain:end -->

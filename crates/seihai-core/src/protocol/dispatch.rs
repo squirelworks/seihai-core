@@ -578,8 +578,9 @@ pub struct SessionState {
     pub large_file: Option<(String, Vec<u8>)>,
     /// Size the server announced for the large file (`PLO_LARGEFILESIZE`).
     pub large_file_size: Option<u64>,
-    /// `PLO_FILE` carries a 5-byte modtime for 2.1+ clients. 2.05 and
-    /// older get the name and data only. Set this from the version.
+    /// `PLO_FILE` carries a 5-byte modtime for 2.05 rev 2, the NewWorld
+    /// betas and 2.1+; older builds get the name and data only. Set this
+    /// from the version.
     pub file_has_modtime: bool,
     /// Our own nickname (NICKNAME, prop 0, in `PLO_PLAYERPROPS`).
     pub nickname: Option<String>,

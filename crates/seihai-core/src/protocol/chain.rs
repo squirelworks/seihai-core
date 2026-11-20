@@ -855,9 +855,14 @@ pub const CHAIN: &[Step] = &[
             server_in_title: Some(true),
             gs1_commands: Some(161),
             mannerisms: Some(MANNER_205),
+            // Real 2.05 rev 2 takes a served file only with the GINT5 mod
+            // time; sent without it, the file is dropped and an NPC with that
+            // image is not drawn (Wine lab against seihai-gserver,
+            // 2026-11-05). GServer counts the mod time from 2.1 on.
+            modtime: Some(true),
             ..Delta::NONE
         },
-        source: "binary (rev 1 and rev 2) and lab: .nw and .gmap levels, PLO 168, server name in the title, GS1 157 to 161; death rules traced here (combat as 2.03, traced in both)",
+        source: "binary (rev 1 and rev 2) and lab: .nw and .gmap levels, PLO 168, server name in the title, GS1 157 to 161; death rules traced here (combat as 2.03, traced in both); PLO_FILE with the mod time (rev 2 lab)",
         unknown: &[
             Unknown { area: "listserver", what: "this profile now sends the real 2.05 frame (shape A, captured in the lab: id 0 `newmain` only). No public run has used it: the 2026-10-25 matrix binary sent the gen-5 login for 2.05 (the saved-version override, since fixed) and both 14922 and 14923 answered that. 14923 answered the older classic login (shape B) of every other classic profile, so 14923 is assumed here" },
         ],
@@ -886,7 +891,7 @@ pub const CHAIN: &[Step] = &[
         source: "binary (md5 88d1f84c) and lab 2026-10-30: PLO 2, 4, 17, 18, 154 and 155 and PLI 7, 8, 11, 15, 16, 17 and 20 gone with the built-in sword, bow, baddies, chests, horses and freeze; GANI (10) a string, COLORS sent and read as 8 bytes (lab 2026-11-19 against seihai-gserver: 8 on every login; the 7 of the 2026-10-30 notes was a misread), HEADGIF without an extension, STATUS bit 0x20; login props 0, 11, 13, 18, 31, 33 then LANGUAGE; PLO 42 is the NewWorld time (GINT4 minutes since 1000/01/01); GS1 161 commands plus the nw* time variables; 65x65 terrain heights in the level",
         unknown: &[
             Unknown { area: "listserver", what: "the real client dials 14921 and asks for the list `newworld` (id 0 only); this row keeps 2.05's frame with `newmain`, and the public listserver was not asked for a `newworld` list" },
-            Unknown { area: "props", what: "what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build, and the betas draw those parts (pullover, pants, border, as seen in the 2026-11-19 lab) white" },
+            Unknown { area: "props", what: "COLORS bytes 6 to 8 are pullover, pants and border (the beta readme; the 2026-11-19 lab saw them drawn white when padded with 0). A server should fill them from the classic five (pullover = coat, pants = shoes, black border), as seihai-gserver does; the betas fill their own the same way" },
             Unknown { area: "life", what: "the death and combat rules are carried from 2.05; with no built-in sword the server must give a sword weapon, and hits were not traced" },
             Unknown { area: "ui", what: "the HUD (150/150 health and the NewWorld calendar clock) and the terrain heights are not modelled; the row carries 2.05's" },
             Unknown { area: "files", what: "the .png default image extension is taken from the join requests (shield1.png, bodynw.png); the default-image table was not read" },
@@ -955,8 +960,6 @@ pub const CHAIN: &[Step] = &[
             listserver: Some(Some(Listserver::new(ListKind::Legacy, PortStatus::Assumed, None))),
             pli: IdDelta { minus: &[7, 8, 11, 15, 16, 17, 20], ..IdDelta::NONE },
             colors: Some((8, 8)),
-            // 2.1 test 3's file packets: no modtime (binary).
-            modtime: Some(false),
             download_maps: Some(false),
             gs1_commands: Some(165),
             // A binary: GS1 and no NPC bytecode (131).
@@ -966,9 +969,9 @@ pub const CHAIN: &[Step] = &[
         },
         source: "binary (md5 af2d2106) and lab 2026-10-30: beta 1's removals and COLORS width on a 2.1 test 3 build (PLO 49 and 169, props 43 to 45 and UDP 27 kept); GS1 165 commands (addstring, insertstring, removestring, deletestring); asks for shield1.png, idle.gani and headalgo000 at join; list login id 0 `newworld` then id 1 account and password",
         unknown: &[
-            Unknown { area: "base", what: "the binary is 2.1 test 3; this row is built on the generic inferred 2.1 row, so values the NewWorld profile does not list (UI, death rules, image extension) are that row's; the file packets are set back to 2.1 test 3's (no modtime, no maps folder rule)" },
+            Unknown { area: "base", what: "the binary is 2.1 test 3; this row is built on the generic inferred 2.1 row, so values the NewWorld profile does not list (UI, death rules, image extension) are that row's; the maps folder rule is set back to 2.1 test 3's (none). The file packets keep the mod time: the static read said 2.1 test 3 has none, but both betas drop every file sent without it (Wine lab against seihai-gserver, 2026-11-20)" },
             Unknown { area: "listserver", what: "the real client dials 14922 and asks for the list `newworld`; this row keeps 2.1's frame with `newmain`. It sent fewer password characters than were typed (23 of 28); the cut-off was not pinned down" },
-            Unknown { area: "props", what: "what COLORS bytes 6 to 8 mean is not known; a server pads them with 0 for this build, and the betas draw those parts (pullover, pants, border, as seen in the 2026-11-19 lab) white" },
+            Unknown { area: "props", what: "COLORS bytes 6 to 8 are pullover, pants and border (the beta readme; the 2026-11-19 lab saw them drawn white when padded with 0). A server should fill them from the classic five (pullover = coat, pants = shoes, black border), as seihai-gserver does; the betas fill their own the same way" },
         ],
     },
     Step {
@@ -2472,7 +2475,8 @@ mod tests {
     /// (1.31 on, so 1.31 to 1.42 decode packet hits, with 1.31 to 1.39
     /// testing no range), the flat 3-heart revive of 1.39, and the 2.17+
     /// ghost and 176/177 tests (`ghost_and_stop_gates`). The props then got
-    /// the COLORS widths, 5 and 5 in every one of these rows.
+    /// the COLORS widths, 5 and 5 in every one of these rows. 2.05 then got
+    /// the `PLO_FILE` mod time (Wine lab of 2.05 rev 2, 2026-11-05).
     #[test]
     fn chain_equals_the_hand_written_rows() {
         let mut seen = 0;

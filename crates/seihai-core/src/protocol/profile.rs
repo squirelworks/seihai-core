@@ -407,7 +407,7 @@ pub struct Props {
 /// File transfer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Files {
-    /// `PLO_FILE` carries a 5-byte modtime (2.1+).
+    /// `PLO_FILE` carries a 5-byte modtime (2.05 rev 2, the NewWorld betas, 2.1+).
     pub modtime: bool,
     /// `PLO_LARGEFILESTART`/`END` (68/69): files over 64 KB (2.14+).
     pub large_files: bool,
@@ -1364,7 +1364,8 @@ mod tests {
 
     /// GServer's 2.1 line: modtime, gani prop 10 and `.png` defaults.
     /// The NewWorld betas mix the two: GANI (10) a string and `.png`
-    /// images, with 2.05's file packets (no modtime).
+    /// images. 2.05 rev 2 and both betas take files only with the mod
+    /// time (Wine lab, 2026-11-05 and 2026-11-20), a step before the rest.
     #[test]
     fn the_2_1_line() {
         for p in PROFILES {
@@ -1373,13 +1374,18 @@ mod tests {
                 p.version,
                 ClientVersion::NewWorldB1 | ClientVersion::NewWorldB2
             ) {
-                assert!(!new && !p.props.bow_prop10 && p.files.image_ext == ".png");
+                assert!(new && !p.props.bow_prop10 && p.files.image_ext == ".png");
+                continue;
+            }
+            if p.version == ClientVersion::V205 {
+                assert!(new && p.props.bow_prop10 && p.files.image_ext != ".png");
                 continue;
             }
             assert_eq!(new, !p.props.bow_prop10, "{}", p.label);
             assert_eq!(new, p.files.image_ext == ".png", "{}", p.label);
         }
-        assert!(!profile(ClientVersion::V205).files.modtime);
+        assert!(profile(ClientVersion::V205).files.modtime);
+        assert!(!profile(ClientVersion::V204).files.modtime);
         assert!(profile(ClientVersion::V210).files.modtime);
     }
 
