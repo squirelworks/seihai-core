@@ -645,3 +645,23 @@ fn a_host_property_can_be_a_list() {
     assert_eq!(m.var(Root::This, "n"), Some(&Val::Num(3.0)));
     assert!(h.0.is_empty(), "{:?}", h.0);
 }
+
+/// seihai-core#136: the real 6.03r7 passes only the button to
+/// `onMouseDown` and leaves the click position in `mousex`/`mousey`.
+#[test]
+fn on_mouse_down_reads_the_click_from_mousex_and_mousey() {
+    use seihai_core::scripting::gs2::compile::compile_gs2;
+    let src = "function onMouseDown(mode) {\n\
+                 this.mode = mode;\n\
+                 this.at = mousex @ \",\" @ mousey;\n\
+               }\n";
+    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let mut h = host();
+    h.mouse = (31.0, 26.5);
+    assert_eq!(
+        m.call_event("onMouseDown", &[Val::from("left")], &mut h),
+        Outcome::Done
+    );
+    assert_eq!(m.var(Root::This, "mode"), Some(&Val::from("left")));
+    assert_eq!(m.var(Root::This, "at"), Some(&Val::from("31,26.5")));
+}
