@@ -41,6 +41,51 @@ needs the ALSA development files on Linux). Both are on by default.
 Crates that share a lock file have to name core the same way, so that the
 lock file holds only one seihai-core (#79).
 
+## Building and testing
+
+First time: install Rust from [rustup.rs](https://rustup.rs/), then clone the repo.
+On Linux, the default `audio` feature needs the ALSA development files
+(`sudo apt-get install libasound2-dev` on Debian and Ubuntu); leave the feature out
+if you do not want them.
+
+```sh
+git clone https://github.com/squirelworks/seihai-core.git
+cd seihai-core
+cargo build --workspace
+cargo test --workspace
+# without sound, as Linux CI builds it
+cargo test --workspace --no-default-features --features dev
+```
+
+`seihai-core` is a library, so there is no program to run. The clients and
+servers that use it are in their own repos (see the
+[seihai README](https://github.com/squirelworks/seihai)).
+
+## Command-line tools
+
+A few developer tools ship as Cargo examples. Run them from the repo root with
+`cargo run -p seihai-core --example NAME -- ARGS`.
+
+| Example | What it does | Arguments |
+| --- | --- | --- |
+| `gs1c` | Compiles GS1 client scripts with Seihai's compiler, prints the disassembly and what each client build would be sent, and writes `FILE.gs2bc` next to each input | `FILE...` (one or more script files); `--era LABEL` picks the GS1 command set by client build, such as `1.39`, `2.05` or `2.17` (default `2.17`); `--out DIR` writes the output there instead; `--packet NPCID` also writes `FILE.plo131.bin`, the packet pair GServer-v2 would send for that NPC |
+| `profile_audit` | Prints the version-profile audit | no argument for the TSV (`documentation/profile-audit.tsv`); `summary` for the summary table; `connections` for `documentation/connection-capabilities.md` |
+| `gs1_fuzzcases` | Writes GS1 script fuzz cases for a live client lab, with the result Seihai predicts, as TSV on standard output | `--seed N` (default 1), `--count N` (default 200), `--first-id N` (default 40000), `--only FAMILY` (`expr`, `code`, `cond`, `limit` or `text`) |
+| `gs2_fuzzcases` | The same for GS2 bytecode | `--seed N`, `--count N`, `--first-id N`, `--only FAMILY` (see the comment at the top of the file for the families) |
+
+Some tests read real Graal files that are not in the repo. They are marked
+`#[ignore]` and take their input from an environment variable:
+
+| Variable | Used by |
+| --- | --- |
+| `SEIHAI_DATA_222` | the 2.22 data folder, for the asset coverage test |
+| `SEIHAI_GANI_DIR` | a `levels/ganis` folder, for `real_ganis` |
+| `SEIHAI_SOUNDS_DIR` | a sounds folder, for `real_sounds`; `SEIHAI_DUMP_DIR` also writes the decoded sound there |
+| `SEIHAI_SCRIPT_CORPUS` | a file of real scripts, for the `corpus` test; `SEIHAI_CORPUS_SHOW` prints the named scripts' results |
+| `SEIHAI_VIEWER_SAMPLE_OUT` | where `write_sample_pcap` writes its sample capture |
+
+For example: `SEIHAI_GANI_DIR=path/to/levels/ganis cargo test real_ganis -- --ignored`.
+
 ## Versioning
 
 [VERSIONING.md](VERSIONING.md) says when a release happens, what the
