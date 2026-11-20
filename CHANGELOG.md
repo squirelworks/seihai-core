@@ -7,6 +7,7 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
+- NewWorld beta 1 and beta 2 stay one token served as beta 1: a 2026-11-20 lab run found their login streams byte-identical from the same client folder, so nothing tells them apart (#128). Documented in `documentation/connection-capabilities.md`, with a test.
 - GS1 `playeringuild(NAME)` (and the bare `playeringuild`, for the empty name) is true when the guild name from `guildname.code` equals NAME exactly, case included. No file, or one whose halves differ, matches no name (lab, 1.1 and 1.1.9 offline, 2026-11-20; #63). The host fills the new `PlayerView::guild` with the new `graaldes::guild_name`. Breaking: a new field in `PlayerView`.
 
 ## 0.7.x

@@ -820,6 +820,18 @@ mod tests {
         assert_eq!(serve_as("ZZZZ0000"), None);
     }
 
+    /// NewWorld beta 1 and beta 2 share `G2N15041` and send byte-identical
+    /// login streams from the same client folder (lab, 2026-11-20, #128), so a
+    /// server cannot tell them apart and serves the oldest, beta 1.
+    #[test]
+    fn newworld_betas_are_served_as_beta_1() {
+        assert_eq!(serve_as("G2N15041"), Some(ClientVersion::NewWorldB1));
+        assert_eq!(
+            known_token("G2N15041").unwrap().versions,
+            &[ClientVersion::NewWorldB1, ClientVersion::NewWorldB2]
+        );
+    }
+
     /// A stand-in is served on its profile's generation, so it must not be a
     /// token some other profile already claims.
     #[test]
