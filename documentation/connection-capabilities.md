@@ -25,6 +25,20 @@ The NewWorld betas have profile rows of their own, side builds of 2.05 and
 for the `newmain` list; the real betas ask for `newworld`, which the public
 listserver was not asked for.
 
+**A server cannot tell the two betas apart.** Both send `G2N15041`, and a
+game server serves that token as beta 1 (`serve_as`, the oldest build that
+shares it). A lab run on 2026-11-20 (#128) logged each beta in from fresh
+copies of the same three client folders. Within a folder the two send
+byte-identical streams to the game server: the same ids, lengths, order and
+bodies, the eight COLORS bytes included, and both handle the first `PLO_FILE`
+the same way. Only the nickname and the UDP port (prop 31) differ, and those
+change between runs of the same build anyway. The differences seen on
+2026-11-19 (beta 2 asking for `idle.gani` in the login frame, `WANTFILE`
+where beta 1 sent `UPDATEFILE`, no `NPCPROPS`) came from the two client
+folders, not the builds. Telling them apart would need a message the two
+builds handle differently, and none is known. Beta 2 served as beta 1 gets
+2.05's GS1 table, not 2.1's.
+
 ## Every build
 
 | Build | Native connection | Seihai discovery |
