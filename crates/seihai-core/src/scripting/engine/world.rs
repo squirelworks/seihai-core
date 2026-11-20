@@ -156,6 +156,10 @@ pub struct PlayerView {
     pub selected_weapon: Option<usize>,
     /// Names of the status flags that are true (`playerswimming`, ...).
     pub status: BTreeSet<String>,
+    /// The guild name the 1.x client reads from `guildname.code` in its
+    /// folder ([`crate::graaldes::guild_name`]), for `playeringuild`. `None`
+    /// when the file is missing or does not read back (halves that differ).
+    pub guild: Option<String>,
 }
 
 impl Default for PlayerView {
@@ -179,6 +183,7 @@ impl Default for PlayerView {
             weapons: Vec::new(),
             selected_weapon: None,
             status: BTreeSet::new(),
+            guild: None,
         }
     }
 }

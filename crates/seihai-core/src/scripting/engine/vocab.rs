@@ -896,6 +896,16 @@ pub static BUILTINS: &[Builtin] = &[
         args: &[T],
         since: V121,
     },
+    // `playeringuild(NAME)`: the guild name from `guildname.code` equals
+    // NAME exactly, case included; a bare `playeringuild` asks for the empty
+    // name. No file, or one whose halves differ, is false for every name
+    // (lab 2026-11-20, 1.1 and 1.1.9 offline). [lab] for 1.1; later eras
+    // [inferred].
+    Builtin {
+        name: "playeringuild",
+        args: &[T],
+        since: V121,
+    },
     // Stubs: return a value so scripts do not log every call.
     Builtin {
         name: "strtofloat",

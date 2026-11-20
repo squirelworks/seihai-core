@@ -1778,3 +1778,36 @@ fn nested_commas_parse_in_linear_time() {
     let p = super::parse("if (a in |1,3|, b in |2,4|) { message x; }", Era::V205);
     assert!(p.diagnostics.is_empty(), "{:?}", p.diagnostics);
 }
+
+/// `playeringuild` against the five NPCs of the 2026-11-20 lab (1.1 and
+/// 1.1.9 offline): an exact, case-sensitive match on the name read from
+/// `guildname.code`, the bare form asking for the empty name, and no
+/// match at all with no file or a damaged one.
+#[test]
+fn playeringuild_matches_the_guild_file_exactly() {
+    let src = "if (playerenters) {
+          if (playeringuild(Baddy)) message A;
+          if (playeringuild(baddy)) message B;
+          if (playeringuild(###)) message C;
+          if (playeringuild(Other)) message D;
+          if (playeringuild) message E;
+        }";
+    let pad = || 0x5a;
+    let write = |name: &str| crate::graaldes::code_write(name.as_bytes(), pad);
+    let file = |name: &str| crate::graaldes::guild_name(&write(name));
+    let mut damaged = write("Baddy");
+    damaged[24..].copy_from_slice(&write("Other")[24..]);
+    let cases: [(Option<String>, &[&str]); 5] = [
+        (None, &[]),
+        (file("Baddy"), &["A"]),
+        (file(""), &["E"]),
+        (crate::graaldes::guild_name(&damaged), &[]),
+        (file("###"), &[]),
+    ];
+    for (guild, want) in cases {
+        let (mut w, id) = npc_in(src, Era::V121);
+        w.core.player.guild = guild.clone();
+        w.fire(id, "playerenters", &[]);
+        assert_eq!(messages(&mut w), want, "guild {guild:?}");
+    }
+}
