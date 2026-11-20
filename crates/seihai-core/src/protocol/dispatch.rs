@@ -208,13 +208,21 @@ pub fn parse_script_delivery(b: &[u8]) -> Option<ScriptDelivery> {
     let h = read_gshort(b)? as usize;
     let header = b.get(2..2 + h)?;
     let body = b[2 + h..].to_vec();
-    let mut fields = header.split(|&c| c == b',');
-    let kind = latin1(fields.next()?).trim().to_ascii_lowercase();
-    let name = latin1(fields.next()?);
+    // A CSV line: a name with a comma comes quoted.
+    let fields = crate::scriptcache::csv_fields(header);
+    let kind = latin1(fields.first()?).trim().to_ascii_lowercase();
+    let name = latin1(fields.get(1)?);
     if name.is_empty() {
         return None;
     }
     Some(ScriptDelivery { kind, name, body })
+}
+
+/// The header of a `PLO_NPCWEAPONSCRIPT` (140) payload, the bytes
+/// between its GSHORT length and the body.
+fn script_header(b: &[u8]) -> Option<&[u8]> {
+    let h = read_gshort(b)? as usize;
+    b.get(2..2 + h)
 }
 
 /// A weapon script from the wire. The server writes a line break as `§`:
@@ -554,6 +562,12 @@ pub struct SessionState {
     pub weapon_bytecode: std::collections::BTreeMap<String, Vec<u8>>,
     /// 140 of type `class`: compiled GS2 class scripts by class name.
     pub class_bytecode: std::collections::BTreeMap<String, Vec<u8>>,
+    /// The `GRESCR01` script cache: 140 with the cache flag fills it, and
+    /// `PLO_LOADSCRIPT` (197) reads from it.
+    pub script_cache: crate::scriptcache::ScriptCache,
+    /// `PLI_UPDATESCRIPT` (158) messages owed for 197s the cache missed,
+    /// for the client to send.
+    pub script_requests: Vec<Vec<u8>>,
     /// `PLO_ITEMADD` (22) and `PLO_ITEMDEL` (23) in arrival order, drained
     /// by the game loop onto the floor (see [`crate::items`]).
     pub items: Vec<ServerItem>,
@@ -804,6 +818,19 @@ struct Restored {
 }
 
 impl SessionState {
+    /// A weapon's or class's compiled script, from 140 or the cache.
+    fn take_script(&mut self, kind: String, name: String, body: Vec<u8>) {
+        match kind.as_str() {
+            "weapon" => {
+                self.weapon_bytecode.insert(name, body);
+            }
+            "class" => {
+                self.class_bytecode.insert(name, body);
+            }
+            _ => {}
+        }
+    }
+
     /// COLORS (13) bytes in a prop stream from the server: 5, or 8 for the
     /// NewWorld betas.
     pub fn colors_len(&self) -> usize {
@@ -1225,14 +1252,25 @@ impl SessionState {
                 // PLO_NPCWEAPONSCRIPT, behind PLO_RAWDATA: a weapon's or a
                 // class's compiled GS2.
                 if let Some(d) = parse_script_delivery(&msg.payload) {
-                    match d.kind.as_str() {
-                        "weapon" => {
-                            self.weapon_bytecode.insert(d.name, d.body);
+                    if let Some(h) =
+                        script_header(&msg.payload).and_then(crate::scriptcache::Descriptor::parse)
+                    {
+                        self.script_cache.delivered(&h, &d.body);
+                    }
+                    self.take_script(d.kind, d.name, d.body);
+                }
+            }
+            197 => {
+                // PLO_LOADSCRIPT: `type,name,1,key,crc`. Load the cached
+                // copy whose stored CRC matches, else ask with 158.
+                if let Some(d) = crate::scriptcache::Descriptor::parse(&msg.payload) {
+                    match self.script_cache.load(&d) {
+                        crate::scriptcache::Load::Hit(body) => {
+                            self.take_script(d.kind, d.name, body);
                         }
-                        "class" => {
-                            self.class_bytecode.insert(d.name, d.body);
-                        }
-                        _ => {}
+                        crate::scriptcache::Load::Miss => self
+                            .script_requests
+                            .push(crate::scriptcache::update_script_message(&d.name)),
                     }
                 }
             }
@@ -4628,6 +4666,51 @@ mod tests {
         // A header longer than the payload is dropped.
         assert_eq!(parse_script_delivery(b"\x20\x7fweapon,x"), None);
         assert_eq!(parse_script_delivery(b"\x20\x27weapon"), None);
+    }
+
+    #[test]
+    fn load_script_takes_a_cached_copy_or_asks_with_158() {
+        use crate::scriptcache::{stored_crc, Descriptor};
+        let code = b"\0\0\0\x01\0\0\0\x04\0\0\0\0 more bytes";
+        let mut header = b"weapon,Bomb,1,".to_vec();
+        header.extend_from_slice(&[0x20 + 1; 10]);
+        let key = Descriptor::parse(&header).unwrap().key.unwrap();
+        let crc = stored_crc(code, &key);
+        let gint5 = |v: u32| -> Vec<u8> {
+            (0..5)
+                .rev()
+                .map(|i| ((v as u64 >> (7 * i)) & 0x7F) as u8 + 0x20)
+                .collect()
+        };
+        let load = |name: &str, crc: u32| {
+            let mut p = format!("weapon,{name},1,").into_bytes();
+            p.extend_from_slice(&[0x20 + 1; 10]);
+            p.push(b',');
+            p.extend(gint5(crc));
+            msg(197, &p)
+        };
+        let mut st = SessionState::for_version(ClientVersion::V600R2);
+        // Nothing cached yet: ask for it.
+        st.apply_body(&load("Bomb", crc));
+        assert!(st.weapon_bytecode.is_empty());
+        assert_eq!(
+            std::mem::take(&mut st.script_requests),
+            [b"\xbeBomb".to_vec()]
+        );
+        // 140 with the cache flag fills the cache; dropping the weapon keeps it.
+        st.apply_body(&weapon_script("weapon", "Bomb", code));
+        st.apply_body(&msg(34, b"Bomb"));
+        assert!(st.weapon_bytecode.is_empty());
+        // The next 197 with the stored CRC loads it, and asks nothing.
+        st.apply_body(&load("Bomb", crc));
+        assert_eq!(
+            st.weapon_bytecode.get("Bomb").map(Vec::as_slice),
+            Some(&code[..])
+        );
+        assert!(st.script_requests.is_empty());
+        // A changed script (another CRC) is asked for again.
+        st.apply_body(&load("Bomb", crc ^ 1));
+        assert_eq!(st.script_requests, [b"\xbeBomb".to_vec()]);
     }
 
     #[test]

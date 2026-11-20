@@ -8,6 +8,7 @@ Unreleased; the release PR moves them under the new version.
 ## Unreleased
 
 - NewWorld beta 1 and beta 2 stay one token served as beta 1: a 2026-11-20 lab run found their login streams byte-identical from the same client folder, so nothing tells them apart (#128). Documented in `documentation/connection-capabilities.md`, with a test.
+- The 5.x and 6.x script cache (squirelworks/seihai#497): a `PLO_NPCWEAPONSCRIPT` (140) with the cache flag keeps `GRESCR01` and the body DES-encrypted under the header's key, and `PLO_LOADSCRIPT` (197) loads that copy when the CRC-32 of its stored body matches, else owes a `PLI_UPDATESCRIPT` (158) in `SessionState::script_requests`, which the client sends. New module `scriptcache` (`ScriptCache`, `Descriptor`, `seal`, `open`, `csv_fields`); the client keeps the files in the server's cache folder when it has one. A 140 header is read as CSV, so a quoted name with a comma is kept whole. Breaking: new `SessionState` fields.
 - GS1 `playeringuild(NAME)` (and the bare `playeringuild`, for the empty name) is true when the guild name from `guildname.code` equals NAME exactly, case included. No file, or one whose halves differ, matches no name (lab, 1.1 and 1.1.9 offline, 2026-11-20; #63). The host fills the new `PlayerView::guild` with the new `graaldes::guild_name`. Breaking: a new field in `PlayerView`.
 
 ## 0.7.x
