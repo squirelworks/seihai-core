@@ -1407,7 +1407,7 @@ pub const CHAIN: &[Step] = &[
             gen5_compress_all: Some(true),
             ..Delta::NONE
         },
-        source: "unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed",
+        source: "unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed; lab on Windows 10 64-bit (2026-11-20): login line win,\"\",<md5 of the MAC>,<md5 of the C: serial>,\"6.2 9200 \", the product-id field empty",
         unknown: &[
             Unknown { area: "pli", what: "not read; 5.00r7's set is kept" },
             Unknown { area: "framing", what: "a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy" },
@@ -1452,7 +1452,7 @@ pub const CHAIN: &[Step] = &[
             lobby: Some(Some(LOBBY_512)),
             ..Delta::NONE
         },
-        source: "unpacked from MoleBox and lab: 97 PLO ids (75, 132, 133, 171 and 193 out, 109 and 198 in), one MSVC exe, short bodies sent uncompressed as 2.22, font=Arial",
+        source: "unpacked from MoleBox and lab: 97 PLO ids (75, 132, 133, 171 and 193 out, 109 and 198 in), one MSVC exe, short bodies sent uncompressed as 2.22, font=Arial; lab on Windows 10 64-bit (2026-11-20): login line win,\"\",<md5 of the MAC>,<md5 of the C: serial>,\"6.2 9200 \", the product-id field empty",
         unknown: &[
             Unknown { area: "pli", what: "not read; 5.00r7's set is kept" },
             Unknown { area: "files", what: "stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md" },
@@ -1481,7 +1481,7 @@ pub const CHAIN: &[Step] = &[
         // No tiles before the warp (lab screenshots; 5.24r4 and 5.30r3 in the
         // same lab draw them).
         delta: Delta { lobby: Some(Some(LOBBY_531)), ..Delta::NONE },
-        source: "unpacked from Themida and lab (clock set back): same PLO set and token as 5.30r3; draws no tiles before the warp",
+        source: "unpacked from Themida and lab (clock set back): same PLO set and token as 5.30r3; draws no tiles before the warp; lab on Windows 10 64-bit (2026-11-20): login line win,\"\",<md5 of the MAC>,<md5 of the C: serial>,\"6.2 9200 \", the product-id field empty (clock set to 2011-01-20)",
         unknown: &[
             Unknown { area: "pli", what: "not read; 5.00r7's set is kept" },
             Unknown { area: "ui", what: "why it draws no tiles before the warp was not traced in the binary; the lab shows it, and the warp alone brings the tiles back" },
