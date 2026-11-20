@@ -928,7 +928,7 @@ pub const CHAIN: &[Step] = &[
             ghost_mode: Some(true),
             ..Delta::NONE
         },
-        source: "server source and release notes: gani prop 10, .png defaults, PLO_FILE modtime, gserver minimap, ghost mode; PLO 49 and 169 are in the two 2.1 test builds",
+        source: "server source and release notes: gani prop 10, .png defaults, PLO_FILE modtime, gserver minimap, ghost mode; PLO 49 and 169 are in the two 2.1 test builds; the maps download folder rule is in every Graal 2002 build from ver9 (2.1.0.0) on, read statically in all six (Graal_analysis client-internals/graal2002-save-folders-2026-11-20.md); ver7 and ver8, which send 2.05's token, lack it",
         unknown: &[
             Unknown { area: "binary", what: "this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred" },
             Unknown { area: "token", what: "GNW31101 is binary-read in Graal 2002 ver10, ver13 and v22 (not wire-captured); ver7 to ver9 share GNW03081 with 2.05 and the 2.1 tests. A shared token does not select an exact build's capabilities" },
@@ -937,7 +937,6 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "pli", what: "client send set is carried from 2.05" },
             Unknown { area: "props", what: "player props 43 to 45 and the NPC prop limit 43 are not confirmed for a 2.1 release" },
             Unknown { area: "life", what: "death rule without the name-group test is inferred (the delimiter is not in the 2.1 test binaries)" },
-            Unknown { area: "files", what: "the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule" },
         ],
     },
     // NewWorld beta 2: a side build of 2.1 (its binary is a 2.1 test 3

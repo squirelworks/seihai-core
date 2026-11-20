@@ -1211,21 +1211,21 @@ NewWorld beta 1	scripts	resolve_host	ORIGIN	origin	carried
 2.1	ui	ganis	1.42	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	mannerisms	mannerisms	2.05	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	protocol	sends_language	2.02 rev2	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
-2.1	files	modtime	2.05	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.1	files	modtime	2.05	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	levels	gmap	2.05	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	levels	cached_links	2.05	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	ui	server_in_title	2.05	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	props	bow_prop10	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	props	colors_sent	NewWorld beta 1	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	props	colors_read	NewWorld beta 1	binary	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
-2.1	files	image_ext	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
-2.1	files	download_maps	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.1	files	image_ext	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
+2.1	files	download_maps	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	ui	minimap	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	ui	log_window	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	ui	ghost_mode	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	scripts	gs1	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	scripts	gs2	2.1	inferred	inferred here	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
-2.1	files	large_files	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.1	files	large_files	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	protocol	tampercheck	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	protocol	tamper	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	protocol	showimg (id 24)	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1234,7 +1234,7 @@ NewWorld beta 1	scripts	resolve_host	ORIGIN	origin	carried
 2.1	protocol	client_type	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	protocol	udp_off_by_default	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	props	precise_pos	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
-2.1	files	large_file_size	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.1	files	large_file_size	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	ui	editor	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	protocol	login lobby	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.1	protocol	gen5_round_down	ORIGIN	origin	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1272,7 +1272,7 @@ NewWorld beta 2	ui	server_in_title	2.05	binary	carried
 NewWorld beta 2	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 NewWorld beta 2	props	colors_sent	NewWorld beta 2	binary	read here	
 NewWorld beta 2	props	colors_read	NewWorld beta 2	binary	read here	
-NewWorld beta 2	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+NewWorld beta 2	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 NewWorld beta 2	files	download_maps	NewWorld beta 2	binary	read here	
 NewWorld beta 2	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 NewWorld beta 2	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1326,7 +1326,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 2.12	props	bow_prop10	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.12	props	colors_sent	NewWorld beta 2	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	props	colors_read	NewWorld beta 2	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
-2.12	files	image_ext	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.12	files	image_ext	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.12	files	download_maps	NewWorld beta 2	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary)
 2.12	ui	minimap	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.12	ui	log_window	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.12 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1380,7 +1380,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 2.13	props	bow_prop10	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.13	props	colors_sent	NewWorld beta 2	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	props	colors_read	NewWorld beta 2	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
-2.13	files	image_ext	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.13	files	image_ext	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.13	files	download_maps	NewWorld beta 2	binary	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary)
 2.13	ui	minimap	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.13	ui	log_window	2.1	inferred	carried, no binary	no wire, prop or file change is known; the row is the step before (no 2.13 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1434,7 +1434,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 2.14	props	bow_prop10	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.14	props	colors_sent	NewWorld beta 2	binary	carried, no binary	
 2.14	props	colors_read	NewWorld beta 2	binary	carried, no binary	
-2.14	files	image_ext	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.14	files	image_ext	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.14	files	download_maps	NewWorld beta 2	binary	carried, no binary	
 2.14	ui	minimap	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.14	ui	log_window	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1488,7 +1488,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 2.15	props	bow_prop10	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.15	props	colors_sent	NewWorld beta 2	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	props	colors_read	NewWorld beta 2	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
-2.15	files	image_ext	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.15	files	image_ext	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.15	files	download_maps	NewWorld beta 2	binary	carried, no binary	no change is known; the row is the step before (no 2.15 binary)
 2.15	ui	minimap	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.15	ui	log_window	2.1	inferred	carried, no binary	no change is known; the row is the step before (no 2.15 binary) | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1542,7 +1542,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 2.16	props	bow_prop10	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.16	props	colors_sent	NewWorld beta 2	binary	carried, no binary	
 2.16	props	colors_read	NewWorld beta 2	binary	carried, no binary	
-2.16	files	image_ext	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.16	files	image_ext	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.16	files	download_maps	NewWorld beta 2	binary	carried, no binary	
 2.16	ui	minimap	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.16	ui	log_window	2.1	inferred	carried, no binary	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1596,7 +1596,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 2.17	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.17	props	colors_sent	NewWorld beta 2	binary	carried	
 2.17	props	colors_read	NewWorld beta 2	binary	carried	
-2.17	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.17	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.17	files	download_maps	NewWorld beta 2	binary	carried	
 2.17	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.17	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1650,7 +1650,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 2.22	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.22	props	colors_sent	NewWorld beta 2	binary	carried	
 2.22	props	colors_read	NewWorld beta 2	binary	carried	
-2.22	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.22	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.22	files	download_maps	NewWorld beta 2	binary	carried	
 2.22	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.22	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1704,7 +1704,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 2.3	props	bow_prop10	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.3	props	colors_sent	NewWorld beta 2	binary	carried, no binary	no 2.3 binary; the whole step is the 2.31 values
 2.3	props	colors_read	NewWorld beta 2	binary	carried, no binary	no 2.3 binary; the whole step is the 2.31 values
-2.3	files	image_ext	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.3	files	image_ext	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.3	files	download_maps	NewWorld beta 2	binary	carried, no binary	no 2.3 binary; the whole step is the 2.31 values
 2.3	ui	minimap	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.3	ui	log_window	2.1	inferred	carried, no binary	no 2.3 binary; the whole step is the 2.31 values | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1758,7 +1758,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 2.31	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.31	props	colors_sent	NewWorld beta 2	binary	carried	
 2.31	props	colors_read	NewWorld beta 2	binary	carried	
-2.31	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+2.31	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.31	files	download_maps	NewWorld beta 2	binary	carried	
 2.31	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 2.31	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1812,7 +1812,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 3.04	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 3.04	props	colors_sent	NewWorld beta 2	binary	carried	
 3.04	props	colors_read	NewWorld beta 2	binary	carried	
-3.04	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+3.04	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 3.04	files	download_maps	NewWorld beta 2	binary	carried	
 3.04	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 3.04	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1866,7 +1866,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 3.153	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 3.153	props	colors_sent	NewWorld beta 2	binary	carried	
 3.153	props	colors_read	NewWorld beta 2	binary	carried	
-3.153	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+3.153	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 3.153	files	download_maps	NewWorld beta 2	binary	carried	
 3.153	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 3.153	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1920,7 +1920,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 4.04r2	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.04r2	props	colors_sent	NewWorld beta 2	binary	carried	
 4.04r2	props	colors_read	NewWorld beta 2	binary	carried	
-4.04r2	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.04r2	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.04r2	files	download_maps	NewWorld beta 2	binary	carried	
 4.04r2	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.04r2	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -1974,7 +1974,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 4.04r2 Mac	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.04r2 Mac	props	colors_sent	NewWorld beta 2	binary	carried	
 4.04r2 Mac	props	colors_read	NewWorld beta 2	binary	carried	
-4.04r2 Mac	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.04r2 Mac	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.04r2 Mac	files	download_maps	NewWorld beta 2	binary	carried	
 4.04r2 Mac	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.04r2 Mac	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2028,7 +2028,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 4.20r6	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.20r6	props	colors_sent	NewWorld beta 2	binary	carried	
 4.20r6	props	colors_read	NewWorld beta 2	binary	carried	
-4.20r6	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.20r6	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.20r6	files	download_maps	NewWorld beta 2	binary	carried	
 4.20r6	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.20r6	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2082,7 +2082,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 4.20r8	props	bow_prop10	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.20r8	props	colors_sent	NewWorld beta 2	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 4.20r8	props	colors_read	NewWorld beta 2	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
-4.20r8	files	image_ext	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+4.20r8	files	image_ext	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.20r8	files	download_maps	NewWorld beta 2	binary	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 4.20r8	ui	minimap	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 4.20r8	ui	log_window	2.1	inferred	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2136,7 +2136,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 5.00r7	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.00r7	props	colors_sent	NewWorld beta 2	binary	carried	
 5.00r7	props	colors_read	NewWorld beta 2	binary	carried	
-5.00r7	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.00r7	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.00r7	files	download_maps	NewWorld beta 2	binary	carried	
 5.00r7	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.00r7	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2190,7 +2190,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 5.12	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.12	props	colors_sent	NewWorld beta 2	binary	carried	
 5.12	props	colors_read	NewWorld beta 2	binary	carried	
-5.12	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.12	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.12	files	download_maps	NewWorld beta 2	binary	carried	
 5.12	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.12	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2244,7 +2244,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 5.12 Mac	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.12 Mac	props	colors_sent	NewWorld beta 2	binary	carried	
 5.12 Mac	props	colors_read	NewWorld beta 2	binary	carried	
-5.12 Mac	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.12 Mac	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.12 Mac	files	download_maps	NewWorld beta 2	binary	carried	
 5.12 Mac	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.12 Mac	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2298,7 +2298,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 5.24r4	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.24r4	props	colors_sent	NewWorld beta 2	binary	carried	
 5.24r4	props	colors_read	NewWorld beta 2	binary	carried	
-5.24r4	files	image_ext	2.1	inferred	carried, flagged unknown	stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.24r4	files	image_ext	2.1	inferred	carried, flagged unknown	stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.24r4	files	download_maps	NewWorld beta 2	binary	carried, flagged unknown	stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md
 5.24r4	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.24r4	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2352,7 +2352,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 5.30r3	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.30r3	props	colors_sent	NewWorld beta 2	binary	carried	
 5.30r3	props	colors_read	NewWorld beta 2	binary	carried	
-5.30r3	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.30r3	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.30r3	files	download_maps	NewWorld beta 2	binary	carried	
 5.30r3	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.30r3	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2406,7 +2406,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 5.31r4	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.31r4	props	colors_sent	NewWorld beta 2	binary	carried	
 5.31r4	props	colors_read	NewWorld beta 2	binary	carried	
-5.31r4	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+5.31r4	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.31r4	files	download_maps	NewWorld beta 2	binary	carried	
 5.31r4	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 5.31r4	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2460,7 +2460,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 6.00r2	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.00r2	props	colors_sent	NewWorld beta 2	binary	carried	
 6.00r2	props	colors_read	NewWorld beta 2	binary	carried	
-6.00r2	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.00r2	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.00r2	files	download_maps	NewWorld beta 2	binary	carried	
 6.00r2	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.00r2	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2514,7 +2514,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 6.00r4	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.00r4	props	colors_sent	NewWorld beta 2	binary	carried	
 6.00r4	props	colors_read	NewWorld beta 2	binary	carried	
-6.00r4	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.00r4	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.00r4	files	download_maps	NewWorld beta 2	binary	carried	
 6.00r4	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.00r4	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2568,7 +2568,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 6.015	props	bow_prop10	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.015	props	colors_sent	NewWorld beta 2	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
 6.015	props	colors_read	NewWorld beta 2	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
-6.015	files	image_ext	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.015	files	image_ext	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.015	files	download_maps	NewWorld beta 2	binary	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred
 6.015	ui	minimap	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.015	ui	log_window	2.1	inferred	carried, no binary	no 6.00r7 or 6.01r5 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2622,7 +2622,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 6.034	props	bow_prop10	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.034	props	colors_sent	NewWorld beta 2	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
 6.034	props	colors_read	NewWorld beta 2	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
-6.034	files	image_ext	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.034	files	image_ext	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.034	files	download_maps	NewWorld beta 2	binary	carried, no binary	no 6.03r4 binary; every value of this step is inferred
 6.034	ui	minimap	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.034	ui	log_window	2.1	inferred	carried, no binary	no 6.03r4 binary; every value of this step is inferred | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2676,7 +2676,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 6.03r7	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.03r7	props	colors_sent	NewWorld beta 2	binary	carried	
 6.03r7	props	colors_read	NewWorld beta 2	binary	carried	
-6.03r7	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.03r7	files	image_ext	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.03r7	files	download_maps	NewWorld beta 2	binary	carried	
 6.03r7	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.03r7	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
@@ -2730,7 +2730,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 6.03r7 Linux	props	bow_prop10	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.03r7 Linux	props	colors_sent	NewWorld beta 2	binary	carried	
 6.03r7 Linux	props	colors_read	NewWorld beta 2	binary	carried	
-6.03r7 Linux	files	image_ext	2.1	inferred	carried, flagged unknown	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred | the maps download folder rule (download_maps) is inferred from 2.17.1; 2.05 has no such rule
+6.03r7 Linux	files	image_ext	2.1	inferred	carried, flagged unknown	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for | this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.03r7 Linux	files	download_maps	NewWorld beta 2	binary	carried, flagged unknown	Linux maps font names to files under levels/fonts/ (tempsitc, then trebuc, then courier); Seihai asks for what the Windows build asks for
 6.03r7 Linux	ui	minimap	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
 6.03r7 Linux	ui	log_window	2.1	inferred	carried	this generic 2.1 profile is not pinned to one observed Graal 2002 world build; its profile values remain inferred
