@@ -80,9 +80,11 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
 - [ ] `.code` files for 1.x (#63): core codec shipped in 0.2.10 (#66);
       Seihai client-folder integration and observable guild/registration
       behaviour remain open.
-- [ ] Profile lab checks still open in #7 (5.12 to 5.31r4 ids,
-      `PLI_BADDYHURT` byte order, laying items; walk-update / gmap login
-      bundling leftovers; non-local link first-load warps).
+- [ ] Profile lab checks still open in #7, now #121 (5.12 to 5.31r4 ids;
+      walk-update / gmap login bundling leftovers). Done on a real 2.22
+      (2026-11-20, `documentation/lab/real-222-baddy-lay-warp.md`):
+      `PLI_BADDYHURT` byte order and knockback, laying items, and
+      non-local link first-load warps.
 
 ## Phase 2: polish and release
 
