@@ -623,7 +623,7 @@ Generated; do not edit between the markers.
 - protocol: **gen5_compress_all**: no -> yes
 - unknown (pli): not read; 5.00r7's set is kept
 - unknown (framing): a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
-- source: unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed
+- source: unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed; lab on Windows 10 64-bit (2026-11-20): login line win,"",<md5 of the MAC>,<md5 of the C: serial>,"6.2 9200 ", the product-id field empty
 
 #### 5.12 Mac (`G3D15097`, binary)
 
@@ -642,7 +642,7 @@ Generated; do not edit between the markers.
 - unknown (pli): not read; 5.00r7's set is kept
 - unknown (files): stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md
 - unknown (plo): 109 (probably a file redirect) and 198 (one GINT5) are in the set but not decoded
-- source: unpacked from MoleBox and lab: 97 PLO ids (75, 132, 133, 171 and 193 out, 109 and 198 in), one MSVC exe, short bodies sent uncompressed as 2.22, font=Arial
+- source: unpacked from MoleBox and lab: 97 PLO ids (75, 132, 133, 171 and 193 out, 109 and 198 in), one MSVC exe, short bodies sent uncompressed as 2.22, font=Arial; lab on Windows 10 64-bit (2026-11-20): login line win,"",<md5 of the MAC>,<md5 of the C: serial>,"6.2 9200 ", the product-id field empty
 
 #### 5.30r3 (`G3D26090`, binary, linked 2010-10-18)
 
@@ -655,7 +655,7 @@ Generated; do not edit between the markers.
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - unknown (pli): not read; 5.00r7's set is kept
 - unknown (ui): why it draws no tiles before the warp was not traced in the binary; the lab shows it, and the warp alone brings the tiles back
-- source: unpacked from Themida and lab (clock set back): same PLO set and token as 5.30r3; draws no tiles before the warp
+- source: unpacked from Themida and lab (clock set back): same PLO set and token as 5.30r3; draws no tiles before the warp; lab on Windows 10 64-bit (2026-11-20): login line win,"",<md5 of the MAC>,<md5 of the C: serial>,"6.2 9200 ", the product-id field empty (clock set to 2011-01-20)
 
 #### 6.00r2 (`G3D26090`, binary, linked 2011-06-12)
 

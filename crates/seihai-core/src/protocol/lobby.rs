@@ -18,7 +18,16 @@
 //! and from 5.12 on a fifth field, the quoted Windows version. Seihai reads
 //! none of those machine values: it sends each of the three as `""`, the
 //! value the real 5.00r7 sent for its MAC field under Wine (lab capture,
-//! 2026-10-30). Whether a server accepts all three empty was not tested.
+//! 2026-10-30). Stock GServer-v2 accepts all three empty (lab, 2026-10-31).
+//!
+//! A real 5.12, 5.24r4 and 5.31r4 on 64-bit Windows 10 (lab, 2026-11-20)
+//! sent `win,"",<md5>,<md5>,"6.2 9200 "` to the lobby and again to the game
+//! port after the warp. The product-id field is `""` on any stock 64-bit
+//! Windows: the clients are 32-bit, and the 32-bit registry view of
+//! `CurrentVersion` has no product id. The second field is the MD5 hex of
+//! the six raw MAC bytes and the third the MD5 hex of the `C:\` volume
+//! serial as four little-endian bytes; the three builds sent the same two
+//! values on one machine. An empty field is two quote characters.
 
 /// What a lobby build does at login and before its first server warp.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

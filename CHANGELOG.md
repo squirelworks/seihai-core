@@ -7,6 +7,7 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
+- The 5.12, 5.24r4 and 5.31r4 login line is now read from captures. On 64-bit Windows 10, each build sent `win,"",<md5 of the MAC>,<md5 of the C: serial>,"6.2 9200 "` to the lobby and again after the warp (lab, 2026-11-20; #121). The product-id field is empty on any stock 64-bit Windows, so the `""` Seihai sends matches it. Documented in `protocol::lobby` and in the three steps' sources; Seihai's behaviour is unchanged.
 - NewWorld beta 1 and beta 2 stay one token served as beta 1: a 2026-11-20 lab run found their login streams byte-identical from the same client folder, so nothing tells them apart (#128). Documented in `documentation/connection-capabilities.md`, with a test.
 - GS1 `playeringuild(NAME)` (and the bare `playeringuild`, for the empty name) is true when the guild name from `guildname.code` equals NAME exactly, case included. No file, or one whose halves differ, matches no name (lab, 1.1 and 1.1.9 offline, 2026-11-20; #63). The host fills the new `PlayerView::guild` with the new `graaldes::guild_name`. Breaking: a new field in `PlayerView`.
 
