@@ -17,6 +17,9 @@ jobs:
       - name: No public IPv4 outside the allow-list
         run: python .github/scripts/check_public_ipv4.py
       - name: No lab names, home paths or binary addresses
+        env:
+          LAB_LEAK_DENYLIST: ${{ secrets.LAB_LEAK_DENYLIST }}
+          LAB_LEAK_REQUIRE_DENYLIST: ${{ github.event.pull_request.head.repo.fork != true }}
         run: python .github/scripts/check_lab_leaks.py
 
   test:
