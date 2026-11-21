@@ -205,7 +205,7 @@ const GS2_CORPUS_COMMANDS: &[&str] = &["putbomb", "shoot"];
 
 /// GS1 command names the 3.153 table lacks that real 4.20r8 and 5.12
 /// clients run when a GS2 weapon script calls them, with the GS1 argument
-/// order **\[lab\]** (seihai-core#104, Mirae Windows 10 VM, 2026-11-19):
+/// order **\[lab\]** (seihai-core#104, Windows 10 VM on lab host B, 2026-11-19):
 /// `putexplosion(power, x, y)` and `putexplosion2(power, radius, x, y)`
 /// explode and hurt the player, and send PLI 27; `puthorse(image, x, y)`
 /// puts a horse and sends PLI 7. `putnpc2` is not one: both clients log
