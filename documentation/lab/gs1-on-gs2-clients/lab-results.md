@@ -122,7 +122,7 @@ under Wine, not a compiler one.
 
 ## Pass 3: 2026-11-20 (main `a18093d`, seihai-core#130)
 
-Same tree and method as above, on GwenTea2's Debian lab VM (each run in its
+Same tree and method as above, on lab host A's Debian lab VM (each run in its
 own loopback-only namespace). Compiler: `gs1c` at main `a18093d`. 5.24r4
 logs in through the gs2emu-73 login server; the hud1111 build refuses its
 token (`G3D15010`). 6.03r7 needs the login server's own `pics1.png`, with
