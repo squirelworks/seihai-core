@@ -7,6 +7,8 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
+- Text rendering clips widened shadow, glyph/bold and decoration coordinates before integer narrowing or rule iteration, avoiding overflow at extreme origins while preserving ordinary raster rounding and visible glyph bearings. Synthetic-font regressions reproduce the former X/Y shadow panics, retain visible controls, and cover selected style/alignment extremes, clipped-image translation and a bounded large-glyph path. This does not change public APIs or claim arbitrary font/rasterizer resource safety.
+
 - Own-VM acceptance tests execute authored numeric enums (implicit values, explicit continuation and bare/qualified references) and computed dynamic-member reads/writes in strict and legacy modes. They assert resulting values and unchanged neighboring state, without corpus fixtures, official bytecode equivalence or native-client acceptance; compiler and VM implementations are unchanged.
 
 - The generic 2.1 row's `download_maps` (the `maps` download folder) is no longer an unknown inferred from 2.17.1: Graal_analysis read it statically in every Graal 2002 build from ver9 (2.1.0.0) on, the builds that send `GNW31101`; ver7 and ver8, which send 2.05's token, lack it (Graal_analysis #719). The row's value is unchanged, and the row as a whole stays inferred because it is not pinned to one Graal 2002 build.
