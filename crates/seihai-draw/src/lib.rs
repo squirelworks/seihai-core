@@ -43,6 +43,110 @@ pub struct PixelBuffer {
     pub rgba: Vec<u8>,
 }
 
+#[cfg(test)]
+mod buffer_bounds_tests {
+    use super::PixelBuffer;
+
+    const COLOR: [u8; 4] = [17, 45, 231, 128];
+
+    #[test]
+    fn clipped_outline_handles_large_horizontal_extent() {
+        let mut buffer = PixelBuffer::new(4, 4);
+        buffer.stroke_rect(1, 1, i32::MAX, 2, COLOR);
+        for y in 0..4 {
+            for x in 0..4 {
+                let expected = if x >= 1 && (y == 1 || y == 2) {
+                    COLOR
+                } else {
+                    [0; 4]
+                };
+                assert_eq!(buffer.pixel(x, y), Some(expected), "({x}, {y})");
+            }
+        }
+    }
+
+    #[test]
+    fn clipped_outline_handles_large_vertical_extent() {
+        let mut buffer = PixelBuffer::new(4, 4);
+        buffer.stroke_rect(1, 1, 2, i32::MAX, COLOR);
+        for y in 0..4 {
+            for x in 0..4 {
+                let expected = if y >= 1 && (x == 1 || x == 2) {
+                    COLOR
+                } else {
+                    [0; 4]
+                };
+                assert_eq!(buffer.pixel(x, y), Some(expected), "({x}, {y})");
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod rectangle_geometry_tests {
+    use super::PixelBuffer;
+
+    #[test]
+    fn clipped_rectangles_match_original_pixel_geometry() {
+        let origins = [
+            i32::MIN,
+            i32::MIN + 2,
+            -5,
+            -1,
+            0,
+            1,
+            3,
+            i32::MAX - 1,
+            i32::MAX,
+        ];
+        let extents = [i32::MIN, -1, 0, 1, 2, 5, i32::MAX];
+        let color = [17, 45, 231, 128];
+        for (bw, bh) in [(0, 0), (0, 4), (4, 0), (1, 1), (4, 4), (7, 3)] {
+            for x in origins {
+                for y in origins {
+                    for w in extents {
+                        for h in extents {
+                            for outline in [false, true] {
+                                let mut buffer = PixelBuffer::new(bw, bh);
+                                if outline {
+                                    buffer.stroke_rect(x, y, w, h, color);
+                                } else {
+                                    buffer.fill_rect(x, y, w, h, color);
+                                }
+                                let (left, top) = (i128::from(x), i128::from(y));
+                                let right = left + i128::from(w);
+                                let bottom = top + i128::from(h);
+                                for py in 0..bh {
+                                    for px in 0..bw {
+                                        let (rx, ry) = (i128::from(px), i128::from(py));
+                                        let inside = w > 0
+                                            && h > 0
+                                            && rx >= left
+                                            && rx < right
+                                            && ry >= top
+                                            && ry < bottom;
+                                        let border = rx == left
+                                            || rx == right - 1
+                                            || ry == top
+                                            || ry == bottom - 1;
+                                        let expected = if inside && (!outline || border) {
+                                            color
+                                        } else {
+                                            [0; 4]
+                                        };
+                                        assert_eq!(buffer.pixel(px, py), Some(expected),
+                                            "buffer={bw}x{bh}, rect=({x},{y},{w},{h}), outline={outline}, pixel=({px},{py})");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl PixelBuffer {
     /// A transparent buffer.
     pub fn new(width: u32, height: u32) -> Self {
@@ -65,10 +169,14 @@ impl PixelBuffer {
 
     /// Fill the rectangle `(x, y, w, h)` with `color`, clipped.
     pub fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: [u8; 4]) {
+        let (x, y) = (i64::from(x), i64::from(y));
+        self.fill_bounds(x, y, x + i64::from(w), y + i64::from(h), color);
+    }
+
+    fn fill_bounds(&mut self, x0: i64, y0: i64, x1: i64, y1: i64, color: [u8; 4]) {
         let (bw, bh) = (self.width as i64, self.height as i64);
-        let (x0, y0) = (i64::from(x).max(0), i64::from(y).max(0));
-        let x1 = (i64::from(x) + i64::from(w)).min(bw);
-        let y1 = (i64::from(y) + i64::from(h)).min(bh);
+        let (x0, y0) = (x0.max(0), y0.max(0));
+        let (x1, y1) = (x1.min(bw), y1.min(bh));
         for py in y0..y1 {
             for px in x0..x1 {
                 let i = ((py * bw + px) * 4) as usize;
@@ -82,10 +190,12 @@ impl PixelBuffer {
         if w <= 0 || h <= 0 {
             return;
         }
-        self.fill_rect(x, y, w, 1, color);
-        self.fill_rect(x, y + h - 1, w, 1, color);
-        self.fill_rect(x, y, 1, h, color);
-        self.fill_rect(x + w - 1, y, 1, h, color);
+        let (x, y) = (i64::from(x), i64::from(y));
+        let (right, bottom) = (x + i64::from(w), y + i64::from(h));
+        self.fill_bounds(x, y, right, y + 1, color);
+        self.fill_bounds(x, bottom - 1, right, bottom, color);
+        self.fill_bounds(x, y, x + 1, bottom, color);
+        self.fill_bounds(right - 1, y, right, bottom, color);
     }
 
     /// The pixel at `(x, y)`, or `None` outside the buffer.
