@@ -261,13 +261,22 @@ mod tests {
             0.0
         }
         fn glyph_id(&self, c: char) -> GlyphId {
-            GlyphId(if c == ' ' { 0 } else { 1 })
+            GlyphId(match c {
+                ' ' => 0,
+                'j' => 2,
+                'k' => 3,
+                _ => 1,
+            })
         }
         fn h_advance_unscaled(&self, _: GlyphId) -> f32 {
             10.0
         }
-        fn h_side_bearing_unscaled(&self, _: GlyphId) -> f32 {
-            0.0
+        fn h_side_bearing_unscaled(&self, id: GlyphId) -> f32 {
+            if id.0 == 2 {
+                -8.0
+            } else {
+                0.0
+            }
         }
         fn v_advance_unscaled(&self, _: GlyphId) -> f32 {
             10.0
@@ -282,25 +291,27 @@ mod tests {
             if id.0 == 0 {
                 return None;
             }
-            // 2..8 across, 0..6 up from the baseline.
+            // The j/k boxes have bearings outside the usual advance/ascent box.
+            let (x0, x1) = if id.0 == 2 { (-8.0, -2.0) } else { (2.0, 8.0) };
+            let (y0, y1) = if id.0 == 3 { (18.0, 24.0) } else { (0.0, 6.0) };
             let p = |x, y| point(x, y);
             let line = OutlineCurve::Line;
             Some(Outline {
                 // As the TrueType reader gives it: min is the top-left.
                 bounds: Rect {
-                    min: p(2.0, 6.0),
-                    max: p(8.0, 0.0),
+                    min: p(x0, y1),
+                    max: p(x1, y0),
                 },
                 curves: vec![
-                    line(p(2.0, 0.0), p(8.0, 0.0)),
-                    line(p(8.0, 0.0), p(8.0, 6.0)),
-                    line(p(8.0, 6.0), p(2.0, 6.0)),
-                    line(p(2.0, 6.0), p(2.0, 0.0)),
+                    line(p(x0, y0), p(x1, y0)),
+                    line(p(x1, y0), p(x1, y1)),
+                    line(p(x1, y1), p(x0, y1)),
+                    line(p(x0, y1), p(x0, y0)),
                 ],
             })
         }
         fn glyph_count(&self) -> usize {
-            2
+            4
         }
         fn codepoint_ids(&self) -> ab_glyph::CodepointIdIter<'_> {
             unimplemented!()
@@ -377,5 +388,55 @@ mod tests {
         };
         draw_text(&mut buf, &Boxes, "a", 0, 0, &bold);
         assert!(red(&buf, 8, 5), "one pixel wider");
+    }
+    #[test]
+    fn shaded_text_at_max_x_is_clipped_without_overflow() {
+        let mut buf = PixelBuffer::new(32, 16);
+        let shaded = TextStyle {
+            shaded: true,
+            ..style()
+        };
+        assert_eq!(
+            draw_text(&mut buf, &Boxes, "a", i32::MAX, 0, &shaded),
+            (11, 11)
+        );
+        assert!(buf.rgba.iter().all(|&v| v == 0));
+    }
+
+    #[test]
+    fn shaded_text_at_max_y_is_clipped_without_overflow() {
+        let mut buf = PixelBuffer::new(32, 16);
+        let shaded = TextStyle {
+            shaded: true,
+            ..style()
+        };
+        assert_eq!(
+            draw_text(&mut buf, &Boxes, "a", 0, i32::MAX, &shaded),
+            (11, 11)
+        );
+        assert!(buf.rgba.iter().all(|&v| v == 0));
+    }
+
+    #[test]
+    fn visible_shaded_text_keeps_foreground_and_offset_shadow() {
+        let mut buf = PixelBuffer::new(20, 16);
+        let shaded = TextStyle {
+            shaded: true,
+            ..style()
+        };
+        assert_eq!(draw_text(&mut buf, &Boxes, "a", 0, 0, &shaded), (11, 11));
+        assert!(red(&buf, 7, 7));
+        assert_eq!(buf.pixel(8, 7), Some([0, 0, 0, 255]));
+        assert_eq!(buf.pixel(0, 0), Some([0, 0, 0, 0]));
+    }
+
+    #[test]
+    fn glyph_bearings_can_reach_the_frame_from_an_offscreen_origin() {
+        let mut left = PixelBuffer::new(4, 12);
+        draw_text(&mut left, &Boxes, "j", 6, 0, &style());
+        assert!(red(&left, 1, 3), "negative left bearing reaches the frame");
+        let mut above = PixelBuffer::new(12, 8);
+        draw_text(&mut above, &Boxes, "k", 0, 16, &style());
+        assert!(red(&above, 3, 3), "upper bearing reaches the frame");
     }
 }
