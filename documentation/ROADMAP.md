@@ -1,10 +1,18 @@
 # seihai-core roadmap
 
-Working mirror of [issue #7](https://github.com/squirelworks/seihai-core/issues/7).
-The suite-wide plan is squirelworks/seihai#353. This page groups that work
-into three phases so "finished" has a clear meaning for this crate.
-Last checked 2026-11-19 against `main` at `eb1a732` (after #107), plus
-the 0.6.1 work. Tags are cut with the owner's go-ahead.
+The active release criteria are [0.8.0 (#123)](https://github.com/squirelworks/seihai-core/issues/123)
+and [1.0.0 (#109)](https://github.com/squirelworks/seihai-core/issues/109).
+[Issue #7](https://github.com/squirelworks/seihai-core/issues/7) is the historical
+roadmap they superseded. The suite-wide plan is squirelworks/seihai#353.
+This page groups that work into three phases so "finished" has a clear
+meaning for this crate.
+
+Own-code acceptance was reconciled 2026-11-22 against `main` at
+`9910fcd5c05320bb72acce89e0c58b5be3b497be`. Other sections retain their
+earlier dated context: the full-page check on 2026-11-19 at `eb1a732`
+(after #107), the 0.6.1 work, and any later dates already noted below.
+This is not a new audit of every profile, consumer or native lab result.
+Tags are cut with the owner's go-ahead.
 
 ## Where it stands
 
@@ -27,18 +35,61 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
 - [x] One seihai-core in every lock file, and gserver's temporary Cargo
       patch removed (#79).
 - [x] No public addresses in source, tests or docs, with a CI check (#81).
-- [ ] GS1 to GS2 lowering, the remaining slices (#6): unnamed-event
-      wrapper coverage, residual unsupported forms, and
-      original-client/control acceptance. Named-event structured-lift
-      ordering is already fixed (#71–#73). Synthetic regressions are not
-      native all-version parity. Gap triage by corpus fail hits is #93
-      (`documentation/gs1-to-gs2-gaps.md`); `setbody`, plain `addstring`,
-      `savelog2`, and engine-removed omits (`setbackpal`, `putobject`) now
-      lower; `putbomb` and `shoot` call through by name, as real GS2
-      weapons do (0.5.1) — from 0.6.2 `putexplosion(2)` and `puthorse`
-      call through too (lab #104: real 4.20r8 and 5.12 run them);
-      `putnpc2` stays `Missing` (those clients refuse it) and `putnpc` is
-      untested.
+- [x] GS1 to GS2 lowering's code-side scope
+      ([#6](https://github.com/squirelworks/seihai-core/issues/6), completed
+      2026-11-20): accepted forms compile and unsupported forms retain
+      named refusals. Named-event structured-lift ordering is fixed
+      (#71–#73). The selective event wrappers from
+      [#130](https://github.com/squirelworks/seihai-core/issues/130) are
+      intentional: only events the script tests get wrappers, rather
+      than adding wrappers for unnamed events.
+- [ ] Original-client/current-main control acceptance remains separate.
+      Synthetic regressions and the own-VM controls below do not establish
+      native all-version parity. Deliberate refusals, including flag reads
+      inside GS1 `with` and unsupported flag-write namespaces, stay
+      refused; this reconciliation does not request their implementation.
+      The earlier command triage is #93
+      (`documentation/gs1-to-gs2-gaps.md`): `setbody`, plain `addstring`,
+      `savelog2`, and engine-removed omits (`setbackpal`, `putobject`)
+      lower; `putbomb` and `shoot` call through by name (0.5.1), and from
+      0.6.2 `putexplosion(2)` and `puthorse` call through too (lab #104:
+      real 4.20r8 and 5.12 run them). `putnpc2` stays `Missing` and
+      `putnpc` is untested in that earlier context.
+- [x] Authored GS2 source-to-own-VM value controls
+      ([#141](https://github.com/squirelworks/seihai-core/pull/141),
+      [#143](https://github.com/squirelworks/seihai-core/pull/143)):
+      numeric enums and computed member reads/writes run in strict and
+      legacy modes; text enums retain strict rejection and the legacy
+      warning/value contract. Computed calls to the script's own methods
+      assert argument binding, once-only evaluation and the current own
+      generator's order. These are not generic/external method semantics
+      or an official evaluation-order result. Tests:
+      [`gs2_value_acceptance.rs`](../crates/seihai-core/tests/gs2_value_acceptance.rs).
+- [x] Authored GS1 value/effect controls through
+      `compile_gs1(Era::V217)`, `Machine` and production `EffectHost`
+      ([#145](https://github.com/squirelworks/seihai-core/pull/145),
+      [#146](https://github.com/squirelworks/seihai-core/pull/146)):
+      selective `with(player)` preserves explicitly seeded NPC state
+      and restores context with the exact expected host-effect order;
+      finite indexed-array loops assert every element, visits, sum and
+      final counter with no host effects. This does not add general-with,
+      colon-foreach, escaping break/continue or native acceptance. Tests:
+      [`gs1_lowering_acceptance.rs`](../crates/seihai-core/tests/gs1_lowering_acceptance.rs).
+- [x] Selected renderer coordinate repairs
+      ([#142](https://github.com/squirelworks/seihai-core/pull/142),
+      [#144](https://github.com/squirelworks/seihai-core/pull/144)):
+      text shadow/glyph/bold/decoration coordinates and rectangle-outline
+      edges are widened and clipped before narrowing or iteration.
+      Synthetic-font and independent visible-pixel controls preserve
+      glyph bearings, ordinary raster rounding and original rectangle
+      borders. These assume valid allocated buffers and the tested finite
+      font/style inputs; arbitrary allocation/font-resource safety and
+      historical fidelity are not established.
+
+The merged heads for these own-code controls and repairs passed Linux
+and Windows CI. They do not establish macOS compilation/runtime, official
+bytecode equivalence, native-client acceptance or completion of the broad
+compiler/VM criteria. The remaining native/host coverage boxes stay open.
 - [ ] GS2 VM coverage for the Mac 4.04r2 and 5.12 VMs and the 7.x client
       (`documentation/gs2-vm-versions.md`). The 7.x opcode set is now
       read (Graal_analysis `protocol/gs2-opcode-table.md`, PR #630):
@@ -49,11 +100,12 @@ protocol, assets, GS1 and GS2 layers cover the builds those consumers play.
       it; and the Linux x64 6.x VMs also run 0 and a Linux-only 164,
       which the compiler never needs to emit. Of the Delteria features
       below, only `waitfor` needs more than the 4.03r3 opcode set.
-- [ ] GS2 seen in the 2019 Delteria backup (Graal_analysis PR #625,
-      counts in its note) that compiles but does not run yet. The
-      compiler takes every feature the note counts; mixed GS1/GS2 NPCs
-      and layers 1/2 are covered by `tests/mixed_npcs.rs` (0.5.0). Still
-      open:
+- [ ] Remaining runtime/host acceptance for GS2 seen in the 2019
+      Delteria backup (Graal_analysis PR #625, counts in its note).
+      The compiler takes every feature the note counts; mixed GS1/GS2 NPCs
+      and layers 1/2 are covered by `tests/mixed_npcs.rs` (0.5.0).
+      The authored own-VM controls above do not establish execution of
+      that backup. Earlier completions and remaining host boundaries:
       - ~~`new Type(…) { … }` blocks and `new TStaticVar()`~~ run from
         0.6.1: objects live under the global object by name, `with`
         reaches them, `Machine::objects` lists them. Drawing the GUI
