@@ -7,6 +7,8 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
+- Own-VM value acceptance now covers strict rejection and legacy warning/value behavior for text-valued enums, including numeric continuation and bare/qualified names, plus computed calls to the script's own methods with named-call, argument-binding and evaluation-order controls. These authored programs do not establish external/native method semantics or official evaluation order; compiler and VM implementations are unchanged.
+
 - Text rendering clips widened shadow, glyph/bold and decoration coordinates before integer narrowing or rule iteration, avoiding overflow at extreme origins while preserving ordinary raster rounding and visible glyph bearings. Synthetic-font regressions reproduce the former X/Y shadow panics, retain visible controls, and cover selected style/alignment extremes, clipped-image translation and a bounded large-glyph path. This does not change public APIs or claim arbitrary font/rasterizer resource safety.
 
 - Own-VM acceptance tests execute authored numeric enums (implicit values, explicit continuation and bare/qualified references) and computed dynamic-member reads/writes in strict and legacy modes. They assert resulting values and unchanged neighboring state, without corpus fixtures, official bytecode equivalence or native-client acceptance; compiler and VM implementations are unchanged.
