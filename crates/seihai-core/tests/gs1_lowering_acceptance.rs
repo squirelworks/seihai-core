@@ -1,12 +1,12 @@
 //! seihai-core#6: acceptance tests for the GS1 lowering of flags, `this.`
 //! and `client.` variables, the timer, and the player-property commands.
 //!
-//! Each GS1 script is compiled next to the GS2 a scripter would write for
-//! it, and the two must give the same bytes. Where the GS2 spelling is
+//! Byte-comparison controls compile GS1 next to the GS2 a scripter would
+//! write and require the same bytes. Where the GS2 spelling is
 //! fixture-checked (`tests/fixtures/gs2`), the test says which fixture;
 //! the rest are Seihai's reading of GS2 and say so. Then the bytecode is
 //! run on Seihai's GS2 machine to see it do what the GS1 did. No original
-//! client is involved.
+//! client is involved. Value/effect-only controls use GS1 compilation directly.
 
 use seihai_core::scripting::engine::{Effect, Era, Val};
 use seihai_core::scripting::gs2::compile::{
@@ -276,5 +276,52 @@ fn a_count_alone_marks_the_function_as_calling() {
     same(
         "if (created) { setcharprop #n,bob; }\n",
         "function onCreated() { this.nick = \"bob\"; }\n",
+    );
+}
+
+#[test]
+fn with_player_preserves_npc_variables_and_restores_effect_context() {
+    // This uses the GS1 front end and production EffectHost, not legacy
+    // GS2 compilation or an invented target/host. It covers one accepted
+    // selective-with shape; existing refusal boundaries remain separate.
+    // Seed the NPC explicitly: a newly written bare name outside with
+    // otherwise follows the own VM resolver's global fallback.
+    let (machine, host) = created(gs1(r#"
+        if (created) {
+            this.n = 3;
+            x = 2;
+            with (player) {
+                x = 12;
+                n += x;
+            }
+            this.after = n;
+            x = 7;
+        }
+        "#));
+    assert!(host.log.is_empty(), "{:?}", host.log);
+    assert_eq!(machine.var(Root::This, "n"), Some(&Val::Num(15.0)));
+    assert_eq!(machine.var(Root::This, "after"), Some(&Val::Num(15.0)));
+    assert_eq!(machine.var(Root::Player, "n"), None);
+    assert_eq!(machine.var(Root::Global, "n"), None);
+    assert_eq!(host.player.x, 12.0);
+    assert_eq!(host.x, 7.0);
+    assert_eq!(
+        host.effects,
+        [
+            Effect::SetPos {
+                obj: 3,
+                x: 2.0,
+                y: 0.0
+            },
+            Effect::SetPlayerVar {
+                name: "playerx".into(),
+                value: 12.0
+            },
+            Effect::SetPos {
+                obj: 3,
+                x: 7.0,
+                y: 0.0
+            },
+        ]
     );
 }
