@@ -47,7 +47,8 @@ pub fn draw_sprite(
 /// a `SINGLEDIRECTION` gani uses its one row for every direction. Placements
 /// are drawn in order and a later one replaces an earlier one. The frame
 /// index wraps, as [`Gani::frame`] does. `(dx, dy)` is where the gani's
-/// origin sits on `dst`.
+/// origin sits on `dst`. Translation is widened before clipping, so an
+/// offscreen placement cannot wrap into the destination.
 pub fn draw_gani_frame(
     dst: &mut PixelBuffer,
     gani: &Gani,
@@ -80,12 +81,15 @@ pub fn draw_gani_frame(
         if sprite.x < 0 || sprite.y < 0 || sprite.w <= 0 || sprite.h <= 0 {
             continue;
         }
-        draw_sprite(
+        blit(
             dst,
             image,
             (sprite.x, sprite.y, sprite.w, sprite.h),
-            dx + place.x,
-            dy + place.y,
+            (
+                i64::from(dx) + i64::from(place.x),
+                i64::from(dy) + i64::from(place.y),
+            ),
+            CopyMode::Sprite,
         );
     }
 }

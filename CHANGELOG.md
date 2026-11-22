@@ -7,6 +7,8 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
+- GANI frame drawing widens origin and placement translations before clipping, avoiding coordinate overflow while retaining visible sprite placement, transparency and replacement behavior. Public APIs and dependencies are unchanged.
+
 - Own-player position updates now apply precise X2 and Y2 coordinates when the receiver profile accepts them, retaining the other axis when an update supplies only one.
 
 - An authored GS1 indexed-array loop control now executes through the real GS1 front end and Machine with production EffectHost, checking every square element, visit count, sum and final counter with no host effects. Existing GS1 engine and array-literal coverage remain separate; this adds finite index-loop own-VM acceptance, not colon-foreach or native behavior.
