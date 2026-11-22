@@ -345,7 +345,7 @@ fn indexed_array_loops_execute_through_the_gs1_front_end() {
         "#));
     let expected: Vec<_> = [0.0, 1.0, 4.0, 9.0, 16.0]
         .into_iter()
-        .map(|n| seihai_core::scripting::gs2::exec::Value::from(Val::Num(n)))
+        .map(|n| seihai_core::scripting::gs2::lists::Value::from(Val::Num(n)))
         .collect();
     assert_eq!(
         machine.list(Root::This, "squares"),
