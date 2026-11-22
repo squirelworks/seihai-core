@@ -7,6 +7,8 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
+- Own-VM acceptance tests execute authored numeric enums (implicit values, explicit continuation and bare/qualified references) and computed dynamic-member reads/writes in strict and legacy modes. They assert resulting values and unchanged neighboring state, without corpus fixtures, official bytecode equivalence or native-client acceptance; compiler and VM implementations are unchanged.
+
 - The generic 2.1 row's `download_maps` (the `maps` download folder) is no longer an unknown inferred from 2.17.1: Graal_analysis read it statically in every Graal 2002 build from ver9 (2.1.0.0) on, the builds that send `GNW31101`; ver7 and ver8, which send 2.05's token, lack it (Graal_analysis #719). The row's value is unchanged, and the row as a whole stays inferred because it is not pinned to one Graal 2002 build.
 - GS2 `mousex` and `mousey` read the last click, in level tiles, from the new `EffectHost::mouse`. The real 6.03r7 gives `onMouseDown` only the button as `params[0]` (`"left"`, `"right"`) and keeps the position in those globals (squirelworks/seihai#497 lab, 2026-11-20; #136). Breaking: a new field in `EffectHost`.
 - The 5.12, 5.24r4 and 5.31r4 login line is now read from captures. On 64-bit Windows 10, each build sent `win,"",<md5 of the MAC>,<md5 of the C: serial>,"6.2 9200 "` to the lobby and again after the warp (lab, 2026-11-20; #121). The product-id field is empty on any stock 64-bit Windows, so the `""` Seihai sends matches it. Documented in `protocol::lobby` and in the three steps' sources; Seihai's behaviour is unchanged.
