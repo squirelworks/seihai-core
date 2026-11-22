@@ -119,15 +119,15 @@ pub fn measure_text<F: Font>(font: &F, text: &str, style: &TextStyle) -> (u32, u
     )
 }
 
-fn blend(dst: &mut PixelBuffer, x: i32, y: i32, color: [u8; 4], coverage: f32) {
-    if x < 0 || y < 0 || x as u32 >= dst.width || y as u32 >= dst.height {
+fn blend(dst: &mut PixelBuffer, x: f64, y: f64, color: [u8; 4], coverage: f32) {
+    if !(x >= 0.0 && y >= 0.0 && x < f64::from(dst.width) && y < f64::from(dst.height)) {
         return;
     }
     let a = coverage.clamp(0.0, 1.0) * f32::from(color[3]) / 255.0;
     if a <= 0.0 {
         return;
     }
-    let i = ((y as u32 * dst.width + x as u32) * 4) as usize;
+    let i = (y as usize * dst.width as usize + x as usize) * 4;
     let px = &mut dst.rgba[i..i + 4];
     let da = f32::from(px[3]) / 255.0;
     let out_a = a + da * (1.0 - a);
@@ -156,9 +156,17 @@ pub fn draw_text<F: Font>(
             color: [0, 0, 0, style.color[3]],
             ..*style
         };
-        paint(dst, font, text, x + 1, y + 1, &shadow, size.0);
+        paint(
+            dst,
+            font,
+            text,
+            i64::from(x) + 1,
+            i64::from(y) + 1,
+            &shadow,
+            size.0,
+        );
     }
-    paint(dst, font, text, x, y, style, size.0);
+    paint(dst, font, text, i64::from(x), i64::from(y), style, size.0);
     size
 }
 
@@ -166,8 +174,8 @@ fn paint<F: Font>(
     dst: &mut PixelBuffer,
     font: &F,
     text: &str,
-    x: i32,
-    y: i32,
+    x: i64,
+    y: i64,
     style: &TextStyle,
     box_w: u32,
 ) {
@@ -203,26 +211,30 @@ fn paint<F: Font>(
             let b = outline.px_bounds();
             outline.draw(|gx, gy, cov| {
                 let py = b.min.y + gy as f32;
-                let shear = ((baseline - py) * lean).round() as i32;
+                let shear = ((baseline - py) * lean).round();
                 for dx in passes {
                     blend(
                         dst,
-                        b.min.x as i32 + gx as i32 + shear + dx,
-                        py as i32,
+                        f64::from(b.min.x.trunc())
+                            + f64::from(gx)
+                            + f64::from(shear)
+                            + f64::from(*dx),
+                        f64::from(py.trunc()),
                         style.color,
                         cov,
                     );
                 }
             });
         }
-        let thick = (style.size / 14.0).round().max(1.0) as i32;
-        let x0 = left.round() as i32;
-        let x1 = (left + w).round() as i32 + i32::from(u8::from(style.bold));
+        let thick = f64::from((style.size / 14.0).round().max(1.0));
+        let x0 = f64::from(left.round());
+        let x1 = f64::from((left + w).round()) + f64::from(u8::from(style.bold));
+        let columns = clipped_rule_range(x0, x1, dst.width);
         let mut rule = |at: f32| {
-            let ry = at.round() as i32;
-            for yy in ry..ry + thick {
-                for xx in x0..x1 {
-                    blend(dst, xx, yy, style.color, 1.0);
+            let ry = f64::from(at.round());
+            for yy in clipped_rule_range(ry, ry + thick, dst.height) {
+                for xx in columns.clone() {
+                    blend(dst, f64::from(xx), f64::from(yy), style.color, 1.0);
                 }
             }
         };
@@ -233,6 +245,19 @@ fn paint<F: Font>(
             rule(baseline - ascent * 0.35);
         }
     }
+}
+
+// Layout/rasterizer coordinates keep their existing f32 rounding. Widen
+// their integral results before offsets, then clip before narrowing or
+// iterating. This avoids origin-only culling that would discard bearings.
+fn clipped_rule_range(start: f64, end: f64, limit: u32) -> std::ops::Range<u32> {
+    if start.is_nan() || end.is_nan() || start >= end {
+        return 0..0;
+    }
+    let upper = f64::from(limit);
+    let start = start.max(0.0).min(upper) as u32;
+    let end = end.max(0.0).min(upper) as u32;
+    start..end
 }
 
 #[cfg(test)]
@@ -438,5 +463,83 @@ mod tests {
         let mut above = PixelBuffer::new(12, 8);
         draw_text(&mut above, &Boxes, "k", 0, 16, &style());
         assert!(red(&above, 3, 3), "upper bearing reaches the frame");
+    }
+    #[test]
+    fn selected_extreme_origins_are_clipped_for_all_text_styles() {
+        for align in [Align::Left, Align::Center, Align::Right] {
+            for bits in 0..32 {
+                let style = TextStyle {
+                    bold: bits & 1 != 0,
+                    italic: bits & 2 != 0,
+                    underline: bits & 4 != 0,
+                    strikeout: bits & 8 != 0,
+                    shaded: bits & 16 != 0,
+                    align,
+                    wrap: Some(24),
+                    ..style()
+                };
+                for (x, y) in [
+                    (i32::MAX, 0),
+                    (0, i32::MAX),
+                    (i32::MIN, 0),
+                    (0, i32::MIN),
+                    (i32::MAX, i32::MAX),
+                    (i32::MIN, i32::MIN),
+                ] {
+                    let mut buf = PixelBuffer::new(32, 16);
+                    let measured = measure_text(&Boxes, "a a", &style);
+                    assert_eq!(draw_text(&mut buf, &Boxes, "a a", x, y, &style), measured);
+                    assert!(buf.rgba.iter().all(|&v| v == 0), "{bits} {align:?} {x},{y}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn clipped_styled_text_matches_a_crop_of_visible_text() {
+        for align in [Align::Left, Align::Center, Align::Right] {
+            let style = TextStyle {
+                bold: true,
+                italic: true,
+                underline: true,
+                strikeout: true,
+                shaded: true,
+                align,
+                wrap: Some(24),
+                ..style()
+            };
+            let mut clipped = PixelBuffer::new(20, 16);
+            let mut visible = PixelBuffer::new(52, 48);
+            draw_text(&mut clipped, &Boxes, "ja k", -4, -3, &style);
+            draw_text(&mut visible, &Boxes, "ja k", 12, 13, &style);
+            for y in 0..clipped.height {
+                for x in 0..clipped.width {
+                    assert_eq!(
+                        clipped.pixel(x, y),
+                        visible.pixel(x + 16, y + 16),
+                        "{align:?} {x},{y}"
+                    );
+                }
+            }
+        }
+    }
+    #[test]
+    fn large_finite_glyph_at_max_x_stays_offscreen() {
+        let large = TextStyle {
+            size: 1024.0,
+            ..style()
+        };
+        let mut visible = PixelBuffer::new(32, 16);
+        draw_text(&mut visible, &Boxes, "a", -200, -200, &large);
+        assert!(
+            red(&visible, 10, 10),
+            "the finite glyph has actual coverage"
+        );
+        let mut clipped = PixelBuffer::new(32, 16);
+        assert_eq!(
+            draw_text(&mut clipped, &Boxes, "a", i32::MAX, 0, &large),
+            measure_text(&Boxes, "a", &large)
+        );
+        assert!(clipped.rgba.iter().all(|&v| v == 0));
     }
 }
