@@ -3157,6 +3157,74 @@ mod tests {
     }
 
     #[test]
+    fn own_precise_positions_apply_after_the_servers_classic_fallback() {
+        let version = ClientVersion::V231;
+        let own = &version.profile().props.own;
+        assert!(own.contains(78) && own.contains(79));
+        // PLO_PLAYERPROPS in server order: X 10, Y 0, X2 10.3125,
+        // Y2 -0.3125, and alignment 56. Signed GSHORTs are 330 and 11.
+        let props = [
+            15 + 0x20,
+            52,
+            16 + 0x20,
+            32,
+            78 + 0x20,
+            34,
+            106,
+            79 + 0x20,
+            32,
+            43,
+            32 + 0x20,
+            56 + 0x20,
+        ];
+        let parsed = parse_player_props_sized(&props, false, 5, Some(own));
+        assert_eq!(
+            parsed.iter().map(|p| p.id).collect::<Vec<_>>(),
+            [15, 16, 78, 79, 32]
+        );
+
+        let mut st = SessionState::for_version(version);
+        st.apply_body(&[&[9 + 0x20][..], &props, b"\n"].concat());
+        assert_eq!(st.own_alignment, Some(56));
+        assert_eq!(st.player_x.zip(st.player_y), Some((10.3125, -0.3125)));
+    }
+
+    #[test]
+    fn own_precise_only_position_keeps_the_axis_the_server_omits() {
+        let mut st = SessionState::for_version(ClientVersion::V231);
+        st.apply_body(&[9 + 0x20, 15 + 0x20, 46, 16 + 0x20, 50, b'\n']);
+        assert_eq!(st.player_x.zip(st.player_y), Some((7.0, 9.0)));
+
+        // X2 alone. Signed GSHORT 35 is -1.0625 tiles.
+        st.apply_body(&[9 + 0x20, 78 + 0x20, 32, 67, b'\n']);
+        assert_eq!(st.player_x.zip(st.player_y), Some((-1.0625, 9.0)));
+    }
+
+    #[test]
+    fn own_classic_position_remains_gated_by_the_receiver_profile() {
+        let version = ClientVersion::V222;
+        let own = &version.profile().props.own;
+        assert!(!own.contains(78) && !own.contains(79));
+
+        let mut st = SessionState::for_version(version);
+        st.apply_body(&[
+            9 + 0x20,
+            15 + 0x20,
+            53,
+            16 + 0x20,
+            51,
+            78 + 0x20,
+            34,
+            106,
+            79 + 0x20,
+            32,
+            43,
+            b'\n',
+        ]);
+        assert_eq!(st.player_x.zip(st.player_y), Some((10.5, 9.5)));
+    }
+
+    #[test]
     fn own_nickname_from_player_props() {
         let mut st = SessionState::default();
         st.apply_body(b") 'default\n");
