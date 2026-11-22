@@ -7,6 +7,8 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
+- Own-player position updates now apply precise X2 and Y2 coordinates when the receiver profile accepts them, retaining the other axis when an update supplies only one.
+
 - An authored GS1 indexed-array loop control now executes through the real GS1 front end and Machine with production EffectHost, checking every square element, visit count, sum and final counter with no host effects. Existing GS1 engine and array-literal coverage remain separate; this adds finite index-loop own-VM acceptance, not colon-foreach or native behavior.
 
 - A focused authored GS1 `with(player)` execution control now uses the real GS1 front end and production EffectHost to assert an explicitly seeded NPC variable is preserved, player coordinates are updated, and NPC context and exact host-effect order are restored after the block. Existing selective-with refusal boundaries are unchanged; this is own-VM acceptance, not native behavior or general-with completeness.

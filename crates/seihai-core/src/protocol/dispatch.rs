@@ -573,7 +573,7 @@ pub struct SessionState {
     pub items: Vec<ServerItem>,
     pub warps: Vec<String>,
     pub player_props: Vec<u8>,
-    /// Player position extracted from `PLO_PLAYERPROPS` (classic scale).
+    /// Player position in tiles extracted from `PLO_PLAYERPROPS`.
     pub player_x: Option<f32>,
     pub player_y: Option<f32>,
     pub player_dir: Option<u8>,
@@ -987,7 +987,7 @@ impl SessionState {
                 }
             }
             9 => {
-                // PLO_PLAYERPROPS — extract classic position if present.
+                // PLO_PLAYERPROPS — extract position if present.
                 // The props are merged by id: a later message with one prop
                 // (stock beta4 ends the level frame with `Z` alone) must not
                 // drop the head, colours, status and images of the first.
@@ -2001,7 +2001,8 @@ impl SessionState {
 
     /// Pick position and direction out of a `PLO_PLAYERPROPS` stream.
     ///
-    /// X/Y are props 15/16 (GCHAR, half-tiles); direction is SPRITE
+    /// X/Y are props 15/16 (GCHAR, half-tiles) and X2/Y2 are props 78/79
+    /// (GSHORT, sixteenths of a tile); direction is SPRITE
     /// (17) mod 4.
     fn apply_player_props(&mut self, payload: &[u8]) {
         for prop in parse_player_props_sized(
@@ -2013,6 +2014,12 @@ impl SessionState {
             match (prop.id, prop.gchar()) {
                 (15, Some(v)) => self.player_x = Some(v as f32 / 2.0),
                 (16, Some(v)) => self.player_y = Some(v as f32 / 2.0),
+                (78, _) => {
+                    self.player_x = read_gshort(&prop.raw).map(super::props::decode_pos_precise);
+                }
+                (79, _) => {
+                    self.player_y = read_gshort(&prop.raw).map(super::props::decode_pos_precise);
+                }
                 (17, Some(v)) => self.player_dir = Some(v % 4),
                 // The server moves the player's cell (GMAPLEVELX/Y).
                 (43, Some(v)) => {
