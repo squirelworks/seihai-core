@@ -573,7 +573,7 @@ pub struct SessionState {
     pub items: Vec<ServerItem>,
     pub warps: Vec<String>,
     pub player_props: Vec<u8>,
-    /// Player position extracted from `PLO_PLAYERPROPS` (classic scale).
+    /// Player position in tiles extracted from `PLO_PLAYERPROPS`.
     pub player_x: Option<f32>,
     pub player_y: Option<f32>,
     pub player_dir: Option<u8>,
@@ -987,7 +987,7 @@ impl SessionState {
                 }
             }
             9 => {
-                // PLO_PLAYERPROPS — extract classic position if present.
+                // PLO_PLAYERPROPS — extract position if present.
                 // The props are merged by id: a later message with one prop
                 // (stock beta4 ends the level frame with `Z` alone) must not
                 // drop the head, colours, status and images of the first.
@@ -2001,7 +2001,8 @@ impl SessionState {
 
     /// Pick position and direction out of a `PLO_PLAYERPROPS` stream.
     ///
-    /// X/Y are props 15/16 (GCHAR, half-tiles); direction is SPRITE
+    /// X/Y are props 15/16 (GCHAR, half-tiles) and X2/Y2 are props 78/79
+    /// (GSHORT, sixteenths of a tile); direction is SPRITE
     /// (17) mod 4.
     fn apply_player_props(&mut self, payload: &[u8]) {
         for prop in parse_player_props_sized(
@@ -2013,6 +2014,12 @@ impl SessionState {
             match (prop.id, prop.gchar()) {
                 (15, Some(v)) => self.player_x = Some(v as f32 / 2.0),
                 (16, Some(v)) => self.player_y = Some(v as f32 / 2.0),
+                (78, _) => {
+                    self.player_x = read_gshort(&prop.raw).map(super::props::decode_pos_precise);
+                }
+                (79, _) => {
+                    self.player_y = read_gshort(&prop.raw).map(super::props::decode_pos_precise);
+                }
                 (17, Some(v)) => self.player_dir = Some(v % 4),
                 // The server moves the player's cell (GMAPLEVELX/Y).
                 (43, Some(v)) => {
@@ -3154,6 +3161,74 @@ mod tests {
         // PCONNECTED (51) with no value: gone.
         st.apply_body(&other(200, &[51 + 0x20]));
         assert!(st.others.is_empty());
+    }
+
+    #[test]
+    fn own_precise_positions_apply_after_the_servers_classic_fallback() {
+        let version = ClientVersion::V231;
+        let own = &version.profile().props.own;
+        assert!(own.contains(78) && own.contains(79));
+        // PLO_PLAYERPROPS in server order: X 10, Y 0, X2 10.3125,
+        // Y2 -0.3125, and alignment 56. Signed GSHORTs are 330 and 11.
+        let props = [
+            15 + 0x20,
+            52,
+            16 + 0x20,
+            32,
+            78 + 0x20,
+            34,
+            106,
+            79 + 0x20,
+            32,
+            43,
+            32 + 0x20,
+            56 + 0x20,
+        ];
+        let parsed = parse_player_props_sized(&props, false, 5, Some(own));
+        assert_eq!(
+            parsed.iter().map(|p| p.id).collect::<Vec<_>>(),
+            [15, 16, 78, 79, 32]
+        );
+
+        let mut st = SessionState::for_version(version);
+        st.apply_body(&[&[9 + 0x20][..], &props, b"\n"].concat());
+        assert_eq!(st.own_alignment, Some(56));
+        assert_eq!(st.player_x.zip(st.player_y), Some((10.3125, -0.3125)));
+    }
+
+    #[test]
+    fn own_precise_only_position_keeps_the_axis_the_server_omits() {
+        let mut st = SessionState::for_version(ClientVersion::V231);
+        st.apply_body(&[9 + 0x20, 15 + 0x20, 46, 16 + 0x20, 50, b'\n']);
+        assert_eq!(st.player_x.zip(st.player_y), Some((7.0, 9.0)));
+
+        // X2 alone. Signed GSHORT 35 is -1.0625 tiles.
+        st.apply_body(&[9 + 0x20, 78 + 0x20, 32, 67, b'\n']);
+        assert_eq!(st.player_x.zip(st.player_y), Some((-1.0625, 9.0)));
+    }
+
+    #[test]
+    fn own_classic_position_remains_gated_by_the_receiver_profile() {
+        let version = ClientVersion::V222;
+        let own = &version.profile().props.own;
+        assert!(!own.contains(78) && !own.contains(79));
+
+        let mut st = SessionState::for_version(version);
+        st.apply_body(&[
+            9 + 0x20,
+            15 + 0x20,
+            53,
+            16 + 0x20,
+            51,
+            78 + 0x20,
+            34,
+            106,
+            79 + 0x20,
+            32,
+            43,
+            b'\n',
+        ]);
+        assert_eq!(st.player_x.zip(st.player_y), Some((10.5, 9.5)));
     }
 
     #[test]
