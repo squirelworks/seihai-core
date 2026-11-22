@@ -325,3 +325,35 @@ fn with_player_preserves_npc_variables_and_restores_effect_context() {
         ]
     );
 }
+
+#[test]
+fn indexed_array_loops_execute_through_the_gs1_front_end() {
+    // This checks the existing GS1-to-Machine seam, not colon-foreach,
+    // native behavior, or a byte-for-byte GS2 comparison.
+    let (machine, host) = created(gs1(r#"
+        if (created) {
+            setarray this.squares,5;
+            this.visits = 0;
+            for (i=0;i<5;i++) {
+                this.squares[i] = i*i;
+                this.visits++;
+            }
+            this.sum = 0;
+            for (i=0;i<5;i++) this.sum += this.squares[i];
+            this.after = i;
+        }
+        "#));
+    let expected: Vec<_> = [0.0, 1.0, 4.0, 9.0, 16.0]
+        .into_iter()
+        .map(|n| seihai_core::scripting::gs2::lists::Value::from(Val::Num(n)))
+        .collect();
+    assert_eq!(
+        machine.list(Root::This, "squares"),
+        Some(expected.as_slice())
+    );
+    assert_eq!(machine.var(Root::This, "visits"), Some(&Val::Num(5.0)));
+    assert_eq!(machine.var(Root::This, "sum"), Some(&Val::Num(30.0)));
+    assert_eq!(machine.var(Root::This, "after"), Some(&Val::Num(5.0)));
+    assert!(host.log.is_empty(), "{:?}", host.log);
+    assert!(host.effects.is_empty(), "{:?}", host.effects);
+}
