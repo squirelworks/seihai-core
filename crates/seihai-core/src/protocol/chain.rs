@@ -1369,29 +1369,28 @@ pub const CHAIN: &[Step] = &[
         delta: Delta {
             // Against 4.20r8: 100, 108 and 196 out; 140 and 197 in.
             plo: IdDelta::plus_minus(&[140, 197], &[100, 108, 196]),
-            // The binary's constant send ids plus 11 and 38 (lab), with the ids both
-            // 3.153 and 6.03r7 send taken as sent. 162 answers 108, which 5.00r7
-            // does not handle. The lobby, list and chat are 4.x's.
-            pli: IdDelta::plus_minus(&[159], &[162]),
+            // Every send site in the binary, read 2026-11-25 (Graal_analysis
+            // `protocol/ids-sent-512-status.md`, G255): all fixed ids. Against
+            // 4.20r8: 40, 43, 45 and 159 in, 3 out. The lobby, list and chat are 4.x's.
+            pli: IdDelta::plus_minus(&[40, 43, 45, 159], &[3]),
             // Not recorded for 5.00r7; the 4.x value is not carried over.
             showimg: Some(None),
             // The 4.x login line; the 4.x after-login messages are not carried over.
             lobby: Some(Some(LOBBY_500)),
-            // Not read in this binary. The round-up guess here is dropped: it
-            // inherits the round-down step of 4.20r8 before it and 5.12 after
-            // it (both read), matching the universal round-down confirmed
-            // through 6.03r7 (lab disasm 2026-11-19).
+            // Round-down is inherited from 4.20r8 and now read in this binary
+            // too: zlib/bz2 bodies step len >> 2 times (max 4), raw bodies
+            // round up, both directions (Graal_analysis
+            // `protocol/gen5-cipher-step-5x.md`, G252, 2026-11-24).
             ..Delta::NONE
         },
-        source: "binary (unpacked engine DLL) and lab (lab-v5-2026-10-30): PLO set of 100 ids, send ids from the send wrappers, login id 5 with G3D22067 and the win,<3 md5> list in the plain zlib frame, then 37 in its own gen-5 frame; Login mode until 178",
+        source: "binary (unpacked engine DLL) and lab (lab-v5-2026-10-30): PLO set of 100 ids, every send site (all fixed ids), login id 5 with G3D22067 and the win,<3 md5> list in the plain zlib frame, then 37 in its own gen-5 frame; Login mode until 178",
         unknown: &[
-            Unknown { area: "pli", what: "only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them" },
+            Unknown { area: "pli", what: "complete static set (every send site uses a fixed id); reachability of each sender is static, not run" },
             Unknown { area: "login", what: "Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); stock GServer-v2 accepts all three empty (lab, 2026-10-31), other servers are untested" },
             Unknown { area: "login", what: "the base-file requests after the language (47 or 23 basepackage.gupd) are not sent" },
             Unknown { area: "props", what: "own and other prop sets are 3.153's; no 5.x parser was read" },
             Unknown { area: "ui", what: "chat is a bold sans serif in the lab; its cell height is not known, 24 is kept" },
             Unknown { area: "3d", what: "the Torque 3D mode (Graal3DEngine.dll, protocol 24) is not modelled" },
-            Unknown { area: "framing", what: "the gen-5 step count was not read in this binary; it inherits the round-down of 4.20r8 before it and 5.12 after it (both read), matching the round-down confirmed through 6.03r7 (lab 2026-11-19)" },
         ],
     },
     Step {
@@ -1401,6 +1400,9 @@ pub const CHAIN: &[Step] = &[
         date: "2007-10-19",
         basis: Basis::Binary,
         delta: Delta {
+            // Every send site read (G255): 5.00r7's set without 21 (PUTNPC, sent
+            // only by the GS1 executor 5.12 dropped) and 40 (SHOOT), plus 48 (SHOOT2).
+            pli: IdDelta::plus_minus(&[48], &[21, 40]),
             lobby: Some(Some(LOBBY_512)),
             gen5_round_down: Some(true),
             gen5_compress_all: Some(true),
@@ -1408,7 +1410,6 @@ pub const CHAIN: &[Step] = &[
         },
         source: "unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed; lab on Windows 10 64-bit (2026-11-20): login line win,\"\",<md5 of the MAC>,<md5 of the C: serial>,\"6.2 9200 \", the product-id field empty",
         unknown: &[
-            Unknown { area: "pli", what: "not read; 5.00r7's set is kept" },
             Unknown { area: "framing", what: "a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy" },
         ],
     },
@@ -1453,7 +1454,6 @@ pub const CHAIN: &[Step] = &[
         },
         source: "unpacked from MoleBox and lab: 97 PLO ids (75, 132, 133, 171 and 193 out, 109 and 198 in), one MSVC exe, short bodies sent uncompressed as 2.22, font=Arial; lab on Windows 10 64-bit (2026-11-20): login line win,\"\",<md5 of the MAC>,<md5 of the C: serial>,\"6.2 9200 \", the product-id field empty",
         unknown: &[
-            Unknown { area: "pli", what: "not read; 5.00r7's set is kept" },
             Unknown { area: "files", what: "stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md" },
             Unknown { area: "plo", what: "109 (probably a file redirect) and 198 (one GINT5) are in the set but not decoded" },
         ],
@@ -1482,7 +1482,6 @@ pub const CHAIN: &[Step] = &[
         delta: Delta { lobby: Some(Some(LOBBY_531)), ..Delta::NONE },
         source: "unpacked from Themida and lab (clock set back): same PLO set and token as 5.30r3; draws no tiles before the warp; lab on Windows 10 64-bit (2026-11-20): login line win,\"\",<md5 of the MAC>,<md5 of the C: serial>,\"6.2 9200 \", the product-id field empty (clock set to 2011-01-20)",
         unknown: &[
-            Unknown { area: "pli", what: "not read; 5.00r7's set is kept" },
             Unknown { area: "ui", what: "why it draws no tiles before the warp was not traced in the binary; the lab shows it, and the warp alone brings the tiles back" },
         ],
     },
@@ -1495,7 +1494,8 @@ pub const CHAIN: &[Step] = &[
         delta: Delta {
             plo: IdDelta::plus_minus(&[], &[165, 169]),
             // Linux 6.01r1's set (three months later; 6.00r2 is behind Themida).
-            pli: IdDelta::plus_minus(&[45, 48, 162], &[21, 80, 81]),
+            // (5.12 already has 45, 48 and 162 and has dropped 21; 6.x keeps 3, not 43.)
+            pli: IdDelta::plus_minus(&[3], &[43, 80, 81]),
             chat_text: Some(ChatText { face: ChatFace::TempusSans, height: 24 }),
             gen5_long_frames: Some(true),
             // Back to 5.12's lobby, which draws tiles in Login mode: 6.00r2

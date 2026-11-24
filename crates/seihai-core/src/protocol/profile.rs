@@ -1287,9 +1287,9 @@ mod tests {
         assert_eq!(n(ClientVersion::V404R2), 98);
         assert_eq!(n(ClientVersion::V512), 100);
         // Every gen-5 build rounds the compressed step down (floor(len/4)):
-        // read in the binaries (4.04r2 Win/Mac, 4.20r6 Mac, 4.20r8, 5.12
-        // Win/Mac, 6.03r7 Linux) and inferred for the unread ones (5.00r7,
-        // 5.24r4), which are bracketed by read round-down builds. No gen-5
+        // read in the binaries (4.04r2 Win/Mac, 4.20r6 Mac, 4.20r8, 5.00r7,
+        // 5.12 Win/Mac, 6.03r7 Linux) and inferred for the unread 5.24r4,
+        // which is bracketed by read round-down builds. No gen-5
         // client has been shown to round up (lab 2026-11-13, 2026-11-19).
         for v in [
             ClientVersion::V404R2,
