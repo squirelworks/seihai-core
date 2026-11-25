@@ -710,7 +710,7 @@ pub const THREE_D_512: ThreeD = ThreeD {
 /// `torque/lab-2026-11-25-g3d-worlds.md`). Its loader takes DTS 17, but a
 /// version-17 shape froze the client there: serve DTS 24. No version profile
 /// carries it, since Seihai has no Linux 4.20 version; it is reached by token
-/// through [`token_rows`].
+/// through [`by_token`].
 pub const THREE_D_420_LINUX: ThreeD = ThreeD {
     assumed: Fields::all_but(&[
         Field::Protocol,
