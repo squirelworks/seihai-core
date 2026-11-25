@@ -689,7 +689,7 @@ pub const THREE_D_500: ThreeD = ThreeD {
 /// 5.12 Windows: the most-read build. Streamed terrain and its cache run
 /// live; a `Camera` control object and bare-name textures seen in a capture.
 pub const THREE_D_512: ThreeD = ThreeD {
-    assumed: Fields::of(&[Field::DtsMax, Field::DifVersion]),
+    assumed: Fields::NONE,
     ..THREE_D_500
 };
 
@@ -1047,7 +1047,8 @@ mod tests {
         assert!(t404.reads_dts(24));
         assert!(!t404.reads_dts(25));
         assert!(t404.confirmed(Field::DtsMax));
-        assert!(!t512.confirmed(Field::DtsMax));
+        assert!(t512.confirmed(Field::DtsMax) && t512.confirmed(Field::DifVersion));
+        assert!(t512.reads_dts(24) && !t512.reads_dts(25));
         assert_eq!(t404.formats.dif_version, 44);
         assert!(!of(ClientVersion::V304).formats.three_ds);
         assert!(t512.formats.three_ds && t512.confirmed(Field::ThreeDs));

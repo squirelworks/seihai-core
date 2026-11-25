@@ -627,7 +627,7 @@ Generated; do not edit between the markers.
 - protocol: **pli (client ids sent)**: +48 SHOOT2; -21 PUTNPC, -40 SHOOT (62 -> 61 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - protocol: **gen5_compress_all**: no -> yes
-- 3d: **three_d**: protocol 24 GameObject, terrain chunks, no TorqueScript, 23 of 30 assumed -> protocol 24 GameObject, terrain chunks, no TorqueScript, 2 of 30 assumed
+- 3d: **three_d**: protocol 24 GameObject, terrain chunks, no TorqueScript, 23 of 30 assumed -> protocol 24 GameObject, terrain chunks, no TorqueScript, 0 of 30 assumed
 - unknown (framing): a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
 - source: unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed; lab on Windows 10 64-bit (2026-11-20): login line win,"",<md5 of the MAC>,<md5 of the C: serial>,"6.2 9200 ", the product-id field empty
 
@@ -636,7 +636,7 @@ Generated; do not edit between the markers.
 - protocol: **plo (server ids handled)**: -41 STARTMESSAGE (102 -> 101 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends mac,"","","","8.0.0  Darwin Kernel Version 8.0.0: Sat Mar 26 14:15:22 PST 2005; root:xnu-792.obj~1/RELEASE_PPC"; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0
 - protocol: **gen5_compress_all**: yes -> no
-- 3d: **three_d**: protocol 24 GameObject, terrain chunks, no TorqueScript, 2 of 30 assumed -> protocol 24 GameObject, terrain chunks, no TorqueScript, all assumed
+- 3d: **three_d**: protocol 24 GameObject, terrain chunks, no TorqueScript, 0 of 30 assumed -> protocol 24 GameObject, terrain chunks, no TorqueScript, all assumed
 - unknown (pli): the Windows 5.12 set is kept; the lab saw 2, 23, 24, 37, 46 and 157
 - unknown (login): the kernel string is the one Mac OS X 10.4.0 gave in the lab; a real Mac sends its own
 - unknown (render): on a modern gserver world the level stayed black even with the lab's render shim; the cause was not found
