@@ -141,9 +141,9 @@ pub enum TextureNames {
 /// build needs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Drawn {
-    /// Stayed on the loading picture (3.153, lab).
+    /// Stayed on the loading picture.
     Nothing,
-    /// Only the Sky (4.04r2 under Wine, lab).
+    /// Only the Sky (3.153 and 4.04r2 under Wine, lab).
     SkyOnly,
     /// Terrain, shapes or `GameObject`s.
     World,
@@ -201,11 +201,12 @@ pub enum Field {
     Mirrors2dPosition,
     Sees2dPlayers,
     Takes2dChat,
+    DropsUnknownGhost,
 }
 
 impl Field {
     /// Every field, in the order of `three-d.toml`.
-    pub const ALL: [Field; 38] = [
+    pub const ALL: [Field; 39] = [
         Field::Protocol,
         Field::Game,
         Field::ClassTable,
@@ -244,6 +245,7 @@ impl Field {
         Field::Mirrors2dPosition,
         Field::Sees2dPlayers,
         Field::Takes2dChat,
+        Field::DropsUnknownGhost,
     ];
 
     /// The key in `three-d.toml`.
@@ -287,6 +289,7 @@ impl Field {
             Field::Mirrors2dPosition => "mirrors_2d_position",
             Field::Sees2dPlayers => "sees_2d_players",
             Field::Takes2dChat => "takes_2d_chat",
+            Field::DropsUnknownGhost => "drops_unknown_ghost",
         }
     }
 
@@ -394,6 +397,10 @@ pub struct ThreeD {
     /// Chat from 2D players in the level reaches the client
     /// (`onRemotePlayerChats`, over TCP; 5.12, lab H1).
     pub takes_2d_chat: bool,
+    /// An update for a ghost index that was never created is logged and
+    /// dropped. 4.04r2 crashes on it (fuzz tier 1), so a server must never
+    /// update a ghost before its create reaches that build.
+    pub drops_unknown_ghost: bool,
     /// The fields that are assumed for this build, not read.
     pub assumed: Fields,
 }
@@ -548,6 +555,7 @@ pub const THREE_D_304: ThreeD = ThreeD {
     mirrors_2d_position: false,
     sees_2d_players: false,
     takes_2d_chat: false,
+    drops_unknown_ghost: false,
     assumed: Fields::all_but(&[
         Field::Protocol,
         Field::Game,
@@ -568,8 +576,8 @@ pub const THREE_D_304: ThreeD = ThreeD {
 
 /// 3.153 Mac: Graal's net changes, the TGE game layer, TorqueScript, both terrain paths.
 /// On our gserver (lab) it needs a ghosted `Sky`, asks for sky textures as
-/// `.gif`, runs only its 12 shipped `clientCmd` handlers and has drawn
-/// nothing past its loading picture yet.
+/// `.gif`, runs only its 12 shipped `clientCmd` handlers, and reaches its
+/// sky view once those `.gif` requests are answered (with PNGs).
 pub const THREE_D_3153: ThreeD = ThreeD {
     protocol: 19,
     game: "Graal3D",
@@ -610,10 +618,11 @@ pub const THREE_D_3153: ThreeD = ThreeD {
     udp_port_offset: 1,
     requires_sky: true,
     sky_gif: true,
-    drawn: Drawn::Nothing,
+    drawn: Drawn::SkyOnly,
     mirrors_2d_position: false,
     sees_2d_players: false,
     takes_2d_chat: false,
+    drops_unknown_ghost: false,
     assumed: Fields::of(&[
         Field::PhasesOptional,
         Field::TerMax,
@@ -630,6 +639,7 @@ pub const THREE_D_3153: ThreeD = ThreeD {
         Field::Mirrors2dPosition,
         Field::Sees2dPlayers,
         Field::Takes2dChat,
+        Field::DropsUnknownGhost,
     ]),
 };
 
@@ -678,6 +688,7 @@ pub const THREE_D_404: ThreeD = ThreeD {
     mirrors_2d_position: false,
     sees_2d_players: false,
     takes_2d_chat: false,
+    drops_unknown_ghost: false,
     assumed: Fields::of(&[
         Field::PhasesOptional,
         Field::ChunkCache,
@@ -736,6 +747,7 @@ pub const THREE_D_420: ThreeD = ThreeD {
     mirrors_2d_position: false,
     sees_2d_players: false,
     takes_2d_chat: true,
+    drops_unknown_ghost: true,
     assumed: Fields::all_but(&[
         Field::Protocol,
         Field::Game,
@@ -774,6 +786,7 @@ pub const THREE_D_4208: ThreeD = ThreeD {
         Field::TorqueScript,
         Field::ServerScripts,
         Field::Drawn,
+        Field::DropsUnknownGhost,
     ]),
     ..THREE_D_420
 };
@@ -822,6 +835,7 @@ pub const THREE_D_500: ThreeD = ThreeD {
     mirrors_2d_position: false,
     sees_2d_players: false,
     takes_2d_chat: true,
+    drops_unknown_ghost: true,
     assumed: Fields::all_but(&[
         Field::Protocol,
         Field::Game,
@@ -979,6 +993,7 @@ pub fn fixture_row(label: &str, t: &ThreeD) -> String {
         b(t.mirrors_2d_position).into(),
         b(t.sees_2d_players).into(),
         b(t.takes_2d_chat).into(),
+        b(t.drops_unknown_ghost).into(),
         assumed,
     ]
     .join("\t")
@@ -1036,10 +1051,13 @@ mod tests {
         assert_eq!(t.sky_texture_request_name("day"), "day.gif");
         assert!(!t.requests_download("main.cs") && !t.requests_download("x.ter"));
         assert!(t.confirmed(Field::DownloadRefused) && t.confirmed(Field::ServerScripts));
-        assert_eq!(t.drawn, Drawn::Nothing);
+        assert_eq!(t.drawn, Drawn::SkyOnly);
+        assert!(!t.drops_unknown_ghost && !t.confirmed(Field::DropsUnknownGhost));
 
         let t = of(ClientVersion::V404R2);
         assert_eq!(t.drawn, Drawn::SkyOnly);
+        // Crashes on an update to an uncreated ghost (fuzz tier 1).
+        assert!(!t.drops_unknown_ghost && t.confirmed(Field::DropsUnknownGhost));
         assert!(t.needs_2d_position_relay() && t.confirmed(Field::Mirrors2dPosition));
 
         let t = of(ClientVersion::V512);
@@ -1047,6 +1065,8 @@ mod tests {
         assert_eq!(t.sky_texture_request_name("day.png"), "day.png");
         assert_eq!(t.drawn, Drawn::World);
         assert!(!t.sees_2d_players && t.takes_2d_chat && t.needs_2d_position_relay());
+        assert!(t.drops_unknown_ghost && t.confirmed(Field::DropsUnknownGhost));
+        assert!(of(ClientVersion::V420R8).confirmed(Field::DropsUnknownGhost));
         for f in [
             Field::Sees2dPlayers,
             Field::Takes2dChat,
