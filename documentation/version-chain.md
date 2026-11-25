@@ -529,7 +529,7 @@ Generated; do not edit between the markers.
 - props: **npc_max**: 77 -> 73
 - props: **precise_pos**: yes -> no
 - scripts: **gs1**: yes -> unknown
-- 3d: **three_d**: none -> protocol 9 TGE, terrain .ter, TorqueScript, 17 of 31 assumed
+- 3d: **three_d**: none -> protocol 9 TGE, terrain .ter, TorqueScript, 18 of 32 assumed
 - unknown (listserver): the public listserver sent its list on 14923 to Seihai's G3D30123 login with a made-up account (2026-11-11); a real 3.04 was not run against it, and 14922 with a real account was not tried
 - unknown (login): UDPPORT (31) is left out of the first props, as for every build (no UDP socket); the nickname is the account, where the real client sends the start window's nickname field
 - unknown (ui): the Torque front end (start window, options, themes, chat as white text with a blue shadow) is not modelled; the 2.31 UI row is kept
@@ -547,7 +547,7 @@ Generated; do not edit between the markers.
 - props: **npc_max**: 73 -> 77
 - props: **precise_pos**: no -> yes
 - scripts: **gs2**: no -> yes
-- 3d: **three_d**: protocol 9 TGE, terrain .ter, TorqueScript, 17 of 31 assumed -> protocol 19 TGE, terrain .ter+chunks, TorqueScript, 15 of 31 assumed
+- 3d: **three_d**: protocol 9 TGE, terrain .ter, TorqueScript, 18 of 32 assumed -> protocol 19 TGE, terrain .ter+chunks, TorqueScript, 16 of 32 assumed
 - unknown (pli): 2, 3, 15, 24, 29 and 80 are taken from 3.04; the PPC scan did not resolve those call sites
 - unknown (login): the first frame (5, 37, 34 bigmap.txt, 34 minimap.txt, the two 34s sent twice) and the first props (OSTYPE mac, code page 1250) were seen in the lab; the head and default-weapon checks are 3.04's
 - unknown (3d): the 3D side was not run (T3D-009); three_d marks the values carried from 4.04r2 or stock TGE as assumed (control objects, phases, format bounds, texture naming)
@@ -564,7 +564,7 @@ Generated; do not edit between the markers.
 - protocol: **gen5_round_down**: no -> yes
 - ui: **server_list**: 3 tabs -> direct
 - ui: **chat_text**: ChatText { face: TempusSans, height: 24 } -> ChatText { face: Arial, height: 24 }
-- 3d: **three_d**: protocol 19 TGE, terrain .ter+chunks, TorqueScript, 15 of 31 assumed -> protocol 19 TGE, terrain .ter+chunks, no TorqueScript, 6 of 31 assumed
+- 3d: **three_d**: protocol 19 TGE, terrain .ter+chunks, TorqueScript, 16 of 32 assumed -> protocol 19 TGE, terrain .ter+chunks, no TorqueScript, 7 of 32 assumed
 - unknown (pli): the send ids were read in the 4.20r8 engine (provisional, as in 3.x); 4.04r2 is taken as that set without 162, its answer to 108, which 4.04r2 does not handle. 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's (11, 34, 38 and 46 seen in the lab; the 2026-10-31 live run saw 2, 4, 9, 23, 24, 34, 37, 38, 44, 46, 152, 154 and 157, all in the set)
 - unknown (login): Seihai sends the three machine fields as an empty quoted string, as for 5.00r7; the real client sends three MD5s
 - unknown (login): the after-login messages follow the real client (lab, 2026-10-31), but the nickname is Seihai's setting (default the account), 44 lists Seihai's own window title, and the client's file checks of its GUI images (plisticon, plistcat, state.png, pics1.png) are not sent
@@ -579,7 +579,7 @@ Generated; do not edit between the markers.
 
 - protocol: **plo (server ids handled)**: -41 STARTMESSAGE (98 -> 97 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252 -> first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0
-- 3d: **three_d**: protocol 19 TGE, terrain .ter+chunks, no TorqueScript, 6 of 31 assumed -> protocol 19 TGE, terrain .ter+chunks, no TorqueScript, all assumed
+- 3d: **three_d**: protocol 19 TGE, terrain .ter+chunks, no TorqueScript, 7 of 32 assumed -> protocol 19 TGE, terrain .ter+chunks, no TorqueScript, all assumed
 - unknown (pli): the Windows 4.04r2 set is kept; the lab saw 2, 18, 23, 24, 37, 38, 46 and 157
 - unknown (login): Seihai sends the three machine fields as empty quoted strings; the real client sent the MAC and /etc stat MD5s and an empty fourth field
 - unknown (3d): the Mac 3D side was not read (T3D-004); three_d is the Windows 4.04r2 row with every field assumed
@@ -590,7 +590,7 @@ Generated; do not edit between the markers.
 - protocol: **plo (server ids handled)**: +107 BOARDLAYER, +108 UNKNOWN108 (97 -> 99 ids)
 - protocol: **pli (client ids sent)**: +162 RC_UNKNOWN162 (58 -> 59 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0 -> first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS mac and code page 0
-- 3d: **three_d**: protocol 19 TGE, terrain .ter+chunks, no TorqueScript, all assumed -> protocol 21 GameObject, terrain chunks, no TorqueScript, 21 of 31 assumed
+- 3d: **three_d**: protocol 19 TGE, terrain .ter+chunks, no TorqueScript, all assumed -> protocol 21 GameObject, terrain chunks, no TorqueScript, 22 of 32 assumed
 - unknown (pli): 162 (the answer to 108) is from the Mac binary and 2, 23, 24, 34, 37, 44, 46 and 157 were seen in the lab; the rest of 4.20r8's set is taken
 - unknown (login): the real client sent mac,"",<md5 hex of the /etc stat>,"" in the lab (the MAC field empty under qemu's NIC); Seihai sends all three machine fields as empty quoted strings
 - unknown (flags): the real client sent no 18 for the lab level's gr.x/gr.y clientside setstring; Seihai's flat path does
@@ -601,7 +601,7 @@ Generated; do not edit between the markers.
 
 - protocol: **plo (server ids handled)**: +41 STARTMESSAGE, +196 (99 -> 101 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS mac and code page 0 -> first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252
-- 3d: **three_d**: protocol 21 GameObject, terrain chunks, no TorqueScript, 21 of 31 assumed -> protocol 21 GameObject, terrain chunks, no TorqueScript, 26 of 31 assumed
+- 3d: **three_d**: protocol 21 GameObject, terrain chunks, no TorqueScript, 22 of 32 assumed -> protocol 24 GameObject, terrain none, no TorqueScript, 24 of 32 assumed
 - unknown (pli): provisional: some sends pass the id in a register, so the set is a floor; 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's
 - unknown (binary): only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 - unknown (plo): 196 (same layout as 193) is read and dropped by the client; Seihai drops it too
@@ -613,7 +613,7 @@ Generated; do not edit between the markers.
 - protocol: **pli (client ids sent)**: +40 SHOOT, +43 MUTEPLAYER, +45 PROCESSRUNNING, +159 UPDATEPACKAGEREQUESTFILE; -3 NPCPROPS (59 -> 62 ids)
 - protocol: **showimg (id 24)**: every 5145 ms -> none
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252 -> first server "Login", nothing drawn until 178, login line ends win,"","",""
-- 3d: **three_d**: protocol 21 GameObject, terrain chunks, no TorqueScript, 26 of 31 assumed -> protocol 24 GameObject, terrain chunks, no TorqueScript, 24 of 31 assumed
+- 3d: **three_d**: protocol 24 GameObject, terrain none, no TorqueScript, 24 of 32 assumed -> protocol 24 GameObject, terrain chunks, no TorqueScript, 25 of 32 assumed
 - unknown (pli): complete static set (every send site uses a fixed id); reachability of each sender is static, not run
 - unknown (login): Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); stock GServer-v2 accepts all three empty (lab, 2026-10-31), other servers are untested
 - unknown (login): the base-file requests after the language (47 or 23 basepackage.gupd) are not sent
@@ -627,7 +627,7 @@ Generated; do not edit between the markers.
 - protocol: **pli (client ids sent)**: +48 SHOOT2; -21 PUTNPC, -40 SHOOT (62 -> 61 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","" -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - protocol: **gen5_compress_all**: no -> yes
-- 3d: **three_d**: protocol 24 GameObject, terrain chunks, no TorqueScript, 24 of 31 assumed -> protocol 24 GameObject, terrain chunks, no TorqueScript, 0 of 31 assumed
+- 3d: **three_d**: protocol 24 GameObject, terrain chunks, no TorqueScript, 25 of 32 assumed -> protocol 24 GameObject, terrain chunks, no TorqueScript, 0 of 32 assumed
 - unknown (framing): a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
 - source: unpacked from MoleBox and lab: PLO set identical to 5.00r7, login token G3D14097 with the quoted Windows version as a fifth field, zlib/bz2 frames stepped len/4 rounded down, every frame sent compressed; lab on Windows 10 64-bit (2026-11-20): login line win,"",<md5 of the MAC>,<md5 of the C: serial>,"6.2 9200 ", the product-id field empty
 
@@ -636,7 +636,7 @@ Generated; do not edit between the markers.
 - protocol: **plo (server ids handled)**: -41 STARTMESSAGE (102 -> 101 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends mac,"","","","8.0.0  Darwin Kernel Version 8.0.0: Sat Mar 26 14:15:22 PST 2005; root:xnu-792.obj~1/RELEASE_PPC"; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0
 - protocol: **gen5_compress_all**: yes -> no
-- 3d: **three_d**: protocol 24 GameObject, terrain chunks, no TorqueScript, 0 of 31 assumed -> protocol 24 GameObject, terrain chunks, no TorqueScript, all assumed
+- 3d: **three_d**: protocol 24 GameObject, terrain chunks, no TorqueScript, 0 of 32 assumed -> protocol 24 GameObject, terrain chunks, no TorqueScript, all assumed
 - unknown (pli): the Windows 5.12 set is kept; the lab saw 2, 23, 24, 37, 46 and 157
 - unknown (login): the kernel string is the one Mac OS X 10.4.0 gave in the lab; a real Mac sends its own
 - unknown (render): on a modern gserver world the level stayed black even with the lab's render shim; the cause was not found

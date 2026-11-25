@@ -159,6 +159,7 @@ pub enum Field {
     TorqueScript,
     ServerScripts,
     Terraformer,
+    GreyscaleRgba32Only,
     TerrainEditor,
     DtsMin,
     DtsMax,
@@ -175,7 +176,7 @@ pub enum Field {
 
 impl Field {
     /// Every field, in the order of `three-d.toml`.
-    pub const ALL: [Field; 31] = [
+    pub const ALL: [Field; 32] = [
         Field::Protocol,
         Field::Game,
         Field::ClassTable,
@@ -195,6 +196,7 @@ impl Field {
         Field::TorqueScript,
         Field::ServerScripts,
         Field::Terraformer,
+        Field::GreyscaleRgba32Only,
         Field::TerrainEditor,
         Field::DtsMin,
         Field::DtsMax,
@@ -231,6 +233,7 @@ impl Field {
             Field::TorqueScript => "torque_script",
             Field::ServerScripts => "server_scripts",
             Field::Terraformer => "terraformer",
+            Field::GreyscaleRgba32Only => "greyscale_rgba32_only",
             Field::TerrainEditor => "terrain_editor",
             Field::DtsMin => "dts_min",
             Field::DtsMax => "dts_max",
@@ -258,7 +261,7 @@ pub struct Fields(u32);
 impl Fields {
     pub const NONE: Fields = Fields(0);
     /// Every field: a row whose 3D side was not read at all.
-    pub const ALL: Fields = Fields((1 << Field::ALL.len()) - 1);
+    pub const ALL: Fields = Fields(u32::MAX >> (32 - Field::ALL.len()));
 
     pub const fn of(fields: &[Field]) -> Fields {
         let mut m = 0u32;
@@ -320,6 +323,9 @@ pub struct ThreeD {
     /// own shipped scripts but has no server path to new ones (T3D-009).
     pub server_scripts: bool,
     pub terraformer: Terraformer,
+    /// The Terraformer's `loadGreyscale` is only safe with a 32-bit RGBA PNG:
+    /// a 24-bit RGB or 8-bit grey one crashes the client (5.12 lab).
+    pub greyscale_rgba32_only: bool,
     /// Torque's `TerrainEditor` is present.
     pub terrain_editor: bool,
     pub formats: Formats,
@@ -447,6 +453,7 @@ pub const THREE_D_304: ThreeD = ThreeD {
     torque_script: TorqueScript::Compiles,
     server_scripts: false,
     terraformer: Terraformer::Full,
+    greyscale_rgba32_only: false,
     terrain_editor: true,
     formats: Formats {
         dts_min: 0,
@@ -461,6 +468,7 @@ pub const THREE_D_304: ThreeD = ThreeD {
     bigdata_chunk_max: 0,
     udp_port_offset: 1,
     assumed: Fields::of(&[
+        Field::GreyscaleRgba32Only,
         Field::MissionPhases,
         Field::PhasesOptional,
         Field::ClientMoves,
@@ -505,6 +513,7 @@ pub const THREE_D_3153: ThreeD = ThreeD {
     torque_script: TorqueScript::Compiles,
     server_scripts: false,
     terraformer: Terraformer::Full,
+    greyscale_rgba32_only: false,
     terrain_editor: true,
     formats: Formats {
         dts_min: 0,
@@ -519,6 +528,7 @@ pub const THREE_D_3153: ThreeD = ThreeD {
     bigdata_chunk_max: 191,
     udp_port_offset: 1,
     assumed: Fields::of(&[
+        Field::GreyscaleRgba32Only,
         Field::MissionPhases,
         Field::PhasesOptional,
         Field::ControlObjects,
@@ -562,6 +572,7 @@ pub const THREE_D_404: ThreeD = ThreeD {
     torque_script: TorqueScript::None,
     server_scripts: false,
     terraformer: Terraformer::Greyscale,
+    greyscale_rgba32_only: true,
     terrain_editor: true,
     formats: Formats {
         dts_min: 0,
@@ -576,6 +587,7 @@ pub const THREE_D_404: ThreeD = ThreeD {
     bigdata_chunk_max: 191,
     udp_port_offset: 1,
     assumed: Fields::of(&[
+        Field::GreyscaleRgba32Only,
         Field::PhasesOptional,
         Field::ControlObjects,
         Field::ChunkCache,
@@ -609,6 +621,7 @@ pub const THREE_D_420: ThreeD = ThreeD {
     torque_script: TorqueScript::None,
     server_scripts: false,
     terraformer: Terraformer::Greyscale,
+    greyscale_rgba32_only: true,
     terrain_editor: true,
     formats: Formats {
         dts_min: 17,
@@ -640,12 +653,23 @@ pub const THREE_D_420: ThreeD = ThreeD {
 /// layer, two phases, no TorqueScript and terrain chunks; the protocol
 /// number was not read.
 pub const THREE_D_4208: ThreeD = ThreeD {
+    // A lab run (Graal_analysis PR #854) linked it as protocol 24. It takes
+    // the 5.12 TerrainBlock and chunk layout and fills the heights cache, then
+    // crashes soon after the TerrainBlock is added: no streamed terrain.
+    protocol: 24,
+    terrain: Terrain {
+        chunks: false,
+        ..THREE_D_420.terrain
+    },
     assumed: Fields::all_but(&[
+        Field::Protocol,
+        Field::Game,
         Field::GameLayer,
         Field::MissionPhases,
         Field::TorqueScript,
         Field::ServerScripts,
         Field::TerrainChunks,
+        Field::ChunkCache,
     ]),
     ..THREE_D_420
 };
@@ -674,6 +698,7 @@ pub const THREE_D_500: ThreeD = ThreeD {
     torque_script: TorqueScript::None,
     server_scripts: false,
     terraformer: Terraformer::Greyscale,
+    greyscale_rgba32_only: true,
     terrain_editor: true,
     formats: Formats {
         dts_min: 17,
@@ -722,6 +747,11 @@ pub const THREE_D_420_LINUX: ThreeD = ThreeD {
         Field::DtsMax,
         Field::DifVersion,
     ]),
+    // Windows 4.20r8 crashes once a TerrainBlock is added; assumed here too.
+    terrain: Terrain {
+        chunks: false,
+        ..THREE_D_512.terrain
+    },
     ..THREE_D_512
 };
 
@@ -811,6 +841,7 @@ pub fn fixture_row(label: &str, t: &ThreeD) -> String {
             Terraformer::None => "none",
         }
         .into(),
+        b(t.greyscale_rgba32_only).into(),
         b(t.terrain_editor).into(),
         t.formats.dts_min.to_string(),
         t.formats.dts_max.to_string(),
@@ -951,7 +982,7 @@ mod tests {
             ),
             (
                 ClientVersion::V420R8,
-                21,
+                24,
                 GameLayer::GameObject,
                 ClassTable::NoDatablocks,
             ),
@@ -987,8 +1018,8 @@ mod tests {
         assert_eq!(of(ClientVersion::V304).game, "Torque Game Engine Demo");
         assert!(!of(ClientVersion::V304).length_prefixes);
         assert_eq!(of(ClientVersion::V3153).game, "Graal3D");
-        // 4.20r8's protocol was never read.
-        assert!(!of(ClientVersion::V420R8).confirmed(Field::Protocol));
+        // 4.20r8's protocol 24 is from a lab run (PR #854).
+        assert!(of(ClientVersion::V420R8).confirmed(Field::Protocol));
         assert!(of(ClientVersion::V420R6).confirmed(Field::Protocol));
     }
 
@@ -1034,7 +1065,7 @@ mod tests {
             (ClientVersion::V3153, true, true),
             (ClientVersion::V404R2, true, true),
             (ClientVersion::V420R6, false, true),
-            (ClientVersion::V420R8, false, true),
+            (ClientVersion::V420R8, false, false),
             (ClientVersion::V500R7, false, true),
             (ClientVersion::V512, false, true),
         ];
@@ -1042,8 +1073,10 @@ mod tests {
             let t = of(v);
             assert_eq!(t.terrain.ter_file, ter, "{v:?}");
             assert_eq!(t.offers_terrain_chunks(), chunks, "{v:?}");
-            assert_eq!(t.terrain.cache == ChunkCache::Heights, chunks, "{v:?}");
-            assert_eq!(t.terrain.chunk_max > 0, chunks, "{v:?}");
+            // 4.20r8 fills the cache, but crashes on the TerrainBlock.
+            let cache = chunks || v == ClientVersion::V420R8;
+            assert_eq!(t.terrain.cache == ChunkCache::Heights, cache, "{v:?}");
+            assert_eq!(t.terrain.chunk_max > 0, cache, "{v:?}");
         }
         let t512 = of(ClientVersion::V512);
         assert!(t512.confirmed(Field::TerrainChunks));
@@ -1053,6 +1086,10 @@ mod tests {
         assert!(t512.terrain_texture_ok(256, 256, 24));
         assert!(!t512.terrain_texture_ok(512, 512, 24));
         assert!(!t512.terrain_texture_ok(256, 256, 32));
+        // loadGreyscale: only a 32-bit RGBA PNG is safe on 5.12 (lab).
+        assert!(t512.greyscale_rgba32_only && t512.confirmed(Field::GreyscaleRgba32Only));
+        assert!(!of(ClientVersion::V3153).greyscale_rgba32_only);
+        assert!(!of(ClientVersion::V404R2).confirmed(Field::GreyscaleRgba32Only));
         // Only 5.12's chunk layout was read; the others are assumed to match.
         assert!(!of(ClientVersion::V420R6).confirmed(Field::ChunkCache));
         assert!(of(ClientVersion::V500R7).confirmed(Field::ChunkCache));
