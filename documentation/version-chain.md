@@ -601,7 +601,7 @@ Generated; do not edit between the markers.
 
 - protocol: **plo (server ids handled)**: +41 STARTMESSAGE, +196 (99 -> 101 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends mac,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS mac and code page 0 -> first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252
-- 3d: **three_d**: protocol 21 GameObject, terrain chunks, no TorqueScript, 21 of 31 assumed -> protocol 21 GameObject, terrain chunks, no TorqueScript, 26 of 31 assumed
+- 3d: **three_d**: protocol 21 GameObject, terrain chunks, no TorqueScript, 21 of 31 assumed -> protocol 24 GameObject, terrain none, no TorqueScript, 23 of 31 assumed
 - unknown (pli): provisional: some sends pass the id in a register, so the set is a floor; 0, 3, 11, 20, 27, 30, 34, 38, 46, 93, 97, 98, 155 and 156 are 3.153's
 - unknown (binary): only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 - unknown (plo): 196 (same layout as 193) is read and dropped by the client; Seihai drops it too
@@ -613,7 +613,7 @@ Generated; do not edit between the markers.
 - protocol: **pli (client ids sent)**: +40 SHOOT, +43 MUTEPLAYER, +45 PROCESSRUNNING, +159 UPDATEPACKAGEREQUESTFILE; -3 NPCPROPS (59 -> 62 ids)
 - protocol: **showimg (id 24)**: every 5145 ms -> none
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252 -> first server "Login", nothing drawn until 178, login line ends win,"","",""
-- 3d: **three_d**: protocol 21 GameObject, terrain chunks, no TorqueScript, 26 of 31 assumed -> protocol 24 GameObject, terrain chunks, no TorqueScript, 24 of 31 assumed
+- 3d: **three_d**: protocol 24 GameObject, terrain none, no TorqueScript, 23 of 31 assumed -> protocol 24 GameObject, terrain chunks, no TorqueScript, 24 of 31 assumed
 - unknown (pli): complete static set (every send site uses a fixed id); reachability of each sender is static, not run
 - unknown (login): Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); stock GServer-v2 accepts all three empty (lab, 2026-10-31), other servers are untested
 - unknown (login): the base-file requests after the language (47 or 23 basepackage.gupd) are not sent

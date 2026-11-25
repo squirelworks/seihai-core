@@ -640,12 +640,23 @@ pub const THREE_D_420: ThreeD = ThreeD {
 /// layer, two phases, no TorqueScript and terrain chunks; the protocol
 /// number was not read.
 pub const THREE_D_4208: ThreeD = ThreeD {
+    // A lab run (Graal_analysis PR #854) linked it as protocol 24. It takes
+    // the 5.12 TerrainBlock and chunk layout and fills the heights cache, then
+    // crashes soon after the TerrainBlock is added: no streamed terrain.
+    protocol: 24,
+    terrain: Terrain {
+        chunks: false,
+        ..THREE_D_420.terrain
+    },
     assumed: Fields::all_but(&[
+        Field::Protocol,
+        Field::Game,
         Field::GameLayer,
         Field::MissionPhases,
         Field::TorqueScript,
         Field::ServerScripts,
         Field::TerrainChunks,
+        Field::ChunkCache,
     ]),
     ..THREE_D_420
 };
@@ -722,6 +733,11 @@ pub const THREE_D_420_LINUX: ThreeD = ThreeD {
         Field::DtsMax,
         Field::DifVersion,
     ]),
+    // Windows 4.20r8 crashes once a TerrainBlock is added; assumed here too.
+    terrain: Terrain {
+        chunks: false,
+        ..THREE_D_512.terrain
+    },
     ..THREE_D_512
 };
 
@@ -951,7 +967,7 @@ mod tests {
             ),
             (
                 ClientVersion::V420R8,
-                21,
+                24,
                 GameLayer::GameObject,
                 ClassTable::NoDatablocks,
             ),
@@ -987,8 +1003,8 @@ mod tests {
         assert_eq!(of(ClientVersion::V304).game, "Torque Game Engine Demo");
         assert!(!of(ClientVersion::V304).length_prefixes);
         assert_eq!(of(ClientVersion::V3153).game, "Graal3D");
-        // 4.20r8's protocol was never read.
-        assert!(!of(ClientVersion::V420R8).confirmed(Field::Protocol));
+        // 4.20r8's protocol 24 is from a lab run (PR #854).
+        assert!(of(ClientVersion::V420R8).confirmed(Field::Protocol));
         assert!(of(ClientVersion::V420R6).confirmed(Field::Protocol));
     }
 
@@ -1034,7 +1050,7 @@ mod tests {
             (ClientVersion::V3153, true, true),
             (ClientVersion::V404R2, true, true),
             (ClientVersion::V420R6, false, true),
-            (ClientVersion::V420R8, false, true),
+            (ClientVersion::V420R8, false, false),
             (ClientVersion::V500R7, false, true),
             (ClientVersion::V512, false, true),
         ];
@@ -1042,8 +1058,10 @@ mod tests {
             let t = of(v);
             assert_eq!(t.terrain.ter_file, ter, "{v:?}");
             assert_eq!(t.offers_terrain_chunks(), chunks, "{v:?}");
-            assert_eq!(t.terrain.cache == ChunkCache::Heights, chunks, "{v:?}");
-            assert_eq!(t.terrain.chunk_max > 0, chunks, "{v:?}");
+            // 4.20r8 fills the cache, but crashes on the TerrainBlock.
+            let cache = chunks || v == ClientVersion::V420R8;
+            assert_eq!(t.terrain.cache == ChunkCache::Heights, cache, "{v:?}");
+            assert_eq!(t.terrain.chunk_max > 0, cache, "{v:?}");
         }
         let t512 = of(ClientVersion::V512);
         assert!(t512.confirmed(Field::TerrainChunks));
