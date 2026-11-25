@@ -201,12 +201,13 @@ pub enum Field {
     Mirrors2dPosition,
     Sees2dPlayers,
     Takes2dChat,
+    TerrainTextures,
     DropsUnknownGhost,
 }
 
 impl Field {
     /// Every field, in the order of `three-d.toml`.
-    pub const ALL: [Field; 39] = [
+    pub const ALL: [Field; 40] = [
         Field::Protocol,
         Field::Game,
         Field::ClassTable,
@@ -245,6 +246,7 @@ impl Field {
         Field::Mirrors2dPosition,
         Field::Sees2dPlayers,
         Field::Takes2dChat,
+        Field::TerrainTextures,
         Field::DropsUnknownGhost,
     ];
 
@@ -289,6 +291,7 @@ impl Field {
             Field::Mirrors2dPosition => "mirrors_2d_position",
             Field::Sees2dPlayers => "sees_2d_players",
             Field::Takes2dChat => "takes_2d_chat",
+            Field::TerrainTextures => "terrain_textures",
             Field::DropsUnknownGhost => "drops_unknown_ghost",
         }
     }
@@ -397,6 +400,10 @@ pub struct ThreeD {
     /// Chat from 2D players in the level reaches the client
     /// (`onRemotePlayerChats`, over TCP; 5.12, lab H1).
     pub takes_2d_chat: bool,
+    /// With streamed terrain, the client fetches `heights.info` and the
+    /// terrain textures it lists. 4.20r8 never does (lab), so its terrain
+    /// draws white.
+    pub terrain_textures: bool,
     /// An update for a ghost index that was never created is logged and
     /// dropped. 4.04r2 crashes on it (fuzz tier 1), so a server must never
     /// update a ghost before its create reaches that build.
@@ -555,6 +562,7 @@ pub const THREE_D_304: ThreeD = ThreeD {
     mirrors_2d_position: false,
     sees_2d_players: false,
     takes_2d_chat: false,
+    terrain_textures: false,
     drops_unknown_ghost: false,
     assumed: Fields::all_but(&[
         Field::Protocol,
@@ -571,6 +579,7 @@ pub const THREE_D_304: ThreeD = ThreeD {
         Field::Bigdata,
         Field::BigdataChunkMax,
         Field::TerrainChunkMax,
+        Field::TerrainTextures,
     ]),
 };
 
@@ -622,6 +631,7 @@ pub const THREE_D_3153: ThreeD = ThreeD {
     mirrors_2d_position: false,
     sees_2d_players: false,
     takes_2d_chat: false,
+    terrain_textures: true,
     drops_unknown_ghost: false,
     assumed: Fields::of(&[
         Field::PhasesOptional,
@@ -688,6 +698,7 @@ pub const THREE_D_404: ThreeD = ThreeD {
     mirrors_2d_position: false,
     sees_2d_players: false,
     takes_2d_chat: false,
+    terrain_textures: true,
     drops_unknown_ghost: false,
     assumed: Fields::of(&[
         Field::PhasesOptional,
@@ -700,6 +711,7 @@ pub const THREE_D_404: ThreeD = ThreeD {
         Field::SkyGif,
         Field::Sees2dPlayers,
         Field::Takes2dChat,
+        Field::TerrainTextures,
     ]),
 };
 
@@ -747,6 +759,7 @@ pub const THREE_D_420: ThreeD = ThreeD {
     mirrors_2d_position: false,
     sees_2d_players: false,
     takes_2d_chat: true,
+    terrain_textures: true,
     drops_unknown_ghost: true,
     assumed: Fields::all_but(&[
         Field::Protocol,
@@ -762,20 +775,16 @@ pub const THREE_D_420: ThreeD = ThreeD {
     ]),
 };
 
-/// 4.20r8 Windows: 4.20r6's values. Its 3D DLL shows the `GameObject`
-/// layer, two phases, no TorqueScript and terrain chunks; the protocol
-/// number was not read.
+/// 4.20r8 Windows: 4.20r6's values except what was read: protocol 24, the
+/// `GameObject` layer, two phases, no TorqueScript, streamed terrain without
+/// terrain textures.
 pub const THREE_D_4208: ThreeD = ThreeD {
-    // A lab run (Graal_analysis PR #854) linked it as protocol 24. It takes
-    // the 5.12 TerrainBlock and chunk layout and fills the heights cache, then
-    // crashes drawing terrain near the camera (from about 60 units up, never
-    // from 200). The lab VM has only GDI Generic OpenGL 1.1, so this is a crash
-    // under GDI GL, untested on Mesa or a GPU: no streamed terrain until then.
+    // A lab run (Graal_analysis PR #854) linked it as protocol 24. On Mesa
+    // (T3D-117) it took all 256 streamed chunks and drew the ground; its
+    // near-terrain crash was the VM's GDI OpenGL only. It never fetches
+    // heights.info or terrain textures, so the terrain draws white.
     protocol: 24,
-    terrain: Terrain {
-        chunks: false,
-        ..THREE_D_420.terrain
-    },
+    terrain_textures: false,
     assumed: Fields::all_but(&[
         Field::Protocol,
         Field::Game,
@@ -786,6 +795,7 @@ pub const THREE_D_4208: ThreeD = ThreeD {
         Field::TorqueScript,
         Field::ServerScripts,
         Field::Drawn,
+        Field::TerrainTextures,
         Field::DropsUnknownGhost,
     ]),
     ..THREE_D_420
@@ -835,6 +845,7 @@ pub const THREE_D_500: ThreeD = ThreeD {
     mirrors_2d_position: false,
     sees_2d_players: false,
     takes_2d_chat: true,
+    terrain_textures: true,
     drops_unknown_ghost: true,
     assumed: Fields::all_but(&[
         Field::Protocol,
@@ -870,17 +881,14 @@ pub const THREE_D_420_LINUX: ThreeD = ThreeD {
         Field::Game,
         Field::GameLayer,
         Field::MissionPhases,
+        Field::TerrainChunks,
         Field::DtsMin,
         Field::DtsMax,
         Field::DifVersion,
         Field::ThreeDs,
         Field::Drawn,
+        Field::TerrainTextures,
     ]),
-    // Windows 4.20r8 crashes drawing near terrain under GDI GL; assumed here too.
-    terrain: Terrain {
-        chunks: false,
-        ..THREE_D_512.terrain
-    },
     ..THREE_D_512
 };
 
@@ -993,6 +1001,7 @@ pub fn fixture_row(label: &str, t: &ThreeD) -> String {
         b(t.mirrors_2d_position).into(),
         b(t.sees_2d_players).into(),
         b(t.takes_2d_chat).into(),
+        b(t.terrain_textures).into(),
         b(t.drops_unknown_ghost).into(),
         assumed,
     ]
@@ -1237,7 +1246,7 @@ mod tests {
             (ClientVersion::V3153, true, true),
             (ClientVersion::V404R2, true, true),
             (ClientVersion::V420R6, false, true),
-            (ClientVersion::V420R8, false, false),
+            (ClientVersion::V420R8, false, true),
             (ClientVersion::V500R7, false, true),
             (ClientVersion::V512, false, true),
         ];
@@ -1245,12 +1254,16 @@ mod tests {
             let t = of(v);
             assert_eq!(t.terrain.ter_file, ter, "{v:?}");
             assert_eq!(t.offers_terrain_chunks(), chunks, "{v:?}");
-            // 4.20r8 fills the cache, but crashes on the TerrainBlock.
-            let cache = chunks || v == ClientVersion::V420R8;
+            let cache = chunks;
             assert_eq!(t.terrain.cache == ChunkCache::Heights, cache, "{v:?}");
             assert_eq!(t.terrain.chunk_max > 0, cache, "{v:?}");
         }
+        // 4.20r8 draws streamed terrain, but never fetches its textures (lab).
+        let t4208 = of(ClientVersion::V420R8);
+        assert!(!t4208.terrain_textures && t4208.confirmed(Field::TerrainTextures));
+        assert!(t4208.confirmed(Field::TerrainChunks));
         let t512 = of(ClientVersion::V512);
+        assert!(t512.terrain_textures && t512.confirmed(Field::TerrainTextures));
         assert!(t512.confirmed(Field::TerrainChunks));
         assert!(t512.confirmed(Field::ChunkCache));
         assert!(t512.confirmed(Field::TerrainChunkMax));
