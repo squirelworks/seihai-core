@@ -115,7 +115,7 @@ pub enum Terraformer {
 /// The 3D content formats a build reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Formats {
-    /// Lowest DTS shape version (the low byte of the version word).
+    /// Lowest DTS shape version (the low byte of the version word); 0: no floor.
     pub dts_min: u8,
     /// Highest DTS shape version.
     pub dts_max: u8,
@@ -449,7 +449,7 @@ pub const THREE_D_304: ThreeD = ThreeD {
     terraformer: Terraformer::Full,
     terrain_editor: true,
     formats: Formats {
-        dts_min: 19,
+        dts_min: 0,
         dts_max: 24,
         dif_version: 44,
         three_ds: false,
@@ -507,7 +507,7 @@ pub const THREE_D_3153: ThreeD = ThreeD {
     terraformer: Terraformer::Full,
     terrain_editor: true,
     formats: Formats {
-        dts_min: 19,
+        dts_min: 0,
         dts_max: 24,
         dif_version: 44,
         three_ds: true,
@@ -564,7 +564,7 @@ pub const THREE_D_404: ThreeD = ThreeD {
     terraformer: Terraformer::Greyscale,
     terrain_editor: true,
     formats: Formats {
-        dts_min: 19,
+        dts_min: 0,
         dts_max: 24,
         dif_version: 44,
         three_ds: true,
@@ -705,6 +705,38 @@ pub const THREE_D_512: ThreeD = ThreeD {
     ..THREE_D_500
 };
 
+/// Linux 4.20r6 and 4.20r8 (`G3D22126`): they link as protocol 24, so they
+/// are 5.12's row except where the 2026-11-25 world lab read them (Graal_analysis
+/// `torque/lab-2026-11-25-g3d-worlds.md`). Its loader takes DTS 17, but a
+/// version-17 shape froze the client there: serve DTS 24. No version profile
+/// carries it, since Seihai has no Linux 4.20 version; it is reached by token
+/// through [`by_token`].
+pub const THREE_D_420_LINUX: ThreeD = ThreeD {
+    assumed: Fields::all_but(&[
+        Field::Protocol,
+        Field::Game,
+        Field::GameLayer,
+        Field::MissionPhases,
+        Field::ThreeDs,
+        Field::DtsMin,
+        Field::DtsMax,
+        Field::DifVersion,
+    ]),
+    ..THREE_D_512
+};
+
+/// 3D rows for builds that have a login token but no version profile, with
+/// the label of their fixture row: a server picks them by token.
+pub const TOKEN_ROWS: [(&str, &str, ThreeD); 1] = [("4.20 Linux", "G3D22126", THREE_D_420_LINUX)];
+
+/// The 3D row for a login token that has no version profile of its own.
+pub fn by_token(token: &str) -> Option<ThreeD> {
+    TOKEN_ROWS
+        .iter()
+        .find(|(_, t, _)| *t == token)
+        .map(|&(_, _, row)| row)
+}
+
 /// Every 3D row, with the label of the build it belongs to, in chain order.
 /// The Mac 4.04r2 and 5.12 rows are their Windows twin, all assumed.
 pub const ROWS: [(&str, ThreeD); 9] = [
@@ -816,9 +848,17 @@ mod tests {
             .lines()
             .filter(|l| !l.starts_with('#') && !l.is_empty())
             .collect();
-        assert_eq!(rows.len(), ROWS.len(), "one fixture row per 3D build");
+        assert_eq!(
+            rows.len(),
+            ROWS.len() + TOKEN_ROWS.len(),
+            "one fixture row per 3D build"
+        );
         for want in &rows {
             let label = want.split('\t').next().unwrap();
+            if let Some((_, _, t)) = TOKEN_ROWS.iter().find(|(l, _, _)| *l == label) {
+                assert_eq!(&fixture_row(label, t), want, "{label}");
+                continue;
+            }
             let p = profile::by_label(label).unwrap_or_else(|| panic!("no profile {label}"));
             let t = p
                 .three_d
@@ -834,6 +874,16 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn linux_420_is_reached_by_token() {
+        let t = by_token("G3D22126").unwrap();
+        assert_eq!(t.protocol, 24);
+        assert!(t.confirmed(Field::Protocol) && t.confirmed(Field::DifVersion));
+        assert!(!t.confirmed(Field::TextureNames));
+        assert!(t.reads_dts(24) && !t.reads_dts(25) && !t.reads_dts(16));
+        assert!(by_token("G3D14097").is_none());
     }
 
     #[test]
@@ -1062,9 +1112,9 @@ mod tests {
         assert!(t404.confirmed(Field::DtsMax));
         assert!(t512.confirmed(Field::DtsMax) && t512.confirmed(Field::DifVersion));
         assert!(t512.reads_dts(24) && !t512.reads_dts(25));
-        // DTS from 17 on 5.12 and from 19 on 4.04r2 (T3D-029).
+        // DTS 17 to 24 on 5.12; 4.04r2 has no floor, as stock TGE (T3D-029).
         assert!(t512.reads_dts(17) && !t512.reads_dts(16));
-        assert!(t404.reads_dts(19) && !t404.reads_dts(18));
+        assert!(t404.reads_dts(0) && t404.reads_dts(18));
         assert!(t512.confirmed(Field::DtsMin) && t404.confirmed(Field::DtsMin));
         assert!(!of(ClientVersion::V3153).confirmed(Field::DtsMin));
         assert_eq!(t404.formats.dif_version, 44);
