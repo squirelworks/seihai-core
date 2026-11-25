@@ -603,7 +603,7 @@ Generated; do not edit between the markers.
 
 #### 5.00r7 (`G3D22067`, binary, linked 2007-07)
 
-- protocol: **plo (server ids handled)**: +140 NPCWEAPONSCRIPT, +197 LOADSCRIPT; -100 RAWDATA, -108 UNKNOWN108, -196 (101 -> 100 ids)
+- protocol: **plo (server ids handled)**: +140 NPCWEAPONSCRIPT, +197 LOADSCRIPT; -196 (101 -> 102 ids)
 - protocol: **pli (client ids sent)**: +40 SHOOT, +43 MUTEPLAYER, +45 PROCESSRUNNING, +159 UPDATEPACKAGEREQUESTFILE; -3 NPCPROPS (59 -> 62 ids)
 - protocol: **showimg (id 24)**: every 5145 ms -> none
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","",""; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 152/154 PM and lister setup, 46, 44, props with OS win and code page 1252 -> first server "Login", nothing drawn until 178, login line ends win,"","",""
@@ -625,7 +625,7 @@ Generated; do not edit between the markers.
 
 #### 5.12 Mac (`G3D15097`, binary)
 
-- protocol: **plo (server ids handled)**: +100 RAWDATA, +108 UNKNOWN108; -41 STARTMESSAGE (100 -> 101 ids)
+- protocol: **plo (server ids handled)**: -41 STARTMESSAGE (102 -> 101 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends mac,"","","","8.0.0  Darwin Kernel Version 8.0.0: Sat Mar 26 14:15:22 PST 2005; root:xnu-792.obj~1/RELEASE_PPC"; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0
 - protocol: **gen5_compress_all**: yes -> no
 - unknown (pli): the Windows 5.12 set is kept; the lab saw 2, 23, 24, 37, 46 and 157
@@ -635,7 +635,7 @@ Generated; do not edit between the markers.
 
 #### 5.24r4 (`G3D15010`, binary, linked 2010-02-01)
 
-- protocol: **plo (server ids handled)**: +41 STARTMESSAGE, +109 UNKNOWN109, +198 SERVEROPTIONS; -75 PROFILE, -100 RAWDATA, -108 UNKNOWN108, -132 UNKNOWN132, -133 UNKNOWN133, -171 BIGMAP, -193 UNKNOWN193 (101 -> 97 ids)
+- protocol: **plo (server ids handled)**: +41 STARTMESSAGE, +109 UNKNOWN109, +198 SERVEROPTIONS; -75 PROFILE, -132 UNKNOWN132, -133 UNKNOWN133, -171 BIGMAP, -193 UNKNOWN193 (101 -> 99 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends mac,"","","","8.0.0  Darwin Kernel Version 8.0.0: Sat Mar 26 14:15:22 PST 2005; root:xnu-792.obj~1/RELEASE_PPC"; after the login basepackage.gupd, basepackage.gupd (first session also bigmap.txt), after the burst idle.gani, 46, 44, props with OS mac and code page 0 -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - unknown (files): stock gs2lib does not know G3D15010 and sends the pre-2.1 file layout; see documentation/v5v6-profiles.md
 - unknown (plo): 109 (probably a file redirect) and 198 (one GINT5) are in the set but not decoded
@@ -643,7 +643,7 @@ Generated; do not edit between the markers.
 
 #### 5.30r3 (`G3D26090`, binary, linked 2010-10-18)
 
-- protocol: **plo (server ids handled)**: -41 STARTMESSAGE, -181 UNKNOWN181 (97 -> 95 ids)
+- protocol: **plo (server ids handled)**: -41 STARTMESSAGE, -181 UNKNOWN181 (99 -> 97 ids)
 - unknown (pli): not read; 5.00r7's set is kept
 - source: unpacked from Themida and lab (clock set back): 95 PLO ids (41 and 181 out), bundles no files
 
@@ -655,7 +655,7 @@ Generated; do not edit between the markers.
 
 #### 6.00r2 (`G3D26090`, binary, linked 2011-06-12)
 
-- protocol: **plo (server ids handled)**: -165 MOVE, -169 UPGRADEURL (95 -> 93 ids)
+- protocol: **plo (server ids handled)**: -165 MOVE, -169 UPGRADEURL (97 -> 95 ids)
 - protocol: **pli (client ids sent)**: +3 NPCPROPS; -43 MUTEPLAYER, -80 PROFILEGET, -81 PROFILESET (61 -> 59 ids)
 - protocol: **login lobby**: first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 " -> first server "Login", nothing drawn until 178, login line ends win,"","","","6.2 9200 "
 - protocol: **gen5_long_frames**: no -> yes
@@ -674,7 +674,7 @@ Generated; do not edit between the markers.
 
 #### 6.015 (`G3D3007A`, inferred)
 
-- protocol: **plo (server ids handled)**: -175 SHOOT, -184 TAKESCREENSHOT (93 -> 91 ids)
+- protocol: **plo (server ids handled)**: -175 SHOOT, -184 TAKESCREENSHOT (95 -> 93 ids)
 - scripts: **gs2**: yes -> unknown
 - scripts: **resolve_host**: yes -> no
 - unknown (binary): no 6.00r7 or 6.01r5 binary; every value of this step is inferred
@@ -689,7 +689,7 @@ Generated; do not edit between the markers.
 
 #### 6.034 (`G3D2505C`, inferred)
 
-- protocol: **plo (server ids handled)**: +111 SETNETCOOKIE (91 -> 92 ids)
+- protocol: **plo (server ids handled)**: +111 SETNETCOOKIE (93 -> 94 ids)
 - protocol: **pli (client ids sent)**: +160 RC_FOLDERDELETE (59 -> 60 ids)
 - unknown (binary): no 6.03r4 binary; every value of this step is inferred
 - unknown (token): G3D2505C comes from GServer-v2's allowedversions.txt and gs2lib only; no 6.03r4 login was captured
