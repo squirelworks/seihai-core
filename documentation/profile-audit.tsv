@@ -2106,7 +2106,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 4.20r8	protocol	gen5_long_frames	ORIGIN	origin	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 4.20r8	scripts	resolve_host	ORIGIN	origin	carried, flagged unknown	only the modified engine DLL was readable; the stock 4.20r8 is in a password-protected archive
 5.00r7	protocol	plo (server ids handled)	5.00r7	binary	read here	
-5.00r7	protocol	pli (client ids sent)	5.00r7	binary	read here	only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
+5.00r7	protocol	pli (client ids sent)	5.00r7	binary	read here	complete static set (every send site uses a fixed id); reachability of each sender is static, not run
 5.00r7	protocol	udp	1.28 beta 2	binary	carried	
 5.00r7	props	own-player props	3.153	binary	carried, flagged unknown	own and other prop sets are 3.153's; no 5.x parser was read
 5.00r7	props	npc_max	3.153	binary	carried	
@@ -2155,12 +2155,12 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 5.00r7	files	large_file_size	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 5.00r7	ui	editor	2.3	inferred	carried	no 2.3 binary; the whole step is the 2.31 values
 5.00r7	protocol	login lobby	5.00r7	binary	read here	Seihai sends the three machine fields as an empty quoted string (the value 5.00r7 sent for its MAC field under Wine); stock GServer-v2 accepts all three empty (lab, 2026-10-31), other servers are untested | the base-file requests after the language (47 or 23 basepackage.gupd) are not sent | chat is a bold sans serif in the lab; its cell height is not known, 24 is kept
-5.00r7	protocol	gen5_round_down	4.04r2	binary	carried, flagged unknown	the gen-5 step count was not read in this binary; it inherits the round-down of 4.20r8 before it and 5.12 after it (both read), matching the round-down confirmed through 6.03r7 (lab 2026-11-19)
-5.00r7	protocol	gen5_compress_all	ORIGIN	origin	carried, flagged unknown	the gen-5 step count was not read in this binary; it inherits the round-down of 4.20r8 before it and 5.12 after it (both read), matching the round-down confirmed through 6.03r7 (lab 2026-11-19)
-5.00r7	protocol	gen5_long_frames	ORIGIN	origin	carried, flagged unknown	the gen-5 step count was not read in this binary; it inherits the round-down of 4.20r8 before it and 5.12 after it (both read), matching the round-down confirmed through 6.03r7 (lab 2026-11-19)
+5.00r7	protocol	gen5_round_down	4.04r2	binary	carried	
+5.00r7	protocol	gen5_compress_all	ORIGIN	origin	carried	
+5.00r7	protocol	gen5_long_frames	ORIGIN	origin	carried	
 5.00r7	scripts	resolve_host	ORIGIN	origin	carried	
 5.12	protocol	plo (server ids handled)	5.00r7	binary	carried	
-5.12	protocol	pli (client ids sent)	5.00r7	binary	carried, flagged unknown	not read; 5.00r7's set is kept | only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
+5.12	protocol	pli (client ids sent)	5.12	binary	read here	
 5.12	protocol	udp	1.28 beta 2	binary	carried	
 5.12	props	own-player props	3.153	binary	carried	
 5.12	props	npc_max	3.153	binary	carried	
@@ -2214,7 +2214,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 5.12	protocol	gen5_long_frames	ORIGIN	origin	carried, flagged unknown	a server must step as 5.12 does; GServer-v2 does not, so the lab runs it through a translating proxy
 5.12	scripts	resolve_host	ORIGIN	origin	carried	
 5.12 Mac	protocol	plo (server ids handled)	5.12 Mac	binary	read here	
-5.12 Mac	protocol	pli (client ids sent)	5.00r7	binary	carried, flagged unknown	the Windows 5.12 set is kept; the lab saw 2, 23, 24, 37, 46 and 157 | only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
+5.12 Mac	protocol	pli (client ids sent)	5.12	binary	carried, flagged unknown	the Windows 5.12 set is kept; the lab saw 2, 23, 24, 37, 46 and 157
 5.12 Mac	protocol	udp	1.28 beta 2	binary	carried	
 5.12 Mac	props	own-player props	3.153	binary	carried	
 5.12 Mac	props	npc_max	3.153	binary	carried	
@@ -2268,7 +2268,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 5.12 Mac	protocol	gen5_long_frames	ORIGIN	origin	carried	
 5.12 Mac	scripts	resolve_host	ORIGIN	origin	carried	
 5.24r4	protocol	plo (server ids handled)	5.24r4	binary	read here	109 (probably a file redirect) and 198 (one GINT5) are in the set but not decoded
-5.24r4	protocol	pli (client ids sent)	5.00r7	binary	carried, flagged unknown	not read; 5.00r7's set is kept | only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
+5.24r4	protocol	pli (client ids sent)	5.12	binary	carried	
 5.24r4	protocol	udp	1.28 beta 2	binary	carried	
 5.24r4	props	own-player props	3.153	binary	carried	
 5.24r4	props	npc_max	3.153	binary	carried	
@@ -2322,7 +2322,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 5.24r4	protocol	gen5_long_frames	ORIGIN	origin	carried	
 5.24r4	scripts	resolve_host	ORIGIN	origin	carried	
 5.30r3	protocol	plo (server ids handled)	5.30r3	binary	read here	
-5.30r3	protocol	pli (client ids sent)	5.00r7	binary	carried, flagged unknown	not read; 5.00r7's set is kept | only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
+5.30r3	protocol	pli (client ids sent)	5.12	binary	carried, flagged unknown	not read; 5.00r7's set is kept
 5.30r3	protocol	udp	1.28 beta 2	binary	carried	
 5.30r3	props	own-player props	3.153	binary	carried	
 5.30r3	props	npc_max	3.153	binary	carried	
@@ -2376,7 +2376,7 @@ NewWorld beta 2	scripts	resolve_host	ORIGIN	origin	carried
 5.30r3	protocol	gen5_long_frames	ORIGIN	origin	carried	
 5.30r3	scripts	resolve_host	ORIGIN	origin	carried	
 5.31r4	protocol	plo (server ids handled)	5.30r3	binary	carried	
-5.31r4	protocol	pli (client ids sent)	5.00r7	binary	carried, flagged unknown	not read; 5.00r7's set is kept | only constant send ids were read (a floor); 0, 3, 11, 20, 27, 30, 38 and 46 are taken from the lab or from 3.153 and 6.03r7, which both send them
+5.31r4	protocol	pli (client ids sent)	5.12	binary	carried	
 5.31r4	protocol	udp	1.28 beta 2	binary	carried	
 5.31r4	props	own-player props	3.153	binary	carried	
 5.31r4	props	npc_max	3.153	binary	carried	

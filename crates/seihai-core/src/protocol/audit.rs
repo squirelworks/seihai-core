@@ -222,14 +222,13 @@ mod tests {
 
     #[test]
     fn values_are_traced_to_the_step_that_set_them() {
-        // 5.12 keeps 5.00r7's PLO set and says its send ids were not read.
+        // 5.12 keeps 5.00r7's PLO set and reads its own send ids (G255).
         let r = row_of(ClientVersion::V512);
         let plo = get(&r, "plo (server ids handled)");
         assert_eq!(plo.set_by.unwrap().label, "5.00r7");
         assert_eq!(plo.evidence, Evidence::Carried);
         let pli = get(&r, "pli (client ids sent)");
-        assert_eq!(pli.evidence, Evidence::CarriedUnknown);
-        assert!(pli.notes.iter().any(|n| n.contains("not read")));
+        assert_eq!(pli.evidence, Evidence::ReadHere);
         // 5.24r4 reads its own PLO set.
         let r = row_of(ClientVersion::V524R4);
         assert_eq!(
