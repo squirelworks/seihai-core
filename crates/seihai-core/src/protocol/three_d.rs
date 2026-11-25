@@ -756,7 +756,9 @@ pub const THREE_D_420: ThreeD = ThreeD {
 pub const THREE_D_4208: ThreeD = ThreeD {
     // A lab run (Graal_analysis PR #854) linked it as protocol 24. It takes
     // the 5.12 TerrainBlock and chunk layout and fills the heights cache, then
-    // crashes soon after the TerrainBlock is added: no streamed terrain.
+    // crashes drawing terrain near the camera (from about 60 units up, never
+    // from 200). The lab VM has only GDI Generic OpenGL 1.1, so this is a crash
+    // under GDI GL, untested on Mesa or a GPU: no streamed terrain until then.
     protocol: 24,
     terrain: Terrain {
         chunks: false,
@@ -860,7 +862,7 @@ pub const THREE_D_420_LINUX: ThreeD = ThreeD {
         Field::ThreeDs,
         Field::Drawn,
     ]),
-    // Windows 4.20r8 crashes once a TerrainBlock is added; assumed here too.
+    // Windows 4.20r8 crashes drawing near terrain under GDI GL; assumed here too.
     terrain: Terrain {
         chunks: false,
         ..THREE_D_512.terrain
