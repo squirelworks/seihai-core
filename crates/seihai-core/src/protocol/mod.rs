@@ -31,6 +31,7 @@ pub mod tampercheck;
 pub mod three_d;
 mod tokens;
 mod version;
+pub mod version_pick;
 pub mod walkcadence;
 
 pub use board::BoardModify;
