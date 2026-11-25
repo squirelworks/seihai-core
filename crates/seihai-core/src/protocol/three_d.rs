@@ -136,6 +136,29 @@ pub enum TextureNames {
     AsNamed,
 }
 
+/// The most a build has been seen to draw on Seihai's gserver. A lab state,
+/// not a limit of the client: it moves up as the gserver learns what the
+/// build needs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Drawn {
+    /// Stayed on the loading picture (3.153, lab).
+    Nothing,
+    /// Only the Sky (4.04r2 under Wine, lab).
+    SkyOnly,
+    /// Terrain, shapes or `GameObject`s.
+    World,
+}
+
+impl Drawn {
+    pub const fn key(self) -> &'static str {
+        match self {
+            Drawn::Nothing => "nothing",
+            Drawn::SkyOnly => "sky_only",
+            Drawn::World => "world",
+        }
+    }
+}
+
 /// One field of [`ThreeD`], for [`ThreeD::assumed`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -172,11 +195,17 @@ pub enum Field {
     BigdataChunkMax,
     TerrainChunkMax,
     UdpPortOffset,
+    RequiresSky,
+    SkyGif,
+    Drawn,
+    Mirrors2dPosition,
+    Sees2dPlayers,
+    Takes2dChat,
 }
 
 impl Field {
     /// Every field, in the order of `three-d.toml`.
-    pub const ALL: [Field; 32] = [
+    pub const ALL: [Field; 38] = [
         Field::Protocol,
         Field::Game,
         Field::ClassTable,
@@ -209,6 +238,12 @@ impl Field {
         Field::BigdataChunkMax,
         Field::TerrainChunkMax,
         Field::UdpPortOffset,
+        Field::RequiresSky,
+        Field::SkyGif,
+        Field::Drawn,
+        Field::Mirrors2dPosition,
+        Field::Sees2dPlayers,
+        Field::Takes2dChat,
     ];
 
     /// The key in `three-d.toml`.
@@ -246,6 +281,12 @@ impl Field {
             Field::BigdataChunkMax => "bigdata_chunk_max",
             Field::TerrainChunkMax => "terrain_chunk_max",
             Field::UdpPortOffset => "udp_port_offset",
+            Field::RequiresSky => "requires_sky",
+            Field::SkyGif => "sky_gif",
+            Field::Drawn => "drawn",
+            Field::Mirrors2dPosition => "mirrors_2d_position",
+            Field::Sees2dPlayers => "sees_2d_players",
+            Field::Takes2dChat => "takes_2d_chat",
         }
     }
 
@@ -256,18 +297,18 @@ impl Field {
 
 /// A set of [`Field`]s: the fields of a row that are assumed.
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
-pub struct Fields(u32);
+pub struct Fields(u64);
 
 impl Fields {
     pub const NONE: Fields = Fields(0);
     /// Every field: a row whose 3D side was not read at all.
-    pub const ALL: Fields = Fields(u32::MAX >> (32 - Field::ALL.len()));
+    pub const ALL: Fields = Fields(u64::MAX >> (64 - Field::ALL.len()));
 
     pub const fn of(fields: &[Field]) -> Fields {
-        let mut m = 0u32;
+        let mut m = 0u64;
         let mut i = 0;
         while i < fields.len() {
-            m |= 1 << fields[i] as u8;
+            m |= 1u64 << fields[i] as u8;
             i += 1;
         }
         Fields(m)
@@ -279,7 +320,7 @@ impl Fields {
     }
 
     pub const fn contains(self, f: Field) -> bool {
-        self.0 & (1 << f as u8) != 0
+        self.0 & (1u64 << f as u8) != 0
     }
 
     pub fn iter(self) -> impl Iterator<Item = Field> {
@@ -338,6 +379,21 @@ pub struct ThreeD {
     pub bigdata_chunk_max: u8,
     /// The Torque UDP port is the listed gserver port plus this.
     pub udp_port_offset: u8,
+    /// The client crashes unless a `Sky` is ghosted (3.153, lab).
+    pub requires_sky: bool,
+    /// The client asks for sky textures as `.gif`, never `.png` (3.153, lab).
+    pub sky_gif: bool,
+    /// The most the build has been seen to draw on our gserver.
+    pub drawn: Drawn,
+    /// The client's 3D movement also moves its 2D player on the gserver, so
+    /// 2D clients in the level see it walk. False where read (4.04r2, 5.12):
+    /// the gserver must carry the position across itself.
+    pub mirrors_2d_position: bool,
+    /// The client draws 2D players in its level (5.12 does not, lab H1).
+    pub sees_2d_players: bool,
+    /// Chat from 2D players in the level reaches the client
+    /// (`onRemotePlayerChats`, over TCP; 5.12, lab H1).
+    pub takes_2d_chat: bool,
     /// The fields that are assumed for this build, not read.
     pub assumed: Fields,
 }
@@ -419,6 +475,25 @@ impl ThreeD {
         version >= self.formats.dts_min && version <= self.formats.dts_max
     }
 
+    /// The name the client asks for when a Sky names the texture `texture`:
+    /// a build with [`ThreeD::sky_gif`] asks for `<stem>.gif`.
+    pub fn sky_texture_request_name(&self, texture: &str) -> String {
+        if !self.sky_gif {
+            return texture.to_string();
+        }
+        let stem = match texture.rfind('.') {
+            Some(i) if !texture[i..].contains('/') => &texture[..i],
+            _ => texture,
+        };
+        format!("{stem}.gif")
+    }
+
+    /// 2D clients in the level only see this build's player walk if the
+    /// gserver moves its 2D player from its 3D position itself.
+    pub const fn needs_2d_position_relay(&self) -> bool {
+        !self.mirrors_2d_position
+    }
+
     /// The Torque UDP port for a server listed on `listed_port`.
     pub const fn udp_port(&self, listed_port: u16) -> u16 {
         listed_port.wrapping_add(self.udp_port_offset as u16)
@@ -467,29 +542,34 @@ pub const THREE_D_304: ThreeD = ThreeD {
     bigdata: false,
     bigdata_chunk_max: 0,
     udp_port_offset: 1,
-    assumed: Fields::of(&[
-        Field::GreyscaleRgba32Only,
-        Field::MissionPhases,
-        Field::PhasesOptional,
-        Field::ClientMoves,
-        Field::ControlObjects,
-        Field::TerFile,
-        Field::TerMax,
-        Field::TerrainTexture,
-        Field::Water,
-        Field::ServerScripts,
-        Field::DtsMin,
-        Field::DtsMax,
-        Field::DifVersion,
-        Field::ThreeDs,
-        Field::Md3Version,
-        Field::TextureNames,
-        Field::DownloadRefused,
-        Field::UdpPortOffset,
+    requires_sky: false,
+    sky_gif: false,
+    drawn: Drawn::World,
+    mirrors_2d_position: false,
+    sees_2d_players: false,
+    takes_2d_chat: false,
+    assumed: Fields::all_but(&[
+        Field::Protocol,
+        Field::Game,
+        Field::ClassTable,
+        Field::ClassIds12Bit,
+        Field::LengthPrefixes,
+        Field::GameLayer,
+        Field::TerrainChunks,
+        Field::ChunkCache,
+        Field::TorqueScript,
+        Field::Terraformer,
+        Field::TerrainEditor,
+        Field::Bigdata,
+        Field::BigdataChunkMax,
+        Field::TerrainChunkMax,
     ]),
 };
 
 /// 3.153 Mac: Graal's net changes, the TGE game layer, TorqueScript, both terrain paths.
+/// On our gserver (lab) it needs a ghosted `Sky`, asks for sky textures as
+/// `.gif`, runs only its 12 shipped `clientCmd` handlers and has drawn
+/// nothing past its loading picture yet.
 pub const THREE_D_3153: ThreeD = ThreeD {
     protocol: 19,
     game: "Graal3D",
@@ -523,27 +603,33 @@ pub const THREE_D_3153: ThreeD = ThreeD {
         md3_version: 15,
     },
     texture_names: TextureNames::AsNamed,
-    download_refused: &[],
+    // Never asks for .cs, .dso or .ter (lab), so a server cannot push script.
+    download_refused: REFUSE_SCRIPTS_TER,
     bigdata: true,
     bigdata_chunk_max: 191,
     udp_port_offset: 1,
+    requires_sky: true,
+    sky_gif: true,
+    drawn: Drawn::Nothing,
+    mirrors_2d_position: false,
+    sees_2d_players: false,
+    takes_2d_chat: false,
     assumed: Fields::of(&[
-        Field::GreyscaleRgba32Only,
-        Field::MissionPhases,
         Field::PhasesOptional,
-        Field::ControlObjects,
         Field::TerMax,
-        Field::ChunkCache,
         Field::TerrainTexture,
         Field::Water,
+        Field::GreyscaleRgba32Only,
         Field::DtsMin,
         Field::DtsMax,
         Field::DifVersion,
         Field::Md3Version,
         Field::TextureNames,
-        Field::DownloadRefused,
         Field::BigdataChunkMax,
         Field::TerrainChunkMax,
+        Field::Mirrors2dPosition,
+        Field::Sees2dPlayers,
+        Field::Takes2dChat,
     ]),
 };
 
@@ -586,14 +672,23 @@ pub const THREE_D_404: ThreeD = ThreeD {
     bigdata: true,
     bigdata_chunk_max: 191,
     udp_port_offset: 1,
+    requires_sky: false,
+    sky_gif: false,
+    drawn: Drawn::SkyOnly,
+    mirrors_2d_position: false,
+    sees_2d_players: false,
+    takes_2d_chat: false,
     assumed: Fields::of(&[
-        Field::GreyscaleRgba32Only,
         Field::PhasesOptional,
-        Field::ControlObjects,
         Field::ChunkCache,
         Field::TerrainTexture,
+        Field::GreyscaleRgba32Only,
         Field::TextureNames,
         Field::TerrainChunkMax,
+        Field::RequiresSky,
+        Field::SkyGif,
+        Field::Sees2dPlayers,
+        Field::Takes2dChat,
     ]),
 };
 
@@ -635,6 +730,12 @@ pub const THREE_D_420: ThreeD = ThreeD {
     bigdata: true,
     bigdata_chunk_max: 191,
     udp_port_offset: 1,
+    requires_sky: false,
+    sky_gif: false,
+    drawn: Drawn::World,
+    mirrors_2d_position: false,
+    sees_2d_players: false,
+    takes_2d_chat: true,
     assumed: Fields::all_but(&[
         Field::Protocol,
         Field::Game,
@@ -666,10 +767,11 @@ pub const THREE_D_4208: ThreeD = ThreeD {
         Field::Game,
         Field::GameLayer,
         Field::MissionPhases,
-        Field::TorqueScript,
-        Field::ServerScripts,
         Field::TerrainChunks,
         Field::ChunkCache,
+        Field::TorqueScript,
+        Field::ServerScripts,
+        Field::Drawn,
     ]),
     ..THREE_D_420
 };
@@ -712,6 +814,12 @@ pub const THREE_D_500: ThreeD = ThreeD {
     bigdata: true,
     bigdata_chunk_max: 191,
     udp_port_offset: 1,
+    requires_sky: false,
+    sky_gif: false,
+    drawn: Drawn::World,
+    mirrors_2d_position: false,
+    sees_2d_players: false,
+    takes_2d_chat: true,
     assumed: Fields::all_but(&[
         Field::Protocol,
         Field::Game,
@@ -720,13 +828,17 @@ pub const THREE_D_500: ThreeD = ThreeD {
         Field::MissionPhases,
         Field::TerrainChunks,
         Field::ChunkCache,
+        Field::TerrainTexture,
+        Field::TorqueScript,
+        Field::ServerScripts,
+        Field::ThreeDs,
     ]),
 };
 
 /// 5.12 Windows: the most-read build. Streamed terrain and its cache run
 /// live; a `Camera` control object and bare-name textures seen in a capture.
 pub const THREE_D_512: ThreeD = ThreeD {
-    assumed: Fields::NONE,
+    assumed: Fields::of(&[Field::RequiresSky, Field::SkyGif]),
     ..THREE_D_500
 };
 
@@ -742,10 +854,11 @@ pub const THREE_D_420_LINUX: ThreeD = ThreeD {
         Field::Game,
         Field::GameLayer,
         Field::MissionPhases,
-        Field::ThreeDs,
         Field::DtsMin,
         Field::DtsMax,
         Field::DifVersion,
+        Field::ThreeDs,
+        Field::Drawn,
     ]),
     // Windows 4.20r8 crashes once a TerrainBlock is added; assumed here too.
     terrain: Terrain {
@@ -858,6 +971,12 @@ pub fn fixture_row(label: &str, t: &ThreeD) -> String {
         t.bigdata_chunk_max.to_string(),
         t.terrain.chunk_max.to_string(),
         t.udp_port_offset.to_string(),
+        b(t.requires_sky).into(),
+        b(t.sky_gif).into(),
+        t.drawn.key().into(),
+        b(t.mirrors_2d_position).into(),
+        b(t.sees_2d_players).into(),
+        b(t.takes_2d_chat).into(),
         assumed,
     ]
     .join("\t")
@@ -905,6 +1024,35 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn session_needs_and_2d_mixing() {
+        let t = of(ClientVersion::V3153);
+        assert!(t.requires_sky && t.confirmed(Field::RequiresSky));
+        assert_eq!(t.sky_texture_request_name("sky/day.png"), "sky/day.gif");
+        assert_eq!(t.sky_texture_request_name("day"), "day.gif");
+        assert!(!t.requests_download("main.cs") && !t.requests_download("x.ter"));
+        assert!(t.confirmed(Field::DownloadRefused) && t.confirmed(Field::ServerScripts));
+        assert_eq!(t.drawn, Drawn::Nothing);
+
+        let t = of(ClientVersion::V404R2);
+        assert_eq!(t.drawn, Drawn::SkyOnly);
+        assert!(t.needs_2d_position_relay() && t.confirmed(Field::Mirrors2dPosition));
+
+        let t = of(ClientVersion::V512);
+        assert!(!t.requires_sky && !t.confirmed(Field::RequiresSky));
+        assert_eq!(t.sky_texture_request_name("day.png"), "day.png");
+        assert_eq!(t.drawn, Drawn::World);
+        assert!(!t.sees_2d_players && t.takes_2d_chat && t.needs_2d_position_relay());
+        for f in [
+            Field::Sees2dPlayers,
+            Field::Takes2dChat,
+            Field::Mirrors2dPosition,
+        ] {
+            assert!(t.confirmed(f), "{f:?}");
+        }
+        assert!(Drawn::Nothing < Drawn::SkyOnly && Drawn::SkyOnly < Drawn::World);
     }
 
     #[test]
@@ -1052,9 +1200,11 @@ mod tests {
         }
         assert!(of(ClientVersion::V512).confirmed(Field::TorqueScript));
         assert!(of(ClientVersion::V404R2).confirmed(Field::DownloadRefused));
-        assert!(!of(ClientVersion::V500R7).confirmed(Field::TorqueScript));
-        // 3.153 compiles scripts, so it is not assumed to refuse them.
-        assert!(of(ClientVersion::V3153).requests_download("main.cs"));
+        // The 5.00r7 engine DLL read: no TorqueScript exec.
+        assert!(of(ClientVersion::V500R7).confirmed(Field::TorqueScript));
+        // 3.153 compiles its own scripts but never asks for one (lab).
+        assert!(!of(ClientVersion::V3153).requests_download("main.cs"));
+        assert!(of(ClientVersion::V3153).runs_torque_script());
     }
 
     #[test]
@@ -1129,8 +1279,8 @@ mod tests {
         assert!(!t404.accepts_control(ControlObject::GameObject));
         assert_eq!(t404.mission_phases, 3);
         assert!(!t404.phases_optional);
-        // Not played on 4.04r2 yet.
-        assert!(!t404.confirmed(Field::ControlObjects));
+        // Played on our gserver (lab, under Wine): a stock Player.
+        assert!(t404.confirmed(Field::ControlObjects));
     }
 
     #[test]
