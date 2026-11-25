@@ -115,6 +115,8 @@ pub enum Terraformer {
 /// The 3D content formats a build reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Formats {
+    /// Lowest DTS shape version (the low byte of the version word).
+    pub dts_min: u8,
     /// Highest DTS shape version.
     pub dts_max: u8,
     /// DIF interior resource version; 0 for none.
@@ -158,6 +160,7 @@ pub enum Field {
     ServerScripts,
     Terraformer,
     TerrainEditor,
+    DtsMin,
     DtsMax,
     DifVersion,
     ThreeDs,
@@ -172,7 +175,7 @@ pub enum Field {
 
 impl Field {
     /// Every field, in the order of `three-d.toml`.
-    pub const ALL: [Field; 30] = [
+    pub const ALL: [Field; 31] = [
         Field::Protocol,
         Field::Game,
         Field::ClassTable,
@@ -193,6 +196,7 @@ impl Field {
         Field::ServerScripts,
         Field::Terraformer,
         Field::TerrainEditor,
+        Field::DtsMin,
         Field::DtsMax,
         Field::DifVersion,
         Field::ThreeDs,
@@ -228,6 +232,7 @@ impl Field {
             Field::ServerScripts => "server_scripts",
             Field::Terraformer => "terraformer",
             Field::TerrainEditor => "terrain_editor",
+            Field::DtsMin => "dts_min",
             Field::DtsMax => "dts_max",
             Field::DifVersion => "dif_version",
             Field::ThreeDs => "three_ds",
@@ -405,7 +410,7 @@ impl ThreeD {
 
     /// The build reads a DTS shape of this version.
     pub const fn reads_dts(&self, version: u8) -> bool {
-        version <= self.formats.dts_max
+        version >= self.formats.dts_min && version <= self.formats.dts_max
     }
 
     /// The Torque UDP port for a server listed on `listed_port`.
@@ -444,6 +449,7 @@ pub const THREE_D_304: ThreeD = ThreeD {
     terraformer: Terraformer::Full,
     terrain_editor: true,
     formats: Formats {
+        dts_min: 19,
         dts_max: 24,
         dif_version: 44,
         three_ds: false,
@@ -464,6 +470,7 @@ pub const THREE_D_304: ThreeD = ThreeD {
         Field::TerrainTexture,
         Field::Water,
         Field::ServerScripts,
+        Field::DtsMin,
         Field::DtsMax,
         Field::DifVersion,
         Field::ThreeDs,
@@ -500,6 +507,7 @@ pub const THREE_D_3153: ThreeD = ThreeD {
     terraformer: Terraformer::Full,
     terrain_editor: true,
     formats: Formats {
+        dts_min: 19,
         dts_max: 24,
         dif_version: 44,
         three_ds: true,
@@ -518,6 +526,7 @@ pub const THREE_D_3153: ThreeD = ThreeD {
         Field::ChunkCache,
         Field::TerrainTexture,
         Field::Water,
+        Field::DtsMin,
         Field::DtsMax,
         Field::DifVersion,
         Field::Md3Version,
@@ -555,6 +564,7 @@ pub const THREE_D_404: ThreeD = ThreeD {
     terraformer: Terraformer::Greyscale,
     terrain_editor: true,
     formats: Formats {
+        dts_min: 19,
         dts_max: 24,
         dif_version: 44,
         three_ds: true,
@@ -601,6 +611,7 @@ pub const THREE_D_420: ThreeD = ThreeD {
     terraformer: Terraformer::Greyscale,
     terrain_editor: true,
     formats: Formats {
+        dts_min: 17,
         dts_max: 24,
         dif_version: 44,
         three_ds: true,
@@ -665,6 +676,7 @@ pub const THREE_D_500: ThreeD = ThreeD {
     terraformer: Terraformer::Greyscale,
     terrain_editor: true,
     formats: Formats {
+        dts_min: 17,
         dts_max: 24,
         dif_version: 44,
         three_ds: true,
@@ -768,6 +780,7 @@ pub fn fixture_row(label: &str, t: &ThreeD) -> String {
         }
         .into(),
         b(t.terrain_editor).into(),
+        t.formats.dts_min.to_string(),
         t.formats.dts_max.to_string(),
         t.formats.dif_version.to_string(),
         b(t.formats.three_ds).into(),
@@ -1049,6 +1062,11 @@ mod tests {
         assert!(t404.confirmed(Field::DtsMax));
         assert!(t512.confirmed(Field::DtsMax) && t512.confirmed(Field::DifVersion));
         assert!(t512.reads_dts(24) && !t512.reads_dts(25));
+        // DTS from 17 on 5.12 and from 19 on 4.04r2 (T3D-029).
+        assert!(t512.reads_dts(17) && !t512.reads_dts(16));
+        assert!(t404.reads_dts(19) && !t404.reads_dts(18));
+        assert!(t512.confirmed(Field::DtsMin) && t404.confirmed(Field::DtsMin));
+        assert!(!of(ClientVersion::V3153).confirmed(Field::DtsMin));
         assert_eq!(t404.formats.dif_version, 44);
         assert!(!of(ClientVersion::V304).formats.three_ds);
         assert!(t512.formats.three_ds && t512.confirmed(Field::ThreeDs));
