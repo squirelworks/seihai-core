@@ -288,7 +288,7 @@ impl Era {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Need {
     /// The server is listed as a 3D server (`3 ` prefix): prefer a build
-    /// with a 3D side.
+    /// with a 3D side. Otherwise prefer a build without one.
     pub three_d: bool,
     /// Versions that were already refused or failed on this server.
     pub refused: Vec<ClientVersion>,
@@ -313,8 +313,11 @@ pub enum Pick {
 /// A candidate's rank: higher is better. Field order is priority order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct Rank {
-    /// Has a 3D side, when the server is a 3D one (always true otherwise).
-    three_d: bool,
+    /// The build's 3D side matches the server: a `three_d` row for a 3D
+    /// server, none for a 2D one. A G3D build on a 2D server logs in as a 3D
+    /// client, so the server may send it Torque objects and terrain that Ato
+    /// only draws flat, and those rows are mostly assumed from 5.12.
+    side_fits: bool,
     /// Sure to be admitted (named, or a stock entry in a range).
     sure: bool,
     /// Read from a binary, not inferred.
@@ -329,7 +332,7 @@ fn rank(v: ClientVersion, admit: Admit, need: &Need) -> Rank {
     let p = v.profile();
     let all = ClientVersion::all_versions();
     Rank {
-        three_d: !need.three_d || p.three_d.is_some(),
+        side_fits: need.three_d == p.three_d.is_some(),
         sure: admit >= Admit::InRange,
         binary: p.basis == super::Basis::Binary,
         listed: v.listed_by_default(),
@@ -353,9 +356,9 @@ pub fn ranked(list: &AllowedList, need: &Need) -> Vec<(ClientVersion, Admit)> {
 
 /// The version to log in as next, from a server's allowed list.
 ///
-/// - The best candidate by [`ranked`] wins: a 3D build for a 3D server, then
-///   a sure admit, then a binary-backed row, then a default-listed one, then
-///   the newest.
+/// - The best candidate by [`ranked`] wins: a 3D build for a 3D server and
+///   a build without a 3D side for a 2D one, then a sure admit, then a
+///   binary-backed row, then a default-listed one, then the newest.
 /// - The player is asked only when the default-listed versions the list
 ///   takes fall in two or more runs (a listed version between them is not
 ///   taken) and those runs are in different [`Era`]s. One option per era:
@@ -426,15 +429,19 @@ pub fn pick(list: &AllowedList, need: &Need) -> Pick {
 }
 
 /// The version to try first on a server with no remembered list: the newest
-/// default-listed build (a 3D one for a 3D server). If it is refused, the
-/// refusal carries the list for [`pick`].
+/// default-listed build whose 3D side matches the server (see [`Need`]). If
+/// it is refused, the refusal carries the list for [`pick`].
 pub fn first_try(need: &Need) -> ClientVersion {
-    ClientVersion::reborn_versions()
-        .iter()
-        .rev()
-        .copied()
-        .filter(|v| !need.refused.contains(v))
-        .find(|v| !need.three_d || v.profile().three_d.is_some())
+    let left = || {
+        ClientVersion::reborn_versions()
+            .iter()
+            .rev()
+            .copied()
+            .filter(|v| !need.refused.contains(v))
+    };
+    left()
+        .find(|v| need.three_d == v.profile().three_d.is_some())
+        .or_else(|| left().next())
         .unwrap_or_default()
 }
 
@@ -468,14 +475,21 @@ mod tests {
         assert_eq!(l.admits("GNW03014"), Admit::Named);
         assert_eq!(l.admits("G3D22067"), Admit::Named);
         assert_eq!(l.admits("G3D14097"), Admit::No);
-        // 2.22 and 5.00r7 are both NewMain: the newest wins.
-        assert_eq!(pick(&l, &Need::default()), Pick::Auto(V500R7));
-        // Once 5.00r7 fails there, 2.22.
+        // 2.22 and 5.00r7 are both NewMain, and 5.00r7 is a G3D build:
+        // on a 2D server, 2.22.
+        assert_eq!(pick(&l, &Need::default()), Pick::Auto(V222));
+        // Once 2.22 fails there, 5.00r7.
         let need = Need {
-            refused: vec![V500R7],
+            refused: vec![V222],
             ..Need::default()
         };
-        assert_eq!(pick(&l, &need), Pick::Auto(V222));
+        assert_eq!(pick(&l, &need), Pick::Auto(V500R7));
+        // Listed as a 3D server, 5.00r7.
+        let need = Need {
+            three_d: true,
+            ..Need::default()
+        };
+        assert_eq!(pick(&l, &need), Pick::Auto(V500R7));
     }
 
     /// "S2", 2026-10-30: `Allowed: 2.22, 1.41r1 - iPhone Belote 1.5`.
@@ -540,8 +554,9 @@ mod tests {
             Pick::Auto(V141)
         );
         // newmain = GNW24011:GNW28015, G3D16053:G3D28015
+        // 3.04 and 3.153 are G3D builds, so a 2D server gets 2.31.
         let l = AllowedList::parse("2.0 - 2.31, 3.0 - 3.153");
-        assert_eq!(pick(&l, &Need::default()), Pick::Auto(V304));
+        assert_eq!(pick(&l, &Need::default()), Pick::Auto(V231));
         // modern = G3D14097:GNP1905C
         let l = AllowedList::parse("5.12 - 6.1.1.3");
         assert_eq!(pick(&l, &Need::default()), Pick::Auto(V603R7));

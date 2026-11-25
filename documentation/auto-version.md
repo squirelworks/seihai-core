@@ -51,8 +51,13 @@ and a change to the launcher.
 The candidates are the profiles the list takes, minus the ones already
 refused on this server. They are ranked by these rules, in order:
 
-1. **3D.** For a server listed with the `3 ` prefix, a build with a
-   `three_d` row (3.04 to 5.12).
+1. **3D side matches the server.** For a server listed with the `3 `
+   prefix, a build with a `three_d` row (3.04 to 5.12). For any other
+   server, a build without one. A G3D build logs in as a 3D client, so a 2D
+   server may send it Torque objects and terrain that Ato only draws flat.
+   Those rows are also mostly assumed from 5.12: 25 of 5.00r7's 32 3D
+   fields are assumed, and its props use 3.153's parser. Ato draws 2.22 and
+   5.00r7 the same way, so the newer build gains nothing on a 2D server.
 2. **Sure.** Named in the list, or a stock entry inside a range, ahead of
    `Unsure`.
 3. **Profile quality.** Read from a binary (`Basis::Binary`) ahead of
@@ -72,7 +77,8 @@ refused on this server. They are ranked by these rules, in order:
   with the first. The card offers each era's best version, with the overall
   best first and recommended.
 - Otherwise pick at once. A gap inside one era is not a question: for
-  `2.22, 5.07` (Graal the Adventure), 5.00r7 is picked. A single range that
+  `2.22, 5.07` (Graal the Adventure), 2.22 is picked by rule 1. 5.00r7 is
+  picked if 2.22 is refused or the server is listed as 3D. A single range that
   crosses eras, such as `1.41r1 - iPhone Belote 1.5` (S2), is not a question
   either: 6.03r7 is picked.
 - The answer is saved for that server, so the question comes once.
@@ -81,7 +87,7 @@ refused on this server. They are ranked by these rules, in order:
 
 1. **First try.** Use the version remembered for this server if there is
    one. Otherwise use `version_pick::first_try`: the newest default-listed
-   build, or the newest one with a 3D side for a 3D server. If the server
+   build whose 3D side matches the server (rule 1). If the server
    takes it, nothing else happens.
 2. **Refused with a list.** Parse it (`AllowedList::from_disconnect`), add
    the refused version to `Need::refused`, and `pick`. Log in again with the
@@ -140,9 +146,10 @@ before the password is sent.
 
 ## Open
 
-- Whether 5.00r7 or 2.22 should win on a NewMain server that takes both.
-  The rule picks the newest, but Ato still draws 3.x to 5.x flat. If that
-  matters, a per-line maturity weight can go between rules 4 and 5.
+- A 2D server whose content needs GS2 delivery (S>C 140 `NPCWEAPONSCRIPT`,
+  197 `LOADSCRIPT`), which 2.22 lacks, would want 5.00r7 over 2.22. A
+  server that still takes 2.22 serves GS1 content, so this case is rare.
+  The fallback covers it: when 2.22 fails there, 5.00r7 is tried next.
 - Stock gs2lib's spelling of some names (for example `2.05` and `2.05r2`).
   The table accepts both, and a name it does not know is kept as
   `AllowedItem::Unknown` and takes nothing.
