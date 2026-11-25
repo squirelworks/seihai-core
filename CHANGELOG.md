@@ -7,6 +7,8 @@ Unreleased; the release PR moves them under the new version.
 
 ## Unreleased
 
+- Every version profile now has `three_d`, the build's Torque 3D side (`protocol::three_d`): Torque protocol, game string, class table and framing, game layer, mission phases and control objects, `.ter` vs streamed terrain with the `levels3d/heights` cache and the 1023-byte chunk limit, terrain texture format, TorqueScript, Terraformer and TerrainEditor, DTS/DIF/3DS/MD3 bounds, texture naming (5.12 strips `.png`), the `.dso`/`.cs`/`.ter` download filter and the BigData chunk limit. 3.04 to 5.12 (Windows and Mac) have one; every other build has `None`. Each row lists the fields that are assumed rather than read, and helpers (`offers_terrain_chunks`, `runs_torque_script`, `requests_download`, `texture_request_name`, `accepts_control`) let Ato and the gserver gate behaviour per build. Mirrored from Graal_analysis `version-profiles/three-d.toml` into `three_d_toml.tsv` by seihai `tools/gen_three_d_fixture.py`; a unit test checks every row against it. The "3d not modelled" unknowns on those steps now name what is still assumed. Breaking: a new field in `VersionProfile` and `chain::Delta`.
+
 - GANI frame drawing widens origin and placement translations before clipping, avoiding coordinate overflow while retaining visible sprite placement, transparency and replacement behavior. Public APIs and dependencies are unchanged.
 
 - Own-player position updates now apply precise X2 and Y2 coordinates when the receiver profile accepts them, retaining the other axis when an update supplies only one.

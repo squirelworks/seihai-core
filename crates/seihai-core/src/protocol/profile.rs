@@ -1006,6 +1006,10 @@ pub struct VersionProfile {
     pub world: WorldRules,
     /// Which script engines the build runs, as far as the evidence goes.
     pub scripts: Scripts,
+    /// The Torque 3D side (3.04 to 5.12); `None` for a build without one.
+    /// Each field says whether it was read or is assumed
+    /// ([`super::three_d::ThreeD::assumed`]).
+    pub three_d: Option<super::three_d::ThreeD>,
 }
 
 /// Whether a build runs a script engine.
