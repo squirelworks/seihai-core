@@ -1367,8 +1367,9 @@ pub const CHAIN: &[Step] = &[
         date: "2007-07",
         basis: Basis::Binary,
         delta: Delta {
-            // Against 4.20r8: 100, 108 and 196 out; 140 and 197 in.
-            plo: IdDelta::plus_minus(&[140, 197], &[100, 108, 196]),
+            // Against 4.20r8: 196 out; 140 and 197 in. 100 and 108 are tested
+            // before the switch, as in 4.20r8 (Graal_analysis G262 read).
+            plo: IdDelta::plus_minus(&[140, 197], &[196]),
             // Every send site in the binary, read 2026-11-25 (Graal_analysis
             // `protocol/ids-sent-512-status.md`, G255): all fixed ids. Against
             // 4.20r8: 40, 43, 45 and 159 in, 3 out. The lobby, list and chat are 4.x's.
@@ -1421,8 +1422,8 @@ pub const CHAIN: &[Step] = &[
         basis: Basis::Binary,
         delta: Delta {
             // Static read 2026-11-13: the Mac 4.20r6 set plus 140 and 197, so
-            // against the Windows 5.12 without 41 and with 100 and 108.
-            plo: IdDelta::plus_minus(&[100, 108], &[41]),
+            // against the Windows 5.12 without 41.
+            plo: IdDelta::plus_minus(&[], &[41]),
             lobby: Some(Some(LOBBY_512_MAC)),
             // Rounds down as the Windows 5.12, but sends short bodies raw.
             gen5_compress_all: Some(false),
@@ -1442,8 +1443,8 @@ pub const CHAIN: &[Step] = &[
         date: "2010-02-01",
         basis: Basis::Binary,
         delta: Delta {
-            // Against the Windows 5.12; 41, 100 and 108 undo the Mac 5.12 row.
-            plo: IdDelta::plus_minus(&[41, 109, 198], &[75, 100, 108, 132, 133, 171, 193]),
+            // Against the Windows 5.12; 41 undoes the Mac 5.12 row.
+            plo: IdDelta::plus_minus(&[41, 109, 198], &[75, 132, 133, 171, 193]),
             // Not machine-read (only a packed installer was to hand): it
             // inherits round-down from 5.12 before it and 6.03r7 after it, both
             // read round-down (lab 2026-11-13 and 2026-11-19).

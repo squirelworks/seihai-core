@@ -1285,7 +1285,7 @@ mod tests {
         assert_eq!(ids(ClientVersion::V512Mac), mac512);
         assert_eq!(n(ClientVersion::V512Mac), 101);
         assert_eq!(n(ClientVersion::V404R2), 98);
-        assert_eq!(n(ClientVersion::V512), 100);
+        assert_eq!(n(ClientVersion::V512), 102);
         // Every gen-5 build rounds the compressed step down (floor(len/4)):
         // read in the binaries (4.04r2 Win/Mac, 4.20r6 Mac, 4.20r8, 5.00r7,
         // 5.12 Win/Mac, 6.03r7 Linux) and inferred for the unread 5.24r4,
@@ -1309,29 +1309,31 @@ mod tests {
         assert!(!profile(ClientVersion::V139).protocol.plo.contains(42));
     }
 
-    /// seihai-core#7 / seihai-gserver#95: `PLO_PING`-like 108 is handled
-    /// by the 4.20r6 (Mac), 4.20r8 and Mac 5.12 reads only. The PLO
-    /// switches of 4.04r2 (both), 5.00r7, Windows 5.12, 5.24r4 and later (Linux 6.01r1 and
-    /// 6.03r7 read, Graal_analysis `v5v6/6x-findings.md`) have no case for
-    /// it, though 6.x still sends 162, the 4.x answer to 108. A server must
-    /// not count on a 6.x client answering 108 until a lab shows one does.
+    /// seihai-core#7 / seihai-gserver#95: `PLO_PING`-like 108. The 4.04r2
+    /// switches (Windows and Mac) have no case for it. 4.11 and later test
+    /// 100 and 108 before the main switch; the 5.00r7, 5.12 and 6.03r7 reads
+    /// for Graal_analysis G262 (2026-11-25) confirmed that, so the older
+    /// switch-only lists that left 108 out for 5.x/6.x were incomplete.
+    /// This is a static read: no lab has yet shown a 5.x/6.x client answer a
+    /// 108 with 162, so a server should still not depend on the answer.
     #[test]
     fn id_108_follows_the_binary_reads() {
         use ClientVersion::*;
-        for v in [V420R6, V420R8, V512Mac] {
-            assert!(profile(v).protocol.plo.contains(108), "{v:?}");
-        }
         for v in [
-            V404R2,
-            V404R2Mac,
+            V420R6,
+            V420R8,
             V500R7,
             V512,
+            V512Mac,
             V524R4,
             V531R4,
             V600R2,
             V603R7,
             V603R7Linux,
         ] {
+            assert!(profile(v).protocol.plo.contains(108), "{v:?}");
+        }
+        for v in [V404R2, V404R2Mac] {
             assert!(!profile(v).protocol.plo.contains(108), "{v:?}");
         }
         for v in [V600R2, V603R7] {
