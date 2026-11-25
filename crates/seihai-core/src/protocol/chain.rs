@@ -37,6 +37,10 @@ use super::profile::{
 };
 use super::showimg::ShowImgInfo;
 use super::tampercheck::TamperInfo;
+use super::three_d::{
+    ThreeD, THREE_D_304, THREE_D_3153, THREE_D_404, THREE_D_420, THREE_D_4208, THREE_D_500,
+    THREE_D_512,
+};
 use super::version::{ClientVersion, EncryptionGen};
 use crate::difftest::names;
 
@@ -189,6 +193,8 @@ pub struct Delta {
     pub world: Option<WorldRules>,
     // Script engines.
     pub scripts: Option<Scripts>,
+    /// The Torque 3D side (Graal_analysis `version-profiles/three-d.toml`).
+    pub three_d: Option<Option<ThreeD>>,
     /// A side build: its row is the row before it plus this delta, but the
     /// step after it continues from the row before it, so none of this
     /// delta carries on. The NewWorld betas are side builds of 2.05 and 2.1.
@@ -251,6 +257,7 @@ impl Delta {
         drops: None,
         world: None,
         scripts: None,
+        three_d: None,
         side: false,
     };
 }
@@ -362,6 +369,7 @@ pub const fn apply(prev: VersionProfile, s: &Step) -> VersionProfile {
     p.drops = pick(p.drops, d.drops);
     p.world = pick(p.world, d.world);
     p.scripts = pick(p.scripts, d.scripts);
+    p.three_d = pick(p.three_d, d.three_d);
     p
 }
 
@@ -465,6 +473,8 @@ pub const ORIGIN: VersionProfile = VersionProfile {
     world: WORLD_121,
     // The GS1 command table is read from 1.21 (`gs1_commands`); no 131.
     scripts: Scripts::GS1,
+    // No Torque 3D side before 3.04.
+    three_d: None,
 };
 
 // -- The chain. -------------------------------------------------------------
@@ -1166,6 +1176,7 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Binary,
         delta: Delta {
+            three_d: Some(Some(THREE_D_304)),
             // No 131 in its server ids; nothing read on GS1.
             scripts: Some(Scripts { gs1: Runs::Unknown, gs2: Runs::No, resolve_host: false }),
             // Against 2.31: 44, 101 and 102 in; 170, 177, 182, 183 and MOVE2 (189) out.
@@ -1207,6 +1218,7 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Binary,
         delta: Delta {
+            three_d: Some(Some(THREE_D_3153)),
             // 131 handled and its GS2 VM read (gs2-executor.md); nothing read on GS1.
             scripts: Some(Scripts { gs1: Runs::Unknown, gs2: Runs::Yes, resolve_host: false }),
             plo: IdDelta::plus_minus(&[67, 74, 82, 104, 131, 132, 133, 134, 187, 189], &[44]),
@@ -1231,7 +1243,7 @@ pub const CHAIN: &[Step] = &[
         unknown: &[
             Unknown { area: "pli", what: "2, 3, 15, 24, 29 and 80 are taken from 3.04; the PPC scan did not resolve those call sites" },
             Unknown { area: "login", what: "the first frame (5, 37, 34 bigmap.txt, 34 minimap.txt, the two 34s sent twice) and the first props (OSTYPE mac, code page 1250) were seen in the lab; the head and default-weapon checks are 3.04's" },
-            Unknown { area: "3d", what: "the 3D mode (Torque GameConnection, Graal3D protocol 19, on UDP listed port + 1) is not modelled here; seihai-ato::torque has its profile" },
+            Unknown { area: "3d", what: "the 3D side was not run (T3D-009); three_d marks the values carried from 4.04r2 or stock TGE as assumed (control objects, phases, format bounds, texture naming)" },
         ],
     },
     // The 4.x builds (Graal_analysis `protocol/v4x-clients.md`,
@@ -1247,6 +1259,7 @@ pub const CHAIN: &[Step] = &[
         date: "2006-03-03",
         basis: Basis::Binary,
         delta: Delta {
+            three_d: Some(Some(THREE_D_404)),
             // Against 3.153: update packages (105, 106), ghost mode (170), the
             // window list (182, 183), onServerListerConnect (190), SHOOT2 (191),
             // the cache check (193), script list clear (194) and server ganis (195).
@@ -1277,7 +1290,7 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "serverwarp", what: "the lab's 178 reached the game server, but the warp text it used was not recorded; split on commas only, as the 5.x and 6.x builds" },
             Unknown { area: "props", what: "own and other prop sets are 3.153's; no 4.x prop parser was read (the lab saw X2/Y2, 78 and 79)" },
             Unknown { area: "ui", what: "chat is white bold sans with a blue shadow in the lab; the face and cell height are taken from 5.00r7" },
-            Unknown { area: "3d", what: "Graal3DEngine.dll (Torque protocol 19, UDP on listed port + 1) is not modelled; seihai-ato::torque has its profile" },
+            Unknown { area: "3d", what: "no 3D session was played on Graal3DEngine.dll yet (T3D-025); three_d marks the control objects, the chunk cache and texture naming as assumed" },
         ],
     },
     // The Mac PowerPC 4.04r2 and 5.12 were run unchanged on Mac OS X 10.4 in
@@ -1292,6 +1305,7 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Binary,
         delta: Delta {
+            three_d: Some(Some(THREE_D_404.all_assumed())),
             // Static read 2026-11-13: one 97-case switch, the Windows 4.04r2 set
             // without 41.
             plo: IdDelta::plus_minus(&[], &[41]),
@@ -1304,7 +1318,7 @@ pub const CHAIN: &[Step] = &[
         unknown: &[
             Unknown { area: "pli", what: "the Windows 4.04r2 set is kept; the lab saw 2, 18, 23, 24, 37, 38, 46 and 157" },
             Unknown { area: "login", what: "Seihai sends the three machine fields as empty quoted strings; the real client sent the MAC and /etc stat MD5s and an empty fourth field" },
-            Unknown { area: "3d", what: "the Torque 3D mode is not modelled" },
+            Unknown { area: "3d", what: "the Mac 3D side was not read (T3D-004); three_d is the Windows 4.04r2 row with every field assumed" },
         ],
     },
     Step {
@@ -1314,6 +1328,7 @@ pub const CHAIN: &[Step] = &[
         date: "2006-09",
         basis: Basis::Binary,
         delta: Delta {
+            three_d: Some(Some(THREE_D_420)),
             // Layered board change (107) and 108 in; 41 has no case in this build.
             // Re-read 2026-10-31: the switch has 97 cases (0-195 without 41) and
             // 100 and 108 are taken before it, as in 4.20r8, so 99 ids.
@@ -1330,7 +1345,7 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "pli", what: "162 (the answer to 108) is from the Mac binary and 2, 23, 24, 34, 37, 44, 46 and 157 were seen in the lab; the rest of 4.20r8's set is taken" },
             Unknown { area: "login", what: "the real client sent mac,\"\",<md5 hex of the /etc stat>,\"\" in the lab (the MAC field empty under qemu's NIC); Seihai sends all three machine fields as empty quoted strings" },
             Unknown { area: "flags", what: "the real client sent no 18 for the lab level's gr.x/gr.y clientside setstring; Seihai's flat path does" },
-            Unknown { area: "3d", what: "Torque protocol 21 is not modelled here; seihai-ato::torque has its profile" },
+            Unknown { area: "3d", what: "only the handshake, class set and game packet were read (T3D-026); three_d takes the rest from 5.12, assumed" },
         ],
     },
     Step {
@@ -1340,6 +1355,7 @@ pub const CHAIN: &[Step] = &[
         date: "2007-01",
         basis: Basis::Binary,
         delta: Delta {
+            three_d: Some(Some(THREE_D_4208)),
             plo: IdDelta::plus(&[41, 196]),
             lobby: Some(Some(LOBBY_404)),
             // The engine DLL steps zlib/bz2 bodies len >> 2 times (read
@@ -1367,6 +1383,7 @@ pub const CHAIN: &[Step] = &[
         date: "2007-07",
         basis: Basis::Binary,
         delta: Delta {
+            three_d: Some(Some(THREE_D_500)),
             // Against 4.20r8: 196 out; 140 and 197 in. 100 and 108 are tested
             // before the switch, as in 4.20r8 (Graal_analysis G262 read).
             plo: IdDelta::plus_minus(&[140, 197], &[196]),
@@ -1391,7 +1408,7 @@ pub const CHAIN: &[Step] = &[
             Unknown { area: "login", what: "the base-file requests after the language (47 or 23 basepackage.gupd) are not sent" },
             Unknown { area: "props", what: "own and other prop sets are 3.153's; no 5.x parser was read" },
             Unknown { area: "ui", what: "chat is a bold sans serif in the lab; its cell height is not known, 24 is kept" },
-            Unknown { area: "3d", what: "the Torque 3D mode (Graal3DEngine.dll, protocol 24) is not modelled" },
+            Unknown { area: "3d", what: "the 5.00r7 class set, scripts and file rules were not read (T3D-005); three_d takes them from 5.12, assumed" },
         ],
     },
     Step {
@@ -1401,6 +1418,7 @@ pub const CHAIN: &[Step] = &[
         date: "2007-10-19",
         basis: Basis::Binary,
         delta: Delta {
+            three_d: Some(Some(THREE_D_512)),
             // Every send site read (G255): 5.00r7's set without 21 (PUTNPC, sent
             // only by the GS1 executor 5.12 dropped) and 40 (SHOOT), plus 48 (SHOOT2).
             pli: IdDelta::plus_minus(&[48], &[21, 40]),
@@ -1421,6 +1439,7 @@ pub const CHAIN: &[Step] = &[
         date: "",
         basis: Basis::Binary,
         delta: Delta {
+            three_d: Some(Some(THREE_D_512.all_assumed())),
             // Static read 2026-11-13: the Mac 4.20r6 set plus 140 and 197, so
             // against the Windows 5.12 without 41.
             plo: IdDelta::plus_minus(&[], &[41]),
@@ -1443,6 +1462,7 @@ pub const CHAIN: &[Step] = &[
         date: "2010-02-01",
         basis: Basis::Binary,
         delta: Delta {
+            three_d: Some(None),
             // Against the Windows 5.12; 41 undoes the Mac 5.12 row.
             plo: IdDelta::plus_minus(&[41, 109, 198], &[75, 132, 133, 171, 193]),
             // Not machine-read (only a packed installer was to hand): it
@@ -2271,7 +2291,56 @@ pub fn diff(a: &VersionProfile, b: &VersionProfile) -> Vec<Change> {
         &b.scripts.resolve_host,
         yes_no,
     );
+    value_change(
+        &mut o,
+        "3d",
+        "three_d",
+        &a.three_d,
+        &b.three_d,
+        three_d_text,
+    );
     o
+}
+
+/// One line for a build's 3D side: protocol, layer, terrain, scripts, and
+/// how many fields are assumed.
+fn three_d_text(t: &Option<ThreeD>) -> String {
+    use super::three_d::{Field, GameLayer, TorqueScript};
+    match t {
+        None => "none".into(),
+        Some(t) => {
+            let layer = match t.game_layer {
+                GameLayer::Tge => "TGE",
+                GameLayer::GameObject => "GameObject",
+            };
+            let mut terrain = Vec::new();
+            if t.terrain.ter_file {
+                terrain.push(".ter");
+            }
+            if t.terrain.chunks {
+                terrain.push("chunks");
+            }
+            let script = match t.torque_script {
+                TorqueScript::Compiles => "TorqueScript",
+                TorqueScript::None => "no TorqueScript",
+            };
+            let assumed = t.assumed.iter().count();
+            let assumed = if assumed == Field::ALL.len() {
+                "all assumed".to_string()
+            } else {
+                format!("{assumed} of {} assumed", Field::ALL.len())
+            };
+            format!(
+                "protocol {} {layer}, terrain {}, {script}, {assumed}",
+                t.protocol,
+                if terrain.is_empty() {
+                    "none".into()
+                } else {
+                    terrain.join("+")
+                }
+            )
+        }
+    }
 }
 
 fn runs_text(r: &Runs) -> String {

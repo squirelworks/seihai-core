@@ -28,6 +28,7 @@ mod props;
 pub mod seclogin;
 pub mod showimg;
 pub mod tampercheck;
+pub mod three_d;
 mod tokens;
 mod version;
 pub mod walkcadence;
@@ -70,6 +71,7 @@ pub use showimg::{
     ImgPart, ImgRecord, PlayerImage, PlayerImages, ShowImgInfo, ShowImgSender, ShowImgUpdate,
 };
 pub use tampercheck::{TamperImage, TamperSender, TamperWords};
+pub use three_d::ThreeD;
 pub use tokens::{
     known_token, serve_as, tokens_tsv, KnownToken, TokenGrade, TokenKind, KNOWN_TOKENS, NOT_SERVED,
     STAND_INS,
