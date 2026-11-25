@@ -4770,7 +4770,7 @@ mod tests {
         assert!(st.weapon_bytecode.is_empty());
         assert_eq!(
             std::mem::take(&mut st.script_requests),
-            [b"\xbeBomb".to_vec()]
+            [b"\xbeBomb\n".to_vec()]
         );
         // 140 with the cache flag fills the cache; dropping the weapon keeps it.
         st.apply_body(&weapon_script("weapon", "Bomb", code));
@@ -4785,7 +4785,7 @@ mod tests {
         assert!(st.script_requests.is_empty());
         // A changed script (another CRC) is asked for again.
         st.apply_body(&load("Bomb", crc ^ 1));
-        assert_eq!(st.script_requests, [b"\xbeBomb".to_vec()]);
+        assert_eq!(st.script_requests, [b"\xbeBomb\n".to_vec()]);
     }
 
     #[test]
