@@ -155,6 +155,7 @@ pub enum Field {
     TerrainTexture,
     Water,
     TorqueScript,
+    ServerScripts,
     Terraformer,
     TerrainEditor,
     DtsMax,
@@ -171,7 +172,7 @@ pub enum Field {
 
 impl Field {
     /// Every field, in the order of `three-d.toml`.
-    pub const ALL: [Field; 29] = [
+    pub const ALL: [Field; 30] = [
         Field::Protocol,
         Field::Game,
         Field::ClassTable,
@@ -189,6 +190,7 @@ impl Field {
         Field::TerrainTexture,
         Field::Water,
         Field::TorqueScript,
+        Field::ServerScripts,
         Field::Terraformer,
         Field::TerrainEditor,
         Field::DtsMax,
@@ -223,6 +225,7 @@ impl Field {
             Field::TerrainTexture => "terrain_texture",
             Field::Water => "water",
             Field::TorqueScript => "torque_script",
+            Field::ServerScripts => "server_scripts",
             Field::Terraformer => "terraformer",
             Field::TerrainEditor => "terrain_editor",
             Field::DtsMax => "dts_max",
@@ -307,6 +310,10 @@ pub struct ThreeD {
     /// `WaterBlock` is a networked class.
     pub water: bool,
     pub torque_script: TorqueScript,
+    /// A server can make the client run new TorqueScript (send `.cs` or
+    /// `.dso`, or script text). False even for 3.153, which compiles its
+    /// own shipped scripts but has no server path to new ones (T3D-009).
+    pub server_scripts: bool,
     pub terraformer: Terraformer,
     /// Torque's `TerrainEditor` is present.
     pub terrain_editor: bool,
@@ -343,9 +350,15 @@ impl ThreeD {
         self.terrain.chunks
     }
 
-    /// A server may send TorqueScript (`.cs`, `.dso`) for this build to run.
+    /// The build compiles and runs TorqueScript (its own shipped scripts).
     pub const fn runs_torque_script(&self) -> bool {
         matches!(self.torque_script, TorqueScript::Compiles)
+    }
+
+    /// A server may send TorqueScript for this build to run. No read build
+    /// takes it, so a server should never offer `.cs` or `.dso`.
+    pub const fn runs_server_scripts(&self) -> bool {
+        self.server_scripts
     }
 
     /// The build takes datablocks (protocol 19 and the stock TGE layer).
@@ -427,6 +440,7 @@ pub const THREE_D_304: ThreeD = ThreeD {
     },
     water: true,
     torque_script: TorqueScript::Compiles,
+    server_scripts: false,
     terraformer: Terraformer::Full,
     terrain_editor: true,
     formats: Formats {
@@ -449,6 +463,7 @@ pub const THREE_D_304: ThreeD = ThreeD {
         Field::TerMax,
         Field::TerrainTexture,
         Field::Water,
+        Field::ServerScripts,
         Field::DtsMax,
         Field::DifVersion,
         Field::ThreeDs,
@@ -481,6 +496,7 @@ pub const THREE_D_3153: ThreeD = ThreeD {
     },
     water: true,
     torque_script: TorqueScript::Compiles,
+    server_scripts: false,
     terraformer: Terraformer::Full,
     terrain_editor: true,
     formats: Formats {
@@ -535,6 +551,7 @@ pub const THREE_D_404: ThreeD = ThreeD {
     },
     water: true,
     torque_script: TorqueScript::None,
+    server_scripts: false,
     terraformer: Terraformer::Greyscale,
     terrain_editor: true,
     formats: Formats {
@@ -580,6 +597,7 @@ pub const THREE_D_420: ThreeD = ThreeD {
     },
     water: true,
     torque_script: TorqueScript::None,
+    server_scripts: false,
     terraformer: Terraformer::Greyscale,
     terrain_editor: true,
     formats: Formats {
@@ -615,6 +633,7 @@ pub const THREE_D_4208: ThreeD = ThreeD {
         Field::GameLayer,
         Field::MissionPhases,
         Field::TorqueScript,
+        Field::ServerScripts,
         Field::TerrainChunks,
     ]),
     ..THREE_D_420
@@ -642,6 +661,7 @@ pub const THREE_D_500: ThreeD = ThreeD {
     },
     water: true,
     torque_script: TorqueScript::None,
+    server_scripts: false,
     terraformer: Terraformer::Greyscale,
     terrain_editor: true,
     formats: Formats {
@@ -669,7 +689,7 @@ pub const THREE_D_500: ThreeD = ThreeD {
 /// 5.12 Windows: the most-read build. Streamed terrain and its cache run
 /// live; a `Camera` control object and bare-name textures seen in a capture.
 pub const THREE_D_512: ThreeD = ThreeD {
-    assumed: Fields::of(&[Field::DtsMax, Field::DifVersion, Field::Md3Version]),
+    assumed: Fields::of(&[Field::DtsMax, Field::DifVersion]),
     ..THREE_D_500
 };
 
@@ -740,6 +760,7 @@ pub fn fixture_row(label: &str, t: &ThreeD) -> String {
             TorqueScript::None => "none",
         }
         .into(),
+        b(t.server_scripts).into(),
         match t.terraformer {
             Terraformer::Full => "full",
             Terraformer::Greyscale => "greyscale",
@@ -914,6 +935,12 @@ mod tests {
     fn torque_script_and_download_filter() {
         assert!(of(ClientVersion::V304).runs_torque_script());
         assert!(of(ClientVersion::V3153).runs_torque_script());
+        // No build runs script a server sends; 3.153's is read (T3D-009).
+        for (_, t) in ROWS {
+            assert!(!t.runs_server_scripts());
+        }
+        assert!(of(ClientVersion::V3153).confirmed(Field::ServerScripts));
+        assert!(!of(ClientVersion::V304).confirmed(Field::ServerScripts));
         for v in [
             ClientVersion::V404R2,
             ClientVersion::V420R6,
@@ -995,6 +1022,7 @@ mod tests {
         assert!(t512.accepts_control(ControlObject::Camera));
         assert!(!t512.accepts_control(ControlObject::Player));
         assert!(t512.phases_optional);
+        assert!(t512.confirmed(Field::PhasesOptional));
         assert_eq!(t512.mission_phases, 2);
         let t404 = of(ClientVersion::V404R2);
         assert!(t404.accepts_control(ControlObject::Player));
@@ -1023,6 +1051,10 @@ mod tests {
         assert_eq!(t404.formats.dif_version, 44);
         assert!(!of(ClientVersion::V304).formats.three_ds);
         assert!(t512.formats.three_ds && t512.confirmed(Field::ThreeDs));
+        // 5.12 has no MD3 loader; 4.04r2 does.
+        assert_eq!(t512.formats.md3_version, 0);
+        assert!(t512.confirmed(Field::Md3Version));
+        assert_eq!(t404.formats.md3_version, 15);
     }
 
     #[test]
