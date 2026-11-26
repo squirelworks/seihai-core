@@ -338,7 +338,7 @@ fn gs1_script(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors
     let compiled = |era| -> Result<Compiled, CompileErrors> {
         let program = gs1::program(src, era)?;
         Ok(Compiled {
-            script: codegen::generate(&program, lexer::Spellings::default())?,
+            script: codegen::generate(&program)?,
             front: Front::Gs1,
             warnings: Vec::new(),
         })
@@ -362,7 +362,6 @@ fn gs1_script(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors
 fn gs2_script(src: &str, mode: Mode, lift_events: bool) -> Result<Compiled, CompileErrors> {
     let parser::Parsed {
         mut program,
-        spellings,
         mut quirks,
     } = parser::parse(src)?;
     if lift_events {
@@ -395,7 +394,7 @@ fn gs2_script(src: &str, mode: Mode, lift_events: bool) -> Result<Compiled, Comp
         program.later_wins = false;
     }
     Ok(Compiled {
-        script: codegen::generate(&program, spellings)?,
+        script: codegen::generate(&program)?,
         front: Front::Gs2,
         warnings,
     })

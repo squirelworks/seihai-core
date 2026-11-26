@@ -19,7 +19,6 @@ type PResult<T> = Result<T, CompileError>;
 /// What the parser read: the program, and the quirks it met on the way.
 pub(super) struct Parsed {
     pub program: Program,
-    pub spellings: super::lexer::Spellings,
     pub quirks: Vec<(u32, Quirk)>,
 }
 
@@ -77,7 +76,6 @@ pub(super) fn parse(src: &str) -> PResult<Parsed> {
             later_wins: true,
             gs1: false,
         },
-        spellings: p.lex.spellings,
         quirks,
     })
 }
@@ -464,14 +462,13 @@ impl<'a> Parser<'a> {
                     value,
                 });
             }
-            // `a @= b` is `a = a @ b`.
             if self.eat("@=") {
                 let value = self.expr()?;
                 self.end_stmt()?;
                 return Ok(Stmt::Assign {
                     target: v.clone(),
-                    op: AssignOp::Set,
-                    value: Expr::bin(BinOp::Cat, e.clone(), value),
+                    op: AssignOp::Cat,
+                    value,
                 });
             }
         }

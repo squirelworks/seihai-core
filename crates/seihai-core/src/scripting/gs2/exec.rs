@@ -1145,7 +1145,15 @@ impl Machine {
                     let slot = match ins.op {
                         Op::TypeNumber => Slot::Num(ins.number().unwrap_or(0.0)),
                         Op::TypeString => Slot::Str(text),
-                        Op::TypeVar => Slot::Var(None, text),
+                        // Official bodies push `this`, `thiso`, `playero` and
+                        // `temp` by name where they are values.
+                        Op::TypeVar => match text.as_str() {
+                            "this" => Slot::Obj(Some(self.this_obj())),
+                            "thiso" => Slot::Obj(Some((Root::ThisO, String::new()))),
+                            "playero" => Slot::Obj(Some((Root::PlayerO, String::new()))),
+                            "temp" => Slot::Obj(Some((Root::Temp, String::new()))),
+                            _ => Slot::Var(None, text),
+                        },
                         Op::TypeArray => Slot::Marker,
                         Op::TypeTrue => Slot::Num(1.0),
                         Op::TypeFalse => Slot::Num(0.0),
@@ -1874,8 +1882,16 @@ impl Machine {
             None => name.1.clone(),
             Some(r) => format!("{}.{}", root_name(r), name.1),
         };
-        let result = match self
-            .timer_command(&full, &args)
+        // `pow(a, b)` is a call in official bodies, not `OP_POW`.
+        let pow = (full == "pow" && args.len() == 2).then(|| {
+            let n = |v: &Val| match v {
+                Val::Num(n) => *n,
+                Val::Str(s) => s.trim().parse().unwrap_or(0.0),
+            };
+            Val::Num(n(&args[0]).powf(n(&args[1])))
+        });
+        let result = match pow
+            .or_else(|| self.timer_command(&full, &args))
             .or_else(|| host.command(&full, &args))
         {
             Some(v) => v,

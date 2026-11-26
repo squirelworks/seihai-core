@@ -7,8 +7,6 @@
 //! kept as it is rather than tokenizing the whole file up front.
 
 use super::Quirk;
-use crate::scripting::engine::value::num_to_string;
-use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum Tok {
@@ -29,50 +27,6 @@ const OPS: &[&str] = &[
     "{", "}", "[", "]", ",", ";", ".", "@", "|", "&", ":", "?",
 ];
 
-/// The source text of decimal literals, keyed by the bits of their
-/// absolute value. The reference compiler writes a decimal literal's text
-/// as it stands (`3.0`, `.5`, `1.50`), not a normalised number. A value
-/// written two different ways in one script falls back to the normalised
-/// text.
-#[derive(Debug, Default)]
-pub(crate) struct Spellings {
-    text: HashMap<u64, String>,
-    mixed: HashSet<u64>,
-}
-
-impl Spellings {
-    fn record(&mut self, value: f64, text: &str) {
-        let key = value.to_bits();
-        if self.mixed.contains(&key) {
-            return;
-        }
-        match self.text.get(&key) {
-            Some(seen) if seen != text => {
-                self.text.remove(&key);
-                self.mixed.insert(key);
-            }
-            Some(_) => {}
-            None => {
-                self.text.insert(key, text.to_string());
-            }
-        }
-    }
-
-    /// The written text for a literal whose spelling differs from the
-    /// normalised form, or `None` to use the normalised form.
-    pub fn get(&self, value: f64) -> Option<String> {
-        let t = self.text.get(&value.abs().to_bits())?;
-        if *t == num_to_string(value.abs()) {
-            return None;
-        }
-        Some(if value < 0.0 {
-            format!("-{t}")
-        } else {
-            t.clone()
-        })
-    }
-}
-
 pub(super) struct Lexer<'a> {
     pub src: &'a [u8],
     /// The cursor: just past the last token read (or past the blank space
@@ -85,7 +39,6 @@ pub(super) struct Lexer<'a> {
     pub peek_line: u32,
     /// The line the last token taken started on.
     pub last_line: u32,
-    pub spellings: Spellings,
     /// Non-standard spellings met while lexing, with their lines.
     pub quirks: Vec<(u32, Quirk)>,
 }
@@ -99,7 +52,6 @@ impl<'a> Lexer<'a> {
             peek: None,
             peek_line: 1,
             last_line: 1,
-            spellings: Spellings::default(),
             quirks: Vec::new(),
         }
     }
@@ -278,13 +230,6 @@ impl<'a> Lexer<'a> {
             }
             let text = std::str::from_utf8(&b[start..self.i]).unwrap_or("0");
             let value = text.parse().unwrap_or(0.0);
-            if text.contains('.') {
-                self.spellings.record(value, text);
-            } else {
-                // Integer literals are written normalised (`007` is `7`);
-                // they only mark the value as also written that way.
-                self.spellings.record(value, &num_to_string(value));
-            }
             return Tok::Num(value);
         }
         if c.is_ascii_alphabetic() || c == b'_' || c == b'$' {

@@ -171,12 +171,35 @@ fn chained_and_value_assignments() {
 #[test]
 fn operators_names_and_constants() {
     assert_eq!(
-        f("y = 5 & 3;"),
-        names(&["TYPE_VAR", "TYPE_NUMBER", "TYPE_NUMBER", "BWA", "ASSIGN"])
+        f("y = x & 3;"),
+        names(&[
+            "TYPE_VAR",
+            "TYPE_VAR",
+            "CONV_TO_FLOAT",
+            "TYPE_NUMBER",
+            "BWA",
+            "ASSIGN"
+        ])
     );
     assert_eq!(
-        f("y = 5 | 3;"),
-        names(&["TYPE_VAR", "TYPE_NUMBER", "TYPE_NUMBER", "BWO", "ASSIGN"])
+        f("y = x | 3;"),
+        names(&[
+            "TYPE_VAR",
+            "TYPE_VAR",
+            "CONV_TO_FLOAT",
+            "TYPE_NUMBER",
+            "BWO",
+            "ASSIGN"
+        ])
+    );
+    // Official bodies fold arithmetic and bit operations on literals.
+    assert_eq!(
+        f("y = 5 & 3;"),
+        names(&["TYPE_VAR", "TYPE_NUMBER", "ASSIGN"])
+    );
+    assert_eq!(
+        f("y = 10 + 114 * 16;"),
+        names(&["TYPE_VAR", "TYPE_NUMBER", "ASSIGN"])
     );
     // `in |a, b|` still closes its range.
     assert!(compile_gs2("function f() { if (x in |1, 3|) y = 1; }").is_ok());
@@ -217,14 +240,13 @@ fn member_forms() {
             "ASSIGN",
         ])
     );
-    // `obj.(n)`: Seihai's form, the name as a string (the probe adds it).
+    // `obj.(n)`: official bodies push the name as it is.
     assert_eq!(
         f("obj.(n) = 2;"),
         names(&[
             "TYPE_VAR",
             "CONV_TO_OBJECT",
             "TYPE_VAR",
-            "CONV_TO_STRING",
             "MEMBER_ACCESS",
             "TYPE_NUMBER",
             "ASSIGN",
@@ -385,11 +407,11 @@ fn lambdas_steps_and_dynamic_calls() {
     assert!(
         compile_gs2("function f() { this.n = makevar(\"a\" @ i) += 2; a[i][j] -= 1; }").is_ok()
     );
-    // Integers past 32 bits stay exact.
+    // Official bodies hold integers to the 32-bit range.
     assert!(compile_gs2("function f() { x = 98765432109876; }")
         .unwrap()
         .disassemble()
-        .contains("98765432109876"));
+        .contains("OP_TYPE_NUMBER 2147483647"));
 }
 
 #[test]

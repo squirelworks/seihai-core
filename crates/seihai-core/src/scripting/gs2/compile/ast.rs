@@ -67,6 +67,8 @@ pub(super) enum AssignOp {
     Mod,
     BitAnd,
     BitOr,
+    /// `@=`
+    Cat,
 }
 
 impl AssignOp {
@@ -80,6 +82,7 @@ impl AssignOp {
             AssignOp::Mod => "%=",
             AssignOp::BitAnd => "&=",
             AssignOp::BitOr => "|=",
+            AssignOp::Cat => "@=",
         }
     }
 
@@ -93,6 +96,7 @@ impl AssignOp {
             AssignOp::Mod => BinOp::Mod,
             AssignOp::BitAnd => return Expr::Bits(BitOp::And, Box::new(a), Box::new(v)),
             AssignOp::BitOr => return Expr::Bits(BitOp::Or, Box::new(a), Box::new(v)),
+            AssignOp::Cat => BinOp::Cat,
             AssignOp::Set => unreachable!("`=` has no operator"),
         };
         Expr::Binary(bin, Box::new(a), Box::new(v))

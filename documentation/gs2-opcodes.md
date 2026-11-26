@@ -147,7 +147,7 @@ but nothing in the compiler writes it.
 | 62 | 0x3E | OP_MUL | — | `*`, `*=` | yes |
 | 63 | 0x3F | OP_DIV | — | `/`, `/=` | yes |
 | 64 | 0x40 | OP_MOD | — | `%`, `%=` | yes |
-| 65 | 0x41 | OP_POW | — | `^`, `pow(a, b)`. `^=` has no opcode in the compiler's operator map | yes |
+| 65 | 0x41 | OP_POW | — | `^`. In GS2, `pow(a, b)` is a script call by name, as in official bodies. `^=` has no opcode in the compiler's operator map | yes |
 | 66–67 | 0x42–0x43 | OP_UNKNOWN_66, 67 | — | Placeholders. The client VMs run them as `&&` and `\|\|` that give 1 or 0 (`gs2-vm-versions.md`) | no |
 | 68 | 0x44 | OP_NOT | — | `!` | yes |
 | 69 | 0x45 | OP_UNARYSUB | — | Unary `-` | yes |
@@ -279,7 +279,8 @@ Plain functions:
 | `arraylen`, `sarraylen` | OP_OBJ_SIZE | yes |
 | `setarray` | OP_SETARRAY | yes (command) |
 | `vecx`, `vecy` | OP_VECX, OP_VECY | var (from 2.03) |
-| `exp`, `log`, `min`, `max`, `pow` | OP_EXP, OP_LOG, OP_MIN, OP_MAX, OP_POW | no |
+| `exp`, `log`, `min`, `max` | OP_EXP, OP_LOG, OP_MIN, OP_MAX | no |
+| `pow` | OP_POW in GS1 lowering; a call by name in GS2 | no |
 | `char` | OP_CHAR | no |
 | `getangle`, `getdir` | OP_GETANGLE, OP_GETDIR | no |
 | `waitfor` | OP_WAITFOR | no |
