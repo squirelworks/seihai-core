@@ -165,9 +165,14 @@ impl Descriptor {
 }
 
 /// `PLI_UPDATESCRIPT` (158) for `name`: ask the server for the script.
+/// Like every client message it ends in a line feed: the server splits a
+/// frame at each `\n` and reads the name as the rest of that line, so
+/// without one [`crate::net::check_wire_message`] refuses it (sent, it
+/// would merge with the next message).
 pub fn update_script_message(name: &str) -> Vec<u8> {
     let mut m = vec![PLI_UPDATESCRIPT + 0x20];
     m.extend(name.chars().map(|c| c as u32 as u8));
+    m.push(b'\n');
     m
 }
 
@@ -408,6 +413,11 @@ mod tests {
 
     #[test]
     fn update_script_asks_by_name() {
-        assert_eq!(update_script_message("-Bomb"), b"\xbe-Bomb".to_vec());
+        assert_eq!(update_script_message("-Bomb"), b"\xbe-Bomb\n".to_vec());
+        // GServer-v2's movement weapon, which the 5.31r4 and 6.03r7 joins
+        // ask for: one whole line, so the send path does not drop it.
+        let m = update_script_message("-gr_movement");
+        assert_eq!(crate::net::check_wire_message(&m), Ok(()));
+        assert_eq!(m.len(), 14);
     }
 }
