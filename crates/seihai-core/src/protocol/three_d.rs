@@ -202,12 +202,13 @@ pub enum Field {
     Sees2dPlayers,
     Takes2dChat,
     TerrainTextures,
+    GroundCover,
     DropsUnknownGhost,
 }
 
 impl Field {
     /// Every field, in the order of `three-d.toml`.
-    pub const ALL: [Field; 40] = [
+    pub const ALL: [Field; 41] = [
         Field::Protocol,
         Field::Game,
         Field::ClassTable,
@@ -247,6 +248,7 @@ impl Field {
         Field::Sees2dPlayers,
         Field::Takes2dChat,
         Field::TerrainTextures,
+        Field::GroundCover,
         Field::DropsUnknownGhost,
     ];
 
@@ -292,6 +294,7 @@ impl Field {
             Field::Sees2dPlayers => "sees_2d_players",
             Field::Takes2dChat => "takes_2d_chat",
             Field::TerrainTextures => "terrain_textures",
+            Field::GroundCover => "ground_cover",
             Field::DropsUnknownGhost => "drops_unknown_ghost",
         }
     }
@@ -404,6 +407,10 @@ pub struct ThreeD {
     /// terrain textures it lists. 4.20r8 never does (lab), so its terrain
     /// draws white.
     pub terrain_textures: bool,
+    /// The client grows ground cover from a `DynamicShapeReplicator`,
+    /// `DynamicGrass` or `DynamicGrassReplicator` ghost. 4.20r8 takes the
+    /// ghost but draws nothing around it (lab, GDI and Mesa).
+    pub ground_cover: bool,
     /// An update for a ghost index that was never created is logged and
     /// dropped. 4.04r2 crashes on it (fuzz tier 1), so a server must never
     /// update a ghost before its create reaches that build.
@@ -563,6 +570,7 @@ pub const THREE_D_304: ThreeD = ThreeD {
     sees_2d_players: false,
     takes_2d_chat: false,
     terrain_textures: false,
+    ground_cover: false,
     drops_unknown_ghost: false,
     assumed: Fields::all_but(&[
         Field::Protocol,
@@ -632,6 +640,7 @@ pub const THREE_D_3153: ThreeD = ThreeD {
     sees_2d_players: false,
     takes_2d_chat: false,
     terrain_textures: true,
+    ground_cover: false,
     drops_unknown_ghost: false,
     assumed: Fields::of(&[
         Field::PhasesOptional,
@@ -649,6 +658,7 @@ pub const THREE_D_3153: ThreeD = ThreeD {
         Field::Mirrors2dPosition,
         Field::Sees2dPlayers,
         Field::Takes2dChat,
+        Field::GroundCover,
         Field::DropsUnknownGhost,
     ]),
 };
@@ -699,6 +709,7 @@ pub const THREE_D_404: ThreeD = ThreeD {
     sees_2d_players: false,
     takes_2d_chat: false,
     terrain_textures: true,
+    ground_cover: false,
     drops_unknown_ghost: false,
     assumed: Fields::of(&[
         Field::PhasesOptional,
@@ -712,6 +723,7 @@ pub const THREE_D_404: ThreeD = ThreeD {
         Field::Sees2dPlayers,
         Field::Takes2dChat,
         Field::TerrainTextures,
+        Field::GroundCover,
     ]),
 };
 
@@ -760,6 +772,7 @@ pub const THREE_D_420: ThreeD = ThreeD {
     sees_2d_players: false,
     takes_2d_chat: true,
     terrain_textures: true,
+    ground_cover: true,
     drops_unknown_ghost: true,
     assumed: Fields::all_but(&[
         Field::Protocol,
@@ -782,9 +795,11 @@ pub const THREE_D_4208: ThreeD = ThreeD {
     // A lab run (Graal_analysis PR #854) linked it as protocol 24. On Mesa
     // (T3D-117) it took all 256 streamed chunks and drew the ground; its
     // near-terrain crash was the VM's GDI OpenGL only. It never fetches
-    // heights.info or terrain textures, so the terrain draws white.
+    // heights.info or terrain textures, so the terrain draws white. It takes
+    // replicator ghosts but grows no cover (GDI and Mesa, PR #951).
     protocol: 24,
     terrain_textures: false,
+    ground_cover: false,
     assumed: Fields::all_but(&[
         Field::Protocol,
         Field::Game,
@@ -796,6 +811,7 @@ pub const THREE_D_4208: ThreeD = ThreeD {
         Field::ServerScripts,
         Field::Drawn,
         Field::TerrainTextures,
+        Field::GroundCover,
         Field::DropsUnknownGhost,
     ]),
     ..THREE_D_420
@@ -846,6 +862,7 @@ pub const THREE_D_500: ThreeD = ThreeD {
     sees_2d_players: false,
     takes_2d_chat: true,
     terrain_textures: true,
+    ground_cover: true,
     drops_unknown_ghost: true,
     assumed: Fields::all_but(&[
         Field::Protocol,
@@ -1002,6 +1019,7 @@ pub fn fixture_row(label: &str, t: &ThreeD) -> String {
         b(t.sees_2d_players).into(),
         b(t.takes_2d_chat).into(),
         b(t.terrain_textures).into(),
+        b(t.ground_cover).into(),
         b(t.drops_unknown_ghost).into(),
         assumed,
     ]
@@ -1264,6 +1282,11 @@ mod tests {
         assert!(t4208.confirmed(Field::TerrainChunks));
         let t512 = of(ClientVersion::V512);
         assert!(t512.terrain_textures && t512.confirmed(Field::TerrainTextures));
+        // Replicators: 4.20r8 takes the ghost but grows no cover (lab).
+        assert!(!t4208.ground_cover && t4208.confirmed(Field::GroundCover));
+        assert!(t512.ground_cover && t512.confirmed(Field::GroundCover));
+        assert!(!of(ClientVersion::V3153).ground_cover);
+        assert!(!of(ClientVersion::V500R7).confirmed(Field::GroundCover));
         assert!(t512.confirmed(Field::TerrainChunks));
         assert!(t512.confirmed(Field::ChunkCache));
         assert!(t512.confirmed(Field::TerrainChunkMax));
