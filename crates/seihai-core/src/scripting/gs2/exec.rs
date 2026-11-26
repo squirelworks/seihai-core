@@ -11,7 +11,9 @@
 //! by name, with their type: `with` reaches them, `objecttype()` and
 //! `destroy()` work on them, and [`Machine::objects`] lists them for a host
 //! that draws GUI controls. `OP_OBJ_LINK` (`obj.link()`) gives the
-//! object itself. Behaviour was first taken from the 3.153 client's VM
+//! object itself. A function used as a value (`this.f`, a `function () {
+//! … }` value) is a reference to it, and a call through a variable that
+//! holds one runs it, with `this` as the object for `obj.f()`. Behaviour was first taken from the 3.153 client's VM
 //! (`documentation/gs2-executor.md`); what later VMs change (limits,
 //! `%`, `^`, shifts, the opcodes they added) is a [`VmProfile`]
 //! (`documentation/gs2-vm-versions.md`). [`Machine::new`] runs 3.153's
@@ -582,6 +584,67 @@ impl Machine {
             .map(|f| f.start)
     }
 
+    /// A function value: `this.f` (or `this.function_<id>_<n>`, the name
+    /// the official compiler gives a `function () { … }` value) read where
+    /// `this` has no variable `f` but the script has a function `f`. It is
+    /// kept as a reference to `this.f`, which a call through a variable
+    /// holding it runs ([`Machine::function_value_call`]).
+    fn function_ref(&self, root: Root, name: &str) -> Option<Value> {
+        if !matches!(root, Root::This | Root::ThisO)
+            || name.is_empty()
+            || name.contains('.')
+            || self
+                .vars
+                .contains_key(&(Self::store(root), name.to_string()))
+        {
+            return None;
+        }
+        self.find_function(name)?;
+        Some(Value::Obj(Root::This, name.to_string()))
+    }
+
+    /// A call through a variable that holds a function value: the
+    /// function's first op, and the object `this` is while it runs. Called
+    /// as a member of an object (`obj.f()`, `this.list.f()`), that is the
+    /// object; through `temp`, a parameter or the script's own `this`,
+    /// `this` does not change (`None`).
+    fn function_value_call(
+        &mut self,
+        name: &(Option<Root>, String),
+        host: &mut dyn Host,
+    ) -> Option<(usize, Option<(Root, String)>)> {
+        let Value::Obj(Root::This | Root::ThisO, f) = self.read_value(name.0, &name.1, host) else {
+            return None;
+        };
+        if f.contains('.') || self.vars.contains_key(&(Root::This, f.clone())) {
+            return None;
+        }
+        let start = self.find_function(&f)?;
+        let owner = match (name.0, name.1.rsplit_once('.')) {
+            (Some(r), Some((path, _))) => Some((r, path.to_string())),
+            _ => None,
+        };
+        Some((start, owner))
+    }
+
+    /// The arguments of a call into a script function that are the
+    /// caller's own variables (`inner(v)` or `inner(temp.x)` inside a
+    /// function), read now: the callee binds its parameters in its own frame, where
+    /// the caller's are gone.
+    fn read_caller_args(&mut self, marker: usize, host: &mut dyn Host) {
+        for i in marker + 1..self.stack.len() {
+            let own = match &self.stack[i] {
+                Slot::Var(Some(Root::Temp), _) => true,
+                Slot::Var(None, n) => self.frames.last().is_some_and(|f| f.locals.contains_key(n)),
+                _ => false,
+            };
+            if own {
+                let v = self.value_full(self.stack[i].clone(), host);
+                self.stack[i] = v.into();
+            }
+        }
+    }
+
     /// What `this` is: the innermost `with` object, else the script's own.
     fn this_root(&self) -> Root {
         self.with.last().map_or(Root::This, |w| w.0)
@@ -785,10 +848,21 @@ impl Machine {
     /// A slot as a full value: a variable that holds a list stays a list.
     fn value_full(&mut self, slot: Slot, host: &mut dyn Host) -> Value {
         match slot {
-            Slot::Var(root, name) => self.read_value(root, &name, host),
+            Slot::Var(root, name) => {
+                let v = self.read_value(root, &name, host);
+                match root {
+                    Some(r) if v == Value::default() => self.function_ref(r, &name).unwrap_or(v),
+                    _ => v,
+                }
+            }
             // A variable the compiler converted to an object.
             Slot::Obj(Some((root, path))) if !path.is_empty() => {
-                self.read_value(Some(root), &path, host)
+                let v = self.read_value(Some(root), &path, host);
+                if v == Value::default() {
+                    self.function_ref(root, &path).unwrap_or(v)
+                } else {
+                    v
+                }
             }
             // An object itself (`player`, `this`): kept as a reference.
             Slot::Obj(Some((root, path))) => Value::Obj(root, path),
@@ -1853,22 +1927,32 @@ impl Machine {
             Some(Slot::Str(n)) => (None, n),
             _ => (None, String::new()),
         };
-        // The script's own functions: unqualified, or on `this`.
-        if matches!(name.0, None | Some(Root::This) | Some(Root::ThisO)) {
-            if let Some(start) = self.find_function(&name.1) {
-                if self.frames.len() >= CALL_LIMIT {
-                    return Some(self.stop("callstack overrun".into(), host));
-                }
-                self.frames.push(Frame {
-                    with_depth: self.with.len(),
-                    ret: Some(self.pc),
-                    base: m,
-                    locals: HashMap::new(),
-                    slots: Vec::new(),
-                });
-                self.pc = start;
-                return None;
+        // The script's own functions: unqualified, or on `this`; then a
+        // variable that holds a function value.
+        let own = matches!(name.0, None | Some(Root::This) | Some(Root::ThisO))
+            .then(|| self.find_function(&name.1))
+            .flatten()
+            .map(|start| (start, None));
+        if let Some((start, owner)) = own.or_else(|| self.function_value_call(&name, host)) {
+            if self.frames.len() >= CALL_LIMIT {
+                return Some(self.stop("callstack overrun".into(), host));
             }
+            self.read_caller_args(m, host);
+            let with_depth = self.with.len();
+            if let Some(o) = owner {
+                // The object is `this` until the function returns.
+                self.with.push(o);
+                self.with_span.push((0, usize::MAX, self.frames.len() + 1));
+            }
+            self.frames.push(Frame {
+                with_depth,
+                ret: Some(self.pc),
+                base: m,
+                locals: HashMap::new(),
+                slots: Vec::new(),
+            });
+            self.pc = start;
+            return None;
         }
         let mut args = Vec::new();
         while self.stack.len() > m + 1 {
