@@ -317,6 +317,14 @@ pub struct Options {
     /// its compiles, so only the server knows it. With none, Seihai uses
     /// the line the value ends on.
     pub lambda_id: Option<u32>,
+    /// Leave out the per-function variable cache (opcodes 45 to 47). Only
+    /// a 6.x loader folds the cache's `makeprop`, `setreg` pair into 242,
+    /// which keeps a cached name a name; a 4.x or 5.x client runs
+    /// `makeprop`, so a call through a cached name (a command used five
+    /// times or in a loop) finds nothing there (Graal_analysis
+    /// `client-internals/gs2-vm-quirks-by-version.md`). A server compiling
+    /// for a client before 6.x sets this.
+    pub no_var_cache: bool,
 }
 
 /// Compile a script.
@@ -337,11 +345,16 @@ pub fn compile_with(
     language: Language,
     options: Options,
 ) -> Result<Compiled, CompileErrors> {
-    let Options { mode, lambda_id } = options;
+    let Options {
+        mode,
+        lambda_id,
+        no_var_cache,
+    } = options;
+    let cache = !no_var_cache;
     match language {
-        Language::Gs1(era) => gs1_script(src, era, mode),
-        Language::Gs2 => gs2_script(src, mode, false, lambda_id),
-        Language::Detect(era) => detect(src, era, mode, lambda_id),
+        Language::Gs1(era) => gs1_script(src, era, mode, cache),
+        Language::Gs2 => gs2_script(src, mode, false, lambda_id, cache),
+        Language::Detect(era) => detect(src, era, mode, lambda_id, cache),
     }
 }
 
@@ -363,11 +376,11 @@ pub fn compile_gs2_legacy(src: &str) -> Result<Compiled, CompileErrors> {
 /// The GS1 grammar is the GS1 engine's, and a script it reports a problem
 /// in is refused in both modes. The one GS1 quirk is a script that uses
 /// GS1 newer than its version: legacy mode reads it as GS1 2.1.
-fn gs1_script(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors> {
+fn gs1_script(src: &str, era: Era, mode: Mode, cache: bool) -> Result<Compiled, CompileErrors> {
     let compiled = |era| -> Result<Compiled, CompileErrors> {
         let program = gs1::program(src, era)?;
         Ok(Compiled {
-            script: codegen::generate(&program)?,
+            script: codegen::generate(&program, cache)?,
             front: Front::Gs1,
             warnings: Vec::new(),
         })
@@ -393,6 +406,7 @@ fn gs2_script(
     mode: Mode,
     lift_events: bool,
     lambda_id: Option<u32>,
+    cache: bool,
 ) -> Result<Compiled, CompileErrors> {
     let parser::Parsed {
         mut program,
@@ -428,7 +442,7 @@ fn gs2_script(
         program.later_wins = false;
     }
     Ok(Compiled {
-        script: codegen::generate(&program)?,
+        script: codegen::generate(&program, cache)?,
         front: Front::Gs2,
         warnings,
     })
@@ -439,6 +453,7 @@ fn detect(
     era: Era,
     mode: Mode,
     lambda_id: Option<u32>,
+    cache: bool,
 ) -> Result<Compiled, CompileErrors> {
     if mode == Mode::Strict {
         return Err(CompileError {
@@ -460,23 +475,25 @@ fn detect(
     // A script that looks like GS1 stays GS1, read as a later GS1 if it
     // needs to be: as GS2 its event tests would be variable tests.
     if looks_gs1(src) {
-        if let Ok(c) = gs1_script(src, era, mode) {
+        if let Ok(c) = gs1_script(src, era, mode, cache) {
             return Ok(guessed(c));
         }
     }
-    match gs2_script(src, Mode::Legacy, true, lambda_id) {
+    match gs2_script(src, Mode::Legacy, true, lambda_id, cache) {
         Ok(c) => Ok(guessed(c)),
-        Err(gs2) => gs1_script(src, era, mode).map(guessed).map_err(|gs1| {
-            // Both fronts failed: report both, the likelier one first.
-            let (first, second) = if looks_gs1(src) {
-                (tagged("GS1", gs1), tagged("GS2", gs2))
-            } else {
-                (tagged("GS2", gs2), tagged("GS1", gs1))
-            };
-            CompileErrors {
-                errors: first.into_iter().chain(second).collect(),
-            }
-        }),
+        Err(gs2) => gs1_script(src, era, mode, cache)
+            .map(guessed)
+            .map_err(|gs1| {
+                // Both fronts failed: report both, the likelier one first.
+                let (first, second) = if looks_gs1(src) {
+                    (tagged("GS1", gs1), tagged("GS2", gs2))
+                } else {
+                    (tagged("GS2", gs2), tagged("GS1", gs1))
+                };
+                CompileErrors {
+                    errors: first.into_iter().chain(second).collect(),
+                }
+            }),
     }
 }
 

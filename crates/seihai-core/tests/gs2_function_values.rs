@@ -41,6 +41,7 @@ fn run(src: &str) -> Echo {
         Options {
             mode: Mode::Legacy,
             lambda_id: Some(1),
+            ..Options::default()
         },
     )
     .unwrap();

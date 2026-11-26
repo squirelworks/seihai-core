@@ -81,7 +81,9 @@ fn functions(program: &Program) -> impl Iterator<Item = &Function> {
         .chain(&program.lambdas)
 }
 
-pub(super) fn generate(program: &Program) -> Result<Script, CompileErrors> {
+/// `var_cache`: whether functions keep often-used names in slots (opcodes
+/// 45 to 47, see `cache`).
+pub(super) fn generate(program: &Program, var_cache: bool) -> Result<Script, CompileErrors> {
     // The index of the last function of each name: with `later_wins` it
     // replaces the earlier ones; without, two of a name are an error.
     let mut last = HashMap::<&str, usize>::new();
@@ -108,6 +110,7 @@ pub(super) fn generate(program: &Program) -> Result<Script, CompileErrors> {
         skips: Vec::new(),
         line: 0,
         cache: HashMap::new(),
+        var_cache,
         gs1: program.gs1,
         lambdas: program
             .lambdas
@@ -292,6 +295,8 @@ struct Builder {
     lambdas: HashMap<String, Function>,
     /// The running function's variable-cache slots (see `cache`).
     cache: HashMap<String, i32>,
+    /// Whether functions use the variable cache at all.
+    var_cache: bool,
     /// Lowered from GS1 (see `Program::gs1`).
     gs1: bool,
 }
@@ -577,7 +582,7 @@ impl Builder {
             self.op(Op::CmdCall);
         }
         let outer = std::mem::take(&mut self.cache);
-        if !lambda {
+        if !lambda && self.var_cache {
             let (slots, order) = cache::slots(&f.body);
             for (n, key) in order.iter().enumerate() {
                 match key.split_once('.') {
