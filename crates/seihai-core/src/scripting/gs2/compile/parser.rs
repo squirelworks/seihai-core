@@ -257,6 +257,39 @@ impl<'a> Parser<'a> {
         Ok(body)
     }
 
+    /// The label of a labeled loop next (`outer: for …`), not yet taken.
+    fn loop_label(&mut self) -> Option<String> {
+        let Tok::Id(name) = self.lex.peek() else {
+            return None;
+        };
+        let rest = &self.lex.src[self.lex.i..];
+        let at = rest.iter().position(|c| !c.is_ascii_whitespace())?;
+        if rest[at] != b':' || rest.get(at + 1) == Some(&b':') {
+            return None;
+        }
+        let after = &rest[at + 1..];
+        let word = after.iter().position(|c| !c.is_ascii_whitespace())?;
+        let word = &after[word..];
+        let loop_word = |w: &[u8]| {
+            word.starts_with(w)
+                && !word
+                    .get(w.len())
+                    .is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_')
+        };
+        (loop_word(b"for") || loop_word(b"while")).then_some(name)
+    }
+
+    /// The label after `break` or `continue`, if one is named.
+    fn jump_label(&mut self) -> PResult<Option<String>> {
+        match self.lex.peek() {
+            Tok::Id(name) => {
+                self.lex.bump();
+                Ok(Some(name))
+            }
+            _ => Ok(None),
+        }
+    }
+
     /// The next token is `function` and a name follows it (not a
     /// `function () { … }` value).
     fn sees_function_header(&mut self) -> bool {
@@ -298,6 +331,12 @@ impl<'a> Parser<'a> {
     }
 
     fn one_stmt_inner(&mut self) -> PResult<Stmt> {
+        if let Some(label) = self.loop_label() {
+            self.lex.bump();
+            self.expect(":")?;
+            let body = Box::new(self.one_stmt_inner()?);
+            return Ok(Stmt::Labeled { label, body });
+        }
         if let Some(s) = self.gs1_command()? {
             return Ok(s);
         }
@@ -324,12 +363,14 @@ impl<'a> Parser<'a> {
             return Ok(Stmt::Return(v));
         }
         if self.eat_id("break") {
+            let label = self.jump_label()?;
             self.end_stmt()?;
-            return Ok(Stmt::Break);
+            return Ok(label.map_or(Stmt::Break, Stmt::BreakTo));
         }
         if self.eat_id("continue") {
+            let label = self.jump_label()?;
             self.end_stmt()?;
-            return Ok(Stmt::Continue);
+            return Ok(label.map_or(Stmt::Continue, Stmt::ContinueTo));
         }
         if self.eat("{") {
             return Ok(Stmt::Block(self.block_body()?));
@@ -418,11 +459,11 @@ impl<'a> Parser<'a> {
         }
         if let Some(body) = self.new_body.take() {
             return match e {
-                Expr::New { ty, mut args } if args.len() == 1 => {
+                Expr::New { ty, mut args } if args.len() <= 1 => {
                     self.eat(";");
                     Ok(Stmt::NewBlock {
                         ty,
-                        name: args.remove(0),
+                        name: args.pop(),
                         body,
                     })
                 }
@@ -507,6 +548,12 @@ impl<'a> Parser<'a> {
             | Expr::DynCall { .. }
             | Expr::New { .. }
             | Expr::AssignValue { .. }) => Stmt::Eval(e),
+            // A bare name or `a.b` on its own does nothing in official
+            // bodies, and is left out.
+            Expr::Var(v) if v.index.is_empty() && v.name.matches('.').count() <= 1 => {
+                self.quirk(Quirk::BareExpression);
+                Stmt::Block(Vec::new())
+            }
             other => {
                 self.quirk(Quirk::BareExpression);
                 Stmt::Eval(other)
@@ -890,6 +937,7 @@ impl<'a> Parser<'a> {
             Tok::Id(id) if id == "SPC" => "SPC",
             Tok::Id(id) if id == "NL" => "NL",
             Tok::Id(id) if id == "TAB" => "TAB",
+            Tok::Id(id) if id == "xor" => "xor",
             _ => return None,
         };
         let (prec, op) = match text {
@@ -902,6 +950,7 @@ impl<'a> Parser<'a> {
             // Below `<` so that `x in |a, b|` still closes its range.
             "&" => (3, Either::Bits(BitOp::And)),
             "|" => (3, Either::Bits(BitOp::Or)),
+            "xor" => (3, Either::Bits(BitOp::Xor)),
             "<" => (4, Either::Bin(BinOp::Lt)),
             "<=" | "=<" => (4, Either::Bin(BinOp::Le)),
             ">" => (5, Either::Bin(BinOp::Gt)),
@@ -946,6 +995,9 @@ impl<'a> Parser<'a> {
         }
         if self.eat("-") {
             return Ok(Expr::Neg(Box::new(self.unary()?)));
+        }
+        if self.eat("~") {
+            return Ok(Expr::Invert(Box::new(self.unary()?)));
         }
         if self.eat("+") {
             return self.unary();
@@ -1117,18 +1169,38 @@ impl<'a> Parser<'a> {
             self.lex.line,
             self.lambdas.len() + self.nested.len() + 1
         );
+        let calls = body.iter().any(super::codegen::stmt_calls);
         self.lambdas.push(Function {
             name: format!("public.{name}"),
             params,
             body,
             cmd_call: None,
         });
-        Ok(Expr::Lambda(name))
+        Ok(Expr::Lambda { name, calls })
     }
 
     /// A name: a call `f(…)`, a folded constant, a dotted name with an
     /// optional index, or a method or run-time member on a dotted name.
     fn name_expr(&mut self, mut name: String) -> PResult<Expr> {
+        // `imgwidth(a.png)`: the old image calls take their argument as
+        // the raw text between the brackets, and are `getimgwidth` calls.
+        if matches!(name.as_str(), "imgwidth" | "imgheight") && self.sees("(") {
+            self.lex.bump();
+            let text = self.raw_until_close()?;
+            return Ok(Expr::Call {
+                name: format!("get{name}"),
+                args: vec![Expr::Str(text)],
+            });
+        }
+        // `sarraylen(a)`: the array is named by its text.
+        if name == "sarraylen" && self.sees("(") {
+            self.lex.bump();
+            let text = self.raw_until_close()?;
+            return Ok(Expr::Call {
+                name,
+                args: vec![Expr::Str(text.trim_end().to_string())],
+            });
+        }
         if self.eat("(") {
             let args = self.arg_list()?;
             return Ok(Expr::Call { name, args });
@@ -1137,6 +1209,16 @@ impl<'a> Parser<'a> {
             if !self.sees(".") && !self.sees("[") {
                 return Ok(v);
             }
+        }
+        // Official bodies write the Windows key codes as numbers.
+        if !self.sees(".") && !self.sees("[") {
+            if let Some(code) = key_code(&name) {
+                return Ok(Expr::Num(code));
+            }
+        }
+        // The old GS1 player globals read the player's member.
+        if let Some(member) = old_player_name(&name) {
+            name = format!("player.{member}");
         }
         while self.eat(".") {
             if self.eat("(") {
@@ -1163,12 +1245,54 @@ impl<'a> Parser<'a> {
             name.push('.');
             name.push_str(&part);
         }
+        // `Enum.MEMBER` is the member's value.
+        if !self.sees("[") {
+            if let Some((owner, member)) = name.split_once('.') {
+                let key = format!("{owner}::{member}").to_ascii_lowercase();
+                if !member.contains('.') {
+                    if let Some(v) = self.consts.get(&key).cloned() {
+                        return Ok(v);
+                    }
+                }
+            }
+        }
         let index = if self.eat("[") {
             self.index_list()?
         } else {
             Vec::new()
         };
         Ok(Expr::Var(Var { name, index }))
+    }
+
+    /// The source text from the cursor to the `)` that closes the bracket
+    /// just read, with leading blank space dropped. The cursor moves past
+    /// the `)`.
+    fn raw_until_close(&mut self) -> PResult<String> {
+        let src = self.lex.src;
+        let start = self.lex.i;
+        let (mut at, mut depth, mut quote) = (start, 0usize, None::<u8>);
+        while at < src.len() {
+            let b = src[at];
+            match quote {
+                Some(_) if b == b'\\' => at += 1,
+                Some(q) if b == q => quote = None,
+                Some(_) => {}
+                None if b == b'"' || b == b'\'' => quote = Some(b),
+                None if b == b'(' => depth += 1,
+                None if b == b')' && depth == 0 => break,
+                None if b == b')' => depth -= 1,
+                None => {}
+            }
+            at += 1;
+        }
+        if at >= src.len() {
+            return Err(self.error("expected `)`"));
+        }
+        let raw = &src[start..at];
+        let lines = raw.iter().filter(|&&b| b == b'\n').count() as u32;
+        let text = String::from_utf8_lossy(raw).trim_start().to_string();
+        self.lex.reset(at + 1, lines);
+        Ok(text)
     }
 
     /// A `const` or `enum` value. A negative number is folded; any other
@@ -1192,7 +1316,7 @@ impl<'a> Parser<'a> {
         loop {
             match self.slash_word() {
                 Some(word) => args.push(Expr::Str(word)),
-                None => args.push(self.expr()?),
+                None => args.push(self.arg()?),
             }
             if !self.eat(",") {
                 break;
@@ -1200,6 +1324,23 @@ impl<'a> Parser<'a> {
         }
         self.expect(")")?;
         Ok(args)
+    }
+
+    /// One argument. `f(x += 1)` passes the new value of `x`; a plain `=`
+    /// is not taken here.
+    fn arg(&mut self) -> PResult<Expr> {
+        let value = self.expr()?;
+        if (matches!(value, Expr::Var(_)) || value.is_part_place()) && !self.sees("=") {
+            if let Some(op) = self.assign_op() {
+                let inner = self.assigned_value()?;
+                return Ok(Expr::AssignValue {
+                    target: Box::new(value),
+                    op,
+                    value: Box::new(inner),
+                });
+            }
+        }
+        Ok(value)
     }
 
     /// An argument written as unquoted `/word` (`strequals(#c, /sit)`, as
@@ -1238,6 +1379,9 @@ impl<'a> Parser<'a> {
             Tok::Op("%=") => AssignOp::Mod,
             Tok::Op("&=") => AssignOp::BitAnd,
             Tok::Op("|=") => AssignOp::BitOr,
+            Tok::Op("^=") => AssignOp::Pow,
+            Tok::Op("<<=") => AssignOp::Shl,
+            Tok::Op(">>=") => AssignOp::Shr,
             _ => return None,
         };
         self.lex.bump();
@@ -1248,4 +1392,24 @@ impl<'a> Parser<'a> {
 enum Either {
     Bin(BinOp),
     Bits(BitOp),
+}
+
+/// The key names official bodies write as their Windows key code.
+fn key_code(name: &str) -> Option<f64> {
+    Some(match name {
+        "VK_LEFT" => 37.0,
+        "VK_UP" => 38.0,
+        "VK_RIGHT" => 39.0,
+        "VK_DOWN" => 40.0,
+        "VK_DELETE" => 46.0,
+        _ => return None,
+    })
+}
+
+/// The GS1 player globals that GS2 reads as `player.<member>`.
+fn old_player_name(name: &str) -> Option<&str> {
+    match name {
+        "playerx" | "playery" | "playerz" | "playerdir" | "playerreading" => Some(&name[6..]),
+        _ => None,
+    }
 }

@@ -134,7 +134,7 @@ but nothing in the compiler writes it.
 | 40 | 0x28 | OP_INLINE_NEW | — | `new T(name)` and the `new T(name) { … }` statement, after the name | yes |
 | 41 | 0x29 | OP_MAKEVAR | — | `makevar(s)` | yes |
 | 42 | 0x2A | OP_NEW_OBJECT | — | `new T(…)`, after the type name | yes |
-| 43 | 0x2B | OP_OBJ_FROM_STR | — | *(enum comment: from setstring)* | no |
+| 43 | 0x2B | OP_OBJ_FROM_STR | — | GS2 `sarraylen(a)`: the array named by the text between the brackets, as official bodies write it. The VM treats it like `makevar` | yes |
 | 44 | 0x2C | OP_INLINE_CONDITIONAL | — | End of an `&&`/`\|\|` chain outside an `if` or loop test | yes |
 | 45–47 | 0x2D–0x2F | OP_UNKNOWN_45 … 47 | int (45, 46) | Placeholders in the enum. The client VMs run them as local-slot store, load and resolve (`gs2-vm-versions.md`). Official bodies use them as a per-function variable cache: the prologue resolves each cached name (47), stores it in slot n (45 n) and pops it; each later use is 46 n. Seihai's compiler emits the same (`compile/cache.rs`) | yes |
 | 50 | 0x32 | OP_ASSIGN | — | `=` and the store of a compound assignment | yes |

@@ -114,9 +114,110 @@ fn waitfor_pushes_in_source_order_and_pow_is_a_call() {
 }
 
 #[test]
-fn no_closing_return_after_an_if_else_that_always_returns() {
+fn closing_return_unless_the_last_statement_is_a_return() {
+    // Official bodies add `return 0` even after an `if`/`else` whose
+    // branches all return (GS2 captures).
     let both = lines("function g() {\n  if (temp.x) { return 1; } else if (temp.y) { return 2; } else { return 3; }\n}\n");
-    assert!(!both.iter().any(|x| x == "OP_TYPE_NUMBER 0"), "{both:#?}");
+    assert!(has_run(&both, &["OP_TYPE_NUMBER 0", "OP_RET"]), "{both:#?}");
+    let last = lines("function b() {\n  temp.x = 1;\n  return 2;\n}\n");
+    assert!(!last.iter().any(|x| x == "OP_TYPE_NUMBER 0"), "{last:#?}");
     let one = lines("function a() {\n  if (temp.x) return 1;\n}\n");
     assert!(has_run(&one, &["OP_TYPE_NUMBER 0", "OP_RET"]), "{one:#?}");
+}
+
+#[test]
+fn old_names_key_codes_and_enum_members() {
+    let l = lines(
+        "enum Suit { HEARTS, SPADES = 3 };\nfunction onCreated() {\n  temp.a = playerx;\n  temp.b = VK_LEFT;\n  temp.c = Suit.SPADES;\n  temp.d = imgwidth(foo.png);\n  temp.e = sarraylen(temp.list);\n}\n",
+    );
+    assert!(l.iter().any(|x| x == "OP_PLAYER"), "{l:#?}");
+    assert!(l.iter().any(|x| x == "OP_TYPE_NUMBER 37"), "{l:#?}");
+    assert!(l.iter().any(|x| x == "OP_TYPE_NUMBER 3"), "{l:#?}");
+    assert!(l.iter().any(|x| x.ends_with("\"foo.png\"")), "{l:#?}");
+    assert!(l.iter().any(|x| x.ends_with("\"getimgwidth\"")), "{l:#?}");
+    assert!(l.iter().any(|x| x.ends_with("\"temp.list\"")), "{l:#?}");
+    assert!(l.iter().any(|x| x == "OP_OBJ_FROM_STR"), "{l:#?}");
+    assert!(!l.iter().any(|x| x.ends_with("\"playerx\"")), "{l:#?}");
+}
+
+/// [`lines`] for legacy mode, which takes bare names as statements.
+fn legacy_lines(src: &str) -> Vec<String> {
+    let script = compile::compile_gs2_legacy(src).unwrap().script;
+    script
+        .disassemble()
+        .lines()
+        .filter_map(|l| {
+            let t = l.trim_start();
+            let (index, rest) = t.split_once(char::is_whitespace)?;
+            index.parse::<usize>().ok()?;
+            Some(rest.trim().to_string())
+        })
+        .collect()
+}
+
+#[test]
+fn unused_values_and_bare_names_are_left_out() {
+    let l = legacy_lines(
+        "function f(temp.s) {\n  temp.s.trim();\n  sin(test());\n  float(temp.s);\n  custom;\n  temp.x;\n  hide;\n}\n",
+    );
+    assert!(
+        !l.iter().any(|x| x == "OP_OBJ_TRIM" || x == "OP_SIN"),
+        "{l:#?}"
+    );
+    assert!(!l.iter().any(|x| x.ends_with("\"custom\"")), "{l:#?}");
+    // `test()` went with `sin`, so nothing is called but `hide`.
+    assert!(l.iter().any(|x| x.ends_with("\"hide\"")), "{l:#?}");
+    assert!(!l.iter().any(|x| x.ends_with("\"test\"")), "{l:#?}");
+}
+
+#[test]
+fn lower_float_translate_and_link() {
+    let l = lines(
+        "function f(temp.s) {\n  temp.a = temp.s.lower();\n  temp.b = float(temp.s);\n  temp.c = _(temp.s);\n  temp.d = temp.s.link();\n}\n",
+    );
+    assert!(l.iter().any(|x| x.ends_with("\"lowercase\"")), "{l:#?}");
+    assert!(has_run(&l, &["OP_CONV_TO_FLOAT", "OP_ASSIGN"]), "{l:#?}");
+    assert!(
+        has_run(&l, &["OP_CONV_TO_STRING", "OP_TRANSLATE"]),
+        "{l:#?}"
+    );
+    assert!(has_run(&l, &["OP_CONV_TO_OBJECT", "OP_OBJ_LINK"]), "{l:#?}");
+}
+
+#[test]
+fn bit_operators_and_compound_assignments() {
+    let l = lines(
+        "function f(temp.a, temp.b) {\n  temp.r = temp.a xor temp.b;\n  temp.r = ~temp.a;\n  temp.r ^= 2;\n  temp.r <<= 1;\n  temp.r >>= 1;\n  echo(temp.a += 5);\n}\n",
+    );
+    for op in [
+        "OP_BWX",
+        "OP_BWI",
+        "OP_POW",
+        "OP_BW_LEFTSHIFT",
+        "OP_BW_RIGHTSHIFT",
+    ] {
+        assert!(l.iter().any(|x| x == op), "{op}: {l:#?}");
+    }
+}
+
+#[test]
+fn labeled_loops_jump_to_the_named_loop() {
+    let l = lines(
+        "function f() {\n  outer: for (temp.i = 0; temp.i < 3; temp.i++) {\n    for (temp.j = 0; temp.j < 3; temp.j++) {\n      if (temp.j == 1) continue outer;\n      if (temp.i == 2) break outer;\n    }\n  }\n}\n",
+    );
+    assert!(
+        l.iter().filter(|x| x.starts_with("OP_SET_INDEX")).count() >= 4,
+        "{l:#?}"
+    );
+}
+
+#[test]
+fn a_new_block_without_a_name_uses_unknown_object() {
+    let l = lines("function f() {\n  new TThing() {\n    this.k = 1;\n  }\n}\n");
+    assert!(
+        l.iter()
+            .any(|x| x.starts_with("OP_TYPE_VAR") && x.ends_with("\"unknown_object\"")),
+        "{l:#?}"
+    );
+    assert!(!l.iter().any(|x| x == "OP_INLINE_NEW"), "{l:#?}");
 }

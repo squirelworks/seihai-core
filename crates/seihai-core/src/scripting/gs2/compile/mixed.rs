@@ -270,7 +270,8 @@ fn can_return(s: &Stmt) -> bool {
         | Stmt::For { body, .. }
         | Stmt::ForEach { body, .. }
         | Stmt::With { body, .. }
-        | Stmt::Embedded { body, .. } => can_return(body),
+        | Stmt::Embedded { body, .. }
+        | Stmt::Labeled { body, .. } => can_return(body),
         Stmt::Switch { arms, .. } => arms.iter().flat_map(|a| &a.body).any(can_return),
         _ => false,
     }

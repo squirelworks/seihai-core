@@ -320,7 +320,8 @@ fn opcode_builtins_reject_missing_and_extra_arguments() {
         ("arctan", 1),
         ("abs", 1),
         ("arraylen", 1),
-        ("sarraylen", 1),
+        // `sarraylen(…)` takes its brackets as raw text, so it always has
+        // one argument.
         ("int", 1),
         ("exp", 1),
         ("char", 1),

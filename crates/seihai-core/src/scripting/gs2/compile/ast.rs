@@ -55,6 +55,8 @@ pub(super) enum BitOp {
     Shr,
     And,
     Or,
+    /// `xor`
+    Xor,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,6 +69,11 @@ pub(super) enum AssignOp {
     Mod,
     BitAnd,
     BitOr,
+    /// `^=`
+    Pow,
+    /// `<<=`, `>>=`
+    Shl,
+    Shr,
     /// `@=`
     Cat,
 }
@@ -82,6 +89,9 @@ impl AssignOp {
             AssignOp::Mod => "%=",
             AssignOp::BitAnd => "&=",
             AssignOp::BitOr => "|=",
+            AssignOp::Pow => "^=",
+            AssignOp::Shl => "<<=",
+            AssignOp::Shr => ">>=",
             AssignOp::Cat => "@=",
         }
     }
@@ -96,6 +106,9 @@ impl AssignOp {
             AssignOp::Mod => BinOp::Mod,
             AssignOp::BitAnd => return Expr::Bits(BitOp::And, Box::new(a), Box::new(v)),
             AssignOp::BitOr => return Expr::Bits(BitOp::Or, Box::new(a), Box::new(v)),
+            AssignOp::Shl => return Expr::Bits(BitOp::Shl, Box::new(a), Box::new(v)),
+            AssignOp::Shr => return Expr::Bits(BitOp::Shr, Box::new(a), Box::new(v)),
+            AssignOp::Pow => BinOp::Pow,
             AssignOp::Cat => BinOp::Cat,
             AssignOp::Set => unreachable!("`=` has no operator"),
         };
@@ -136,6 +149,8 @@ pub(super) enum Expr {
     Str(String),
     Var(Var),
     Neg(Box<Expr>),
+    /// `~x`: the bits of `x` flipped.
+    Invert(Box<Expr>),
     Not(Box<Expr>),
     Binary(BinOp, Box<Expr>, Box<Expr>),
     Bits(BitOp, Box<Expr>, Box<Expr>),
@@ -224,8 +239,13 @@ pub(super) enum Expr {
     NewArray(Vec<Expr>),
     /// `@x`: the value as text.
     Text(Box<Expr>),
-    /// `function (…) { … }` as a value: the name of the function made for it.
-    Lambda(String),
+    /// `function (…) { … }` as a value: the name of the function made for
+    /// it, and whether its body calls anything (which counts as a call of
+    /// the function it stands in).
+    Lambda {
+        name: String,
+        calls: bool,
+    },
     /// `x++` / `x--` as a value: the old value, then the step.
     PostStep {
         target: Box<Expr>,
@@ -278,9 +298,9 @@ impl Expr {
     /// The expressions directly inside this one, in source order.
     pub fn parts(&self) -> Vec<&Expr> {
         match self {
-            Expr::Num(_) | Expr::Str(_) | Expr::Lambda(_) | Expr::Message(_) => Vec::new(),
+            Expr::Num(_) | Expr::Str(_) | Expr::Lambda { .. } | Expr::Message(_) => Vec::new(),
             Expr::Var(v) => v.index.iter().collect(),
-            Expr::Neg(a) | Expr::Not(a) | Expr::Text(a) => vec![a],
+            Expr::Neg(a) | Expr::Invert(a) | Expr::Not(a) | Expr::Text(a) => vec![a],
             Expr::InArray { e, .. } => vec![e],
             Expr::Binary(_, a, b) | Expr::Bits(_, a, b) => vec![a, b],
             Expr::Cond { cond, then, els } => vec![cond, then, els],
@@ -347,6 +367,16 @@ pub(super) enum Stmt {
     Return(Option<Expr>),
     Break,
     Continue,
+    /// `name: while (…) …` or `name: for (…) …`: a loop that
+    /// `break name;` and `continue name;` can name.
+    Labeled {
+        label: String,
+        body: Box<Stmt>,
+    },
+    /// `break name;`
+    BreakTo(String),
+    /// `continue name;`
+    ContinueTo(String),
     /// `with (target) body`
     With {
         target: Expr,
@@ -355,9 +385,10 @@ pub(super) enum Stmt {
     },
     /// `new Type(name) { body }`: make the object, run the body with it as
     /// the current object, then add it as a control of the object outside.
+    /// `new Type() { body }` has no name.
     NewBlock {
         ty: String,
-        name: Expr,
+        name: Option<Expr>,
         body: Vec<Stmt>,
     },
     Assign {
@@ -439,22 +470,9 @@ pub(super) struct Program {
     pub gs1: bool,
 }
 
-/// The body always leaves through `return`, so the function needs no
-/// closing `return 0`. An `if` counts when it has an `else` and every
-/// branch returns, which is where the reference compiler also leaves it out.
+/// The body's last statement is a `return`, so the function needs no
+/// closing `return 0`. Official bodies add one after anything else, even
+/// an `if` whose branches all return.
 pub(super) fn ends_with_return(body: &[Stmt]) -> bool {
-    body.last().is_some_and(always_returns)
-}
-
-fn always_returns(s: &Stmt) -> bool {
-    match s {
-        Stmt::Return(_) => true,
-        Stmt::Block(v) => ends_with_return(v),
-        Stmt::If {
-            then,
-            els: Some(els),
-            ..
-        } => always_returns(then) && always_returns(els),
-        _ => false,
-    }
+    matches!(body.last(), Some(Stmt::Return(_)))
 }

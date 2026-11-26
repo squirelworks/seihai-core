@@ -614,8 +614,8 @@ pub(super) fn name_is_call(name: &str, gs1: bool) -> bool {
     if name == "format" || (name == "pow" && !gs1) {
         return true;
     }
-    // `_("text")` is `OP_TRANSLATE`.
-    if name == "_" && !gs1 {
+    // `_("text")` is `OP_TRANSLATE`; `float(x)` is `x` as a number.
+    if matches!(name, "_" | "float") && !gs1 {
         return false;
     }
     if opcode_builtin(name).is_some() {
@@ -952,7 +952,10 @@ fn walk_stmt(s: &Stmt, f: &mut dyn FnMut(&str, bool)) {
         | Stmt::Switch { .. }
         | Stmt::NewBlock { .. }
         | Stmt::Chain { .. }
-        | Stmt::SetPart { .. } => {}
+        | Stmt::SetPart { .. }
+        | Stmt::Labeled { .. }
+        | Stmt::BreakTo(_)
+        | Stmt::ContinueTo(_) => {}
     }
 }
 
