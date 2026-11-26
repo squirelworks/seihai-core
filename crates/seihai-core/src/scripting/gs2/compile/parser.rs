@@ -22,9 +22,11 @@ pub(super) struct Parsed {
     pub quirks: Vec<(u32, Quirk)>,
 }
 
-pub(super) fn parse(src: &str) -> PResult<Parsed> {
+pub(super) fn parse(src: &str, lambda_id: Option<u32>) -> PResult<Parsed> {
     let mut p = Parser {
         lex: Lexer::new(src),
+        lambda_id,
+        in_cond: false,
         consts: HashMap::new(),
         lambdas: Vec::new(),
         nested: Vec::new(),
@@ -84,6 +86,10 @@ struct Parser<'a> {
     lex: Lexer<'a>,
     /// `const` and `enum` names (lower case), folded where they are read.
     consts: HashMap<String, Expr>,
+    /// Inside an `if` or `while` test, where `(a = b)` compares.
+    in_cond: bool,
+    /// The compile's number for lambda names ([`super::Options::lambda_id`]).
+    lambda_id: Option<u32>,
     /// `function (…) { … }` values met so far.
     lambdas: Vec<Function>,
     /// Functions written inside a block.
@@ -674,11 +680,29 @@ impl<'a> Parser<'a> {
 
     /// An `if`/`while` condition. A single `=` there compares, as in GS1
     /// (`if (key = "m")`, a quirk).
+    /// An `if` or `while` test. Official bodies compare for `=` there,
+    /// also inside brackets (`(a = 1) == 2`); an `=` to the right of that
+    /// one stores again (`a = x && b = 2` is `a == ((x && b) = 2)`).
     fn cond(&mut self) -> PResult<Expr> {
+        let outer = std::mem::replace(&mut self.in_cond, true);
+        let e = self.cond_inner();
+        self.in_cond = outer;
+        e
+    }
+
+    fn cond_inner(&mut self) -> PResult<Expr> {
         let e = self.expr()?;
         if self.eat("=") {
             self.quirk(Quirk::AssignInCondition);
-            let rhs = self.expr()?;
+            let mut rhs = self.expr()?;
+            if self.eat("=") {
+                let value = self.assigned_value()?;
+                rhs = Expr::AssignValue {
+                    target: Box::new(rhs),
+                    op: AssignOp::Set,
+                    value: Box::new(value),
+                };
+            }
             return Ok(Expr::bin(BinOp::Eq, e, rhs));
         }
         Ok(e)
@@ -729,7 +753,17 @@ impl<'a> Parser<'a> {
         let cond = if self.eat(";") {
             None
         } else {
-            let c = self.expr()?;
+            let mut c = self.expr()?;
+            // `for (…; a = 1; …)` stores, and tests the stored value.
+            if self.eat("=") {
+                self.quirk(Quirk::AssignInCondition);
+                let value = self.assigned_value()?;
+                c = Expr::AssignValue {
+                    target: Box::new(c),
+                    op: AssignOp::Set,
+                    value: Box::new(value),
+                };
+            }
             self.expect(";")?;
             Some(c)
         };
@@ -830,16 +864,43 @@ impl<'a> Parser<'a> {
     fn expr(&mut self) -> PResult<Expr> {
         let cond = self.binary(1)?;
         if self.eat("?") {
-            let then = self.expr()?;
+            let then = self.branch()?;
             self.expect(":")?;
             let els = self.expr()?;
-            return Ok(Expr::Cond {
+            let whole = Expr::Cond {
                 cond: Box::new(cond),
                 then: Box::new(then),
                 els: Box::new(els),
-            });
+            };
+            // A store after the else branch takes the whole conditional as
+            // its target: `c ? b = 2 : d = 3` is `(c ? b = 2 : d) = 3`.
+            if self.sees("=") {
+                self.lex.bump();
+                let value = self.assigned_value()?;
+                return Ok(Expr::AssignValue {
+                    target: Box::new(whole),
+                    op: AssignOp::Set,
+                    value: Box::new(value),
+                });
+            }
+            return Ok(whole);
         }
         Ok(cond)
+    }
+
+    /// A branch of `c ? a : b`, which may store: `c ? b = 2 : d = 3`.
+    fn branch(&mut self) -> PResult<Expr> {
+        let e = self.expr()?;
+        if self.sees("=") && (matches!(e, Expr::Var(_)) || e.is_part_place()) {
+            self.lex.bump();
+            let value = self.assigned_value()?;
+            return Ok(Expr::AssignValue {
+                target: Box::new(e),
+                op: AssignOp::Set,
+                value: Box::new(value),
+            });
+        }
+        Ok(e)
     }
 
     /// The right side of an assignment, where it may itself be an
@@ -1012,7 +1073,7 @@ impl<'a> Parser<'a> {
         loop {
             if self.eat(".") {
                 if self.eat("(") {
-                    let n = Box::new(self.expr()?);
+                    let n = Box::new(text_whole(self.expr()?));
                     self.expect(")")?;
                     let obj = Box::new(e);
                     e = if self.eat("(") {
@@ -1086,8 +1147,14 @@ impl<'a> Parser<'a> {
             Tok::Id(name) => self.name_expr(name),
             Tok::Op("(") => {
                 let mut e = self.expr()?;
-                // `(x = v)`, `(x += v)`: an assignment used as a value.
-                if let Some(op) = self.assign_op() {
+                // `(x = v)`, `(x += v)`: an assignment used as a value; in
+                // an `if` or `while` test, `(x = v)` compares.
+                if self.in_cond && self.sees("=") {
+                    self.lex.bump();
+                    self.quirk(Quirk::AssignInCondition);
+                    let value = self.expr()?;
+                    e = Expr::bin(BinOp::Eq, e, value);
+                } else if let Some(op) = self.assign_op() {
                     let value = self.expr()?;
                     e = Expr::AssignValue {
                         target: Box::new(e),
@@ -1166,7 +1233,7 @@ impl<'a> Parser<'a> {
         let body = self.block_body()?;
         let name = format!(
             "function_{}_{}",
-            self.lex.line,
+            self.lambda_id.unwrap_or(self.lex.line),
             self.lambdas.len() + self.nested.len() + 1
         );
         let calls = body.iter().any(super::codegen::stmt_calls);
@@ -1223,7 +1290,7 @@ impl<'a> Parser<'a> {
         while self.eat(".") {
             if self.eat("(") {
                 // `a.b.(expr)`: a member named by a value.
-                let n = Box::new(self.expr()?);
+                let n = Box::new(text_whole(self.expr()?));
                 self.expect(")")?;
                 let obj = Box::new(Expr::var(name));
                 if self.eat("(") {
@@ -1411,5 +1478,31 @@ fn old_player_name(name: &str) -> Option<&str> {
     match name {
         "playerx" | "playery" | "playerz" | "playerdir" | "playerreading" => Some(&name[6..]),
         _ => None,
+    }
+}
+
+/// A run-time member name that starts with `@` makes the whole name text:
+/// `obj.(@n - 1)` is `obj.(@(n - 1))` in official bodies.
+fn text_whole(e: Expr) -> Expr {
+    fn strip(e: Expr) -> (Expr, bool) {
+        match e {
+            Expr::Text(inner) => (*inner, true),
+            Expr::Binary(op, a, b) => {
+                let (a, found) = strip(*a);
+                (Expr::Binary(op, Box::new(a), b), found)
+            }
+            Expr::Bits(op, a, b) => {
+                let (a, found) = strip(*a);
+                (Expr::Bits(op, Box::new(a), b), found)
+            }
+            other => (other, false),
+        }
+    }
+    if matches!(e, Expr::Text(_)) {
+        return e;
+    }
+    match strip(e.clone()) {
+        (inner, true) => Expr::Text(Box::new(inner)),
+        _ => e,
     }
 }
