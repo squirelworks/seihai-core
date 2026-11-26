@@ -477,44 +477,39 @@ impl Builder {
 
     /// A number: as written, when the script wrote it differently from its
     /// normalised text; else an integer where it is one, else its text.
-    /// A number literal as official bodies write it: rounded to nine
-    /// decimals, and held to the `i32` range.
+    /// A number as official bodies write it (literals and folded values
+    /// alike): an integer when the value is within 0.0001 of one; past the
+    /// `i32` range, that range's end as text; otherwise the integer part
+    /// and the first nine decimals, cut rather than rounded, except that a
+    /// run ending in 999 is carried up.
     fn emit_number(&mut self, n: f64) {
-        let n = if n.is_finite() && n.fract() != 0.0 {
-            (n * 1e9).round() / 1e9
-        } else {
-            n
-        };
-        self.emit_plain_number(n);
-    }
-
-    /// A folded constant: cut (not rounded) to nine decimals, and 0 below
-    /// 0.0001, as official bodies write it.
-    fn emit_folded(&mut self, n: f64) {
-        let n = if n.abs() < 1e-4 {
-            0.0
-        } else if n.fract() != 0.0 {
-            (n * 1e9).trunc() / 1e9
-        } else {
-            n
-        };
-        self.emit_plain_number(n);
-    }
-
-    fn emit_plain_number(&mut self, n: f64) {
-        let n = if n.is_finite() && n.abs() >= 2147483648.0 {
-            n.clamp(i32::MIN as f64, i32::MAX as f64).trunc()
-        } else {
-            n
-        };
-        if n.is_finite() && n.fract() == 0.0 && (i32::MIN as f64..=i32::MAX as f64).contains(&n) {
-            self.emit_int(n as i32);
-        } else {
-            // At most nine decimals, no trailing zeros.
-            let text = format!("{n:.9}");
-            let text = text.trim_end_matches('0').trim_end_matches('.');
-            self.push(Op::TypeNumber, Operand::Decimal(text.to_string()));
+        let near = n.round();
+        if (i32::MIN as f64..=i32::MAX as f64).contains(&near) && (n - near).abs() <= 0.0001 {
+            self.emit_int(near as i32);
+            return;
         }
+        let sign = if n < 0.0 { "-" } else { "" };
+        let mag = n.abs();
+        if !mag.is_finite() || mag > i32::MAX as f64 {
+            self.push(Op::TypeNumber, Operand::Decimal(format!("{sign}{}", i32::MAX)));
+            return;
+        }
+        let mut whole = mag.trunc() as i64;
+        let mut frac = ((mag - mag.trunc()) * 1e9) as i64;
+        if frac % 1000 == 999 {
+            frac += 1;
+            if frac == 1_000_000_000 {
+                whole += 1;
+                frac = 0;
+            }
+        }
+        let mut text = format!("{sign}{whole}");
+        if frac != 0 {
+            let digits = format!("{frac:09}");
+            text.push('.');
+            text.push_str(digits.trim_end_matches('0'));
+        }
+        self.push(Op::TypeNumber, Operand::Decimal(text));
     }
 
     fn new_loop(&mut self) {
@@ -993,7 +988,7 @@ impl Builder {
                 self.value(obj);
                 self.op(Op::ConvToObject);
                 for i in index {
-                    self.value(i);
+                    self.numeric(i);
                 }
                 self.value(value);
                 self.op(if index.len() == 1 {
@@ -1492,6 +1487,11 @@ impl Builder {
                 self.emit_str(s);
                 Kind::String
             }
+            // `pi` is a number; it folds like a literal (`pi * 1.5`).
+            Expr::Var(v) if v.index.is_empty() && v.name == "pi" => {
+                self.place(&v.name);
+                Kind::Number
+            }
             Expr::Var(v) if v.index.is_empty() => {
                 self.place(&v.name);
                 Kind::Other
@@ -1505,7 +1505,7 @@ impl Builder {
                 Kind::Other
             }
             Expr::Binary(..) | Expr::Bits(..) | Expr::Neg(_) if fold(e).is_some() => {
-                self.emit_folded(fold(e).unwrap());
+                self.emit_number(fold(e).unwrap());
                 Kind::Number
             }
             Expr::Neg(a) => {
@@ -1517,14 +1517,15 @@ impl Builder {
                 }
                 Kind::Number
             }
+            // Official bodies use `!`, `&&`/`||` and comparisons as numbers.
             Expr::Not(a) => {
                 self.not_operand(a);
                 self.op(Op::Not);
-                Kind::Other
+                Kind::Number
             }
             Expr::Binary(BinOp::And | BinOp::Or, _, _) => {
                 self.logic(e);
-                Kind::Other
+                Kind::Number
             }
             Expr::Binary(op, a, b) => self.binary(*op, a, b),
             // `5 & 3` is the two numbers and `OP_BWA` (Preagonal probe).
@@ -1617,12 +1618,10 @@ impl Builder {
                 Kind::Other
             }
             Expr::Call { name, args } => {
+                // Official bodies convert every call's result, `int(…)`
+                // included.
                 self.call(name, args);
-                if matches!(name.as_str(), "int" | "arraylen" | "sarraylen" | "strlen") {
-                    Kind::Number
-                } else {
-                    Kind::Other
-                }
+                Kind::Other
             }
             Expr::HostCall { name, args } => {
                 self.call_by_name(name, args);
@@ -1650,7 +1649,7 @@ impl Builder {
                 self.value(obj);
                 self.op(Op::ConvToObject);
                 for i in index {
-                    self.value(i);
+                    self.numeric(i);
                 }
                 self.op(element_op(index.len()));
                 Kind::Other
@@ -1763,7 +1762,7 @@ impl Builder {
                     return Kind::Other;
                 }
                 self.op(if *delta < 0.0 { Op::Dec } else { Op::Inc });
-                Kind::Other
+                Kind::Number
             }
             // `y = (x = 2)` (Preagonal probe): x, `OP_COPY_LAST_OP`, the
             // value, `OP_ASSIGN`, leaving x. For `+=` and the others Seihai
@@ -1817,14 +1816,14 @@ impl Builder {
             self.numeric(a);
             self.numeric(b);
             self.op(code);
-            return Kind::Other;
+            return Kind::Number;
         }
         match op {
             BinOp::Eq | BinOp::Ne => {
                 self.value(a);
                 self.value(b);
                 self.op(if op == BinOp::Eq { Op::Eq } else { Op::Neq });
-                Kind::Other
+                Kind::Number
             }
             BinOp::Cat | BinOp::CatSpc | BinOp::CatNl | BinOp::CatTab => {
                 // Official bodies join `@` between text literals at compile
@@ -1972,6 +1971,7 @@ fn fold(e: &Expr) -> Option<f64> {
     fn operand(e: &Expr) -> Option<f64> {
         match e {
             Expr::Num(n) if *n >= 0.0 => Some(*n),
+            Expr::Var(v) if v.index.is_empty() && v.name == "pi" => Some(std::f64::consts::PI),
             Expr::Binary(..) | Expr::Bits(..) => fold(e),
             _ => None,
         }
