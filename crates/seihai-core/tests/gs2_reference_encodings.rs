@@ -227,6 +227,7 @@ fn legacy_lines_with_lambda(src: &str, lambda_id: u32) -> Vec<String> {
     let options = compile::Options {
         mode: compile::Mode::Legacy,
         lambda_id: Some(lambda_id),
+        ..compile::Options::default()
     };
     let script = compile::compile_with(src, compile::Language::Gs2, options)
         .unwrap()
