@@ -307,12 +307,41 @@ pub struct Compiled {
     pub warnings: Vec<Warning>,
 }
 
+/// How to compile, beyond the language.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Options {
+    pub mode: Mode,
+    /// The number the server gives this compile, for the names of
+    /// `function () { … }` values: `function_<id>_<n>`, as official bodies
+    /// write them. The official server takes it from a running count of
+    /// its compiles, so only the server knows it. With none, Seihai uses
+    /// the line the value ends on.
+    pub lambda_id: Option<u32>,
+}
+
 /// Compile a script.
 pub fn compile(src: &str, language: Language, mode: Mode) -> Result<Compiled, CompileErrors> {
+    compile_with(
+        src,
+        language,
+        Options {
+            mode,
+            ..Options::default()
+        },
+    )
+}
+
+/// Compile a script with [`Options`].
+pub fn compile_with(
+    src: &str,
+    language: Language,
+    options: Options,
+) -> Result<Compiled, CompileErrors> {
+    let Options { mode, lambda_id } = options;
     match language {
         Language::Gs1(era) => gs1_script(src, era, mode),
-        Language::Gs2 => gs2_script(src, mode, false),
-        Language::Detect(era) => detect(src, era, mode),
+        Language::Gs2 => gs2_script(src, mode, false, lambda_id),
+        Language::Detect(era) => detect(src, era, mode, lambda_id),
     }
 }
 
@@ -359,11 +388,16 @@ fn gs1_script(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors
 /// `lift_events`: read top-level GS1 event tests as event code (only for
 /// an unmarked script, see [`mixed`]). A script marked GS2 keeps them as
 /// variable tests, as gs2-parser does (issue 32).
-fn gs2_script(src: &str, mode: Mode, lift_events: bool) -> Result<Compiled, CompileErrors> {
+fn gs2_script(
+    src: &str,
+    mode: Mode,
+    lift_events: bool,
+    lambda_id: Option<u32>,
+) -> Result<Compiled, CompileErrors> {
     let parser::Parsed {
         mut program,
         mut quirks,
-    } = parser::parse(src)?;
+    } = parser::parse(src, lambda_id)?;
     if lift_events {
         let (lifted, lift_warnings) = mixed::lift_event_tests(&mut program);
         mixed::merge_event_functions(&mut program, &lifted);
@@ -400,7 +434,12 @@ fn gs2_script(src: &str, mode: Mode, lift_events: bool) -> Result<Compiled, Comp
     })
 }
 
-fn detect(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors> {
+fn detect(
+    src: &str,
+    era: Era,
+    mode: Mode,
+    lambda_id: Option<u32>,
+) -> Result<Compiled, CompileErrors> {
     if mode == Mode::Strict {
         return Err(CompileError {
             line: 0,
@@ -425,7 +464,7 @@ fn detect(src: &str, era: Era, mode: Mode) -> Result<Compiled, CompileErrors> {
             return Ok(guessed(c));
         }
     }
-    match gs2_script(src, Mode::Legacy, true) {
+    match gs2_script(src, Mode::Legacy, true, lambda_id) {
         Ok(c) => Ok(guessed(c)),
         Err(gs2) => gs1_script(src, era, mode).map(guessed).map_err(|gs1| {
             // Both fronts failed: report both, the likelier one first.

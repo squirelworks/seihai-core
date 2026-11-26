@@ -221,3 +221,136 @@ fn a_new_block_without_a_name_uses_unknown_object() {
     );
     assert!(!l.iter().any(|x| x == "OP_INLINE_NEW"), "{l:#?}");
 }
+
+/// [`legacy_lines`] with a lambda number chosen by the caller.
+fn legacy_lines_with_lambda(src: &str, lambda_id: u32) -> Vec<String> {
+    let options = compile::Options {
+        mode: compile::Mode::Legacy,
+        lambda_id: Some(lambda_id),
+    };
+    let script = compile::compile_with(src, compile::Language::Gs2, options)
+        .unwrap()
+        .script;
+    script
+        .disassemble()
+        .lines()
+        .map(|l| l.trim().to_string())
+        .collect()
+}
+
+#[test]
+fn lambdas_take_the_given_number_and_count_up() {
+    let l = legacy_lines_with_lambda(
+        "function onCreated() {\n  temp.f = function() { return 1; };\n  temp.g = function() { return 2; };\n}\n",
+        1234,
+    );
+    assert!(l.iter().any(|x| x == "public.function_1234_1:"), "{l:#?}");
+    assert!(l.iter().any(|x| x == "public.function_1234_2:"), "{l:#?}");
+}
+
+#[test]
+fn a_for_test_with_and_is_a_value_then_if() {
+    let l = legacy_lines(
+        "function f() {\n  for (temp.i = 0; temp.i < 3 && temp.j; temp.i++) echo(temp.i);\n}\n",
+    );
+    assert!(
+        has_run(&l, &["OP_INLINE_CONDITIONAL"]) && l.iter().any(|x| x.starts_with("OP_IF")),
+        "{l:#?}"
+    );
+    let at = l.iter().position(|x| x == "OP_INLINE_CONDITIONAL").unwrap();
+    assert!(l[at + 1].starts_with("OP_IF"), "{l:#?}");
+}
+
+#[test]
+fn a_post_increment_value_is_converted_again() {
+    let l = lines("function f() {\n  temp.k = temp.i++;\n}\n");
+    assert!(
+        has_run(
+            &l,
+            &[
+                "OP_COPY_LAST_OP",
+                "OP_CONV_TO_FLOAT",
+                "OP_SWAP_LAST_OPS",
+                "OP_INC"
+            ]
+        ),
+        "{l:#?}"
+    );
+}
+
+#[test]
+fn a_member_name_starting_with_text_is_text_as_a_whole() {
+    let l = lines("function f() {\n  temp.o = temp.x.(@temp.n - 1);\n}\n");
+    assert!(
+        has_run(&l, &["OP_SUB", "OP_CONV_TO_STRING", "OP_MEMBER_ACCESS"]),
+        "{l:#?}"
+    );
+}
+
+#[test]
+fn legacy_stores_and_compares_in_tests() {
+    // `=` in an `if` test compares, also inside brackets.
+    let l = legacy_lines("function f() {\n  if ((temp.a = 1) == 2) echo(2);\n}\n");
+    assert!(
+        has_run(
+            &l,
+            &["OP_TYPE_NUMBER 1", "OP_EQ", "OP_TYPE_NUMBER 2", "OP_EQ"]
+        ),
+        "{l:#?}"
+    );
+    assert!(!l.iter().any(|x| x == "OP_ASSIGN"), "{l:#?}");
+
+    // `a = 1 && b = 2` is `a == ((1 && b) = 2)`.
+    let l = legacy_lines("function f() {\n  if (temp.a = 1 && temp.b = 2) echo(3);\n}\n");
+    assert!(
+        has_run(
+            &l,
+            &[
+                "OP_INLINE_CONDITIONAL",
+                "OP_COPY_LAST_OP",
+                "OP_TYPE_NUMBER 2",
+                "OP_ASSIGN",
+                "OP_EQ"
+            ]
+        ),
+        "{l:#?}"
+    );
+
+    // `=` in a `for` test stores, then tests the stored value.
+    let l = legacy_lines("function f() {\n  for (temp.i = 0; temp.i = 1; temp.i++) echo(4);\n}\n");
+    assert!(
+        has_run(
+            &l,
+            &[
+                "OP_COPY_LAST_OP",
+                "OP_TYPE_NUMBER 1",
+                "OP_ASSIGN",
+                "OP_CONV_TO_FLOAT"
+            ]
+        ),
+        "{l:#?}"
+    );
+}
+
+#[test]
+fn legacy_conditional_branches_store() {
+    // The then branch stores into `b`; the trailing `= 3` stores into the
+    // whole conditional: `(a ? b = 2 : c) = 3`.
+    let l = legacy_lines("function f() {\n  temp.s = temp.a ? temp.b = 2 : temp.c = 3;\n}\n");
+    assert!(
+        has_run(&l, &["OP_COPY_LAST_OP", "OP_TYPE_NUMBER 2", "OP_ASSIGN"]),
+        "{l:#?}"
+    );
+    assert!(
+        has_run(
+            &l,
+            &[
+                "OP_COPY_LAST_OP",
+                "OP_TYPE_NUMBER 3",
+                "OP_ASSIGN",
+                "OP_ASSIGN"
+            ]
+        ),
+        "{l:#?}"
+    );
+}

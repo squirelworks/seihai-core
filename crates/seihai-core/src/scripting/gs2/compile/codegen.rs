@@ -776,8 +776,15 @@ impl Builder {
         }
         let test = self.here();
         let mut fails = Vec::new();
-        if let Some(cond) = cond {
-            self.cond_fail(cond, &mut fails);
+        match cond {
+            // GS2: a `&&`/`||` test of a `for` is the chain as a value, then
+            // one `OP_IF` (official captures); `if` and `while` split it.
+            Some(cond) if !self.gs1 && (is_and(cond) || is_or(cond)) => {
+                self.logic(cond);
+                fails.push(self.hole(Op::If));
+            }
+            Some(cond) => self.cond_fail(cond, &mut fails),
+            None => {}
         }
         self.op(Op::CmdCall);
         self.new_loop();
@@ -1967,7 +1974,12 @@ impl Builder {
                 self.op(Op::SwapLastOps);
                 self.op(if *delta < 0.0 { Op::Dec } else { Op::Inc });
                 self.op(Op::IndexDec);
-                Kind::Number
+                // GS2 converts the old value again where a number is needed.
+                if self.gs1 {
+                    Kind::Number
+                } else {
+                    Kind::Other
+                }
             }
             // `++x` used as a value: the place and `OP_INC`, which leaves
             // the changed variable (Seihai's form, no probe).
@@ -1994,6 +2006,17 @@ impl Builder {
                 };
                 self.element_assign(v, *op, value);
                 self.value(target);
+                Kind::Other
+            }
+            // `a == ((x && b) = 2)` in a GS2 test: a value that is no place
+            // is stored to as it is (official captures).
+            Expr::AssignValue { target, op, value }
+                if *op == AssignOp::Set && !self.gs1 && !is_place(target) =>
+            {
+                self.value(target);
+                self.op(Op::CopyLastOp);
+                self.value(value);
+                self.op(Op::Assign);
                 Kind::Other
             }
             Expr::AssignValue { target, op, value } => {
@@ -2336,6 +2359,15 @@ fn builtin_args_fit(name: &str, n: usize) -> bool {
     match name {
         "format" => n > 0,
         _ => builtin_arity(name).is_none_or(|want| want == n),
+    }
+}
+
+/// Whether `++`, `--` and `=` can change `e` ([`Builder::step_place`]).
+fn is_place(e: &Expr) -> bool {
+    match e {
+        Expr::Var(_) | Expr::Member { .. } | Expr::DynMember { .. } | Expr::Index { .. } => true,
+        Expr::Call { name, .. } => name == "makevar",
+        _ => false,
     }
 }
 
