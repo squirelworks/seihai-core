@@ -92,7 +92,6 @@ fn while_true_uses_the_calls_fixture_shape() {
             "OP_45",
             "OP_INDEX_DEC",
             "OP_TYPE_TRUE",
-            "OP_CONV_TO_FLOAT",
             "OP_IF",
             "OP_CMD_CALL",
             "OP_46",
@@ -103,15 +102,15 @@ fn while_true_uses_the_calls_fixture_shape() {
             "OP_RET",
         ]
     );
-    assert_eq!(got.code[17].op, Op::SetIndex);
+    assert_eq!(got.code[16].op, Op::SetIndex);
     assert_eq!(
-        got.code[17].jump_target(),
+        got.code[16].jump_target(),
         Some(10),
         "the loop jumps back to true"
     );
     assert_eq!(
-        got.code[12].jump_target(),
-        Some(18),
+        got.code[11].jump_target(),
+        Some(17),
         "a failed test leaves the loop"
     );
 }

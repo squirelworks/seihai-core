@@ -614,6 +614,10 @@ pub(super) fn name_is_call(name: &str, gs1: bool) -> bool {
     if name == "format" || (name == "pow" && !gs1) {
         return true;
     }
+    // `_("text")` is `OP_TRANSLATE`.
+    if name == "_" && !gs1 {
+        return false;
+    }
     if opcode_builtin(name).is_some() {
         return false;
     }

@@ -343,6 +343,8 @@ fn has_new_block(s: &Stmt) -> bool {
 /// GS1 text with message codes does not.
 fn expr_calls(e: &Expr) -> bool {
     match e {
+        // A folded constant calls nothing (`false && f()`).
+        e if const_bool(e).is_some() => false,
         // Official bodies treat `format` like the other opcode built-ins.
         Expr::Call { name, args } => {
             (name != "format" && name_is_call(name, false)) || args.iter().any(expr_calls)
@@ -1374,8 +1376,21 @@ impl Builder {
             } else {
                 self.stringish(obj);
             }
+            // Official bodies make positions numbers and searched-for
+            // text text (GS2).
             for a in args {
-                self.value(a);
+                match op {
+                    _ if self.gs1 => {
+                        self.value(a);
+                    }
+                    Op::ObjSubstr | Op::ObjCharAt => self.numeric(a),
+                    Op::ObjPos | Op::ObjStarts | Op::ObjEnds | Op::ObjPositions => {
+                        self.stringish(a)
+                    }
+                    _ => {
+                        self.value(a);
+                    }
+                }
             }
             if op == Op::ObjSubstr && n == 1 {
                 self.emit_int(-1);
@@ -1404,12 +1419,32 @@ impl Builder {
         if let Some((op, pushes)) = list_op {
             self.value(obj);
             self.op(Op::ConvToObject);
-            if matches!(op, Op::ObjInsertString | Op::ObjReplaceString) {
-                self.value(&args[1]);
-                self.value(&args[0]);
-            } else {
-                for a in args {
-                    self.value(a);
+            // GS2: indexes and counts are made numbers, and a missing
+            // `subarray` count is -1.
+            let index = |b: &mut Self, a: &Expr| {
+                if b.gs1 {
+                    b.value(a);
+                } else {
+                    b.numeric(a);
+                }
+            };
+            match op {
+                Op::ObjInsertString | Op::ObjReplaceString => {
+                    self.value(&args[1]);
+                    index(self, &args[0]);
+                }
+                Op::ObjDeleteString | Op::ObjSubarray => {
+                    for a in args {
+                        index(self, a);
+                    }
+                    if op == Op::ObjSubarray && n == 1 && !self.gs1 {
+                        self.emit_int(-1);
+                    }
+                }
+                _ => {
+                    for a in args {
+                        self.value(a);
+                    }
                 }
             }
             self.op(op);
@@ -1522,6 +1557,24 @@ impl Builder {
             Expr::Str(s) => {
                 self.emit_str(s);
                 Kind::String
+            }
+            // GS2: `true` and `false` are numbers; `!true`, `false && x`
+            // and `true || x` fold to a constant.
+            e if !self.gs1 && const_bool(e).is_some() && !matches!(e, Expr::Var(_)) => {
+                self.op(if const_bool(e).unwrap() {
+                    Op::TypeTrue
+                } else {
+                    Op::TypeFalse
+                });
+                Kind::Number
+            }
+            Expr::Var(v)
+                if !self.gs1
+                    && v.index.is_empty()
+                    && matches!(v.name.as_str(), "true" | "false") =>
+            {
+                self.place(&v.name);
+                Kind::Number
             }
             // `pi` is a number; it folds like a literal (`pi * 1.5`).
             Expr::Var(v) if v.index.is_empty() && v.name == "pi" => {
@@ -1761,6 +1814,11 @@ impl Builder {
                 Kind::Other
             }
             // `(@x).y` pushes x and `OP_CONV_TO_STRING` (Preagonal probe).
+            // GS2: `@x` is x as text (no conversion when it already is).
+            Expr::Text(e) if !self.gs1 => {
+                self.stringish(e);
+                Kind::String
+            }
             Expr::Text(e) => {
                 self.value(e);
                 self.op(Op::ConvToString);
@@ -2117,4 +2175,17 @@ fn event_mask(b: &Builder, top_level: &[std::ops::Range<usize>]) -> u32 {
         }
     }
     mask
+}
+
+/// The value of a `true`/`false` test official bodies fold: the constants
+/// themselves, `!` of one, `false && …` and `true || …`.
+fn const_bool(e: &Expr) -> Option<bool> {
+    match e {
+        Expr::Var(v) if v.index.is_empty() && v.name == "true" => Some(true),
+        Expr::Var(v) if v.index.is_empty() && v.name == "false" => Some(false),
+        Expr::Not(x) => const_bool(x).map(|b| !b),
+        Expr::Binary(BinOp::And, a, _) if const_bool(a) == Some(false) => Some(false),
+        Expr::Binary(BinOp::Or, a, _) if const_bool(a) == Some(true) => Some(true),
+        _ => None,
+    }
 }
