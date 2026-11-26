@@ -27,15 +27,15 @@ fn has_run(lines: &[String], run: &[&str]) -> bool {
 }
 
 #[test]
-fn decimal_literals_keep_their_spelling() {
+fn decimal_literals_are_normalised() {
     let l = lines(
         "function onCreated() {\n  temp.a = 3.0;\n  temp.b = .5;\n  temp.c = -1.50;\n  temp.d = 1.;\n  temp.e = 007;\n  temp.f = 2.25;\n}\n",
     );
     for want in [
-        "OP_TYPE_NUMBER 3.0",
-        "OP_TYPE_NUMBER .5",
-        "OP_TYPE_NUMBER -1.50",
-        "OP_TYPE_NUMBER 1.",
+        "OP_TYPE_NUMBER 3",
+        "OP_TYPE_NUMBER 0.5",
+        "OP_TYPE_NUMBER -1.5",
+        "OP_TYPE_NUMBER 1",
         "OP_TYPE_NUMBER 7",
         "OP_TYPE_NUMBER 2.25",
     ] {

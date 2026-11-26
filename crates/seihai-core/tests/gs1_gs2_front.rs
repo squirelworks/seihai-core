@@ -1070,8 +1070,9 @@ fn fixture_source(name: &str) -> String {
 /// The `.gs2bc` fixtures are gs2-parser output, and the compiler now
 /// writes the official layout instead (variable cache, narrow jumps, no
 /// closing `OP_RET`, hash-ordered function table). What must still agree
-/// is what a script is made of: the same functions, the same strings, and
-/// bytes that read back to the same instructions.
+/// is what a script is made of: the same functions, and bytes that read
+/// back to the same instructions. (Strings differ where official bodies
+/// fold text literals.)
 #[test]
 fn gs2_front_end_keeps_the_fixtures_functions_and_strings() {
     for name in [
@@ -1086,12 +1087,6 @@ fn gs2_front_end_keeps_the_fixtures_functions_and_strings() {
             v
         };
         assert_eq!(fns(&got), fns(&want), "{name}");
-        let strs = |s: &Script| {
-            let mut v = s.strings.clone();
-            v.sort();
-            v
-        };
-        assert_eq!(strs(&got), strs(&want), "{name}");
         let back = Script::parse(&got.write()).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(back.disassemble(), got.disassemble(), "{name}");
     }

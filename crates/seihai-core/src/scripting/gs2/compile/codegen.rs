@@ -39,10 +39,8 @@ use super::super::{Function as FnEntry, Instr, Op, Operand, Script};
 use super::ast::*;
 use super::cache;
 use super::gs1::name_is_call;
-use super::lexer::Spellings;
 use super::tables::*;
 use super::{CompileError, CompileErrors};
-use crate::scripting::engine::value::num_to_string;
 use std::collections::{HashMap, HashSet};
 
 /// What a value is known to be, to decide on conversions.
@@ -81,7 +79,7 @@ fn functions(program: &Program) -> impl Iterator<Item = &Function> {
         .chain(&program.lambdas)
 }
 
-pub(super) fn generate(program: &Program, spellings: Spellings) -> Result<Script, CompileErrors> {
+pub(super) fn generate(program: &Program) -> Result<Script, CompileErrors> {
     // The index of the last function of each name: with `later_wins` it
     // replaces the earlier ones; without, two of a name are an error.
     let mut last = HashMap::<&str, usize>::new();
@@ -106,7 +104,6 @@ pub(super) fn generate(program: &Program, spellings: Spellings) -> Result<Script
         loops: Vec::new(),
         skips: Vec::new(),
         line: 0,
-        spellings,
         cache: HashMap::new(),
         gs1: program.gs1,
         lambdas: program
@@ -116,6 +113,7 @@ pub(super) fn generate(program: &Program, spellings: Spellings) -> Result<Script
             .collect(),
     };
     let mut nth = 0;
+    let mut top_level = Vec::new();
     for item in &program.items {
         match item {
             Item::Code(body) => {
@@ -127,9 +125,11 @@ pub(super) fn generate(program: &Program, spellings: Spellings) -> Result<Script
                 for skip in std::mem::take(&mut b.skips) {
                     b.patch(skip, here);
                 }
+                let start = b.here();
                 for s in body {
                     b.stmt(s);
                 }
+                top_level.push(start..b.here());
             }
             Item::Function(f) => {
                 if last.get(f.name.as_str()) == Some(&nth) {
@@ -149,8 +149,13 @@ pub(super) fn generate(program: &Program, spellings: Spellings) -> Result<Script
         return Err(CompileErrors { errors: b.errors });
     }
     thread_jumps(&mut b.code);
+    let gs1_flags = if program.gs1 {
+        0
+    } else {
+        event_mask(&b, &top_level)
+    };
     let script = Script {
-        gs1_flags: 0,
+        gs1_flags,
         functions: official_function_order(b.functions),
         strings: b.strings,
         code: b.code,
@@ -235,8 +240,28 @@ fn official_function_order(functions: Vec<FnEntry>) -> Vec<FnEntry> {
         let n = f.name.split(',').next().unwrap_or_default();
         n.strip_prefix("public.").unwrap_or(n).to_string()
     };
-    let (qualified, plain): (Vec<_>, Vec<_>) =
-        functions.into_iter().partition(|f| bare(f).contains('.'));
+    // A `universe` function is listed without `public.`, and a plain
+    // `onServerListerConnect` is listed a second time as
+    // `universe.onServerListerConnect`, in source order with the others.
+    let mut plain = Vec::new();
+    let mut qualified = Vec::new();
+    for mut f in functions {
+        let name = bare(&f);
+        if name.contains('.') {
+            if name.starts_with("universe.") {
+                f.name = name;
+            }
+            qualified.push(f);
+        } else {
+            if name == "onServerListerConnect" {
+                qualified.push(FnEntry {
+                    name: format!("universe.{name}"),
+                    start: f.start,
+                });
+            }
+            plain.push(f);
+        }
+    }
     let mut out = engine_hash_order(plain, |f| bare(f));
     out.extend(qualified);
     out
@@ -252,7 +277,6 @@ struct Builder {
     /// Jumps over function bodies, patched to the next code outside them.
     skips: Vec<usize>,
     line: u32,
-    spellings: Spellings,
     /// `function () { … }` values by function name, emitted where used.
     lambdas: HashMap<String, Function>,
     /// The running function's variable-cache slots (see `cache`).
@@ -453,16 +477,43 @@ impl Builder {
 
     /// A number: as written, when the script wrote it differently from its
     /// normalised text; else an integer where it is one, else its text.
+    /// A number literal as official bodies write it: rounded to nine
+    /// decimals, and held to the `i32` range.
     fn emit_number(&mut self, n: f64) {
-        if let Some(text) = self.spellings.get(n) {
-            self.push(Op::TypeNumber, Operand::Decimal(text));
-        } else if n.is_finite()
-            && n.fract() == 0.0
-            && (i32::MIN as f64..=i32::MAX as f64).contains(&n)
-        {
+        let n = if n.is_finite() && n.fract() != 0.0 {
+            (n * 1e9).round() / 1e9
+        } else {
+            n
+        };
+        self.emit_plain_number(n);
+    }
+
+    /// A folded constant: cut (not rounded) to nine decimals, and 0 below
+    /// 0.0001, as official bodies write it.
+    fn emit_folded(&mut self, n: f64) {
+        let n = if n.abs() < 1e-4 {
+            0.0
+        } else if n.fract() != 0.0 {
+            (n * 1e9).trunc() / 1e9
+        } else {
+            n
+        };
+        self.emit_plain_number(n);
+    }
+
+    fn emit_plain_number(&mut self, n: f64) {
+        let n = if n.is_finite() && n.abs() >= 2147483648.0 {
+            n.clamp(i32::MIN as f64, i32::MAX as f64).trunc()
+        } else {
+            n
+        };
+        if n.is_finite() && n.fract() == 0.0 && (i32::MIN as f64..=i32::MAX as f64).contains(&n) {
             self.emit_int(n as i32);
         } else {
-            self.push(Op::TypeNumber, Operand::Decimal(num_to_string(n)));
+            // At most nine decimals, no trailing zeros.
+            let text = format!("{n:.9}");
+            let text = text.trim_end_matches('0').trim_end_matches('.');
+            self.push(Op::TypeNumber, Operand::Decimal(text.to_string()));
         }
     }
 
@@ -489,7 +540,9 @@ impl Builder {
         // A `temp.x` parameter is the place `temp.x` (TEMP, x, member
         // access in the Preagonal baselines).
         for p in f.params.iter().rev() {
-            if p.contains('.') {
+            if p == "params" {
+                self.op(Op::Params);
+            } else if p.contains('.') {
                 self.place(p);
             } else {
                 self.emit_var(p);
@@ -611,6 +664,25 @@ impl Builder {
     }
 
     fn if_stmt(&mut self, cond: &Expr, then: &Stmt, els: Option<&Stmt>) {
+        // With nothing to run on either side, official bodies keep only the
+        // test as a dropped value, and drop a constant test altogether.
+        let empty = |s: &Stmt| matches!(s, Stmt::Block(v) if v.is_empty());
+        if empty(then) && els.is_none_or(empty) {
+            match cond {
+                Expr::Num(_) | Expr::Str(_) => {}
+                Expr::Var(v)
+                    if v.index.is_empty() && matches!(v.name.as_str(), "true" | "false") => {}
+                e if is_and(e) || is_or(e) => {
+                    self.logic_operand(e);
+                    self.op(Op::IndexDec);
+                }
+                e => {
+                    self.value(e);
+                    self.op(Op::IndexDec);
+                }
+            }
+            return;
+        }
         let mut fails = Vec::new();
         self.cond_fail(cond, &mut fails);
         self.stmt(then);
@@ -1432,6 +1504,10 @@ impl Builder {
                 self.op(element_op(dims));
                 Kind::Other
             }
+            Expr::Binary(..) | Expr::Bits(..) | Expr::Neg(_) if fold(e).is_some() => {
+                self.emit_folded(fold(e).unwrap());
+                Kind::Number
+            }
             Expr::Neg(a) => {
                 if let Expr::Num(n) = a.as_ref() {
                     self.emit_number(-n);
@@ -1442,11 +1518,7 @@ impl Builder {
                 Kind::Number
             }
             Expr::Not(a) => {
-                if is_logic(a) {
-                    self.logic(a);
-                } else {
-                    self.bool_leaf(a);
-                }
+                self.not_operand(a);
                 self.op(Op::Not);
                 Kind::Other
             }
@@ -1468,8 +1540,14 @@ impl Builder {
                 Kind::Number
             }
             Expr::Cond { cond, then, els } => {
+                // A `&&`/`||` test is the value chain and one `OP_IF`.
                 let mut fails = Vec::new();
-                self.cond_fail(cond, &mut fails);
+                if is_and(cond) || is_or(cond) {
+                    self.logic_operand(cond);
+                    fails.push(self.hole(Op::If));
+                } else {
+                    self.cond_fail(cond, &mut fails);
+                }
                 let kt = self.value(then);
                 let jump = self.hole(Op::SetIndex);
                 let else_at = self.here();
@@ -1609,19 +1687,20 @@ impl Builder {
                 self.op(Op::Call);
                 Kind::Other
             }
-            // `objects.gs2bc`: `new TStaticVar()` pushes the name
-            // "unknown_object", the type, then `OP_NEW_OBJECT`. The type is
-            // interned first. With an argument, Seihai pushes it in place
-            // of the default name (no fixture).
+            // `new T()` pushes the name "unknown_object", the type, then
+            // `OP_NEW_OBJECT`, with the strings stored in that order
+            // (gs2-parser stores the type first). `new T(name)` pushes the
+            // name and `OP_INLINE_NEW` in its place. Official bodies push
+            // the default name for two or more arguments and drop them.
             Expr::New { ty, args } => {
-                let t = self.intern(ty);
-                match args.first() {
-                    Some(a) => {
+                match args.as_slice() {
+                    [a] => {
                         self.value(a);
+                        self.op(Op::InlineNew);
                     }
-                    None => self.emit_var("unknown_object"),
+                    _ => self.emit_var("unknown_object"),
                 }
-                self.push(Op::TypeString, Operand::Str(t));
+                self.emit_str(ty);
                 self.op(Op::NewObject);
                 Kind::Other
             }
@@ -1748,16 +1827,30 @@ impl Builder {
                 Kind::Other
             }
             BinOp::Cat | BinOp::CatSpc | BinOp::CatNl | BinOp::CatTab => {
-                self.stringish(a);
+                // Official bodies join `@` between text literals at compile
+                // time, and the left side of `SPC`/`NL`/`TAB` with its
+                // separator, but never the right side of those.
+                if let Some(text) =
+                    fold_text(&Expr::Binary(op, Box::new(a.clone()), Box::new(b.clone())))
+                {
+                    self.emit_str(&text);
+                    return Kind::String;
+                }
                 let sep = match op {
                     BinOp::CatSpc => Some(" "),
                     BinOp::CatNl => Some("\n"),
                     BinOp::CatTab => Some("\t"),
                     _ => None,
                 };
-                if let Some(sep) = sep {
-                    self.emit_str(sep);
-                    self.op(Op::Join);
+                match (sep, fold_text(a)) {
+                    (Some(sep), Some(left)) => self.emit_str(&format!("{left}{sep}")),
+                    _ => {
+                        self.stringish(a);
+                        if let Some(sep) = sep {
+                            self.emit_str(sep);
+                            self.op(Op::Join);
+                        }
+                    }
                 }
                 self.stringish(b);
                 self.op(Op::Join);
@@ -1784,68 +1877,72 @@ impl Builder {
         self.op(Op::InlineConditional);
     }
 
-    fn logic_operand(&mut self, e: &Expr) {
-        match e {
-            Expr::Binary(BinOp::Or, a, b) => {
-                let mut holes = Vec::new();
-                if is_and(a) {
-                    self.and_parts(a, &mut holes);
-                } else if is_or(a) {
-                    self.logic_operand(a);
-                } else {
-                    self.bool_leaf(a);
-                }
-                let or_hole = self.hole(Op::Or);
-                let right = self.here();
-                for h in holes {
-                    self.patch(h, right);
-                }
-                self.logic_operand(b);
-                self.patch(or_hole, self.here());
-            }
-            Expr::Binary(BinOp::And, _, _) => {
-                let mut holes = Vec::new();
-                self.and_parts(e, &mut holes);
-                let end = self.here();
-                for h in holes {
-                    self.patch(h, end);
-                }
-            }
-            other => self.bool_leaf(other),
-        }
-    }
-
-    fn and_parts(&mut self, e: &Expr, holes: &mut Vec<usize>) {
-        if let Expr::Binary(BinOp::And, a, b) = e {
-            self.and_parts(a, holes);
-            holes.push(self.hole(Op::And));
-            self.and_parts(b, holes);
-        } else if is_or(e) {
-            self.logic_operand(e);
+    /// The operand of `!`: a `&&`/`||` chain negates the chain itself, with
+    /// no `OP_INLINE_CONDITIONAL`; a comparison or membership test as it
+    /// is; anything else gets `OP_CONV_TO_FLOAT`, even a number.
+    fn not_operand(&mut self, x: &Expr) {
+        if is_logic(x) {
+            self.logic_operand(x);
+        } else if is_comparison(x) || matches!(x, Expr::InRange { .. } | Expr::Not(_)) {
+            self.value(x);
         } else {
-            self.bool_leaf(e);
+            self.value(x);
+            self.op(Op::ConvToFloat);
         }
     }
 
-    /// A condition that jumps to the holes in `fails` when false.
+    /// A `&&`/`||` chain as a value. Each run of the same operator jumps
+    /// to the end of that run: `a && b || c` is `a`, `OP_AND` to the
+    /// `OP_OR`, `b`, `OP_OR` to the end, `c`.
+    fn logic_operand(&mut self, e: &Expr) {
+        let op = match e {
+            Expr::Binary(op @ (BinOp::And | BinOp::Or), _, _) => *op,
+            other => return self.bool_leaf(other),
+        };
+        let mut parts = Vec::new();
+        flatten(e, op, &mut parts);
+        let jump = if op == BinOp::And { Op::And } else { Op::Or };
+        let mut holes = Vec::new();
+        for (i, p) in parts.iter().enumerate() {
+            self.logic_operand(p);
+            if i + 1 < parts.len() {
+                holes.push(self.hole(jump));
+            }
+        }
+        let end = self.here();
+        for h in holes {
+            self.patch(h, end);
+        }
+    }
+
+    /// A condition that jumps to the holes in `fails` when false. A
+    /// top-level `&&` is one `OP_IF` per part. An `||` is its parts but the
+    /// last as values, each followed by `OP_OR` to the last part's final
+    /// `OP_IF` (which then sees the true value), and the last part as a
+    /// condition. `!(…)` of a chain is the chain, `OP_NOT` and `OP_IF`.
     fn cond_fail(&mut self, e: &Expr, fails: &mut Vec<usize>) {
         match e {
             Expr::Binary(BinOp::And, a, b) => {
                 self.cond_fail(a, fails);
                 self.cond_fail(b, fails);
             }
-            Expr::Binary(BinOp::Or, a, b) => {
+            Expr::Binary(BinOp::Or, _, _) => {
+                let mut parts = Vec::new();
+                flatten(e, BinOp::Or, &mut parts);
+                let (last, rest) = parts.split_last().unwrap();
                 let mut trues = Vec::new();
-                self.cond_true(a, &mut trues);
-                self.cond_fail(b, fails);
-                let success = self.here();
+                for p in rest {
+                    self.logic_operand(p);
+                    trues.push(self.hole(Op::Or));
+                }
+                self.cond_fail(last, fails);
+                let test = self.here() - 1;
                 for t in trues {
-                    self.patch(t, success);
+                    self.patch(t, test);
                 }
             }
-            Expr::Not(x) if is_logic(x) => self.cond_true(x, fails),
             Expr::Not(x) => {
-                self.bool_leaf(x);
+                self.not_operand(x);
                 self.op(Op::Not);
                 fails.push(self.hole(Op::If));
             }
@@ -1855,32 +1952,123 @@ impl Builder {
             }
         }
     }
+}
 
-    /// A condition that jumps to the holes in `trues` when true.
-    fn cond_true(&mut self, e: &Expr, trues: &mut Vec<usize>) {
+/// The operands of a run of one logical operator, left to right.
+fn flatten<'e>(e: &'e Expr, op: BinOp, out: &mut Vec<&'e Expr>) {
+    match e {
+        Expr::Binary(o, a, b) if *o == op => {
+            flatten(a, op, out);
+            flatten(b, op, out);
+        }
+        other => out.push(other),
+    }
+}
+
+/// The value of an arithmetic or bit expression over number literals, as
+/// official bodies fold it. Only literals that are not negative fold, so
+/// `2 + -1` stays as written; `-(2 + 3)` folds to -5.
+fn fold(e: &Expr) -> Option<f64> {
+    fn operand(e: &Expr) -> Option<f64> {
         match e {
-            Expr::Binary(BinOp::Or, a, b) => {
-                self.cond_true(a, trues);
-                self.cond_true(b, trues);
+            Expr::Num(n) if *n >= 0.0 => Some(*n),
+            Expr::Binary(..) | Expr::Bits(..) => fold(e),
+            _ => None,
+        }
+    }
+    let v = match e {
+        Expr::Binary(op, a, b) => {
+            let (a, b) = (operand(a)?, operand(b)?);
+            match op {
+                BinOp::Add => a + b,
+                BinOp::Sub => a - b,
+                BinOp::Mul => a * b,
+                BinOp::Div if b != 0.0 => a / b,
+                BinOp::Mod if b != 0.0 => a % b,
+                BinOp::Pow => a.powf(b),
+                _ => return None,
             }
-            Expr::Binary(BinOp::And, a, b) => {
-                let mut local = Vec::new();
-                self.cond_fail(a, &mut local);
-                self.cond_true(b, trues);
-                let after = self.here();
-                for f in local {
-                    self.patch(f, after);
-                }
+        }
+        Expr::Bits(op, a, b) => {
+            let (a, b) = (operand(a)? as i64 as i32, operand(b)? as i64 as i32);
+            (match op {
+                BitOp::Shl => a.wrapping_shl(b as u32),
+                BitOp::Shr => a.wrapping_shr(b as u32),
+                BitOp::And => a & b,
+                BitOp::Or => a | b,
+            }) as f64
+        }
+        Expr::Neg(x) if matches!(**x, Expr::Binary(..) | Expr::Bits(..)) => -fold(x)?,
+        _ => return None,
+    };
+    v.is_finite().then_some(v)
+}
+
+/// Text that `@` between text literals folds to.
+fn fold_text(e: &Expr) -> Option<String> {
+    match e {
+        Expr::Str(s) => Some(s.clone()),
+        Expr::Binary(BinOp::Cat, a, b) => Some(fold_text(a)? + &fold_text(b)?),
+        _ => None,
+    }
+}
+
+/// The engine's script events, by bit in the segment 1 mask (the client's
+/// `script_event` list; Graal_analysis
+/// `client-internals/gs2-vm-from-engines.md`).
+const SCRIPT_EVENTS: [&str; 27] = [
+    "playerenters",
+    "playertouchsme",
+    "playertouchsother",
+    "playerchats",
+    "playerhurt",
+    "playerdies",
+    "playerlaysitem",
+    "playerendsreading",
+    "compusdied",
+    "emoticon",
+    "mousedown",
+    "mouseup",
+    "mousewheel",
+    "exploded",
+    "wasshot",
+    "waspelt",
+    "keypressed",
+    "actionprojectile2",
+    "",
+    "",
+    "",
+    "playerleaves",
+    "washit",
+    "",
+    "",
+    "shapetrigger",
+    "playanimation",
+];
+
+/// Segment 1 as official bodies write it: a bit for each script event
+/// named as a plain variable in code outside the functions (an old-style
+/// `if (playerenters)` test), matched without regard to case.
+fn event_mask(b: &Builder, top_level: &[std::ops::Range<usize>]) -> u32 {
+    let mut mask = 0;
+    for range in top_level {
+        for at in range.clone() {
+            let ins = &b.code[at];
+            let (Op::TypeVar, Operand::Str(n)) = (ins.op, &ins.operand) else {
+                continue;
+            };
+            let next = b.code.get(at + 1).map(|i| i.op);
+            if matches!(next, Some(Op::MemberAccess | Op::Call)) {
+                continue;
             }
-            Expr::Not(x) if is_logic(x) => self.cond_fail(x, trues),
-            Expr::Not(x) => {
-                self.bool_leaf(x);
-                trues.push(self.hole(Op::If));
-            }
-            other => {
-                self.bool_leaf(other);
-                trues.push(self.hole(Op::Or));
+            let name = b.strings[*n as usize].to_ascii_lowercase();
+            if let Some(bit) = SCRIPT_EVENTS
+                .iter()
+                .position(|e| !e.is_empty() && *e == name)
+            {
+                mask |= 1 << bit;
             }
         }
     }
+    mask
 }
