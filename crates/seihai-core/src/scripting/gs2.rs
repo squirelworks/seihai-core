@@ -316,6 +316,9 @@ impl Script {
                         (*entry as usize) < self.strings.len()
                     }
                     (Op::Unknown(_), _) => true,
+                    // Official bodies carry an integer after `OP_IN_RANGE`;
+                    // older open compilers write none.
+                    (Op::InRange, Operand::Int(_)) => true,
                     (Op::TypeNumber | Op::TypeString | Op::TypeVar, _) => false,
                     (_, Operand::None) => true,
                     _ => false,
@@ -388,24 +391,20 @@ impl Script {
         out
     }
 
-    /// Writes the four segments and nothing after them, using the operand
-    /// widths in `documentation/gs2-opcodes.md`: the smallest marker for
-    /// integers and string indexes, `F4` for a forward jump (or `F5` when
-    /// the target does not fit in 16 bits), and the smallest marker for a
-    /// backward jump. Official server-compiled bodies end after segment 4;
-    /// a trailing `0x0A` is not part of that shape.
+    /// Writes the four segments and nothing after them, with the smallest
+    /// marker for every integer, jump target and string index. That is the
+    /// shape of official server-compiled bodies (all 151 captures in
+    /// `Graal_analysis` `npc-library/gs2-official-emit-spec-2026-11-26.md`);
+    /// the open compilers write forward jumps as `F4`. Official bodies end
+    /// after segment 4; a trailing `0x0A` is not part of that shape.
     pub fn write(&self) -> Vec<u8> {
         let mut code = Vec::new();
-        for (index, ins) in self.code.iter().enumerate() {
+        for ins in &self.code {
             code.push(ins.op.value());
             match &ins.operand {
                 Operand::None => {}
                 Operand::Str(n) => write_str_index(&mut code, *n),
-                Operand::Int(n) => {
-                    let forward = ins.op.jumps() && *n >= 0 && (*n as usize) > index;
-                    let min_width = if forward { 2 } else { 1 };
-                    write_signed(&mut code, *n, min_width);
-                }
+                Operand::Int(n) => write_signed(&mut code, *n),
                 Operand::Decimal(text) => {
                     code.push(0xF6);
                     code.extend(text.bytes());
@@ -452,15 +451,14 @@ fn write_str_index(out: &mut Vec<u8>, n: u32) {
     }
 }
 
-/// `min_width` is 1 for the smallest marker and 2 when a forward jump must
-/// be at least `F4`.
-fn write_signed(out: &mut Vec<u8>, n: i32, min_width: u8) {
+/// The smallest of `F3`, `F4` and `F5` that holds `n`.
+fn write_signed(out: &mut Vec<u8>, n: i32) {
     let fits8 = (i8::MIN as i32..=i8::MAX as i32).contains(&n);
     let fits16 = (i16::MIN as i32..=i16::MAX as i32).contains(&n);
-    if min_width <= 1 && fits8 {
+    if fits8 {
         out.push(0xF3);
         out.push(n as u8);
-    } else if min_width <= 2 && fits16 {
+    } else if fits16 {
         out.push(0xF4);
         out.extend_from_slice(&(n as i16).to_be_bytes());
     } else {
@@ -709,11 +707,51 @@ mod tests {
                 (script.functions, script.strings.clone(), script.gs1_flags)
             );
         }
-        // Some backward jumps in the other fixtures are 16 bits wide even
-        // when the target fits in a byte. `write` uses the smallest width.
-        // shared.gs2bc has only forward jumps, so the widths match the file.
+        // gs2-parser writes forward jumps as `F4`; `write` uses the smallest
+        // width, as official bodies do, so it is never longer.
         let shared = std::fs::read(dir.join("shared.gs2bc")).unwrap();
-        assert_eq!(Script::parse(&shared).unwrap().write(), shared);
+        let rewritten = Script::parse(&shared).unwrap().write();
+        assert!(rewritten.len() < shared.len());
+        assert_eq!(
+            Script::parse(&rewritten).unwrap().disassemble(),
+            Script::parse(&shared).unwrap().disassemble()
+        );
+    }
+
+    #[test]
+    fn writer_uses_the_smallest_marker_for_jumps() {
+        let script = Script {
+            gs1_flags: 0,
+            functions: Vec::new(),
+            strings: Vec::new(),
+            code: vec![
+                Instr {
+                    op: Op::SetIndex,
+                    operand: Operand::Int(2),
+                    offset: 0,
+                },
+                Instr {
+                    op: Op::SetIndex,
+                    operand: Operand::Int(300),
+                    offset: 0,
+                },
+            ],
+        };
+        let w = script.write();
+        let code = &w[w.len() - 7..];
+        assert_eq!(code, &[1, 0xF3, 2, 1, 0xF4, 0x01, 0x2C][..]);
+    }
+
+    /// Forward jumps gs2-parser wrote as `F4` that fit in `F3`.
+    fn narrowed_jumps(s: &Script) -> usize {
+        s.code
+            .iter()
+            .enumerate()
+            .filter(|(i, ins)| {
+                ins.op.jumps()
+                    && matches!(ins.operand, Operand::Int(n) if n as usize > *i && (0..=127).contains(&n))
+            })
+            .count()
     }
 
     #[test]
@@ -723,7 +761,7 @@ mod tests {
         let script = Script::parse(&bytes).unwrap();
         let written = script.write();
         assert!(!written.ends_with(&[0x0A]));
-        assert_eq!(written, bytes);
+        assert_eq!(written.len(), bytes.len() - narrowed_jumps(&script));
 
         let mut with_newline = written.clone();
         with_newline.push(0x0A);

@@ -457,9 +457,27 @@ impl Machine {
             }
             // Turns the top into a variable reference for the slots. A
             // variable is read when it is used, so it stays as it is.
+            // A root object's name (official bodies cache `player` as
+            // `OP_TYPE_VAR "player"`, opcode 47) becomes that object.
             vm::op::RESOLVE_VAR => {
-                if self.stack.is_empty() {
+                let Some(top) = self.stack.last_mut() else {
                     return fault(self, host);
+                };
+                if let Slot::Var(None, name) = top {
+                    let root = match name.as_str() {
+                        "player" => Some(Root::Player),
+                        "playero" => Some(Root::PlayerO),
+                        "thiso" => Some(Root::ThisO),
+                        "level" => Some(Root::Level),
+                        "temp" => Some(Root::Temp),
+                        _ => None,
+                    };
+                    if let Some(r) = root {
+                        *top = Slot::Obj(Some((r, String::new())));
+                    } else if name == "this" {
+                        let this = self.this_obj();
+                        *self.stack.last_mut().unwrap() = Slot::Obj(Some(this));
+                    }
                 }
             }
             // `a && b` and `a || b` as values (1 or 0), both sides run.

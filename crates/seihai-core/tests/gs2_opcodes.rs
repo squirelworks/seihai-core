@@ -13,6 +13,8 @@ enum Operand {
     None,
     Str,
     Num,
+    /// A number official bodies write and gs2-parser leaves out.
+    OptNum,
     Jump,
 }
 
@@ -45,6 +47,7 @@ fn table() -> HashMap<u8, Row> {
             "—" => Operand::None,
             "str" => Operand::Str,
             "num" => Operand::Num,
+            "num?" => Operand::OptNum,
             "jump" => Operand::Jump,
             other => panic!("unknown operand kind {other:?} for {}", cells[3]),
         };
@@ -146,7 +149,7 @@ fn walk(name: &str, s: &Script, ops: &HashMap<u8, Row>) -> Vec<(u8, Option<i64>)
         );
         let marker = c.get(i).copied().filter(|&m| m >= 0xF0);
         let value = match (entry.operand, marker) {
-            (Operand::None, None) => None,
+            (Operand::None | Operand::OptNum, None) => None,
             (Operand::None, Some(m)) => panic!(
                 "{name}: byte {at}: {} takes no operand, found marker {m:#x}",
                 entry.name
@@ -155,7 +158,7 @@ fn walk(name: &str, s: &Script, ops: &HashMap<u8, Row>) -> Vec<(u8, Option<i64>)
             (kind, Some(m)) => {
                 let allowed = match kind {
                     Operand::Str => (0xF0..=0xF2).contains(&m),
-                    Operand::Num => (0xF3..=0xF6).contains(&m),
+                    Operand::Num | Operand::OptNum => (0xF3..=0xF6).contains(&m),
                     Operand::Jump => (0xF3..=0xF5).contains(&m),
                     Operand::None => unreachable!(),
                 };

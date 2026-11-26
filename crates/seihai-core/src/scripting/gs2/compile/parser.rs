@@ -75,6 +75,7 @@ pub(super) fn parse(src: &str) -> PResult<Parsed> {
             items,
             lambdas: p.lambdas,
             later_wins: true,
+            gs1: false,
         },
         spellings: p.lex.spellings,
         quirks,

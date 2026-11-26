@@ -1,10 +1,15 @@
 //! Code generation: the compiler's tree to GS2 bytecode.
 //!
-//! The encodings are the ones in `documentation/gs2-opcodes.md` and the
-//! fixtures in `tests/fixtures/gs2`, and where those are silent, the
-//! output of the Preagonal compiler (a port of gs2-parser) for small
-//! hand-written probes, used as a black box. Where Seihai departs from that
-//! output on purpose, the comment says so:
+//! The target is the official server-side compiler's output, as described
+//! in Graal_analysis `npc-library/gs2-official-emit-spec-2026-11-26.md`
+//! and checked against the official captures listed there: the variable
+//! cache (`cache`), `params` as `OP_PARAMS`, the smallest operand for every
+//! jump, no closing `OP_RET`, jump threading and the hash-ordered function
+//! table. Where that note is silent, the encodings are the ones in
+//! `documentation/gs2-opcodes.md`, the gs2-parser fixtures in
+//! `tests/fixtures/gs2`, and black-box probes of the open compilers. GS1
+//! input keeps the older choices where no official GS1 output was seen.
+//! Where Seihai departs from gs2-parser on purpose, the comment says so:
 //!
 //! - after the last `switch` arm Seihai jumps out, so a last arm without
 //!   `break` does not run on into the case tests;
@@ -32,6 +37,7 @@
 
 use super::super::{Function as FnEntry, Instr, Op, Operand, Script};
 use super::ast::*;
+use super::cache;
 use super::gs1::name_is_call;
 use super::lexer::Spellings;
 use super::tables::*;
@@ -101,6 +107,8 @@ pub(super) fn generate(program: &Program, spellings: Spellings) -> Result<Script
         skips: Vec::new(),
         line: 0,
         spellings,
+        cache: HashMap::new(),
+        gs1: program.gs1,
         lambdas: program
             .lambdas
             .iter()
@@ -125,13 +133,14 @@ pub(super) fn generate(program: &Program, spellings: Spellings) -> Result<Script
             }
             Item::Function(f) => {
                 if last.get(f.name.as_str()) == Some(&nth) {
-                    b.function(f);
+                    b.function(f, false);
                 }
                 nth += 1;
             }
         }
     }
-    b.op(Op::Ret);
+    // Official bodies end with the last instruction of the script: no
+    // closing `OP_RET` (gs2-parser and older Seihai wrote one).
     let end = b.here();
     for skip in std::mem::take(&mut b.skips) {
         b.patch(skip, end);
@@ -139,15 +148,98 @@ pub(super) fn generate(program: &Program, spellings: Spellings) -> Result<Script
     if !b.errors.is_empty() {
         return Err(CompileErrors { errors: b.errors });
     }
+    thread_jumps(&mut b.code);
     let script = Script {
         gs1_flags: 0,
-        functions: b.functions,
+        functions: official_function_order(b.functions),
         strings: b.strings,
         code: b.code,
     };
     Script::parse(&script.write()).map_err(|message| CompileErrors {
         errors: vec![CompileError { line: 0, message }],
     })
+}
+
+/// A jump to an unconditional jump goes straight to where that one goes,
+/// as in official bodies (none of their jumps lands on an `OP_SET_INDEX`).
+/// `OP_WITH` and `OP_FOREACH` keep their targets.
+fn thread_jumps(code: &mut [Instr]) {
+    let target = |code: &[Instr], at: usize| -> Option<i32> {
+        let mut t = match code.get(at)?.operand {
+            Operand::Int(t) => t,
+            _ => return None,
+        };
+        let mut seen = HashSet::new();
+        while let Some(next) = usize::try_from(t).ok().and_then(|i| code.get(i)) {
+            match (next.op, &next.operand) {
+                (Op::SetIndex, Operand::Int(n)) if seen.insert(t) => t = *n,
+                _ => break,
+            }
+        }
+        Some(t)
+    };
+    for at in 0..code.len() {
+        if matches!(
+            code[at].op,
+            Op::SetIndex | Op::SetIndexTrue | Op::Or | Op::If | Op::And
+        ) {
+            if let Some(t) = target(code, at) {
+                code[at].operand = Operand::Int(t);
+            }
+        }
+    }
+}
+
+/// The name hash the engine's string hash list uses: start at `0x1505`,
+/// and for each byte (ASCII capitals folded to lower case, other bytes
+/// read as signed) multiply by 17 and xor the byte in.
+pub(super) fn engine_name_hash(name: &str) -> u32 {
+    let mut h: u32 = 0x1505;
+    for &b in name.as_bytes() {
+        let c = if b.is_ascii_uppercase() {
+            (b + 32) as u32
+        } else {
+            b as i8 as i32 as u32
+        };
+        h = h.wrapping_mul(17) ^ c;
+    }
+    h
+}
+
+/// Orders items the way the engine's hash list walks them: 32 buckets to
+/// start, eight times as many each time the count reaches the bucket count
+/// (moving the old entries bucket by bucket), each new entry put at the
+/// front of its bucket, and the walk bucket by bucket from the front.
+pub(super) fn engine_hash_order<T>(items: Vec<T>, name: impl Fn(&T) -> String) -> Vec<T> {
+    let mut buckets: Vec<Vec<(u32, T)>> = (0..32).map(|_| Vec::new()).collect();
+    for (count, item) in items.into_iter().enumerate() {
+        if count == buckets.len() {
+            let grown = buckets.len() * 8;
+            let old = std::mem::replace(&mut buckets, (0..grown).map(|_| Vec::new()).collect());
+            for (h, it) in old.into_iter().flatten() {
+                buckets[h as usize & (grown - 1)].insert(0, (h, it));
+            }
+        }
+        let h = engine_name_hash(&name(&item));
+        let n = buckets.len();
+        buckets[h as usize & (n - 1)].insert(0, (h, item));
+    }
+    buckets.into_iter().flatten().map(|(_, it)| it).collect()
+}
+
+/// Segment 2 as official bodies write it: plain functions in hash-list
+/// order of their bare names (without `public.`), then the functions on an
+/// object (`obj.f`, `universe` entries) in source order.
+fn official_function_order(functions: Vec<FnEntry>) -> Vec<FnEntry> {
+    let bare = |f: &FnEntry| -> String {
+        let n = f.name.split(',').next().unwrap_or_default();
+        n.strip_prefix("public.").unwrap_or(n).to_string()
+    };
+    let (qualified, plain): (Vec<_>, Vec<_>) =
+        functions.into_iter().partition(|f| bare(f).contains('.'));
+    let mut out = engine_hash_order(plain, |f| bare(f));
+    out.extend(qualified);
+    out
 }
 
 struct Builder {
@@ -163,6 +255,10 @@ struct Builder {
     spellings: Spellings,
     /// `function () { … }` values by function name, emitted where used.
     lambdas: HashMap<String, Function>,
+    /// The running function's variable-cache slots (see `cache`).
+    cache: HashMap<String, i32>,
+    /// Lowered from GS1 (see `Program::gs1`).
+    gs1: bool,
 }
 
 // ---- what counts as a call ----
@@ -187,7 +283,10 @@ fn stmt_calls(s: &Stmt) -> bool {
                 || step.as_deref().is_some_and(stmt_calls)
                 || stmt_calls(body)
         }
-        Stmt::ForEach { list, body, .. } => expr_calls(list) || stmt_calls(body),
+        // A `new … { }` block in the loop body counts as a call.
+        Stmt::ForEach { list, body, .. } => {
+            expr_calls(list) || stmt_calls(body) || has_new_block(body)
+        }
         Stmt::Switch { value, arms } => {
             expr_calls(value)
                 || arms.iter().flat_map(|a| &a.values).any(expr_calls)
@@ -207,17 +306,31 @@ fn stmt_calls(s: &Stmt) -> bool {
     }
 }
 
+fn has_new_block(s: &Stmt) -> bool {
+    match s {
+        Stmt::NewBlock { .. } => true,
+        Stmt::Block(v) => v.iter().any(|s| matches!(s, Stmt::NewBlock { .. })),
+        _ => false,
+    }
+}
+
 /// Whether an expression calls anything. Opcode built-ins other than
 /// `format` do not; a method, `new`, or a call by a run-time name does.
 /// GS1 text with message codes does not.
 fn expr_calls(e: &Expr) -> bool {
     match e {
-        Expr::Call { name, args } => name_is_call(name, false) || args.iter().any(expr_calls),
+        // Official bodies treat `format` like the other opcode built-ins.
+        Expr::Call { name, args } => {
+            (name != "format" && name_is_call(name, false)) || args.iter().any(expr_calls)
+        }
+        // The inline string and list methods are not calls.
+        Expr::Method { name, .. } if cache::inline_method(name) => false,
+        // `new T(args)` calls only when an argument does.
+        Expr::New { args, .. } => args.iter().any(expr_calls),
         Expr::HostCall { .. }
         | Expr::Method { .. }
         | Expr::DynMethod { .. }
-        | Expr::DynCall { .. }
-        | Expr::New { .. } => true,
+        | Expr::DynCall { .. } => true,
         Expr::Message(_) | Expr::Lambda(_) => false,
         other => other.parts().into_iter().any(expr_calls),
     }
@@ -365,7 +478,7 @@ impl Builder {
     /// A function where it stands: a jump over it, the parameter list,
     /// `OP_CMD_CALL` when the body calls anything, the body, and `return 0`
     /// unless the body always returns.
-    fn function(&mut self, f: &Function) {
+    fn function(&mut self, f: &Function, lambda: bool) {
         let skip = self.hole(Op::SetIndex);
         let start = self.here();
         self.functions.push(FnEntry {
@@ -387,9 +500,29 @@ impl Builder {
         if f.cmd_call.unwrap_or_else(|| f.body.iter().any(stmt_calls)) {
             self.op(Op::CmdCall);
         }
+        let outer = std::mem::take(&mut self.cache);
+        if !lambda {
+            let (slots, order) = cache::slots(&f.body);
+            for (n, key) in order.iter().enumerate() {
+                match key.split_once('.') {
+                    _ if key == "params" => self.op(Op::Params),
+                    Some((root, member)) => {
+                        self.root(root);
+                        self.emit_var(member);
+                        self.op(Op::MemberAccess);
+                    }
+                    None => self.emit_var(key),
+                }
+                self.op(Op::Unknown(cache::RESOLVE));
+                self.push(Op::Unknown(cache::STORE), Operand::Int(n as i32));
+                self.op(Op::IndexDec);
+            }
+            self.cache = slots;
+        }
         for s in &f.body {
             self.stmt(s);
         }
+        self.cache = outer;
         if !ends_with_return(&f.body) {
             self.emit_int(0);
             self.op(Op::Ret);
@@ -567,7 +700,11 @@ impl Builder {
         for at in std::iter::once(top).chain(frame.breaks) {
             self.patch(at, end);
         }
-        self.op(Op::IndexDec);
+        // The variable, the list and the counter: official bodies drop all
+        // three.
+        for _ in 0..3 {
+            self.op(Op::IndexDec);
+        }
     }
 
     /// `switch` as in `control.gs2bc`: a jump to the tests, the arm bodies
@@ -589,13 +726,17 @@ impl Builder {
                 self.stmt(s);
             }
         }
+        // Official GS2 bodies always jump out after the last arm. From GS1
+        // Seihai jumps out only when the last arm would run on into the
+        // tests.
         let falls_off = arms
             .last()
             .is_some_and(|a| !matches!(a.body.last(), Some(Stmt::Break | Stmt::Return(_))));
-        let out = falls_off.then(|| self.hole(Op::SetIndex));
+        let out = (!self.gs1 || falls_off).then(|| self.hole(Op::SetIndex));
         let frame = self.loops.pop().unwrap();
         self.patch(to_tests, self.here());
         self.value(value);
+        // The tests in source order; `default` jumps where it stands.
         for (arm, &start) in arms.iter().zip(&starts) {
             for v in &arm.values {
                 self.op(Op::CopyLastOp);
@@ -603,15 +744,11 @@ impl Builder {
                 self.op(Op::Eq);
                 self.jump(Op::SetIndexTrue, start);
             }
+            if arm.default {
+                self.jump(Op::SetIndex, start);
+            }
         }
-        let default = arms
-            .iter()
-            .zip(&starts)
-            .find(|(a, _)| a.default)
-            .map(|(_, &s)| s);
-        let to_default = self.hole(Op::SetIndex);
         let end = self.here();
-        self.patch(to_default, default.unwrap_or(end));
         self.op(Op::IndexDec);
         for b in frame.breaks.into_iter().chain(out) {
             self.patch(b, end);
@@ -630,6 +767,14 @@ impl Builder {
     /// past the block, the body, `OP_WITHEND`. A `return` or a jump out of
     /// the block is kept: the executor closes the function's open blocks.
     fn with_stmt(&mut self, target: &Expr, body: &Stmt, line: u32) {
+        let cache = std::mem::take(&mut self.cache);
+        self.with_body(target, body, line);
+        self.cache = cache;
+    }
+
+    /// `with`, `new … { }`, the opcode built-ins, the inline methods and a
+    /// dynamic member name are compiled without the variable cache.
+    fn with_body(&mut self, target: &Expr, body: &Stmt, line: u32) {
         self.line = line;
         self.value(target);
         self.op(Op::ConvToObject);
@@ -647,6 +792,12 @@ impl Builder {
     /// `OP_WITH` past the block, the body, `OP_WITHEND`, then
     /// `addcontrol(object)` on the object outside and `OP_INDEX_DEC`.
     fn new_block(&mut self, ty: &str, name: &Expr, body: &[Stmt]) {
+        let cache = std::mem::take(&mut self.cache);
+        self.new_block_body(ty, name, body);
+        self.cache = cache;
+    }
+
+    fn new_block_body(&mut self, ty: &str, name: &Expr, body: &[Stmt]) {
         self.value(name);
         self.op(Op::InlineNew);
         for _ in 0..3 {
@@ -791,6 +942,20 @@ impl Builder {
     /// `this`/`temp`/`player`/… (`this.a.b` is THIS a MA CTO b MA;
     /// `client.a` is VAR client CTO a MA).
     fn place(&mut self, name: &str) {
+        if let Some(slot) = cache::key_of(name).and_then(|k| self.cache.get(&k).copied()) {
+            let skip = if matches!(name.split('.').next(), Some("this" | "thiso" | "temp")) {
+                2
+            } else {
+                1
+            };
+            self.push(Op::Unknown(cache::LOAD), Operand::Int(slot));
+            for member in name.split('.').skip(skip) {
+                self.op(Op::ConvToObject);
+                self.emit_var(member);
+                self.op(Op::MemberAccess);
+            }
+            return;
+        }
         let mut parts = name.split('.');
         let first = parts.next().unwrap_or_default();
         self.root(first);
@@ -813,8 +978,10 @@ impl Builder {
         match name {
             "true" => self.op(Op::TypeTrue),
             "false" => self.op(Op::TypeFalse),
-            "null" => self.op(Op::TypeNull),
+            "null" | "NULL" => self.op(Op::TypeNull),
             "pi" => self.op(Op::Pi),
+            // Official bodies push the argument list with `OP_PARAMS`.
+            "params" => self.op(Op::Params),
             _ => self.emit_var(name),
         }
     }
@@ -875,9 +1042,12 @@ impl Builder {
     /// no conversion (`members.gs2bc`).
     fn object(&mut self, obj: &Expr) {
         self.value(obj);
-        let root = matches!(obj, Expr::Var(v) if v.index.is_empty() && root_op(&v.name).is_some());
-        let element = matches!(obj, Expr::Var(v) if !v.index.is_empty());
-        if !root && !element {
+        // Official bodies convert every owner except a root object pushed
+        // by its own opcode, including an element read (`a[i].x`).
+        let root = matches!(obj, Expr::Var(v) if v.index.is_empty()
+            && root_op(&v.name).is_some()
+            && !(v.name != "this" && self.cache.contains_key(&v.name)));
+        if !root {
             self.op(Op::ConvToObject);
         }
     }
@@ -887,7 +1057,16 @@ impl Builder {
     /// A call by name. Returns whether it pushed a value a statement
     /// should drop.
     fn call(&mut self, name: &str, args: &[Expr]) -> bool {
-        if self.builtin(name, args) {
+        let cache = if cache::inline_call(name) {
+            std::mem::take(&mut self.cache)
+        } else {
+            HashMap::new()
+        };
+        let done = self.builtin(name, args);
+        if !cache.is_empty() {
+            self.cache = cache;
+        }
+        if done {
             return call_pushes(name);
         }
         self.call_by_name(name, args);
@@ -900,8 +1079,65 @@ impl Builder {
         for a in args.iter().rev() {
             self.value(a);
         }
-        self.emit_var(name);
+        self.load_or_var(name);
         self.op(Op::Call);
+    }
+
+    /// The owner of `obj.(name)`: as any member owner, and `this` is
+    /// converted too.
+    fn dyn_owner(&mut self, obj: &Expr) {
+        let this = matches!(obj, Expr::Var(v) if v.index.is_empty() && v.name == "this");
+        self.object(obj);
+        if this {
+            self.op(Op::ConvToObject);
+        }
+    }
+
+    /// The name of `obj.(name)`, compiled without the variable cache. Text
+    /// is used as it is; anything else is converted to text.
+    fn dyn_name(&mut self, name: &Expr) {
+        let cache = std::mem::take(&mut self.cache);
+        let inner = match name {
+            Expr::Text(e) => &**e,
+            e => e,
+        };
+        let kind = self.value(inner);
+        self.cache = cache;
+        if kind != Kind::String
+            && !matches!(
+                inner,
+                Expr::Binary(
+                    BinOp::Cat | BinOp::CatSpc | BinOp::CatNl | BinOp::CatTab,
+                    ..
+                )
+            )
+        {
+            self.op(Op::ConvToString);
+        }
+    }
+
+    /// A name: its cache slot when it has one, else `OP_TYPE_VAR`.
+    fn load_or_var(&mut self, key: &str) {
+        match self.cache.get(key).copied() {
+            Some(slot) => self.push(Op::Unknown(cache::LOAD), Operand::Int(slot)),
+            None => self.emit_var(key),
+        }
+    }
+
+    /// `this.name` / `thiso.name` / `temp.name` as one cached slot, when
+    /// `obj` is that root and the member has a slot.
+    fn cached_member(&mut self, obj: &Expr, name: &str) -> bool {
+        let Expr::Var(v) = obj else { return false };
+        if !v.index.is_empty() || !matches!(v.name.as_str(), "this" | "thiso" | "temp") {
+            return false;
+        }
+        match self.cache.get(&format!("{}.{name}", v.name)).copied() {
+            Some(slot) => {
+                self.push(Op::Unknown(cache::LOAD), Operand::Int(slot));
+                true
+            }
+            None => false,
+        }
     }
 
     /// An opcode built-in. Returns `false` when `name` is not one.
@@ -964,8 +1200,7 @@ impl Builder {
             // `makevar` takes its name as a string, converted even when it
             // already is one, as the reference compiler does.
             "makevar" => {
-                self.value(&args[0]);
-                self.op(Op::ConvToString);
+                self.stringish(&args[0]);
                 self.op(Op::MakeVar);
             }
             // `waitfor(object, event, timeout)` pushes in source order: the
@@ -976,10 +1211,18 @@ impl Builder {
                 self.numeric(&args[2]);
                 self.op(Op::WaitFor);
             }
+            // Official bodies push these in source order from GS2 and
+            // reversed from GS1.
             "sin" | "cos" | "arctan" | "abs" | "random" | "exp" | "log" | "min" | "max"
             | "char" | "vecx" | "vecy" => {
-                for a in args.iter().rev() {
-                    self.numeric(a);
+                if self.gs1 {
+                    for a in args.iter().rev() {
+                        self.numeric(a);
+                    }
+                } else {
+                    for a in args {
+                        self.numeric(a);
+                    }
                 }
                 self.op(opcode_builtin(name).unwrap());
             }
@@ -994,6 +1237,12 @@ impl Builder {
     /// (`objects.gs2bc`: the arguments reversed, the object, the name,
     /// `OP_MEMBER_ACCESS`, `OP_CALL`). Returns whether a value was pushed.
     fn method(&mut self, obj: &Expr, name: &str, args: &[Expr]) -> bool {
+        if cache::inline_method(name) && !self.cache.is_empty() {
+            let cache = std::mem::take(&mut self.cache);
+            let pushed = self.method(obj, name, args);
+            self.cache = cache;
+            return pushed;
+        }
         let lower = name.to_ascii_lowercase();
         let n = args.len();
         let string_op = match (lower.as_str(), n) {
@@ -1010,10 +1259,23 @@ impl Builder {
         };
         if let Some(op) = string_op {
             // `lists.gs2bc` converts even a string literal.
-            self.value(obj);
-            self.op(Op::ConvToString);
+            // `"text".length()` is the byte count itself.
+            if let (Op::ObjLength, Expr::Str(text), false) = (op, obj, self.gs1) {
+                self.emit_int(text.len() as i32);
+                return true;
+            }
+            // Official bodies convert the receiver unless it is text.
+            if self.gs1 {
+                self.value(obj);
+                self.op(Op::ConvToString);
+            } else {
+                self.stringish(obj);
+            }
             for a in args {
                 self.value(a);
+            }
+            if op == Op::ObjSubstr && n == 1 {
+                self.emit_int(-1);
             }
             if op == Op::ObjTokenize && n == 0 {
                 self.emit_str(" ,");
@@ -1060,9 +1322,11 @@ impl Builder {
         for a in args.iter().rev() {
             self.value(a);
         }
-        self.object(obj);
-        self.emit_var(name);
-        self.op(Op::MemberAccess);
+        if !matches!(obj, Expr::Var(v) if v.name != "temp" && self.cached_member(obj, name)) {
+            self.object(obj);
+            self.emit_var(name);
+            self.op(Op::MemberAccess);
+        }
         self.op(Op::Call);
         true
     }
@@ -1226,7 +1490,9 @@ impl Builder {
                 self.value(e);
                 self.value(lo);
                 self.value(hi);
-                self.op(Op::InRange);
+                // The operand: 2 for an open lower bound, 1 for an open
+                // upper one; written ranges are closed.
+                self.push(Op::InRange, Operand::Int(0));
                 Kind::Number
             }
             // `x in {a, b}`: like `x in arr` in `lists.gs2bc`, with the
@@ -1292,20 +1558,19 @@ impl Builder {
                 Kind::Other
             }
             Expr::Member { obj, name } => {
-                self.object(obj);
-                self.emit_var(name);
-                self.op(Op::MemberAccess);
+                if !self.cached_member(obj, name) {
+                    self.object(obj);
+                    self.emit_var(name);
+                    self.op(Op::MemberAccess);
+                }
                 Kind::Other
             }
             // `a[i][j]`: no conversion between the two reads in the
             // Preagonal baselines.
             Expr::Index { obj, index } => {
+                // `a[i][j]`: official bodies convert the first read too.
                 self.value(obj);
-                let element = matches!(&**obj, Expr::Var(v) if !v.index.is_empty())
-                    || matches!(&**obj, Expr::Index { .. });
-                if !element {
-                    self.op(Op::ConvToObject);
-                }
+                self.op(Op::ConvToObject);
                 for i in index {
                     self.value(i);
                 }
@@ -1316,9 +1581,8 @@ impl Builder {
             // Seihai's form: the Preagonal output for `obj.(@n)` adds the
             // name to the object as numbers.
             Expr::DynMember { obj, name } => {
-                self.object(obj);
-                self.value(name);
-                self.op(Op::ConvToString);
+                self.dyn_owner(obj);
+                self.dyn_name(name);
                 self.op(Op::MemberAccess);
                 Kind::Other
             }
@@ -1329,9 +1593,8 @@ impl Builder {
                 for a in args.iter().rev() {
                     self.value(a);
                 }
-                self.object(obj);
-                self.value(name);
-                self.op(Op::ConvToString);
+                self.dyn_owner(obj);
+                self.dyn_name(name);
                 self.op(Op::MemberAccess);
                 self.op(Op::Call);
                 Kind::Other
@@ -1388,7 +1651,7 @@ impl Builder {
                     return Kind::Other;
                 };
                 let loops = std::mem::take(&mut self.loops);
-                self.function(&f);
+                self.function(&f, true);
                 self.loops = loops;
                 if let Some(skip) = self.skips.pop() {
                     let here = self.here();

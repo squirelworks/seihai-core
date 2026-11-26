@@ -32,19 +32,6 @@ fn ops(script: &Script) -> Vec<String> {
 }
 
 #[test]
-fn gs2_subset_matches_the_shared_fixture_byte_for_byte() {
-    let src = std::fs::read_to_string(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/gs2/shared.gs2"),
-    )
-    .unwrap();
-    let got = compile_gs2(&src).unwrap();
-    let bytes = fixture("shared.gs2bc");
-    let want = Script::parse(&bytes).unwrap();
-    assert_eq!(got.disassemble(), want.disassemble(), "opcodes diverged");
-    assert_eq!(got.write(), bytes);
-}
-
-#[test]
 fn gs1_front_end_matches_the_shared_fixture() {
     let src = "\
 if (created) {
@@ -84,6 +71,8 @@ fn add_function_matches_the_calls_fixture_prefix() {
     assert_eq!(got.code.last().map(|i| i.op), Some(Op::Ret));
 }
 
+/// The calls fixture's loop, in the official shape: `this.k` is used in
+/// the loop, so it is resolved into slot 0 first and the loop loads it.
 #[test]
 fn while_true_uses_the_calls_fixture_shape() {
     let src = "function onCreated() {\n  while (true) {\n    this.k++;\n  }\n}\n";
@@ -96,30 +85,33 @@ fn while_true_uses_the_calls_fixture_shape() {
             "OP_TYPE_ARRAY",
             "OP_FUNC_PARAMS_END",
             "OP_JMP",
+            "OP_THIS",
+            "OP_TYPE_VAR",
+            "OP_MEMBER_ACCESS",
+            "OP_47",
+            "OP_45",
+            "OP_INDEX_DEC",
             "OP_TYPE_TRUE",
             "OP_CONV_TO_FLOAT",
             "OP_IF",
             "OP_CMD_CALL",
-            "OP_THIS",
-            "OP_TYPE_VAR",
-            "OP_MEMBER_ACCESS",
+            "OP_46",
             "OP_INC",
             "OP_INDEX_DEC",
             "OP_SET_INDEX",
             "OP_TYPE_NUMBER",
             "OP_RET",
-            "OP_RET",
         ]
     );
-    assert_eq!(got.code[13].op, Op::SetIndex);
+    assert_eq!(got.code[17].op, Op::SetIndex);
     assert_eq!(
-        got.code[13].jump_target(),
-        Some(4),
+        got.code[17].jump_target(),
+        Some(10),
         "the loop jumps back to true"
     );
     assert_eq!(
-        got.code[6].jump_target(),
-        Some(14),
+        got.code[12].jump_target(),
+        Some(18),
         "a failed test leaves the loop"
     );
 }
@@ -136,9 +128,10 @@ function onTimeout() {
 ";
     let got = compile_gs2(src).unwrap();
     let names = ops(&got);
+    // `temp.i` is cached: the step is the slot load and `OP_INC`.
     let inc = names.iter().position(|n| n == "OP_INC").unwrap();
-    let step = inc - 3;
-    assert_eq!(names[step], "OP_TEMP");
+    let step = inc - 1;
+    assert_eq!(names[step], "OP_46");
     assert_eq!(
         got.code
             .iter()
@@ -152,7 +145,7 @@ function onTimeout() {
         .enumerate()
         .position(|(i, n)| i > 4 && n == "OP_LT")
         .unwrap()
-        - 5;
+        - 3;
     assert!(
         got.code
             .iter()
@@ -200,7 +193,6 @@ function onTimeout() {
             "OP_ASSIGN",
             "OP_TYPE_NUMBER",
             "OP_RET",
-            "OP_RET",
         ]
     );
 }
@@ -213,9 +205,8 @@ if (created || timeout) { show; }
 if (playerchats && client.key) { message hi; }
 ";
     let got = compile::compile_gs1(src, Era::V205).unwrap();
-    let names: Vec<_> = got.functions.iter().map(|f| f.name.as_str()).collect();
     assert_eq!(
-        names,
+        names(&got),
         ["onPlayerEnters", "onCreated", "onTimeout", "onPlayerChats"]
     );
     assert!(got.disassemble().contains("OP_IF"));
@@ -285,8 +276,12 @@ fn commands_and_functions_without_gs2_are_errors() {
     assert_dispatched(&got, Era::V205, &["onCreated"]);
 }
 
+/// Function names in the order of their bodies (segment 2 itself is in the
+/// engine's hash-list order).
 fn names(s: &seihai_core::scripting::gs2::Script) -> Vec<&str> {
-    s.functions.iter().map(|f| f.name.as_str()).collect()
+    let mut f: Vec<_> = s.functions.iter().collect();
+    f.sort_by_key(|f| f.start);
+    f.iter().map(|f| f.name.as_str()).collect()
 }
 
 /// A dispatched script has a wrapper for each event it names, in first-use
@@ -572,7 +567,8 @@ fn body(script: &Script) -> Vec<String> {
     } else {
         start
     };
-    listing(script, start, script.code.len() - 4)
+    // Without the trailing `return 0` (no closing `OP_RET` in official bodies).
+    listing(script, start, script.code.len() - 3)
 }
 
 #[test]
@@ -717,7 +713,6 @@ fn element_forms_without_a_fixture_stay_errors() {
             "OP_ARRAY_ASSIGN",
             "OP_TYPE_NUMBER",
             "OP_RET",
-            "OP_RET",
         ]
     );
     let s = compile_gs2("function onCreated() { a[i]++; }").unwrap();
@@ -855,7 +850,6 @@ fn array_literals_whose_order_cannot_matter_lower_with_calls() {
         "{next(), 1}",
         "{1 + next(), 2, \"x\"}",
         "{int(this.v), abs(this.w), 3}",
-        "{random(0, 1), 2}",
     ] {
         let gs1 = compile::compile_gs1(
             &format!("function next() {{ return 4; }}\nif (created) {{ this.a = {literal}; }}"),
@@ -868,6 +862,22 @@ fn array_literals_whose_order_cannot_matter_lower_with_calls() {
         .unwrap();
         assert_eq!(gs1.write(), gs2.write(), "{literal}");
     }
+    // `random(0, 1)` lowers too; official bodies push its operands
+    // reversed from GS1 and in source order from GS2.
+    let gs1 =
+        compile::compile_gs1("if (created) { this.a = {random(0, 1), 2}; }", Era::V217).unwrap();
+    let gs2 = compile_gs2("function onCreated() { this.a = {random(0, 1), 2}; }").unwrap();
+    let operands = |s: &Script| -> Vec<String> {
+        let d = s.disassemble();
+        let l: Vec<&str> = d.lines().collect();
+        let at = l.iter().position(|x| x.contains("OP_RANDOM")).unwrap();
+        l[at - 2..at]
+            .iter()
+            .map(|x| x.split_whitespace().last().unwrap().to_string())
+            .collect()
+    };
+    assert_eq!(operands(&gs1), ["1", "0"]);
+    assert_eq!(operands(&gs2), ["0", "1"]);
     let script = compile::compile_gs1(
         "function next() { return 4; }\nif (created) { this.v = 2.5; this.a = {int(this.v), 9}; this.b = {next(), 7}; }",
         Era::V217,
@@ -1057,39 +1067,33 @@ fn fixture_source(name: &str) -> String {
     .unwrap()
 }
 
+/// The `.gs2bc` fixtures are gs2-parser output, and the compiler now
+/// writes the official layout instead (variable cache, narrow jumps, no
+/// closing `OP_RET`, hash-ordered function table). What must still agree
+/// is what a script is made of: the same functions, the same strings, and
+/// bytes that read back to the same instructions.
 #[test]
-fn gs2_front_end_matches_ten_fixtures() {
+fn gs2_front_end_keeps_the_fixtures_functions_and_strings() {
     for name in [
         "shared", "timers", "strings", "lists", "rest", "objects", "members", "nested", "tiles",
-        "elemlist",
+        "elemlist", "control", "calls",
     ] {
         let got = compile_gs2(&fixture_source(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
-        let bytes = fixture(&format!("{name}.gs2bc"));
-        let want = Script::parse(&bytes).unwrap();
-        assert_eq!(got.disassemble(), want.disassemble(), "{name}");
-        assert_eq!(got.strings, want.strings, "{name}");
-        // `timers.gs2bc` lists its functions in another order; the bytes
-        // match everywhere else.
-        if name != "timers" {
-            assert_eq!(got.write(), bytes, "{name}");
-        }
-    }
-}
-
-/// The two fixtures Seihai does not copy exactly: each differs by one
-/// instruction, on purpose (see `switch_stmt` and the if-body call).
-#[test]
-fn gs2_front_end_differs_from_two_fixtures_by_one_deliberate_instruction() {
-    for (name, extra) in [("control", Op::SetIndex), ("calls", Op::IndexDec)] {
-        let got = compile_gs2(&fixture_source(name)).unwrap();
         let want = Script::parse(&fixture(&format!("{name}.gs2bc"))).unwrap();
-        let (g, w) = (ops(&got), ops(&want));
-        assert_eq!(g.len(), w.len() + 1, "{name}");
-        let at = g.iter().zip(&w).position(|(a, b)| a != b).unwrap();
-        assert_eq!(g[at], extra.to_string(), "{name}");
-        assert_eq!(g[..at], w[..at], "{name}");
-        assert_eq!(g[at + 1..], w[at..], "{name}");
-        assert_eq!(got.strings, want.strings, "{name}");
+        let fns = |s: &Script| {
+            let mut v: Vec<String> = s.functions.iter().map(|f| f.name.clone()).collect();
+            v.sort();
+            v
+        };
+        assert_eq!(fns(&got), fns(&want), "{name}");
+        let strs = |s: &Script| {
+            let mut v = s.strings.clone();
+            v.sort();
+            v
+        };
+        assert_eq!(strs(&got), strs(&want), "{name}");
+        let back = Script::parse(&got.write()).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(back.disassemble(), got.disassemble(), "{name}");
     }
 }
 
@@ -1130,7 +1134,7 @@ fn gs1_top_level_join_and_guard_chains_lower() {
     let dis = got.disassemble();
     assert!(dis.contains("\"join\""), "{dis}");
     assert_dispatched(&got, Era::V217, &["onPlayerTouchsMe"]);
-    assert_eq!(got.functions[0].name, "onPlayerTouchsMe");
+    assert_eq!(names(&got)[0], "onPlayerTouchsMe");
     // A call before the event runs in every GS1 event, so the event is not
     // lifted on its own: the script dispatches and calls `f()` first.
     let got = compile::compile_gs1("if (f() && playertouchsme) { hide; }\n", Era::V217).unwrap();
@@ -1264,7 +1268,15 @@ fn gs1_board_is_tiles_with_the_board_guard() {
             .unwrap_or_else(|e| panic!("{gs1}: {e}"));
         let want = compile_gs2(&format!("function onCreated() {{ {gs2} }}"))
             .unwrap_or_else(|e| panic!("{gs2}: {e}"));
-        assert_eq!(ops(&got), ops(&want), "{gs1}");
+        // `format` counts as a call for `OP_CMD_CALL` from GS1 only, as in
+        // official bodies.
+        let calls = |s: &Script| {
+            ops(s)
+                .into_iter()
+                .filter(|o| o != "OP_CMD_CALL")
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(calls(&got), calls(&want), "{gs1}");
         assert_eq!(got.strings, want.strings, "{gs1}");
     }
 }

@@ -431,6 +431,8 @@ pub(super) struct Program {
     /// Whether a later function replaces an earlier one of the same name
     /// (GS2 legacy) instead of being an error.
     pub later_wins: bool,
+    /// Lowered from GS1: a few encodings differ from GS2 source.
+    pub gs1: bool,
 }
 
 /// The body always leaves through `return`, so the function needs no

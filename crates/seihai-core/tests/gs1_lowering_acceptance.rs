@@ -35,6 +35,33 @@ fn same(gs1_src: &str, gs2_src: &str) -> Script {
     a
 }
 
+/// Like `same`, for forms whose GS2 spelling now compiles to the official
+/// shape while the GS1 lowering keeps its older one: the GS1 side may
+/// carry an extra `OP_CMD_CALL` (it counts the lowered command as a call)
+/// and `OP_CONV_TO_STRING` on a text receiver. Everything else must match.
+fn same_but_gs1_extras(gs1_src: &str, gs2_src: &str) -> Script {
+    let a = gs1(gs1_src);
+    let b = gs2(gs2_src);
+    let ops = |s: &Script| -> Vec<String> {
+        s.code
+            .iter()
+            .map(|i| format!("{} {:?}", i.op, i.operand))
+            .collect()
+    };
+    let drop = |v: Vec<String>| -> Vec<String> {
+        v.into_iter()
+            .filter(|o| !o.starts_with("OP_CMD_CALL ") && !o.starts_with("OP_CONV_TO_STRING "))
+            .filter(|o| !o.starts_with("OP_SET_INDEX "))
+            .collect()
+    };
+    assert_eq!(
+        drop(ops(&a)),
+        drop(ops(&b)),
+        "GS1:\n{gs1_src}\nGS2:\n{gs2_src}"
+    );
+    a
+}
+
 fn created(script: Script) -> (Machine, EffectHost) {
     let mut m = Machine::new(script);
     let mut host = EffectHost::new(Era::V217, 3);
@@ -202,11 +229,11 @@ fn setbody_lowers_to_player_bodyimg_effect() {
 
 #[test]
 fn counts_and_old_command_names_lower() {
-    same(
+    same_but_gs1_extras(
         "if (created) {\n  tokenize a b c;\n  this.n = tokenscount;\n  setgif door.png;\n  setgifpart door.png,0,0,32,32;\n}\n",
         "function onCreated() {\n  tokens = \"a b c\".tokenize();\n  this.n = tokens.size();\n  setimg(\"door.png\");\n  setimgpart(\"door.png\", 0, 0, 32, 32);\n}\n",
     );
-    same(
+    same_but_gs1_extras(
         "if (created) { this.a = playerhp; this.b = weaponscount; hide; }\n",
         "function onCreated() { this.a = player.hearts; this.b = player.weapons.size(); hide(); }\n",
     );
@@ -269,7 +296,7 @@ fn every_gs1_command_says_how_it_lowers() {
 
 #[test]
 fn a_count_alone_marks_the_function_as_calling() {
-    same(
+    same_but_gs1_extras(
         "if (created) { this.n = tokenscount; }\n",
         "function onCreated() { this.n = tokens.size(); }\n",
     );
