@@ -137,6 +137,7 @@ fn lower_items(
         items,
         lambdas: Vec::new(),
         later_wins: false,
+        gs1: true,
     };
     super::mixed::merge_event_functions(&mut program, &lifted);
     Ok(program)

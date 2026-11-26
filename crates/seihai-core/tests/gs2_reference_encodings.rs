@@ -55,7 +55,7 @@ fn membership_tests_are_already_numbers() {
         "function onCreated() {\n  temp.s = (temp.a in |1, 3|) + 1;\n  temp.t = (temp.a in temp.l) + 1;\n  temp.u = (temp.a in {1, 2}) + 1;\n}\n",
     );
     assert!(
-        has_run(&l, &["OP_IN_RANGE", "OP_TYPE_NUMBER 1", "OP_ADD"]),
+        has_run(&l, &["OP_IN_RANGE 0", "OP_TYPE_NUMBER 1", "OP_ADD"]),
         "{l:#?}"
     );
     assert_eq!(
@@ -69,8 +69,14 @@ fn membership_tests_are_already_numbers() {
 }
 
 #[test]
-fn makevar_takes_a_string_even_from_a_string() {
+fn makevar_converts_only_what_is_not_already_text() {
+    // Official bodies push a text argument as it is.
     let l = lines("function onCreated() {\n  temp.u = makevar(\"x\");\n}\n");
+    assert!(
+        has_run(&l, &["OP_TYPE_STRING #1 \"x\"", "OP_MAKEVAR"]),
+        "{l:#?}"
+    );
+    let l = lines("function onCreated() {\n  temp.u = makevar(temp.n);\n}\n");
     assert!(has_run(&l, &["OP_CONV_TO_STRING", "OP_MAKEVAR"]), "{l:#?}");
 }
 

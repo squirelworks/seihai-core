@@ -40,6 +40,7 @@
 //! compiler cannot lower is an error in both modes.
 
 mod ast;
+mod cache;
 mod codegen;
 mod gs1;
 mod lexer;

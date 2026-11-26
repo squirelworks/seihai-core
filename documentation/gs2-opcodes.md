@@ -53,9 +53,15 @@ one `0x0A` outside every segment; the reader ignores leftover bytes.
 - Function names: `public.` is put in front for a `public function`. A
   method is `obj.name`. A function on `universe` is written as
   `name,universe.name` (with `public.` in front of both parts if public).
-- The compiler appends one `OP_RET` after the last statement of the
+- gs2-parser appends one `OP_RET` after the last statement of the
   script. The source says this works around the last function being
-  uncallable on the client the author tested with.
+  uncallable on the client the author tested with. Official server-compiled
+  bodies do not, and neither does Seihai's compiler: a script with no
+  top-level code ends with its last function's `OP_RET`.
+- Official bodies, and Seihai's compiler, list plain functions in the order
+  of the engine's name hash list over their names without `public.`, then
+  the functions on an object in source order (Graal_analysis
+  `npc-library/gs2-official-emit-spec-2026-11-26.md`).
 
 ## Operands
 
@@ -73,15 +79,16 @@ opcode. **[src][fx]**
 | `F5` | `i32` | integer, or op index of a jump target |
 | `F6` | NUL-terminated decimal text | a non-integer number (`0.5` is `F6 30 2E 35 00`) |
 
-The writer picks the smallest marker that holds the value. Forward jumps
-are an exception: they are always written as `F4` and a 16-bit placeholder,
-which is patched once the target is known. Backward jumps (the end of a
+The writer picks the smallest marker that holds the value. In gs2-parser,
+forward jumps are an exception: they are always written as `F4` and a
+16-bit placeholder, which is patched once the target is known. Official
+bodies and Seihai's writer use the smallest marker for jumps too. Backward jumps (the end of a
 loop) use the smallest `F3`/`F4`/`F5`. Integers are signed (`-1` is
 `F3 FF`). String indices are unsigned. The `F1`, `F2` and `F5` widths are in
 the writer but not in the fixtures, apart from `F5` for 100000.
 
 Column **Operand**: `—` none · `str` a string index (`F0`–`F2`) · `num` an
-integer (`F3`–`F5`) or a decimal (`F6`) · `jump` an op index (`F3`–`F5`).
+integer (`F3`–`F5`) or a decimal (`F6`) · `num?` a number official bodies write and gs2-parser leaves out · `jump` an op index (`F3`–`F5`).
 
 ## Opcodes
 
@@ -129,7 +136,7 @@ but nothing in the compiler writes it.
 | 42 | 0x2A | OP_NEW_OBJECT | — | `new T(…)`, after the type name | yes |
 | 43 | 0x2B | OP_OBJ_FROM_STR | — | *(enum comment: from setstring)* | no |
 | 44 | 0x2C | OP_INLINE_CONDITIONAL | — | End of an `&&`/`\|\|` chain outside an `if` or loop test | yes |
-| 45–47 | 0x2D–0x2F | OP_UNKNOWN_45 … 47 | int | Placeholders in the enum. The client VMs run them as local-slot store, load and resolve (`gs2-vm-versions.md`) | no |
+| 45–47 | 0x2D–0x2F | OP_UNKNOWN_45 … 47 | int (45, 46) | Placeholders in the enum. The client VMs run them as local-slot store, load and resolve (`gs2-vm-versions.md`). Official bodies use them as a per-function variable cache: the prologue resolves each cached name (47), stores it in slot n (45 n) and pops it; each later use is 46 n. Seihai's compiler emits the same (`compile/cache.rs`) | yes |
 | 50 | 0x32 | OP_ASSIGN | — | `=` and the store of a compound assignment | yes |
 | 51 | 0x33 | OP_FUNC_PARAMS_END | — | End of a function's parameter list | yes |
 | 52 | 0x34 | OP_INC | — | `++`, and the index step in `for`-each | yes |
@@ -154,7 +161,7 @@ but nothing in the compiler writes it.
 | 77 | 0x4D | OP_BWA | — | `&` | yes |
 | 78 | 0x4E | OP_BWX | — | `xor` | yes |
 | 79 | 0x4F | OP_BWI | — | `~` | yes |
-| 80 | 0x50 | OP_IN_RANGE | — | `x in \|a, b\|` and `x in <a, b>` | yes |
+| 80 | 0x50 | OP_IN_RANGE | num? | `x in \|a, b\|` and `x in <a, b>`. Official bodies carry an integer operand; every one of the 26 seen in captures is 0, which Seihai writes. The other values (read as open bounds) are not confirmed | yes |
 | 81 | 0x51 | OP_IN_OBJ | — | `x in obj` | yes |
 | 82 | 0x52 | OP_OBJ_INDEX | — | `obj.index(x)` | yes |
 | 83 | 0x53 | OP_OBJ_TYPE | — | `obj.type()`. *(enum comment: 0 float, 1 string, 2 object, 3 array)* | yes |
@@ -212,7 +219,7 @@ but nothing in the compiler writes it.
 | 183 | 0xB7 | OP_PLAYERO | — | `playero` | yes |
 | 184 | 0xB8 | OP_LEVEL | — | `level` | yes |
 | 189 | 0xBD | OP_TEMP | — | `temp` | yes |
-| 190 | 0xBE | OP_PARAMS | — | In the enum. The compiler does not map `params` to it | no |
+| 190 | 0xBE | OP_PARAMS | — | `params`. gs2-parser does not map `params` to it; official bodies and Seihai's compiler do | yes |
 
 Values that are not in the table (12–19, 28–29, 48–49, 55–59, 105–109,
 121–129, 143–149, 152–162, 164–179, 185–188, 191–239) are not in the enum.

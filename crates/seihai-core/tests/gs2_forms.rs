@@ -13,7 +13,7 @@ fn compile_gs2(src: &str) -> Result<Script, CompileErrors> {
 }
 
 /// The ops of the function body after its four-op header, without the
-/// trailing `return 0` and the closing `OP_RET`.
+/// trailing `return 0` (official bodies have no closing `OP_RET`).
 fn body(src: &str) -> Vec<String> {
     let s = compile_gs2(src).unwrap_or_else(|e| panic!("{src}: {e}"));
     let ops = ops(&s);
@@ -23,7 +23,7 @@ fn body(src: &str) -> Vec<String> {
     } else {
         start
     };
-    ops[start..ops.len() - 3].to_vec()
+    ops[start..ops.len() - 2].to_vec()
 }
 
 fn ops(s: &Script) -> Vec<String> {
@@ -197,10 +197,7 @@ fn operators_names_and_constants() {
     assert!(s.strings.iter().any(|t| t == "$pref::Video::style"));
     // `const` folds and leaves no code at top level.
     let s = compile_gs2("const C = 1; y = C;").unwrap();
-    assert_eq!(
-        ops(&s),
-        names(&["TYPE_VAR", "TYPE_NUMBER", "ASSIGN", "RET"])
-    );
+    assert_eq!(ops(&s), names(&["TYPE_VAR", "TYPE_NUMBER", "ASSIGN"]));
     // Seihai folds `enum` members too (the probe reads them as variables).
     let s = compile_gs2("enum Dir { UP, DOWN = 5, LEFT };\ny = LEFT + Dir::DOWN;").unwrap();
     assert!(s.strings.iter().all(|t| t != "LEFT" && t != "Dir::DOWN"));
@@ -284,8 +281,11 @@ fn elseif_and_with_exits() {
             "WITHEND"
         ])
     );
+    // The loop variable is cached, so the `with` sits after that slot.
+    let got = f("for (i = 0; i < 2; i++) { with (player) { break; } }");
+    let at = got.iter().position(|o| o == "OP_PLAYER").unwrap();
     assert_eq!(
-        f("for (i = 0; i < 2; i++) { with (player) { break; } }")[9..14],
+        got[at..at + 5],
         names(&["PLAYER", "CONV_TO_OBJECT", "WITH", "SET_INDEX", "WITHEND"])
     );
 }
@@ -373,6 +373,7 @@ fn lambdas_steps_and_dynamic_calls() {
             "CONV_TO_OBJECT",
             "TYPE_NUMBER",
             "ARRAY",
+            "CONV_TO_OBJECT",
             "TYPE_NUMBER",
             "ARRAY",
             "DEC",
