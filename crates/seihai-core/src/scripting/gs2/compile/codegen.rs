@@ -54,6 +54,8 @@ enum Kind {
 struct Loop {
     continues: Vec<usize>,
     breaks: Vec<usize>,
+    /// The name `break name;` and `continue name;` use, if any.
+    label: Option<String>,
 }
 
 /// The functions a later one of the same name replaces.
@@ -102,6 +104,7 @@ pub(super) fn generate(program: &Program) -> Result<Script, CompileErrors> {
         functions: Vec::new(),
         errors: Vec::new(),
         loops: Vec::new(),
+        label: None,
         skips: Vec::new(),
         line: 0,
         cache: HashMap::new(),
@@ -132,7 +135,13 @@ pub(super) fn generate(program: &Program) -> Result<Script, CompileErrors> {
                 top_level.push(start..b.here());
             }
             Item::Function(f) => {
-                if last.get(f.name.as_str()) == Some(&nth) {
+                // Official bodies keep every copy of a function on an
+                // object (`obj.f`), each listed in the table.
+                let on_object = {
+                    let n = f.name.strip_prefix("public.").unwrap_or(&f.name);
+                    n.contains('.')
+                };
+                if last.get(f.name.as_str()) == Some(&nth) || on_object {
                     b.function(f, false);
                 }
                 nth += 1;
@@ -274,6 +283,8 @@ struct Builder {
     functions: Vec<FnEntry>,
     errors: Vec<CompileError>,
     loops: Vec<Loop>,
+    /// The label for the next loop opened (`name: for …`).
+    label: Option<String>,
     /// Jumps over function bodies, patched to the next code outside them.
     skips: Vec<usize>,
     line: u32,
@@ -288,7 +299,7 @@ struct Builder {
 // ---- what counts as a call ----
 
 /// Whether a statement calls anything, for the function's `OP_CMD_CALL`.
-fn stmt_calls(s: &Stmt) -> bool {
+pub(super) fn stmt_calls(s: &Stmt) -> bool {
     let index = |v: &Var| v.index.iter().any(expr_calls);
     match s {
         Stmt::Block(v) => v.iter().any(stmt_calls),
@@ -318,15 +329,21 @@ fn stmt_calls(s: &Stmt) -> bool {
         }
         Stmt::Return(v) => v.as_ref().is_some_and(expr_calls),
         Stmt::With { target, body, .. } => expr_calls(target) || stmt_calls(body),
-        Stmt::NewBlock { name, body, .. } => expr_calls(name) || body.iter().any(stmt_calls),
+        Stmt::NewBlock { name, body, .. } => {
+            name.as_ref().is_some_and(expr_calls) || body.iter().any(stmt_calls)
+        }
         Stmt::Assign { target, value, .. } => index(target) || expr_calls(value),
         Stmt::IncDec { target, .. } => index(target),
         Stmt::Chain { targets, value } => targets.iter().any(index) || expr_calls(value),
         Stmt::SetPart { target, value } => expr_calls(target) || expr_calls(value),
+        // A built-in whose value goes unused is left out, calls and all.
+        Stmt::Call { name, .. } if unused_builtin(name) => false,
         Stmt::Call { name, args } => name_is_call(name, false) || args.iter().any(expr_calls),
+        Stmt::Eval(Expr::Method { name, .. }) if value_method(name) => false,
         Stmt::Eval(e) => expr_calls(e),
         Stmt::Embedded { calls, .. } => *calls,
-        Stmt::Break | Stmt::Continue => false,
+        Stmt::Break | Stmt::Continue | Stmt::BreakTo(_) | Stmt::ContinueTo(_) => false,
+        Stmt::Labeled { body, .. } => stmt_calls(body),
     }
 }
 
@@ -357,7 +374,8 @@ fn expr_calls(e: &Expr) -> bool {
         | Expr::Method { .. }
         | Expr::DynMethod { .. }
         | Expr::DynCall { .. } => true,
-        Expr::Message(_) | Expr::Lambda(_) => false,
+        Expr::Lambda { calls, .. } => *calls,
+        Expr::Message(_) => false,
         other => other.parts().into_iter().any(expr_calls),
     }
 }
@@ -398,6 +416,9 @@ fn arith(op: AssignOp) -> Op {
         AssignOp::Mod => Op::Mod,
         AssignOp::BitAnd => Op::BitAnd,
         AssignOp::BitOr => Op::BitOr,
+        AssignOp::Pow => Op::Pow,
+        AssignOp::Shl => Op::ShiftLeft,
+        AssignOp::Shr => Op::ShiftRight,
         AssignOp::Cat => Op::Join,
         AssignOp::Set => unreachable!("`=` has no operator"),
     }
@@ -522,6 +543,7 @@ impl Builder {
         self.loops.push(Loop {
             continues: Vec::new(),
             breaks: Vec::new(),
+            label: self.label.take(),
         });
     }
 
@@ -626,8 +648,30 @@ impl Builder {
                     frame.continues.push(h);
                 }
             }
+            Stmt::Labeled { label, body } => {
+                self.label = Some(label.clone());
+                self.stmt(body);
+                self.label = None;
+            }
+            Stmt::BreakTo(label) | Stmt::ContinueTo(label) => {
+                let Some(frame) = self
+                    .loops
+                    .iter()
+                    .rposition(|l| l.label.as_deref() == Some(label.as_str()))
+                else {
+                    self.err(format!("no loop named `{label}`"));
+                    return;
+                };
+                let h = self.hole(Op::SetIndex);
+                let frame = &mut self.loops[frame];
+                if matches!(s, Stmt::BreakTo(_)) {
+                    frame.breaks.push(h);
+                } else {
+                    frame.continues.push(h);
+                }
+            }
             Stmt::With { target, body, line } => self.with_stmt(target, body, *line),
-            Stmt::NewBlock { ty, name, body } => self.new_block(ty, name, body),
+            Stmt::NewBlock { ty, name, body } => self.new_block(ty, name.as_ref(), body),
             Stmt::Assign { target, op, value } => self.assign(target, *op, value),
             Stmt::IncDec { target, delta } => {
                 if target.index.is_empty() {
@@ -645,6 +689,10 @@ impl Builder {
             }
             Stmt::Chain { targets, value } => self.chain(targets, value),
             Stmt::SetPart { target, value } => self.set_part(target, value),
+            // GS2 leaves out a built-in whose value is not used.
+            Stmt::Call { name, args }
+                if !self.gs1 && unused_builtin(name) && builtin_args_fit(name, args.len()) => {}
+            Stmt::Eval(Expr::Method { name, .. }) if !self.gs1 && value_method(name) => {}
             Stmt::Call { name, args } => {
                 if self.call(name, args) {
                     self.op(Op::IndexDec);
@@ -755,6 +803,12 @@ impl Builder {
     /// `OP_INDEX_DEC` follows the loop. A `continue` goes to the `OP_INC`.
     fn foreach_stmt(&mut self, var: &str, list: &Expr, body: &Stmt) {
         self.place(var);
+        // From here on a bare `x` means the loop's `temp.x` and its slot.
+        if let Some(n) = var.strip_prefix("temp.").filter(|n| !n.contains('.')) {
+            if let Some(&slot) = self.cache.get(var) {
+                self.cache.insert(n.to_string(), slot);
+            }
+        }
         self.value(list);
         self.op(Op::ConvToObject);
         self.emit_int(0);
@@ -864,15 +918,21 @@ impl Builder {
     /// `OP_ASSIGN` (the name now holds the object), `OP_CONV_TO_OBJECT`,
     /// `OP_WITH` past the block, the body, `OP_WITHEND`, then
     /// `addcontrol(object)` on the object outside and `OP_INDEX_DEC`.
-    fn new_block(&mut self, ty: &str, name: &Expr, body: &[Stmt]) {
+    fn new_block(&mut self, ty: &str, name: Option<&Expr>, body: &[Stmt]) {
         let cache = std::mem::take(&mut self.cache);
         self.new_block_body(ty, name, body);
         self.cache = cache;
     }
 
-    fn new_block_body(&mut self, ty: &str, name: &Expr, body: &[Stmt]) {
-        self.value(name);
-        self.op(Op::InlineNew);
+    fn new_block_body(&mut self, ty: &str, name: Option<&Expr>, body: &[Stmt]) {
+        // With no name, official bodies push `unknown_object` by name.
+        match name {
+            Some(name) => {
+                self.value(name);
+                self.op(Op::InlineNew);
+            }
+            None => self.emit_var("unknown_object"),
+        }
         for _ in 0..3 {
             self.op(Op::CopyLastOp);
         }
@@ -1278,6 +1338,13 @@ impl Builder {
                 }
                 self.op(Op::Format);
             }
+            // GS2 `sarraylen(a)`: the array named by the text.
+            "sarraylen" if !self.gs1 => {
+                self.value(&args[0]);
+                self.op(Op::ObjFromStr);
+                self.op(Op::ConvToObject);
+                self.op(Op::ObjSize);
+            }
             // The reference compiler hands `OP_OBJ_SIZE` an object.
             "arraylen" | "sarraylen" => {
                 self.value(&args[0]);
@@ -1298,9 +1365,18 @@ impl Builder {
                 self.op(opcode_builtin(name).unwrap());
             }
             // `strings.gs2bc`: `_("text")` is the text, then `OP_TRANSLATE`.
+            // GS2 converts anything but text first.
             "_" if args.len() == 1 => {
-                self.value(&args[0]);
+                if self.gs1 {
+                    self.value(&args[0]);
+                } else {
+                    self.stringish(&args[0]);
+                }
                 self.op(Op::Translate);
+            }
+            // GS2 `float(x)`: `x` as a number, with no opcode of its own.
+            "float" if args.len() == 1 && !self.gs1 => {
+                self.numeric(&args[0]);
             }
             // `makevar` takes its name as a string, converted even when it
             // already is one, as the reference compiler does.
@@ -1350,6 +1426,19 @@ impl Builder {
         }
         let lower = name.to_ascii_lowercase();
         let n = args.len();
+        // GS2: `s.lower()` and `s.upper()` are calls of `lowercase` and
+        // `uppercase` on the text.
+        if !self.gs1 && n == 0 && matches!(name, "lower" | "upper") {
+            self.op(Op::TypeArray);
+            self.stringish(obj);
+            self.emit_var(if name == "lower" {
+                "lowercase"
+            } else {
+                "uppercase"
+            });
+            self.op(Op::Call);
+            return true;
+        }
         let string_op = match (lower.as_str(), n) {
             ("trim", 0) => Some(Op::ObjTrim),
             ("length", 0) => Some(Op::ObjLength),
@@ -1405,6 +1494,7 @@ impl Builder {
         // two-operand ones push the value before the index.
         let list_op = match (lower.as_str(), n) {
             ("size", 0) => Some((Op::ObjSize, true)),
+            ("link", 0) if !self.gs1 => Some((Op::ObjLink, true)),
             ("type", 0) => Some((Op::ObjType, true)),
             ("clear", 0) => Some((Op::ObjClear, false)),
             ("index", 1) => Some((Op::ObjIndex, true)),
@@ -1451,8 +1541,15 @@ impl Builder {
             return pushes;
         }
         if lower == "indices" && n == 1 {
-            self.value(&args[0]);
-            self.value(obj);
+            // GS2 pushes the list as an object, then the value.
+            if self.gs1 {
+                self.value(&args[0]);
+                self.value(obj);
+            } else {
+                self.value(obj);
+                self.op(Op::ConvToObject);
+                self.value(&args[0]);
+            }
             self.op(Op::ObjIndices);
             return true;
         }
@@ -1616,6 +1713,11 @@ impl Builder {
                 }
                 Kind::Number
             }
+            Expr::Invert(a) => {
+                self.numeric(a);
+                self.op(Op::BitInvert);
+                Kind::Number
+            }
             // Official bodies use `!`, `&&`/`||` and comparisons as numbers.
             Expr::Not(a) => {
                 self.not_operand(a);
@@ -1636,6 +1738,7 @@ impl Builder {
                     BitOp::Shr => Op::ShiftRight,
                     BitOp::And => Op::BitAnd,
                     BitOp::Or => Op::BitOr,
+                    BitOp::Xor => Op::BitXor,
                 });
                 Kind::Number
             }
@@ -1656,7 +1759,8 @@ impl Builder {
                 }
                 let ke = self.value(els);
                 self.patch(jump, self.here());
-                if kt == Kind::String && ke == Kind::String {
+                // GS2 converts a choice of two texts again.
+                if self.gs1 && kt == Kind::String && ke == Kind::String {
                     Kind::String
                 } else {
                     Kind::Other
@@ -1665,9 +1769,15 @@ impl Builder {
             // The reference compiler uses the result of `OP_IN_RANGE` and
             // `OP_IN_OBJ` as a number with no `OP_CONV_TO_FLOAT`.
             Expr::InRange { e, lo, hi } => {
+                // GS2 makes the bounds numbers; the value stays as it is.
                 self.value(e);
-                self.value(lo);
-                self.value(hi);
+                if self.gs1 {
+                    self.value(lo);
+                    self.value(hi);
+                } else {
+                    self.numeric(lo);
+                    self.numeric(hi);
+                }
                 // The operand: 2 for an open lower bound, 1 for an open
                 // upper one; written ranges are closed.
                 self.push(Op::InRange, Operand::Int(0));
@@ -1827,7 +1937,7 @@ impl Builder {
             // `function (…) { … }` as a value (Preagonal probe): the
             // function emitted where it stands and jumped over, then
             // `this.<name>` as an object.
-            Expr::Lambda(name) => {
+            Expr::Lambda { name, .. } => {
                 let Some(f) = self.lambdas.remove(&format!("public.{name}")) else {
                     self.err("a `function () { … }` value is used twice");
                     return Kind::Other;
@@ -1872,6 +1982,20 @@ impl Builder {
             // value, `OP_ASSIGN`, leaving x. For `+=` and the others Seihai
             // copies the place once more, so x is still there after the
             // store (the Preagonal output does not, and leaves nothing).
+            // GS2 `x = a[i] += v`: the element store, then the element read
+            // again as the value.
+            Expr::AssignValue { target, op, value }
+                if !self.gs1
+                    && *op != AssignOp::Set
+                    && matches!(&**target, Expr::Var(v) if !v.index.is_empty()) =>
+            {
+                let Expr::Var(v) = &**target else {
+                    unreachable!()
+                };
+                self.element_assign(v, *op, value);
+                self.value(target);
+                Kind::Other
+            }
             Expr::AssignValue { target, op, value } => {
                 if !self.step_place(target) {
                     return Kind::Other;
@@ -1986,7 +2110,16 @@ impl Builder {
     fn not_operand(&mut self, x: &Expr) {
         if is_logic(x) {
             self.logic_operand(x);
-        } else if is_comparison(x) || matches!(x, Expr::InRange { .. } | Expr::Not(_)) {
+        } else if is_comparison(x)
+            || matches!(
+                x,
+                Expr::InRange { .. }
+                    | Expr::InList { .. }
+                    | Expr::InArray { .. }
+                    | Expr::InValue { .. }
+                    | Expr::Not(_)
+            )
+        {
             self.value(x);
         } else {
             self.value(x);
@@ -2100,6 +2233,7 @@ fn fold(e: &Expr) -> Option<f64> {
                 BitOp::Shr => a.wrapping_shr(b as u32),
                 BitOp::And => a & b,
                 BitOp::Or => a | b,
+                BitOp::Xor => a ^ b,
             }) as f64
         }
         Expr::Neg(x) if matches!(**x, Expr::Binary(..) | Expr::Bits(..)) => -fold(x)?,
@@ -2188,4 +2322,44 @@ fn const_bool(e: &Expr) -> Option<bool> {
         Expr::Binary(BinOp::Or, a, _) if const_bool(a) == Some(true) => Some(true),
         _ => None,
     }
+}
+
+/// A built-in that only gives a value (not `waitfor`), which GS2 leaves
+/// out when it is not used.
+fn unused_builtin(name: &str) -> bool {
+    name != "waitfor" && call_pushes(name) && cache::inline_call(name)
+}
+
+/// Whether a built-in call has an argument count it takes, so that one
+/// left out unused is still checked.
+fn builtin_args_fit(name: &str, n: usize) -> bool {
+    match name {
+        "format" => n > 0,
+        _ => builtin_arity(name).is_none_or(|want| want == n),
+    }
+}
+
+/// The built-in methods that only give a value, which GS2 leaves out when
+/// it is not used.
+fn value_method(name: &str) -> bool {
+    matches!(
+        name,
+        "size"
+            | "type"
+            | "indices"
+            | "link"
+            | "index"
+            | "length"
+            | "substring"
+            | "pos"
+            | "charat"
+            | "starts"
+            | "ends"
+            | "trim"
+            | "tokenize"
+            | "positions"
+            | "subarray"
+            | "lower"
+            | "upper"
+    )
 }

@@ -665,3 +665,35 @@ fn on_mouse_down_reads_the_click_from_mousex_and_mousey() {
     assert_eq!(m.var(Root::This, "mode"), Some(&Val::from("left")));
     assert_eq!(m.var(Root::This, "at"), Some(&Val::from("31,26.5")));
 }
+
+fn run_source(src: &str, event: &str) -> Machine {
+    let script = seihai_core::scripting::gs2::compile::compile_gs2(src).unwrap();
+    let mut m = Machine::new(Script::parse(&script.write()).unwrap());
+    let mut h = host();
+    m.call_event(event, &[], &mut h);
+    assert!(h.log.is_empty(), "{:?}", h.log);
+    m
+}
+
+#[test]
+fn labeled_loops_break_and_continue_the_named_loop() {
+    let m = run_source(
+        "function onCreated() {\n  this.n = 0;\n  outer: for (temp.i = 0; temp.i < 5; temp.i++) {\n    for (temp.j = 0; temp.j < 5; temp.j++) {\n      if (temp.j == 2) continue outer;\n      if (temp.i == 3) break outer;\n      this.n++;\n    }\n  }\n}\n",
+        "onCreated",
+    );
+    // Rows 0 to 2 count two each before `continue outer`; row 3 stops.
+    assert_eq!(m.var(Root::This, "n"), Some(&Val::Num(6.0)));
+}
+
+#[test]
+fn lower_upper_xor_and_invert_run() {
+    let m = run_source(
+        "function onCreated() {\n  this.a = \"AbC\".lower();\n  this.b = \"AbC\".upper();\n  this.c = 6 xor 3;\n  this.d = ~0;\n  this.e = 2;\n  this.e ^= 3;\n}\n",
+        "onCreated",
+    );
+    assert_eq!(m.var(Root::This, "a"), Some(&Val::from("abc")));
+    assert_eq!(m.var(Root::This, "b"), Some(&Val::from("ABC")));
+    assert_eq!(m.var(Root::This, "c"), Some(&Val::Num(5.0)));
+    assert_eq!(m.var(Root::This, "d"), Some(&Val::Num(-1.0)));
+    assert_eq!(m.var(Root::This, "e"), Some(&Val::Num(8.0)));
+}

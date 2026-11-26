@@ -10,8 +10,8 @@
 //! `new GuiWindowCtrl("name") { … }` blocks) live under the global object
 //! by name, with their type: `with` reaches them, `objecttype()` and
 //! `destroy()` work on them, and [`Machine::objects`] lists them for a host
-//! that draws GUI controls. `OP_OBJ_LINK` and `OP_OBJ_FROM_STR` (which the
-//! compiler never emits) are still logged and skipped. Behaviour was first taken from the 3.153 client's VM
+//! that draws GUI controls. `OP_OBJ_LINK` (`obj.link()`) gives the
+//! object itself. Behaviour was first taken from the 3.153 client's VM
 //! (`documentation/gs2-executor.md`); what later VMs change (limits,
 //! `%`, `^`, shifts, the opcodes they added) is a [`VmProfile`]
 //! (`documentation/gs2-vm-versions.md`). [`Machine::new`] runs 3.153's
@@ -1810,8 +1810,17 @@ impl Machine {
                         return fault(self, host);
                     }
                 }
-                // `makevar(name)`: the variable the text names.
-                Op::MakeVar => {
+                // `obj.link()`: a reference to the object, which here is
+                // the object itself.
+                Op::ObjLink => {
+                    let Some(o) = self.pop() else {
+                        return fault(self, host);
+                    };
+                    self.push(o);
+                }
+                // `makevar(name)`, and `OP_OBJ_FROM_STR` (`sarraylen(a)`):
+                // the variable the text names.
+                Op::MakeVar | Op::ObjFromStr => {
                     let Some(v) = self.pop_val(host) else {
                         return fault(self, host);
                     };
@@ -1829,9 +1838,6 @@ impl Machine {
                         return o;
                     }
                 }
-                other => host.log(format!(
-                    "gs2: {other} at op {at} is not run yet (Stage D), skipped"
-                )),
             }
         }
     }
@@ -1890,7 +1896,15 @@ impl Machine {
             };
             Val::Num(n(&args[0]).powf(n(&args[1])))
         });
+        // `s.lower()` and `s.upper()` are these calls in official bodies.
+        let case = match (full.as_str(), args.as_slice()) {
+            ("lowercase", [Val::Str(s)]) => Some(Val::Str(s.to_ascii_lowercase())),
+            ("uppercase", [Val::Str(s)]) => Some(Val::Str(s.to_ascii_uppercase())),
+            ("lowercase" | "uppercase", [v]) => Some(v.clone()),
+            _ => None,
+        };
         let result = match pow
+            .or(case)
             .or_else(|| self.timer_command(&full, &args))
             .or_else(|| host.command(&full, &args))
         {

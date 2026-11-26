@@ -69,7 +69,7 @@ pub(super) fn inline_method(name: &str) -> bool {
 /// its name is no reference). `pow` is the one built-in whose arguments
 /// still count.
 pub(super) fn inline_call(name: &str) -> bool {
-    name != "pow" && opcode_builtin(name).is_some()
+    name != "pow" && (opcode_builtin(name).is_some() || matches!(name, "_" | "float"))
 }
 
 /// The slot key for a variable written `a.b.c`, if it has one: `this.b`,
@@ -169,6 +169,10 @@ impl Refs {
                 self.stmt(body, true);
             }
             Stmt::ForEach { var, list, body } => {
+                // The loop variable is a use inside the loop.
+                if let Some(k) = key_of(var) {
+                    self.add(k, true);
+                }
                 if let Some(n) = var.strip_prefix("temp.") {
                     if !n.contains('.') {
                         self.binding.insert(n.to_string(), var.clone());
@@ -193,7 +197,13 @@ impl Refs {
                     self.expr(v, l);
                 }
             }
-            Stmt::Break | Stmt::Continue | Stmt::With { .. } | Stmt::NewBlock { .. } => {}
+            Stmt::Labeled { body, .. } => self.stmt(body, l),
+            Stmt::Break
+            | Stmt::Continue
+            | Stmt::BreakTo(_)
+            | Stmt::ContinueTo(_)
+            | Stmt::With { .. }
+            | Stmt::NewBlock { .. } => {}
             Stmt::Assign { target, value, .. } => {
                 self.var(target, l);
                 self.expr(value, l);
@@ -230,7 +240,7 @@ impl Refs {
     fn expr(&mut self, e: &Expr, l: bool) {
         match e {
             Expr::Var(v) => self.var(v, l),
-            Expr::Text(_) | Expr::Lambda(_) | Expr::New { .. } | Expr::NewArray(_) => {}
+            Expr::Text(_) | Expr::Lambda { .. } | Expr::New { .. } | Expr::NewArray(_) => {}
             Expr::Call { name, args } => self.call(name, args, l),
             Expr::Method { obj, name, args } => {
                 if inline_method(name) {
@@ -255,6 +265,24 @@ impl Refs {
                 }
                 _ => self.expr(obj, l),
             },
+            // A run-time member of a bare `this` uses `this` itself.
+            // `x in this.list`: the list is a use too.
+            Expr::InArray { e, name } => {
+                self.expr(e, l);
+                if let Some(k) = key_of(name) {
+                    self.add(k, l);
+                }
+            }
+            Expr::DynMember { obj, name } if is_this(obj) => {
+                self.add("this".to_string(), l);
+                self.expr(name, l);
+            }
+            Expr::DynMethod { obj, args, .. } if is_this(obj) => {
+                self.add("this".to_string(), l);
+                for a in args {
+                    self.expr(a, l);
+                }
+            }
             Expr::DynMethod { obj, args, .. } => {
                 self.expr(obj, l);
                 for a in args {
@@ -301,4 +329,8 @@ pub(super) fn slots(body: &[Stmt]) -> (HashMap<String, i32>, Vec<String>) {
         }
     }
     (map, kept)
+}
+
+fn is_this(e: &Expr) -> bool {
+    matches!(e, Expr::Var(v) if v.index.is_empty() && v.name == "this")
 }
