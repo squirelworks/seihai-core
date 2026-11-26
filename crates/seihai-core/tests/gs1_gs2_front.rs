@@ -333,7 +333,6 @@ fn opcode_builtins_reject_missing_and_extra_arguments() {
         ("log", 2),
         ("min", 2),
         ("max", 2),
-        ("pow", 2),
         ("getangle", 2),
         ("getdir", 2),
         ("waitfor", 3),

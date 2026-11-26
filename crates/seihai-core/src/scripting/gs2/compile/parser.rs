@@ -462,14 +462,13 @@ impl<'a> Parser<'a> {
                     value,
                 });
             }
-            // `a @= b` is `a = a @ b`.
             if self.eat("@=") {
                 let value = self.expr()?;
                 self.end_stmt()?;
                 return Ok(Stmt::Assign {
                     target: v.clone(),
-                    op: AssignOp::Set,
-                    value: Expr::bin(BinOp::Cat, e.clone(), value),
+                    op: AssignOp::Cat,
+                    value,
                 });
             }
         }

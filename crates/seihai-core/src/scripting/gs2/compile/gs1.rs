@@ -611,7 +611,7 @@ fn mentions_any_call(e: &g::Expr) -> bool {
 /// call is `format` still gets `OP_CMD_CALL`). With `gs1`, the GS1
 /// built-ins lowered to opcodes do not either.
 pub(super) fn name_is_call(name: &str, gs1: bool) -> bool {
-    if name == "format" {
+    if name == "format" || (name == "pow" && !gs1) {
         return true;
     }
     if opcode_builtin(name).is_some() {

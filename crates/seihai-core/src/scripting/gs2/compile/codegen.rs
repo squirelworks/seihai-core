@@ -396,6 +396,7 @@ fn arith(op: AssignOp) -> Op {
         AssignOp::Mod => Op::Mod,
         AssignOp::BitAnd => Op::BitAnd,
         AssignOp::BitOr => Op::BitOr,
+        AssignOp::Cat => Op::Join,
         AssignOp::Set => unreachable!("`=` has no operator"),
     }
 }
@@ -491,7 +492,10 @@ impl Builder {
         let sign = if n < 0.0 { "-" } else { "" };
         let mag = n.abs();
         if !mag.is_finite() || mag > i32::MAX as f64 {
-            self.push(Op::TypeNumber, Operand::Decimal(format!("{sign}{}", i32::MAX)));
+            self.push(
+                Op::TypeNumber,
+                Operand::Decimal(format!("{sign}{}", i32::MAX)),
+            );
             return;
         }
         let mut whole = mag.trunc() as i64;
@@ -898,6 +902,12 @@ impl Builder {
         self.place(&target.name);
         if op == AssignOp::Set {
             self.value(value);
+        } else if op == AssignOp::Cat {
+            // `a @= b`: a, `OP_COPY_LAST_OP`, as text, b as text, join.
+            self.op(Op::CopyLastOp);
+            self.op(Op::ConvToString);
+            self.stringish(value);
+            self.op(Op::Join);
         } else {
             self.op(Op::CopyLastOp);
             self.op(Op::ConvToFloat);
@@ -922,8 +932,13 @@ impl Builder {
                 };
                 self.op(element_op(dims));
                 self.op(Op::CopyLastOp);
-                self.op(Op::ConvToFloat);
-                self.numeric(value);
+                if op == AssignOp::Cat {
+                    self.op(Op::ConvToString);
+                    self.stringish(value);
+                } else {
+                    self.op(Op::ConvToFloat);
+                    self.numeric(value);
+                }
                 self.op(arith(op));
                 self.op(Op::Assign);
                 return;
@@ -1108,7 +1123,13 @@ impl Builder {
     /// array element (`players[i].x`) is used as `OP_ARRAY` left it, with
     /// no conversion (`members.gs2bc`).
     fn object(&mut self, obj: &Expr) {
-        self.value(obj);
+        match obj {
+            // An owner root keeps its opcode (or its cache slot).
+            Expr::Var(v) if v.index.is_empty() && root_op(&v.name).is_some() => self.place(&v.name),
+            _ => {
+                self.value(obj);
+            }
+        }
         // Official bodies convert every owner except a root object pushed
         // by its own opcode, including an element read (`a[i].x`).
         let root = matches!(obj, Expr::Var(v) if v.index.is_empty()
@@ -1153,7 +1174,13 @@ impl Builder {
     /// The owner of `obj.(name)`: as any member owner, and `this` is
     /// converted too.
     fn dyn_owner(&mut self, obj: &Expr) {
+        // A `this` owner is pushed by name and converted.
         let this = matches!(obj, Expr::Var(v) if v.index.is_empty() && v.name == "this");
+        if this && !self.gs1 {
+            self.value(obj);
+            self.op(Op::ConvToObject);
+            return;
+        }
         self.object(obj);
         if this {
             self.op(Op::ConvToObject);
@@ -1170,6 +1197,10 @@ impl Builder {
         };
         let kind = self.value(inner);
         self.cache = cache;
+        // GS2: a plain expression is used as it is; `@x` is made text.
+        if !self.gs1 && !matches!(name, Expr::Text(_)) {
+            return;
+        }
         if kind != Kind::String
             && !matches!(
                 inner,
@@ -1209,6 +1240,11 @@ impl Builder {
 
     /// An opcode built-in. Returns `false` when `name` is not one.
     fn builtin(&mut self, name: &str, args: &[Expr]) -> bool {
+        // Official bodies compile `pow(a, b)` as a script call; `OP_POW`
+        // is only for `^`.
+        if name == "pow" && !self.gs1 {
+            return false;
+        }
         if name == "format" && args.is_empty() {
             self.err("`format` expects at least 1 argument, got 0");
             return true;
@@ -1491,6 +1527,16 @@ impl Builder {
             Expr::Var(v) if v.index.is_empty() && v.name == "pi" => {
                 self.place(&v.name);
                 Kind::Number
+            }
+            // As a value (not an owner), official bodies push these roots
+            // by name; `player` and `level` keep their opcodes.
+            Expr::Var(v)
+                if v.index.is_empty()
+                    && !self.gs1
+                    && matches!(v.name.as_str(), "this" | "thiso" | "playero" | "temp") =>
+            {
+                self.load_or_var(&v.name);
+                Kind::Other
             }
             Expr::Var(v) if v.index.is_empty() => {
                 self.place(&v.name);

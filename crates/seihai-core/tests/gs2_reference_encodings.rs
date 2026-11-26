@@ -87,7 +87,7 @@ fn arraylen_takes_an_object() {
 }
 
 #[test]
-fn waitfor_and_pow_push_in_source_order() {
+fn waitfor_pushes_in_source_order_and_pow_is_a_call() {
     let l = lines(
         "function onCreated() {\n  temp.e = waitfor(this, \"ev\", 5);\n  temp.p = pow(temp.x, 2);\n}\n",
     );
@@ -95,19 +95,22 @@ fn waitfor_and_pow_push_in_source_order() {
         has_run(
             &l,
             &[
-                "OP_THIS",
+                "OP_TYPE_VAR #1 \"this\"",
                 "OP_CONV_TO_STRING",
-                "OP_TYPE_STRING #1 \"ev\"",
+                "OP_TYPE_STRING #2 \"ev\"",
                 "OP_TYPE_NUMBER 5",
                 "OP_WAITFOR"
             ]
         ),
         "{l:#?}"
     );
+    // Official bodies call `pow` by name; `OP_POW` is only for `^`.
     assert!(
-        has_run(&l, &["OP_CONV_TO_FLOAT", "OP_TYPE_NUMBER 2", "OP_POW"]),
+        has_run(&l, &["OP_TYPE_ARRAY", "OP_TYPE_NUMBER 2"]),
         "{l:#?}"
     );
+    assert!(l.iter().any(|x| x.ends_with("\"pow\"")), "{l:#?}");
+    assert!(!l.iter().any(|x| x == "OP_POW"), "{l:#?}");
 }
 
 #[test]

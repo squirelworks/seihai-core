@@ -240,14 +240,13 @@ fn member_forms() {
             "ASSIGN",
         ])
     );
-    // `obj.(n)`: Seihai's form, the name as a string (the probe adds it).
+    // `obj.(n)`: official bodies push the name as it is.
     assert_eq!(
         f("obj.(n) = 2;"),
         names(&[
             "TYPE_VAR",
             "CONV_TO_OBJECT",
             "TYPE_VAR",
-            "CONV_TO_STRING",
             "MEMBER_ACCESS",
             "TYPE_NUMBER",
             "ASSIGN",
