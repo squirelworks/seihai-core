@@ -29,6 +29,7 @@ pub mod seclogin;
 pub mod showimg;
 pub mod tampercheck;
 pub mod three_d;
+pub mod three_d_ext;
 mod tokens;
 mod version;
 pub mod version_pick;
