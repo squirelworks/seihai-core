@@ -697,3 +697,45 @@ fn lower_upper_xor_and_invert_run() {
     assert_eq!(m.var(Root::This, "d"), Some(&Val::Num(-1.0)));
     assert_eq!(m.var(Root::This, "e"), Some(&Val::Num(8.0)));
 }
+
+#[test]
+fn an_element_step_changes_the_element() {
+    use seihai_core::scripting::gs2::compile::compile_gs2;
+    let src = "function onCreated() {
+      temp.a = {1, 5};
+      temp.a[0]++;
+      temp.a[1]--;
+      temp.a[1]--;
+      temp.g = new[2][2];
+      temp.g[1, 0] = 3;
+      temp.g[1, 0]++;
+      this.ex = temp.a[0];
+      this.ey = temp.a[1];
+      this.ez = temp.g[1, 0];
+    }";
+    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let mut h = host();
+    assert_eq!(m.run_top_level(&mut h), Outcome::Done);
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    assert_eq!(m.var(Root::This, "ex"), Some(&Val::Num(2.0)));
+    assert_eq!(m.var(Root::This, "ey"), Some(&Val::Num(3.0)));
+    assert_eq!(m.var(Root::This, "ez"), Some(&Val::Num(4.0)));
+    assert!(h.log.is_empty(), "{:?}", h.log);
+}
+
+#[test]
+fn a_returned_list_can_be_indexed_and_sized_in_place() {
+    use seihai_core::scripting::gs2::compile::compile_gs2;
+    let src = "function pair(a) { return {a, a * 2}; }
+    function onCreated() {
+      this.ex = pair(4)[1];
+      this.en = pair(4).size();
+    }";
+    let mut m = Machine::new(compile_gs2(src).unwrap());
+    let mut h = host();
+    assert_eq!(m.run_top_level(&mut h), Outcome::Done);
+    assert_eq!(m.call_event("onCreated", &[], &mut h), Outcome::Done);
+    assert!(h.log.is_empty(), "{:?}", h.log);
+    assert_eq!(m.var(Root::This, "ex"), Some(&Val::Num(8.0)));
+    assert_eq!(m.var(Root::This, "en"), Some(&Val::Num(2.0)));
+}

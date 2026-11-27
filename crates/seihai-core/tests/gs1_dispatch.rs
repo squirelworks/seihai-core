@@ -293,3 +293,19 @@ fn suffix_commands_follow_each_event_with_dispatch_and_event_only_controls() {
         }
     }
 }
+
+#[test]
+fn a_hash_v_number_inside_hash_t_and_hash_e_is_its_expression() {
+    // `#t(#v(this.i))` and `#e(#v(this.i),1,text)`: the GS1 engine expands
+    // the `#v` first, so the index and the start are `this.i`.
+    let src = "if (created) { tokenize a b c; this.i = 2; \
+               setstring x,#t(#v(this.i)); \
+               if (strequals(#e(#v(this.i),1,abcd),c)) this.n = 1; }";
+    let (mut m, mut host) = machine(src);
+    fire(&mut m, &mut host, "onCreated");
+    assert_eq!(
+        host.flags.get("client.gs1_x").map(String::as_str),
+        Some("c")
+    );
+    assert_eq!(num(&m, "n"), 1.0);
+}
