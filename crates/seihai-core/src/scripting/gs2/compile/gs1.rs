@@ -2205,6 +2205,15 @@ fn split_codes(s: &str, era: Era) -> Result<Vec<Result<String, Code>>, String> {
     let mut i = 0;
     let num = |x: &str| -> g::Expr {
         let x = x.trim();
+        // `#t(#v(this.i))`, `#e(#v(i),1,text)`: a number given as `#v(..)`
+        // is that expression, as the GS1 engine expands it.
+        if let Some(inner) = x
+            .strip_prefix("#v(")
+            .and_then(|r| r.strip_suffix(')'))
+            .filter(|r| !r.contains('#'))
+        {
+            return engine::parser::parse_expr(inner, era).unwrap_or(g::Expr::Num(0.0));
+        }
         if x.contains('#') {
             g::Expr::Str(x.to_string())
         } else {

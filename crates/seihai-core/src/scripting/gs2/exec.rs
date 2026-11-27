@@ -933,6 +933,9 @@ impl Machine {
                 _ => Slot::Obj(Some((root.unwrap_or(Root::Global), name))),
             },
             Slot::Obj(o) => Slot::Obj(o),
+            // A list value (a call's result, a literal) stays that list:
+            // `f()[1]`, `f().size()`.
+            Slot::List(l) => Slot::List(l),
             _ => Slot::Obj(None),
         }
     }
@@ -1516,12 +1519,55 @@ impl Machine {
                     let (Some(j), Some(i), Some(o)) = (j, self.pop_num(host), self.pop()) else {
                         return fault(self, host);
                     };
+                    // `a[i]++` is the element read then `OP_INC`: the step
+                    // is on the element itself, so write it back.
+                    let step = match self.script.code.get(self.pc).map(|n| n.op) {
+                        Some(Op::Inc) => Some(1.0),
+                        Some(Op::Dec) => Some(-1.0),
+                        _ => None,
+                    };
+                    let target = step.map(|_| o.clone());
                     let mut v = self.value_full(o, host);
                     let path = if ins.op == Op::ArrayMultidim {
                         vec![i, j]
                     } else {
                         vec![i]
                     };
+                    if let (Some(d), Some(target)) = (step, target) {
+                        let (i, j) = (client_int(i), client_int(j));
+                        let multi = ins.op == Op::ArrayMultidim;
+                        let profile = self.profile;
+                        let mut stepped = None;
+                        self.edit_list(&target, host, |l| {
+                            let Some(mut e) = usize::try_from(i).ok().and_then(|i| l.get_mut(i))
+                            else {
+                                return;
+                            };
+                            if multi {
+                                let Value::List(inner) = e else {
+                                    return;
+                                };
+                                let Some(inner) =
+                                    usize::try_from(j).ok().and_then(|j| inner.get_mut(j))
+                                else {
+                                    return;
+                                };
+                                e = inner;
+                            }
+                            let n = match e {
+                                Value::Val(v) => gs2_num(v, profile),
+                                Value::List(_) | Value::Obj(..) => 0.0,
+                            } + d;
+                            *e = Value::Val(Val::Num(n));
+                            stepped = Some(n);
+                        });
+                        if let Some(n) = stepped {
+                            // The step is done; skip `OP_INC`/`OP_DEC`.
+                            self.pc += 1;
+                            self.push(Slot::Num(n));
+                            continue;
+                        }
+                    }
                     for k in path {
                         v = match v {
                             Value::List(l) => usize::try_from(client_int(k))
